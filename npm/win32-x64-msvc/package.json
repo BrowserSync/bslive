@@ -1,6 +1,6 @@
 {
   "name": "@browsersync/bslive-win32-x64-msvc",
-  "version": "0.0.0",
+  "version": "0.0.6",
   "os": [
     "win32"
   ],
