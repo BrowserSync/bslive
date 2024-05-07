@@ -3,7 +3,12 @@
 #[macro_use]
 extern crate napi_derive;
 
+use std::time::Duration;
+use tokio::time::sleep;
+
 #[napi]
-pub fn sum(a: i32, b: i32) -> i32 {
-  a + b
+async fn start(args: Vec<String>) -> napi::bindgen_prelude::Result<i32> {
+  println!("{:?}", args);
+  sleep(Duration::from_secs(2)).await;
+  Ok(32)
 }

@@ -3,6 +3,9 @@
   "version": "0.0.5",
   "main": "index.js",
   "types": "index.d.ts",
+  "bin": {
+    "bslive": "./bin.js"
+  },
   "napi": {
     "name": "bslive",
     "triples": {
