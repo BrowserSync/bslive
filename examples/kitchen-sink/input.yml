@@ -1,0 +1,133 @@
+servers:
+  - name: bs
+    bind_address: 0.0.0.0:5002
+    routes:
+      - path: /
+        dir: /Users/shaneosbourne/WebstormProjects/browsersync.github.io/public
+      - path: /api
+        json: [ 1, 2 ]
+  - name: api
+    bind_address: 0.0.0.0:5001
+    routes:
+      - path: /
+        json: { "a": "b", "c": "sd", "es": "fssssessssssssssss" }
+        cors: true
+      - path: /style.css
+        raw: body { }
+      - path: /api
+        dir: ./examples/kitchen-sink/api
+        cors: true
+  - name: s1
+    bind_address: 0.0.0.0:4001
+    routes:
+      - path: /
+        html: "hello world theres"
+        cors: true
+  #  - bind_address: 0.0.0.0:3001
+  #    routes:
+  #      - path: /
+  #        html: "hello world there"
+  #      - path: /start
+  #        cors: true
+  #        html: <p>lol</p>
+  - bind_address: 0.0.0.0:3002
+    routes:
+      - path: /other
+        dir: ./examples
+      - path: /index.html
+        dir: ./index.html
+      - path: /start
+        html: <p>helldsosss wosrld</p>
+      - path: /ws.js
+        #language=javascript
+        raw: |+
+          console.log("here?");
+          let closeSocket = reconnect();
+          
+          function reconnect() {
+              let socket = new WebSocket('ws://localhost:3002/__bs_ws');
+              const handler = {
+                  handleEvent: (evt) => {
+                      console.log(evt)
+                      if (evt.type === "message") {
+                          window.location.reload()
+                      }
+                  }
+              }
+              
+              socket.addEventListener('open', handler);
+              socket.addEventListener('message', handler);
+              
+              return () => {
+                  socket.close();
+                  socket.removeEventListener('open', handler)
+                  socket.removeEventListener('message', handler)
+              };
+          }
+      
+      
+      #          setTimeout(() => {
+      #              const obj = { hello: "world" };
+      #              const blob = new Blob([JSON.stringify(obj, null, 2)], {
+      #                  type: "application/json",
+      #              });
+      #              console.log("Sending blob over websocket");
+      #              socket.send(blob);
+      #          }, 1000);
+      #          setTimeout(() => {
+      #              socket.send('About done here...');
+      #              console.log("Sending close over websocket");
+      #              socket.close(3000, "Crash and Burn!");
+      #          }, 3000);
+      - path: /ws
+        html:
+          <script src="ws.js"></script>
+
+      - path: /
+        cors: true
+        buff: true
+        html: |
+          <!doctype html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport"
+                    content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+              <meta http-equiv="X-UA-Compatible" content="ie=edge">
+              <title>Document</title>
+          </head>
+          <body>
+          <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Aliquid architecto assumenda cumque cupiditate
+              dicta
+              dolorum eius fuga fugit harum hic, illo impedit ipsa itaque laudantium nam nihil pariatur tenetur
+              voluptas.</p>
+          <p>Aliquid asperiores aut consectetur consequatur consequuntur culpa, et illo labore nemo nostrum omnis optio
+              quisquam
+              temporibus, tenetur ut, vero voluptas voluptate? Aliquam cupiditate ipsam similique voluptatibus. Deserunt
+              ex hic
+              incidunt!</p>
+          <p>Adipisci corporis culpa deserunt dolor dolorum et ex, expedita fugiat fugit incidunt minima non omnis quos,
+              ut vel
+              veniam voluptatem! Consequatur delectus dolorum explicabo, fugit illo minima odit sit vero!</p>
+          <p>Aliquid asperiores debitis id itaque non odio porro! A architecto cupiditate eveniet ex harum, nisi placeat
+              provident
+              reprehenderit tempore totam. Ab adipisci at eaque fugiat iste mollitia nostrum reprehenderit ullam.</p>
+          <p>Ab commodi, consequuntur, corporis earum esse est, incidunt itaque labore laudantium libero magnam nemo
+              optio
+              perferendis praesentium quibusdam quidem quisquam saepe soluta tempora vitae? Enim facere quas quo saepe
+              sequi?</p>
+          <p>Accusamus aliquam doloribus excepturi exercitationem fuga itaque, nostrum nulla pariatur quasi rerum!
+              Beatae dolor
+              dolore maxime possimus repellat? Animi aperiam corporis deserunt, distinctio explicabo in inventore odit
+              quis
+              repellat voluptas!</p>
+          <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+          <!-- have a button POST a click via AJAX -->
+          <div hx-target="this" hx-swap="outerHTML">
+              <h3>Start Progress</h3>
+              <button class="btn" hx-post="/start">
+                  Start Job
+              </button>
+          </div>
+          </body>
+          </html>

@@ -1,0 +1,29 @@
+[package]
+name = "bsnext_system"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bsnext_input = { path = "../bsnext_input" }
+bsnext_tracing = { path = "../bsnext_tracing" }
+bsnext_core = { path = "../bsnext_core" }
+bsnext_fs = { path = "../bsnext_fs" }
+bsnext_example = { path = "../bsnext_example" }
+rand = "0.8.5"
+
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+actix = { workspace = true }
+actix-rt = { workspace = true }
+tracing = { workspace = true }
+random_word = { workspace = true }
+tempfile = { workspace = true }
+
+[dev-dependencies]
+insta = { version = "1.38.0", features = ["yaml"] }

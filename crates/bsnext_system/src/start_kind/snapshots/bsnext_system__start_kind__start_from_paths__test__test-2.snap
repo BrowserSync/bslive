@@ -1,0 +1,11 @@
+---
+source: bsnext_system/src/start_kind/start_from_paths.rs
+expression: input
+---
+servers:
+  - bind_address: "0.0.0.0:3000"
+    routes:
+      - path: /
+        watch: true
+        dir: "."
+    watchers: []

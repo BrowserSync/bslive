@@ -1,0 +1,43 @@
+[package]
+name = "bsnext_core"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bsnext_input = { path = "../bsnext_input" }
+bsnext_fs = { path = "../bsnext_fs" }
+bsnext_resp = { path = "../bsnext_resp" }
+bsnext_client = { path = "../bsnext_client" }
+
+axum-server = { version = "0.6.0", features = ["tls-rustls"] }
+axum-extra = { version = "0.9.3", features = ["typed-header"] }
+hyper = { version = "1.0.0", features = ["full"] }
+hyper-tls = { version = "0.6.0" }
+hyper-util = { version = "0.1.1", features = ["client-legacy"] }
+matchit = { version = "0.7.3" }
+htmlescape = { version = "0.3.1" }
+
+mime_guess = { workspace = true }
+axum = { workspace = true }
+clap = { workspace = true }
+http-body-util = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+actix = { workspace = true }
+actix-rt = { workspace = true }
+anyhow = { workspace = true }
+futures = { workspace = true }
+futures-util = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde_json = { workspace = true }
+bytes = { workspace = true }
+http = { workspace = true }
+typeshare = { workspace = true }

@@ -1,0 +1,25 @@
+{
+  "name": "bsnext_client",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "tsc": "tsc",
+    "build": "esbuild ts/index.ts --bundle --outdir=dist --format=esm",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "schema": "ts-to-zod generated/dto.ts generated/schema.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "esbuild": "^0.20.2",
+    "livereload-js": "^4.0.2",
+    "rxjs": "^7.8.1",
+    "typescript": "^5.4.5",
+    "@types/node": "18.19.25",
+    "ts-to-zod": "^3.8.2",
+    "zod": "^3.22.4"
+  }
+}

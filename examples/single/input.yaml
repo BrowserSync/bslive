@@ -1,0 +1,26 @@
+servers:
+  - bind_address: 0.0.0.0:4000
+  - name: a
+    bind_address: 0.0.0.0:5001
+    routes:
+      - path: /
+        cors: true
+        json: [ "hello world!" ]
+  - name: b
+    bind_address: 0.0.0.0:5002
+    routes:
+      - path: /app.css
+        raw: |+
+          body { background: blue }
+      - path: /
+        #language=html
+        html: |
+          <body>
+          <p>Hello world?</p>
+          <link rel="stylesheet" href="/app.css"/>
+          <script type="module">
+              const v = await fetch("http://127.0.0.1:5001")
+              const r = await v.json()
+              console.log(r);
+          </script>
+          </body>

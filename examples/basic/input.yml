@@ -1,0 +1,5 @@
+servers:
+  - name: 'simple'
+    routes:
+      - path: /
+        dir: public
