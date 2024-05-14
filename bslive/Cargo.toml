@@ -7,10 +7,25 @@ version = "0.0.0"
 crate-type = ["cdylib"]
 
 [dependencies]
+bsnext_core = { path = "../crates/bsnext_core" }
+bsnext_input = { path = "../crates/bsnext_input" }
+bsnext_fs = { path = "../crates/bsnext_fs" }
+bsnext_tracing = { path = "../crates/bsnext_tracing" }
+bsnext_system = { path = "../crates/bsnext_system" }
+bsnext_output = { path = "../crates/bsnext_output" }
+
+clap = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+actix = { workspace = true }
+actix-rt = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
 napi = { version = "2.12.2", default-features = false, features = ["napi4", "tokio_rt", "tokio_full"] }
 napi-derive = "2.12.2"
-tokio = { workspace = true }
 
 [build-dependencies]
 napi-build = "2.0.1"

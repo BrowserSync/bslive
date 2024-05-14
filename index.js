@@ -310,6 +310,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { start } = nativeBinding
+const { start, startSync } = nativeBinding
 
 module.exports.start = start
+module.exports.startSync = startSync

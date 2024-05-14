@@ -39,38 +39,58 @@ pub fn create_watcher(
                             tracing::trace!("EventKind::Access AccessKind::Read")
                         }
                         AccessKind::Open(o) => match o {
-                            AccessMode::Any => tracing::trace!(
-                                "EventKind::Access AccessKind::Open AccessMode::Any"
-                            ),
-                            AccessMode::Execute => tracing::trace!(
-                                "EventKind::Access AccessKind::Open AccessMode::Execute"
-                            ),
-                            AccessMode::Read => tracing::trace!(
-                                "EventKind::Access AccessKind::Open AccessMode::Read"
-                            ),
-                            AccessMode::Write => tracing::trace!(
-                                "EventKind::Access AccessKind::Open AccessMode::Write"
-                            ),
-                            AccessMode::Other => tracing::trace!(
-                                "EventKind::Access AccessKind::Open AccessMode::Other"
-                            ),
+                            AccessMode::Any => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Open AccessMode::Any"
+                                )
+                            }
+                            AccessMode::Execute => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Open AccessMode::Execute"
+                                )
+                            }
+                            AccessMode::Read => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Open AccessMode::Read"
+                                )
+                            }
+                            AccessMode::Write => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Open AccessMode::Write"
+                                )
+                            }
+                            AccessMode::Other => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Open AccessMode::Other"
+                                )
+                            }
                         },
                         AccessKind::Close(c) => match c {
-                            AccessMode::Any => tracing::trace!(
-                                "EventKind::Access AccessKind::Close AccessMode::Any"
-                            ),
-                            AccessMode::Execute => tracing::trace!(
-                                "EventKind::Access AccessKind::Close AccessMode::Execute"
-                            ),
-                            AccessMode::Read => tracing::trace!(
-                                "EventKind::Access AccessKind::Close AccessMode::Read"
-                            ),
-                            AccessMode::Write => tracing::trace!(
-                                "EventKind::Access AccessKind::Close AccessMode::Write"
-                            ),
-                            AccessMode::Other => tracing::trace!(
-                                "EventKind::Access AccessKind::Close AccessMode::Other"
-                            ),
+                            AccessMode::Any => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Close AccessMode::Any"
+                                )
+                            }
+                            AccessMode::Execute => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Close AccessMode::Execute"
+                                )
+                            }
+                            AccessMode::Read => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Close AccessMode::Read"
+                                )
+                            }
+                            AccessMode::Write => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Close AccessMode::Write"
+                                )
+                            }
+                            AccessMode::Other => {
+                                tracing::trace!(
+                                    "EventKind::Access AccessKind::Close AccessMode::Other"
+                                )
+                            }
                         },
                         AccessKind::Other => {
                             tracing::trace!("EventKind::Access AccessKind::Other")
@@ -148,21 +168,29 @@ pub fn create_watcher(
                             }
                         }
                         ModifyKind::Name(mode) => match mode {
-                            RenameMode::Any => tracing::trace!(
-                                "EventKind::Modify ModifyKind::Name RenameMode::Any"
-                            ),
+                            RenameMode::Any => {
+                                tracing::trace!(
+                                    "EventKind::Modify ModifyKind::Name RenameMode::Any"
+                                )
+                            }
                             RenameMode::To => {
                                 tracing::trace!("EventKind::Modify ModifyKind::Name RenameMode::To")
                             }
-                            RenameMode::From => tracing::trace!(
-                                "EventKind::Modify ModifyKind::Name RenameMode::From"
-                            ),
-                            RenameMode::Both => tracing::trace!(
-                                "EventKind::Modify ModifyKind::Name RenameMode::Both"
-                            ),
-                            RenameMode::Other => tracing::trace!(
-                                "EventKind::Modify ModifyKind::Name RenameMode::Other"
-                            ),
+                            RenameMode::From => {
+                                tracing::trace!(
+                                    "EventKind::Modify ModifyKind::Name RenameMode::From"
+                                )
+                            }
+                            RenameMode::Both => {
+                                tracing::trace!(
+                                    "EventKind::Modify ModifyKind::Name RenameMode::Both"
+                                )
+                            }
+                            RenameMode::Other => {
+                                tracing::trace!(
+                                    "EventKind::Modify ModifyKind::Name RenameMode::Other"
+                                )
+                            }
                         },
                         ModifyKind::Other => {
                             tracing::trace!("EventKind::Modify ModifyKind::Other")
