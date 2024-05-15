@@ -43,7 +43,8 @@ pub fn print_files_changed<W: Write>(w: &mut W, evt: &FilesChangedDTO) -> anyhow
         },
         3.. => {
             let other = evt.paths.len() - 2;
-            writeln!(w, "[multi-change] {} (and {} others)", short_file_list(&evt.paths), other)?;
+            let subset = evt.paths.iter().take(2).collect::<Vec<_>>();
+            writeln!(w, "[multi-change] {} (and {} others)", short_file_list(&subset), other)?;
         }
     }
     Ok(())
