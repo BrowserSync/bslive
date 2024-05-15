@@ -1,7 +1,7 @@
 use std::env::current_dir;
-use std::{env, io};
 use std::io::Write;
 use std::process::Command;
+use std::{env, io};
 
 fn main() {
     if env::var("CI").is_ok() {

@@ -4,7 +4,7 @@ use bsnext_core::dto::{
     ServerChangeSetItem, ServersStarted, StoppedWatching, Watching,
 };
 use std::io::Write;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 pub struct PrettyPrint;
 
@@ -40,19 +40,29 @@ pub fn print_files_changed<W: Write>(w: &mut W, evt: &FilesChangedDTO) -> anyhow
     match evt.paths.len() {
         0 | 1 | 2 => {
             writeln!(w, "[multi-change] {}", short_file_list(&evt.paths))?;
-        },
+        }
         3.. => {
             let other = evt.paths.len() - 2;
             let subset = evt.paths.iter().take(2).collect::<Vec<_>>();
-            writeln!(w, "[multi-change] {} (and {} others)", short_file_list(&subset), other)?;
+            writeln!(
+                w,
+                "[multi-change] {} (and {} others)",
+                short_file_list(&subset),
+                other
+            )?;
         }
     }
     Ok(())
 }
 
 fn short_file_list<A: AsRef<str>>(paths: &[A]) -> String {
-    let file_names = paths.iter()
-        .filter_map(|p| PathBuf::from(p.as_ref()).file_name().map(|filename| filename.to_string_lossy().to_string()))
+    let file_names = paths
+        .iter()
+        .filter_map(|p| {
+            PathBuf::from(p.as_ref())
+                .file_name()
+                .map(|filename| filename.to_string_lossy().to_string())
+        })
         .collect::<Vec<_>>();
     file_names.join(", ")
 }
