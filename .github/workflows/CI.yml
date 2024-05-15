@@ -188,6 +188,10 @@ jobs:
             node -v
             echo "~~~~ yarn --version ~~~~"
             yarn --version
+            echo "~~~~ installing typeshare ~~~~"
+            cargo install typeshare-cli
+            which typeshare
+            yarn --version
             pwd
             ls -lah
             whoami
