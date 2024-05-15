@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod test {
-
     use crate::dto::ClientEvent;
     use crate::server::router::make_router;
     use crate::server::state::ServerState;
@@ -10,6 +9,7 @@ mod test {
     use bsnext_input::route::{CorsOpts, Route, RouteKind};
     use bsnext_input::server_config::{Identity, ServerConfig};
     use http::HeaderValue;
+    use std::collections::BTreeMap;
     use std::sync::Arc;
     use tokio::sync::RwLock;
     use tower::ServiceExt;
@@ -35,6 +35,8 @@ mod test {
 
     #[tokio::test]
     async fn test_handlers() -> Result<(), anyhow::Error> {
+        let headers: BTreeMap<String, String> =
+            [("a".to_string(), "b".to_string())].into_iter().collect();
         let state: ServerState = ServerConfig {
             identity: Identity::Address {
                 bind_address: "127.0.0.1:3000".to_string(),
@@ -42,6 +44,7 @@ mod test {
             routes: vec![Route {
                 path: "/hello".to_string(),
                 kind: RouteKind::html("🐥"),
+                headers: Some(headers),
                 ..Default::default()
             }],
             ..Default::default()
@@ -52,7 +55,7 @@ mod test {
         let req = Request::get("/hello").body(Body::empty()).unwrap();
         let res = app.oneshot(req).await.unwrap();
 
-        assert_eq!(res.headers().get("content-length").unwrap(), "4");
+        insta::assert_debug_snapshot!(res.headers());
         assert_eq!(
             res.headers().get("content-type").unwrap(),
             "text/html; charset=utf-8"

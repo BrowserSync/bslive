@@ -30,7 +30,7 @@ impl Default for Route {
             delay_opts: None,
             cors_opts: None,
             watch_opts: Default::default(),
-            headers: None
+            headers: None,
         }
     }
 }

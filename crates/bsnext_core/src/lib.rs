@@ -1,6 +1,7 @@
 pub mod server;
 pub mod servers_supervisor;
 
+pub mod common_layers;
 pub mod dir_loader;
 pub mod dto;
 pub mod handlers;

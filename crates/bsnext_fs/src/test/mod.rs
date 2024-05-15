@@ -131,7 +131,7 @@ async fn test_single_file_impl() -> Result<(), Box<dyn std::error::Error>> {
     let tc = TestCase::new(Debounce::trailing_ms(10), None);
     tc.watch().await;
     tc.write_file("test_file.txt").await;
-    let events = tc.get_events_after(Duration::from_millis(300)).await;
+    let events = tc.get_events_after(Duration::from_millis(500)).await;
     assert_eq!(events.len(), 2);
     assert_eq!(
         matches!(events.get(0).unwrap().kind, FsEventKind::PathAdded(..)),

@@ -11,17 +11,18 @@ use crate::meta::MetaData;
 use crate::server::state::ServerState;
 use axum::body::Body;
 use axum::response::sse::Event;
-use bsnext_input::route::{CorsOpts, DelayKind, DelayOpts, DirRoute, ProxyRoute, Route, RouteKind};
+use bsnext_input::route::{DirRoute, ProxyRoute, RouteKind};
 use bsnext_resp::response_modifications_layer;
 use bytes::Bytes;
 use http::StatusCode;
 use http_body_util::BodyExt;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::sleep;
+
 use tokio_stream::StreamExt;
 use tower::ServiceExt;
-use tower_http::cors::CorsLayer;
+
+use crate::common_layers::add_route_layers;
 use tracing::{span, Level};
 
 // use futures_util::stream::{self, Stream};
@@ -143,37 +144,6 @@ async fn tag_raw(req: Request, next: Next) -> Result<impl IntoResponse, (StatusC
         parts.extensions.insert(MetaData::ServedRaw);
     }
     Ok(Response::from_parts(parts, body))
-}
-
-pub fn add_route_layers(app: Router, route: &Route) -> Router {
-    let mut app = app;
-
-    if route
-        .cors_opts
-        .as_ref()
-        .is_some_and(|v| *v == CorsOpts::Cors(true))
-    {
-        tracing::trace!(to = route.path, "adding permissive cors");
-        app = app.layer(CorsLayer::permissive());
-    }
-
-    if let Some(DelayOpts::Delay(DelayKind::Ms(ms))) = route.delay_opts.as_ref() {
-        tracing::trace!(to = route.path, ?ms, "adding delay");
-        let ms = *ms;
-        app = app.layer(middleware::from_fn(
-            move |req: Request, next: Next| async move {
-                let res = next.run(req).await;
-                sleep(Duration::from_millis(ms)).await;
-                Ok::<_, Infallible>(res)
-            },
-        ));
-    }
-
-    // if route.opts.as_ref().is_some_and(|v| v.buff) {
-    // app = app.layer(middleware::from_fn(print_request_response));
-    // }
-
-    app
 }
 
 #[allow(dead_code)]

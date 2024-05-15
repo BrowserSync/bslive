@@ -20,6 +20,7 @@ matchit = { version = "0.7.3" }
 htmlescape = { version = "0.3.1" }
 
 mime_guess = { workspace = true }
+insta = { workspace = true }
 axum = { workspace = true }
 clap = { workspace = true }
 http-body-util = { workspace = true }

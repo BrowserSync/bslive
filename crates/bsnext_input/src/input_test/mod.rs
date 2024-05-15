@@ -43,7 +43,6 @@ fn test_deserialize_2() {
     assert_eq!(delay_opts, DelayOpts::Delay(DelayKind::Ms(2000)));
 }
 
-
 #[test]
 fn test_deserialize_cors_false() {
     #[derive(serde::Deserialize, serde::Serialize, Debug)]
