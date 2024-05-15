@@ -1,0 +1,24 @@
+---
+source: crates/bsnext_input/src/input_test/mod.rs
+expression: c
+---
+Config {
+    items: [
+        Route {
+            path: "/api",
+            cors_opts: None,
+            delay_opts: None,
+            watch_opts: Bool(
+                true,
+            ),
+            kind: Json {
+                json: JsonWrapper(
+                    Array [
+                        Number(1),
+                        Number(2),
+                    ],
+                ),
+            },
+        },
+    ],
+}

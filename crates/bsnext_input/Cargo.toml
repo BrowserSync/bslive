@@ -20,3 +20,6 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 typeshare = { workspace = true }
 nom = "7.1.3"
+
+[dev-dependencies]
+insta = { workspace = true }
