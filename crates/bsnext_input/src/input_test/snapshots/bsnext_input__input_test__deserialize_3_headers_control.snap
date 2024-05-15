@@ -19,11 +19,7 @@ Config {
                     ],
                 ),
             },
-            headers: Some(
-                {
-                    "a": "b",
-                },
-            ),
+            headers: None,
         },
     ],
 }

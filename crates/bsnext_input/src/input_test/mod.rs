@@ -64,6 +64,22 @@ fn test_deserialize_cors_false() {
 }
 
 #[test]
+fn test_deserialize_3_headers_control() {
+    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    struct Config {
+        pub items: Vec<Route>,
+    }
+
+    let input = r#"
+    items:
+      - path: /api
+        json: [1,2]
+        "#;
+    let c: Config = serde_yaml::from_str(input).unwrap();
+    insta::assert_debug_snapshot!(c)
+}
+
+#[test]
 fn test_deserialize_3_headers() {
     #[derive(serde::Deserialize, serde::Serialize, Debug)]
     struct Config {

@@ -1,5 +1,5 @@
 ---
-source: bsnext_system/src/start_kind/start_from_paths.rs
+source: crates/bsnext_system/src/start_kind/start_from_paths.rs
 expression: input
 ---
 Input {
@@ -21,6 +21,7 @@ Input {
                             dir: ".",
                         },
                     ),
+                    headers: None,
                 },
             ],
             watchers: [],

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
@@ -16,6 +17,7 @@ pub struct Route {
     pub watch_opts: WatchOpts,
     #[serde(flatten)]
     pub kind: RouteKind,
+    pub headers: Option<BTreeMap<String, String>>,
 }
 
 impl Default for Route {
@@ -28,6 +30,7 @@ impl Default for Route {
             delay_opts: None,
             cors_opts: None,
             watch_opts: Default::default(),
+            headers: None
         }
     }
 }
