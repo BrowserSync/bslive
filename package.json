@@ -37,9 +37,6 @@
   "engines": {
     "node": ">= 10"
   },
-  "workspaces": [
-    "crates/bsnext_client"
-  ],
   "scripts": {
     "artifacts": "napi artifacts",
     "build": "napi build --cargo-name bslive --platform --release",
