@@ -138,11 +138,13 @@ jobs:
           run: |
             cd crates/bsnext_client
             npm i
+            cd -
             ${{ matrix.settings.build }}
       - name: Build
         run: |
           cd crates/bsnext_client
           npm i
+          cd -
           ${{ matrix.settings.build }}
         if: ${{ !matrix.settings.docker }}
         shell: bash
