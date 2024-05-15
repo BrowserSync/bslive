@@ -22,7 +22,7 @@ permissions:
 jobs:
   build:
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         settings:
           - host: macos-latest
