@@ -136,12 +136,16 @@ jobs:
           image: ${{ matrix.settings.docker }}
           options: '--user 0:0 -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build'
           run: |
+            cargo install typeshare-cli
+            which typeshare
             cd crates/bsnext_client
             npm i
             cd -
             ${{ matrix.settings.build }}
       - name: Build
         run: |
+          cargo install typeshare-cli
+          which typeshare 
           cd crates/bsnext_client
           npm i
           cd -
