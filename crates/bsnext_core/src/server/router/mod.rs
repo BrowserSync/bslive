@@ -5,7 +5,7 @@ use axum::http::Uri;
 use axum::middleware::{from_fn_with_state, Next};
 use axum::response::IntoResponse;
 use axum::routing::{get, MethodRouter};
-use axum::{http, Extension, Router};
+use axum::{http, Extension, Router, Json};
 
 use axum::body::Body;
 use http::header::CONTENT_TYPE;
@@ -47,6 +47,14 @@ pub fn make_router(state: &Arc<ServerState>) -> Router {
 }
 
 pub fn built_ins(state: Arc<ServerState>) -> Router {
+
+    async fn api_handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
+        let routes = app.routes.read().await;
+        let dto = ServerDesc {
+            routes: routes.iter().map(|r| RouteDTO::from(r)).collect(),
+        };
+        Json(dto)
+    }
     async fn handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
         // let v = app.lock().await;
         let routes = app.routes.read().await;
@@ -77,6 +85,7 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
 
     route("/__bsnext", get(handler))
         .route("/__bs_js", get(js_handler))
+        .route("/__bs_api", get(api_handler))
         .route("/__bs_ws", get(ws_handler))
         .with_state(state.clone())
 }
