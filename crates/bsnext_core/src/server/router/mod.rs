@@ -5,7 +5,7 @@ use axum::http::Uri;
 use axum::middleware::{from_fn_with_state, Next};
 use axum::response::IntoResponse;
 use axum::routing::{get, MethodRouter};
-use axum::{http, Extension, Router, Json};
+use axum::{http, Extension, Router};
 
 use axum::body::Body;
 use http::header::CONTENT_TYPE;
@@ -26,11 +26,13 @@ use crate::meta::MetaData;
 use crate::not_found::not_found_service::not_found_loader;
 use crate::not_found::route_list::create_route_list_html;
 use crate::raw_loader::raw_loader;
+use crate::server::router::pub_api::pub_api;
 use crate::server::state::ServerState;
 use crate::ws::ws_handler;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
+mod pub_api;
 mod tests;
 
 pub fn make_router(state: &Arc<ServerState>) -> Router {
@@ -47,14 +49,6 @@ pub fn make_router(state: &Arc<ServerState>) -> Router {
 }
 
 pub fn built_ins(state: Arc<ServerState>) -> Router {
-
-    async fn api_handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
-        let routes = app.routes.read().await;
-        let dto = ServerDesc {
-            routes: routes.iter().map(|r| RouteDTO::from(r)).collect(),
-        };
-        Json(dto)
-    }
     async fn handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
         // let v = app.lock().await;
         let routes = app.routes.read().await;
@@ -85,7 +79,7 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
 
     route("/__bsnext", get(handler))
         .route("/__bs_js", get(js_handler))
-        .route("/__bs_api", get(api_handler))
+        .nest("/__bs_api", pub_api(state.clone()))
         .route("/__bs_ws", get(ws_handler))
         .with_state(state.clone())
 }
