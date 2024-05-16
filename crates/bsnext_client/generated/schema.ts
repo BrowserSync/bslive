@@ -2,6 +2,54 @@
 import { z } from "zod";
 import { EventLevel, ChangeKind, ChangeDTO } from "./dto";
 
+export const routeKindDTOSchema = z.union([
+  z.object({
+    kind: z.literal("Html"),
+    payload: z.object({
+      html: z.string(),
+    }),
+  }),
+  z.object({
+    kind: z.literal("Json"),
+    payload: z.object({
+      json_str: z.string(),
+    }),
+  }),
+  z.object({
+    kind: z.literal("Raw"),
+    payload: z.object({
+      raw: z.string(),
+    }),
+  }),
+  z.object({
+    kind: z.literal("Sse"),
+    payload: z.object({
+      sse: z.string(),
+    }),
+  }),
+  z.object({
+    kind: z.literal("Proxy"),
+    payload: z.object({
+      proxy: z.string(),
+    }),
+  }),
+  z.object({
+    kind: z.literal("Dir"),
+    payload: z.object({
+      dir: z.string(),
+    }),
+  }),
+]);
+
+export const routeDTOSchema = z.object({
+  path: z.string(),
+  kind: routeKindDTOSchema,
+});
+
+export const serverDescSchema = z.object({
+  routes: z.array(routeDTOSchema),
+});
+
 export const identityDTOSchema = z.union([
   z.object({
     kind: z.literal("Both"),
@@ -24,13 +72,13 @@ export const identityDTOSchema = z.union([
   }),
 ]);
 
-export const serversDTOSchema = z.object({
+export const serverDTOSchema = z.object({
   identity: identityDTOSchema,
   socket_addr: z.string(),
 });
 
 export const getServersMessageResponseSchema = z.object({
-  servers: z.array(serversDTOSchema),
+  servers: z.array(serverDTOSchema),
 });
 
 export const serverChangeSchema = z.union([

@@ -1,4 +1,4 @@
-use crate::dto::{GetServersMessageResponse, ServersDTO};
+use crate::dto::{GetServersMessageResponse, ServerDTO};
 use crate::servers_supervisor::actor::ServersSupervisor;
 
 #[derive(actix::Message)]
@@ -13,7 +13,7 @@ impl actix::Handler<GetServersMessage> for ServersSupervisor {
             servers: self
                 .handlers
                 .iter()
-                .map(|(identity, child_handler)| ServersDTO {
+                .map(|(identity, child_handler)| ServerDTO {
                     identity: identity.into(),
                     socket_addr: child_handler.socket_addr.to_string(),
                 })

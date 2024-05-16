@@ -8,6 +8,7 @@ use http::header::CONTENT_TYPE;
 use http::{HeaderValue, StatusCode};
 use mime_guess::mime;
 
+use crate::dto::{RouteDTO, ServerDesc};
 use crate::handlers::proxy::AnyAppError;
 use crate::not_found::route_list::create_route_list_html;
 use crate::server::state::ServerState;
@@ -27,7 +28,10 @@ pub async fn not_found_loader(
     };
 
     let routes = state.routes.read().await;
-    let markup = create_route_list_html(&routes);
+    let dto = ServerDesc {
+        routes: routes.iter().map(|r| RouteDTO::from(r)).collect(),
+    };
+    let markup = create_route_list_html(&dto);
 
     Ok((
         StatusCode::NOT_FOUND,

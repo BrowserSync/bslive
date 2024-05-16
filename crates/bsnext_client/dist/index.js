@@ -6259,6 +6259,51 @@ var ChangeKind = /* @__PURE__ */ ((ChangeKind2) => {
 })(ChangeKind || {});
 
 // generated/schema.ts
+var routeKindDTOSchema = z.union([
+  z.object({
+    kind: z.literal("Html"),
+    payload: z.object({
+      html: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Json"),
+    payload: z.object({
+      json_str: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Raw"),
+    payload: z.object({
+      raw: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Sse"),
+    payload: z.object({
+      sse: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Proxy"),
+    payload: z.object({
+      proxy: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Dir"),
+    payload: z.object({
+      dir: z.string()
+    })
+  })
+]);
+var routeDTOSchema = z.object({
+  path: z.string(),
+  kind: routeKindDTOSchema
+});
+var serverDescSchema = z.object({
+  routes: z.array(routeDTOSchema)
+});
 var identityDTOSchema = z.union([
   z.object({
     kind: z.literal("Both"),
@@ -6280,12 +6325,12 @@ var identityDTOSchema = z.union([
     })
   })
 ]);
-var serversDTOSchema = z.object({
+var serverDTOSchema = z.object({
   identity: identityDTOSchema,
   socket_addr: z.string()
 });
 var getServersMessageResponseSchema = z.object({
-  servers: z.array(serversDTOSchema)
+  servers: z.array(serverDTOSchema)
 });
 var serverChangeSchema = z.union([
   z.object({

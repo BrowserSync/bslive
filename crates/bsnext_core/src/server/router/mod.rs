@@ -21,6 +21,7 @@ use tower::ServiceBuilder;
 use tower_http::catch_panic::CatchPanicLayer;
 
 use crate::dir_loader::serve_dir_loader;
+use crate::dto::{RouteDTO, ServerDesc};
 use crate::meta::MetaData;
 use crate::not_found::not_found_service::not_found_loader;
 use crate::not_found::route_list::create_route_list_html;
@@ -49,7 +50,10 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
     async fn handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
         // let v = app.lock().await;
         let routes = app.routes.read().await;
-        let markup = create_route_list_html(&routes);
+        let dto = ServerDesc {
+            routes: routes.iter().map(|r| RouteDTO::from(r)).collect(),
+        };
+        let markup = create_route_list_html(&dto);
         (
             [(
                 CONTENT_TYPE,

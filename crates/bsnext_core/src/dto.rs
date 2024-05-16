@@ -6,7 +6,65 @@ use std::path::Path;
 
 use crate::server::handler_change::{Change, ChangeKind};
 use bsnext_fs::Debounce;
+use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
 use typeshare::typeshare;
+
+#[typeshare]
+#[derive(Debug, serde::Serialize)]
+pub struct ServerDesc {
+    pub routes: Vec<RouteDTO>,
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize)]
+pub struct RouteDTO {
+    pub path: String,
+    pub kind: RouteKindDTO,
+}
+
+impl From<Route> for RouteDTO {
+    fn from(value: Route) -> Self {
+        Self {
+            path: value.path.to_owned(),
+            kind: RouteKindDTO::from(value.kind),
+        }
+    }
+}
+impl From<&Route> for RouteDTO {
+    fn from(value: &Route) -> Self {
+        Self {
+            path: value.path.to_owned(),
+            kind: RouteKindDTO::from(value.kind.clone()),
+        }
+    }
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize)]
+#[serde(tag = "kind", content = "payload")]
+pub enum RouteKindDTO {
+    Html { html: String },
+    Json { json_str: String },
+    Raw { raw: String },
+    Sse { sse: String },
+    Proxy { proxy: String },
+    Dir { dir: String },
+}
+
+impl From<RouteKind> for RouteKindDTO {
+    fn from(value: RouteKind) -> Self {
+        match value {
+            RouteKind::Html { html } => RouteKindDTO::Html { html },
+            RouteKind::Json { json } => RouteKindDTO::Json {
+                json_str: serde_json::to_string(&json).expect("unreachable"),
+            },
+            RouteKind::Raw { raw } => RouteKindDTO::Raw { raw },
+            RouteKind::Sse { sse } => RouteKindDTO::Sse { sse },
+            RouteKind::Proxy(ProxyRoute { proxy }) => RouteKindDTO::Proxy { proxy },
+            RouteKind::Dir(DirRoute { dir }) => RouteKindDTO::Dir { dir },
+        }
+    }
+}
 
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
@@ -157,12 +215,12 @@ pub struct ServerChangeSet {
 #[typeshare::typeshare]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, MessageResponse)]
 pub struct GetServersMessageResponse {
-    pub servers: Vec<ServersDTO>,
+    pub servers: Vec<ServerDTO>,
 }
 
 #[typeshare::typeshare]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ServersDTO {
+pub struct ServerDTO {
     pub identity: IdentityDTO,
     pub socket_addr: String,
 }
