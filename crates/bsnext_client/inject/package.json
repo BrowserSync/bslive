@@ -1,0 +1,12 @@
+{
+  "name": "@browsersync/bslive-inject",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outdir=dist --format=esm"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

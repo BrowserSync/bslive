@@ -167,7 +167,7 @@ mod test {
 
         let body = to_resp_body(res).await;
 
-        assert!(body.contains("<title>BSNEXT</title>"));
+        assert!(body.contains("<title>Browsersync LIVE</title>"));
         assert_eq!(status, 404);
         Ok(())
     }
@@ -199,8 +199,8 @@ mod test {
 
         let body = to_resp_body(res).await;
 
-        assert!(body.contains("<title>BSNEXT</title>"));
-        assert!(body.contains("<code>/abc</code>"));
+        assert!(body.contains("<title>Browsersync LIVE</title>"));
+        assert!(body.contains("<base href=\"/__bs_assets/ui/\" />"));
         assert_eq!(status, 200);
         Ok(())
     }

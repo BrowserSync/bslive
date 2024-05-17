@@ -5,8 +5,8 @@ import {Timer} from "livereload-js/src/timer.js";
 
 import {webSocket} from "rxjs/webSocket";
 import {retry} from "rxjs";
-import {clientEventSchema} from "../generated/schema.js";
-import {ChangeDTO, ClientEvent} from "../generated/dto";
+import {clientEventSchema} from "../../generated/schema.js";
+import {ChangeDTO, ClientEvent} from "../../generated/dto";
 import {createLRConsoleObserver, Level} from "./console";
 
 const [consoleSubject, consoleApi] = createLRConsoleObserver();

@@ -1,6 +1,5 @@
-use axum::extract::{Request, State};
+use axum::extract::Request;
 use axum::middleware::Next;
-use std::sync::Arc;
 
 use axum::response::{IntoResponse, Response};
 
@@ -8,17 +7,12 @@ use http::header::CONTENT_TYPE;
 use http::{HeaderValue, StatusCode};
 use mime_guess::mime;
 
-use crate::dto::{RouteDTO, ServerDesc};
 use crate::handlers::proxy::AnyAppError;
-use crate::not_found::route_list::create_route_list_html;
-use crate::server::state::ServerState;
+
+use bsnext_client::html_with_base;
 use tracing::{span, Level};
 
-pub async fn not_found_loader(
-    State(state): State<Arc<ServerState>>,
-    req: Request,
-    next: Next,
-) -> Result<Response, AnyAppError> {
+pub async fn not_found_loader(req: Request, next: Next) -> Result<Response, AnyAppError> {
     let span = span!(parent: None, Level::INFO, "not_found", path = req.uri().path());
     let _guard = span.enter();
 
@@ -27,11 +21,7 @@ pub async fn not_found_loader(
         return Ok(r);
     };
 
-    let routes = state.routes.read().await;
-    let dto = ServerDesc {
-        routes: routes.iter().map(|r| RouteDTO::from(r)).collect(),
-    };
-    let markup = create_route_list_html(&dto);
+    let markup = html_with_base("/__bs_assets/ui/");
 
     Ok((
         StatusCode::NOT_FOUND,

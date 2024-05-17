@@ -1,0 +1,36 @@
+@import url("./reset.css");
+:root {
+    --brand-blue: #0F2634;
+    --brand-grey: #6D6D6D;
+    --brand-red: #F24747;
+    --brand-white: #FFFFFF;
+}
+svg:not(:root) {
+    overflow: hidden;
+}
+.main {
+    color: white;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+.header {
+    padding: 1em;
+}
+.logo .svg-icon {
+    position: relative;
+    top: -4px;
+    margin-right: 6px;
+    height: 30px;
+    width: 140px;
+    color: white;
+}
+.svg-icon {
+    display: inline-block;
+    fill: currentColor !important;
+    height: 1em;
+    width: 1em;
+    vertical-align: middle;
+}
+body {
+    background: var(--brand-blue);
+}

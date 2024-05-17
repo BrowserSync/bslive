@@ -24,14 +24,16 @@ use crate::dir_loader::serve_dir_loader;
 use crate::dto::{RouteDTO, ServerDesc};
 use crate::meta::MetaData;
 use crate::not_found::not_found_service::not_found_loader;
-use crate::not_found::route_list::create_route_list_html;
 use crate::raw_loader::raw_loader;
+use crate::server::router::assets::pub_ui_assets;
 use crate::server::router::pub_api::pub_api;
 use crate::server::state::ServerState;
 use crate::ws::ws_handler;
+use bsnext_client::html_with_base;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
+mod assets;
 mod pub_api;
 mod tests;
 
@@ -52,10 +54,10 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
     async fn handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
         // let v = app.lock().await;
         let routes = app.routes.read().await;
-        let dto = ServerDesc {
-            routes: routes.iter().map(|r| RouteDTO::from(r)).collect(),
+        let _dto = ServerDesc {
+            routes: routes.iter().map(RouteDTO::from).collect(),
         };
-        let markup = create_route_list_html(&dto);
+        let markup = html_with_base("/__bs_assets/ui/");
         (
             [(
                 CONTENT_TYPE,
@@ -66,7 +68,7 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
             .into_response()
     }
     async fn js_handler(_uri: Uri) -> impl IntoResponse {
-        let markup = include_str!("../../../../bsnext_client/dist/index.js");
+        let markup = include_str!("../../../../bsnext_client/inject/dist/index.js");
         (
             [(
                 CONTENT_TYPE,
@@ -80,6 +82,7 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
     route("/__bsnext", get(handler))
         .route("/__bs_js", get(js_handler))
         .nest("/__bs_api", pub_api(state.clone()))
+        .nest("/__bs_assets/ui", pub_ui_assets(state.clone()))
         .route("/__bs_ws", get(ws_handler))
         .with_state(state.clone())
 }

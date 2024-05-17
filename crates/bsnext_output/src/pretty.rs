@@ -38,7 +38,7 @@ pub fn print_file_changed<W: Write>(w: &mut W, evt: &FileChanged) -> anyhow::Res
 
 pub fn print_files_changed<W: Write>(w: &mut W, evt: &FilesChangedDTO) -> anyhow::Result<()> {
     match evt.paths.len() {
-        0 | 1 | 2 => {
+        0..=2 => {
             writeln!(w, "[multi-change] {}", short_file_list(&evt.paths))?;
         }
         3.. => {

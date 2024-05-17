@@ -10,7 +10,7 @@ use std::sync::Arc;
 async fn api_handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
     let routes = app.routes.read().await;
     let dto = ServerDesc {
-        routes: routes.iter().map(|r| RouteDTO::from(r)).collect(),
+        routes: routes.iter().map(RouteDTO::from).collect(),
     };
     Json(dto)
 }

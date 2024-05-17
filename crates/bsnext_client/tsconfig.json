@@ -8,9 +8,15 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "experimentalDecorators": true
   },
   "include": [
-    "ts"
+    "inject",
+    "ui"
+  ],
+  "exclude": [
+    "ui/dist",
+    "inject/dist"
   ]
 }
