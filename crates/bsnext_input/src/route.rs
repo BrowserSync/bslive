@@ -140,6 +140,7 @@ pub enum FilterKind {
     StringGlob(String),
     Extension { ext: String },
     Glob { glob: String },
+    List(Vec<FilterKind>),
 }
 
 #[derive(

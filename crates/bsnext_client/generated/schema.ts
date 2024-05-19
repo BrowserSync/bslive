@@ -48,6 +48,7 @@ export const routeDTOSchema = z.object({
 
 export const serverDescSchema = z.object({
   routes: z.array(routeDTOSchema),
+  id: z.string(),
 });
 
 export const identityDTOSchema = z.union([
@@ -73,6 +74,7 @@ export const identityDTOSchema = z.union([
 ]);
 
 export const serverDTOSchema = z.object({
+  id: z.string(),
   identity: identityDTOSchema,
   socket_addr: z.string(),
 });

@@ -14,6 +14,7 @@ impl actix::Handler<GetServersMessage> for ServersSupervisor {
                 .handlers
                 .iter()
                 .map(|(identity, child_handler)| ServerDTO {
+                    id: identity.as_id().to_string(),
                     identity: identity.into(),
                     socket_addr: child_handler.socket_addr.to_string(),
                 })

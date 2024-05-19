@@ -6302,7 +6302,8 @@ var routeDTOSchema = z.object({
   kind: routeKindDTOSchema
 });
 var serverDescSchema = z.object({
-  routes: z.array(routeDTOSchema)
+  routes: z.array(routeDTOSchema),
+  id: z.string()
 });
 var identityDTOSchema = z.union([
   z.object({
@@ -6326,6 +6327,7 @@ var identityDTOSchema = z.union([
   })
 ]);
 var serverDTOSchema = z.object({
+  id: z.string(),
   identity: identityDTOSchema,
   socket_addr: z.string()
 });

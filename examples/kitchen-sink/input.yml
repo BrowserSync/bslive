@@ -35,7 +35,7 @@ servers:
       - path: /other
         dir: ./examples
       - path: /index.html
-        dir: ./index.html
+        dir: examples/kitchen-sink/input.html
       - path: /start
         html: <p>helldsosss wosrld</p>
       - path: /ws.js

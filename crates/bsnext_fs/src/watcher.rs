@@ -247,6 +247,7 @@ fn is_auto_excluded<P: AsRef<Path>>(cwd: &P, subject: &P) -> bool {
         ".vscode",
         ".idea",
         ".sass-cache",
+        "bslive.log",
     ]
     .into_iter()
     .map(OsStr::new)

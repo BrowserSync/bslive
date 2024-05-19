@@ -29,6 +29,7 @@ export interface RouteDTO {
 
 export interface ServerDesc {
 	routes: RouteDTO[];
+	id: string;
 }
 
 export type IdentityDTO = 
@@ -44,6 +45,7 @@ export type IdentityDTO =
 }};
 
 export interface ServerDTO {
+	id: string;
 	identity: IdentityDTO;
 	socket_addr: string;
 }

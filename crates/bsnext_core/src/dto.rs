@@ -13,6 +13,7 @@ use typeshare::typeshare;
 #[derive(Debug, serde::Serialize)]
 pub struct ServerDesc {
     pub routes: Vec<RouteDTO>,
+    pub id: String,
 }
 
 #[typeshare]
@@ -221,6 +222,7 @@ pub struct GetServersMessageResponse {
 #[typeshare::typeshare]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ServerDTO {
+    pub id: String,
     pub identity: IdentityDTO,
     pub socket_addr: String,
 }

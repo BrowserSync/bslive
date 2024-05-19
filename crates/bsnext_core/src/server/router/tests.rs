@@ -19,6 +19,8 @@ mod test {
             let (sender, _) = tokio::sync::broadcast::channel::<ClientEvent>(10);
             ServerState {
                 routes: Arc::new(RwLock::new(val.routes.clone())),
+                id: val.identity.as_id(),
+                parent: None,
                 client_sender: Arc::new(sender),
             }
         }
@@ -188,7 +190,7 @@ mod test {
         .into();
 
         let app = make_router(&Arc::new(state));
-        let req = Request::get("/__bsnext").body(Body::empty()).unwrap();
+        let req = Request::get("/__bslive").body(Body::empty()).unwrap();
         let res = app.oneshot(req).await.unwrap();
         let status = res.status().as_u16();
 

@@ -54,20 +54,11 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
             };
 
             if let Some(opts) = &watchable.spec_opts() {
-                // todo: handle the specs here!
-                if let Some(filter) = &opts.filter {
-                    let f = match filter {
-                        FilterKind::Extension { ext } => Filter::Extension {
-                            ext: ext.to_string(),
-                        },
-                        FilterKind::StringGlob(glob) => Filter::Glob {
-                            glob: glob.to_owned(),
-                        },
-                        FilterKind::Glob { glob } => Filter::Glob {
-                            glob: glob.to_owned(),
-                        },
-                    };
-                    input_watcher.with_filter(f);
+                if let Some(filter_kind) = &opts.filter {
+                    let filters = convert(&filter_kind);
+                    for filter in filters {
+                        input_watcher.with_filter(filter);
+                    }
                 }
             }
 
@@ -95,6 +86,21 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
 
             ctx.notify(InsertMonitor((*watchable).clone(), monitor))
         }
+    }
+}
+
+fn convert(fk: &FilterKind) -> Vec<Filter> {
+    match fk {
+        FilterKind::StringGlob(sg) => vec![Filter::Glob {
+            glob: sg.to_string(),
+        }],
+        FilterKind::Extension { ext } => vec![Filter::Extension {
+            ext: ext.to_string(),
+        }],
+        FilterKind::Glob { glob } => vec![Filter::Glob {
+            glob: glob.to_string(),
+        }],
+        FilterKind::List(items) => items.into_iter().flat_map(convert).collect::<Vec<_>>(),
     }
 }
 

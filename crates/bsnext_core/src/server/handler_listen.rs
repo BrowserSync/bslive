@@ -2,7 +2,8 @@ use crate::server::actor::ServerActor;
 use crate::server::error::ServerError;
 use crate::server::router::make_router;
 use crate::server::state::ServerState;
-use actix::AsyncContext;
+use crate::servers_supervisor::actor::ServersSupervisor;
+use actix::{Addr, AsyncContext};
 use actix_rt::Arbiter;
 use bsnext_input::server_config::Identity;
 use std::future::Future;
@@ -14,13 +15,15 @@ use tokio::sync::{oneshot, RwLock};
 
 #[derive(actix::Message)]
 #[rtype(result = "Result<(SocketAddr, actix::Addr<ServerActor>), ServerError>")]
-pub struct Listen;
+pub struct Listen {
+    pub(crate) parent: Addr<ServersSupervisor>,
+}
 
 impl actix::Handler<Listen> for ServerActor {
     type Result =
         Pin<Box<dyn Future<Output = Result<(SocketAddr, actix::Addr<ServerActor>), ServerError>>>>;
 
-    fn handle(&mut self, _msg: Listen, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: Listen, ctx: &mut Self::Context) -> Self::Result {
         let identity = self.config.identity.clone();
         tracing::trace!("actor started for {:?}", identity);
         let (send_complete, handle, client_sender) = self.install_signals();
@@ -29,7 +32,10 @@ impl actix::Handler<Listen> for ServerActor {
         let h2 = handle.clone();
 
         let app_state = Arc::new(ServerState {
+            // parent: ,
             routes: Arc::new(RwLock::new(self.config.routes.clone())),
+            id: self.config.identity.as_id(),
+            parent: Some(msg.parent.clone()),
             client_sender: Arc::new(client_sender),
         });
 

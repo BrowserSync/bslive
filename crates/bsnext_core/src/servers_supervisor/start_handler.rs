@@ -31,7 +31,11 @@ impl actix::Handler<StartMessage> for ServersSupervisor {
                     let server = ServerActor::new_from_config(server_config.clone());
                     let actor_addr = server.start();
                     let c = server_config.clone();
-                    actor_addr.send(Listen).map(|r| (r, c))
+                    actor_addr
+                        .send(Listen {
+                            parent: self_addr.clone(),
+                        })
+                        .map(|r| (r, c))
                 })
                 .collect::<Vec<_>>();
 

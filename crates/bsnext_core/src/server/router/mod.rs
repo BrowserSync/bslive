@@ -56,6 +56,7 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
         let routes = app.routes.read().await;
         let _dto = ServerDesc {
             routes: routes.iter().map(RouteDTO::from).collect(),
+            id: app.id.to_string(),
         };
         let markup = html_with_base("/__bs_assets/ui/");
         (
@@ -79,7 +80,7 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
             .into_response()
     }
 
-    route("/__bsnext", get(handler))
+    route("/__bslive", get(handler))
         .route("/__bs_js", get(js_handler))
         .nest("/__bs_api", pub_api(state.clone()))
         .nest("/__bs_assets/ui", pub_ui_assets(state.clone()))

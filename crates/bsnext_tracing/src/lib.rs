@@ -85,7 +85,7 @@ pub fn init_tracing(
                 .init();
         }
         (OutputFormat::Json, WriteOption::File) => {
-            let file = File::create("out.log").expect("create out.log");
+            let file = File::create("bslive.log").expect("create bslive.log");
             let fmt_layer = tracing_subscriber::fmt::layer()
                 .json()
                 .with_ansi(false)
@@ -111,7 +111,7 @@ pub fn init_tracing(
                 .init();
         }
         (OutputFormat::Normal, WriteOption::File) => {
-            let file = File::create("out.log").expect("create out.log");
+            let file = File::create("bslive.log").expect("create bslive.log");
             let fmt_layer = tracing_subscriber::fmt::layer()
                 .with_ansi(false)
                 .with_writer(file);

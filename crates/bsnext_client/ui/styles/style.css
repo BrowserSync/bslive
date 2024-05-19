@@ -4,33 +4,26 @@
     --brand-grey: #6D6D6D;
     --brand-red: #F24747;
     --brand-white: #FFFFFF;
+
+    --theme-txt-color: var(--brand-blue);
+    --theme-page-color: var(--brand-white);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    color: var(--theme-txt-color);
+    background: var(--theme-page-color);
 }
 svg:not(:root) {
     overflow: hidden;
 }
 .main {
-    color: white;
     padding-left: 1em;
     padding-right: 1em;
 }
-.header {
-    padding: 1em;
-}
-.logo .svg-icon {
-    position: relative;
-    top: -4px;
-    margin-right: 6px;
-    height: 30px;
-    width: 140px;
-    color: white;
-}
-.svg-icon {
-    display: inline-block;
-    fill: currentColor !important;
-    height: 1em;
-    width: 1em;
-    vertical-align: middle;
-}
-body {
-    background: var(--brand-blue);
+@media (prefers-color-scheme: dark) {
+    :root {
+        --theme-txt-color: var(--brand-white);
+        --theme-page-color: var(--brand-blue);
+    }
 }
