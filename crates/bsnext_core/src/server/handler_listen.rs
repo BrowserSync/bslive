@@ -103,7 +103,7 @@ impl actix::Handler<Listen> for ServerActor {
                 listening = h2.listening() => {
                     match listening {
                         Some(socket_addr) => {
-                            tracing::debug!("box::pin was listening...");
+                            tracing::debug!("{} listening...", socket_addr);
                             Ok((socket_addr, self_addr.clone()))
                         }
                         None => {

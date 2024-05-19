@@ -9,7 +9,7 @@ use bsnext_system::args::Args;
 use bsnext_system::start_kind::StartKind;
 use bsnext_system::startup::{DidStart, StartupResult};
 use bsnext_system::{BsSystem, Start};
-use bsnext_tracing::{init_tracing, OutputFormat};
+use bsnext_tracing::{init_tracing, OutputFormat, WriteOption};
 use clap::Parser;
 use tokio::sync::{mpsc, oneshot};
 
@@ -19,9 +19,14 @@ async fn main() -> Result<(), anyhow::Error> {
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
     let args = Args::parse();
     let format_clone = args.format;
+    let write_opt = if args.write_log {
+        WriteOption::File
+    } else {
+        WriteOption::None
+    };
 
-    init_tracing(args.log_level, args.format);
-    tracing::trace!(?args);
+    init_tracing(args.log_level, args.format, write_opt);
+    tracing::debug!("{:#?}", args);
 
     let (tx, rx) = oneshot::channel();
     let (startup_oneshot_sender, startup_oneshot_receiver) = oneshot::channel::<StartupResult>();
@@ -55,6 +60,7 @@ async fn main() -> Result<(), anyhow::Error> {
             Some(OutputFormat::Json) => Writers::Json,
         };
         while let Some(evt) = events_receiver.recv().await {
+            tracing::debug!(external_event=?evt);
             match printer.handle_event(stdout, &evt) {
                 Ok(_v) => {}
                 Err(e) => tracing::error!("could not write to stdout {e}"),

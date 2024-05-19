@@ -29,7 +29,7 @@ impl Handler<RequestWatchPath> for FsWatcher {
 
                     tracing::debug!(path = ?msg.path, "👀 watching! {} receivers", self.receivers.len());
                     tracing::debug!(?self.cwd);
-                    tracing::debug!(?self.receivers);
+                    tracing::debug!("{} receivers", self.receivers.len());
 
                     let matched = msg.path == self.cwd;
 

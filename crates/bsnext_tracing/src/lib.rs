@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::fs::File;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -33,6 +34,12 @@ pub enum OutputFormat {
     Normal,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
+pub enum WriteOption {
+    File,
+    None,
+}
+
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -47,7 +54,11 @@ impl Default for OutputFormat {
         Self::Normal
     }
 }
-pub fn init_tracing(log_level: Option<LogLevel>, format: Option<OutputFormat>) {
+pub fn init_tracing(
+    log_level: Option<LogLevel>,
+    format: Option<OutputFormat>,
+    write_option: WriteOption,
+) {
     let log_level = log_level.unwrap_or(LogLevel::Error);
     let level = log_level.to_string();
     let lines = [
@@ -59,8 +70,8 @@ pub fn init_tracing(log_level: Option<LogLevel>, format: Option<OutputFormat>) {
     ];
     let debug_str = lines.join(",");
 
-    match format.unwrap_or_default() {
-        OutputFormat::Json => {
+    match (format.unwrap_or_default(), write_option) {
+        (OutputFormat::Json, WriteOption::None) => {
             let fmt_layer = tracing_subscriber::fmt::layer()
                 .without_time()
                 .json()
@@ -73,10 +84,37 @@ pub fn init_tracing(log_level: Option<LogLevel>, format: Option<OutputFormat>) {
                 .with(fmt_layer)
                 .init();
         }
-        OutputFormat::Normal => {
+        (OutputFormat::Json, WriteOption::File) => {
+            let file = File::create("out.log").expect("create out.log");
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .json()
+                .with_ansi(false)
+                .with_writer(file);
+            tracing_subscriber::registry()
+                .with(
+                    tracing_subscriber::EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| debug_str.into()),
+                )
+                .with(fmt_layer)
+                .init();
+        }
+        (OutputFormat::Normal, WriteOption::None) => {
             let fmt_layer = tracing_subscriber::fmt::layer()
                 .without_time()
                 .with_file(false);
+            tracing_subscriber::registry()
+                .with(
+                    tracing_subscriber::EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| debug_str.into()),
+                )
+                .with(fmt_layer)
+                .init();
+        }
+        (OutputFormat::Normal, WriteOption::File) => {
+            let file = File::create("out.log").expect("create out.log");
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .with_ansi(false)
+                .with_writer(file);
             tracing_subscriber::registry()
                 .with(
                     tracing_subscriber::EnvFilter::try_from_default_env()
