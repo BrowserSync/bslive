@@ -28,14 +28,14 @@ jobs:
           - host: macos-latest
             target: x86_64-apple-darwin
             build: yarn build --target x86_64-apple-darwin
-#          - host: windows-latest
-#            build: yarn build --target x86_64-pc-windows-msvc
-#            target: x86_64-pc-windows-msvc
-#          - host: windows-latest
-#            build: |
-#              yarn build --target i686-pc-windows-msvc
-#              yarn test
-#            target: i686-pc-windows-msvc
+          - host: windows-latest
+            build: yarn build --target x86_64-pc-windows-msvc
+            target: x86_64-pc-windows-msvc
+          - host: windows-latest
+            build: |
+              yarn build --target i686-pc-windows-msvc
+              yarn test
+            target: i686-pc-windows-msvc
 #          - host: ubuntu-latest
 #            target: x86_64-unknown-linux-gnu
 #            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
@@ -73,9 +73,9 @@ jobs:
 #              set -e &&
 #              rustup target add aarch64-unknown-linux-musl &&
 #              yarn build --target aarch64-unknown-linux-musl
-#          - host: windows-latest
-#            target: aarch64-pc-windows-msvc
-#            build: yarn build --target aarch64-pc-windows-msvc
+          - host: windows-latest
+            target: aarch64-pc-windows-msvc
+            build: yarn build --target aarch64-pc-windows-msvc
 #          - host: ubuntu-latest
 #            target: riscv64gc-unknown-linux-gnu
 #            setup: |
@@ -156,8 +156,8 @@ jobs:
         settings:
           - host: macos-latest
             target: x86_64-apple-darwin
-#          - host: windows-latest
-#            target: x86_64-pc-windows-msvc
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
         node:
           - '18'
           - '20'
@@ -392,8 +392,8 @@ jobs:
     name: Publish
     runs-on: ubuntu-latest
     needs:
-#      - build-freebsd
-#      - test-macOS-windows-binding
+      - build-freebsd
+      - test-macOS-windows-binding
 #      - test-linux-x64-gnu-binding
 #      - test-linux-x64-musl-binding
 #      - test-linux-aarch64-gnu-binding
