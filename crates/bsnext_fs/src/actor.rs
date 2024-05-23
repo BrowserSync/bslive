@@ -14,7 +14,7 @@ use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 
 pub struct FsWatcher {
-    pub watcher: Option<notify::FsEventWatcher>,
+    pub watcher: Option<notify::RecommendedWatcher>,
     raw_fs_stream: Arc<broadcast::Sender<InnerChangeEvent>>,
     pub receivers: Vec<Recipient<FsEvent>>,
     pub ctx: FsEventContext,

@@ -13,7 +13,7 @@ use tokio::sync::broadcast;
 pub fn create_watcher(
     sender: Arc<broadcast::Sender<InnerChangeEvent>>,
     cwd: &Path,
-) -> notify::Result<notify::FsEventWatcher> {
+) -> notify::Result<notify::RecommendedWatcher> {
     let cwd_c = cwd.to_owned();
     notify::recommended_watcher(move |res: Result<notify::Event, _>| {
         let span = tracing::span!(tracing::Level::TRACE, "raw");
