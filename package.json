@@ -6,6 +6,11 @@
   "bin": {
     "bslive": "./bin.js"
   },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "bin.js"
+  ],
   "napi": {
     "name": "bslive",
     "triples": {
