@@ -41,7 +41,6 @@ pub struct Args {
     #[arg(short, long)]
     pub port: Option<u16>,
 
-    /// Paths to watch, incompatible with `-i` option
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true, long)]
+    /// Paths to serve + possibly watch, incompatible with `-i` option
     pub paths: Vec<String>,
 }
