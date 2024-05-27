@@ -1,4 +1,4 @@
-use crate::dto::{GetServersMessageResponse, ServerDTO};
+use bsnext_dto::{GetServersMessageResponse, ServerDTO};
 use crate::servers_supervisor::actor::ServersSupervisor;
 
 #[derive(actix::Message)]

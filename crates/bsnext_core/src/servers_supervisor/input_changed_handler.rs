@@ -1,10 +1,10 @@
-use crate::dto::ServerChangeSet;
 use crate::servers_supervisor::actor::ServersSupervisor;
 use actix::AsyncContext;
 use bsnext_input::Input;
 use std::future::Future;
 
 use std::pin::Pin;
+use bsnext_dto::ServerChangeSet;
 
 #[derive(actix::Message)]
 #[rtype(result = "ServerChangeSet")]

@@ -1,5 +1,5 @@
 use crate::OutputWriter;
-use bsnext_core::dto::{
+use bsnext_dto::{
     ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, ServerChange,
     ServerChangeSetItem, ServersStarted, StoppedWatching, Watching,
 };

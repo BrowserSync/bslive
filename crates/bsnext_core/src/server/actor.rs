@@ -1,4 +1,3 @@
-use crate::dto::ClientEvent;
 use crate::server::handler_stop::Stop;
 use crate::server::signals::ServerSignals;
 use crate::server::state::ServerState;
@@ -11,6 +10,7 @@ use std::sync::Arc;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, oneshot};
 use tracing::{span, Level};
+use bsnext_dto::ClientEvent;
 
 pub struct ServerActor {
     pub config: ServerConfig,

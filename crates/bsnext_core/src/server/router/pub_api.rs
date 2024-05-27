@@ -1,4 +1,3 @@
-use crate::dto::{RouteDTO, ServerDesc};
 use crate::server::state::ServerState;
 use crate::servers_supervisor::get_servers_handler::GetServersMessage;
 use axum::extract::State;
@@ -7,6 +6,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use http::{StatusCode, Uri};
 use std::sync::Arc;
+use bsnext_dto::{RouteDTO, ServerDesc};
 
 async fn all_servers_handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
     match &app.parent {

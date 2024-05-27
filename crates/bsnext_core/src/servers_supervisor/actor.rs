@@ -1,5 +1,3 @@
-use crate::dto::{ServerChange, ServerChangeSet, ServerChangeSetItem};
-
 use crate::server::handler_stop::Stop;
 use actix::{Actor, Addr, Running};
 
@@ -16,6 +14,7 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use tokio::sync::oneshot::Sender;
 use tracing::{span, Level};
+use bsnext_dto::{ServerChange, ServerChangeSet, ServerChangeSetItem};
 
 #[derive(Debug)]
 pub struct ServersSupervisor {

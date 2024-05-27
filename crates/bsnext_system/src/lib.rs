@@ -7,7 +7,7 @@ use bsnext_input::Input;
 use std::collections::HashMap;
 
 use actix_rt::Arbiter;
-use bsnext_core::dto::{ExternalEvents, ServersStarted};
+use bsnext_dto::{ExternalEvents, ServersStarted};
 use std::path::PathBuf;
 
 use bsnext_example::Example;

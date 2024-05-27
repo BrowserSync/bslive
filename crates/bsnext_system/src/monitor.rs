@@ -2,8 +2,7 @@ use crate::BsSystem;
 use actix::{Actor, Addr, AsyncContext};
 use std::hash::Hash;
 
-use bsnext_core::dto;
-use bsnext_core::dto::{ExternalEvents, StoppedWatching, Watching};
+use bsnext_dto::{ExternalEvents, StoppedWatching, Watching};
 use bsnext_core::servers_supervisor::file_changed_handler::{FileChanged, FilesChanged};
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{Debounce, FsEvent, FsEventContext, FsEventKind};
@@ -77,7 +76,7 @@ impl actix::Handler<FsEvent> for BsSystem {
                         id: msg.ctx.id(),
                     })
                 }
-                let evt = ExternalEvents::FilesChanged(dto::FilesChangedDTO { paths: as_strings });
+                let evt = ExternalEvents::FilesChanged(bsnext_dto::FilesChangedDTO { paths: as_strings });
                 self.ext_evt(evt);
             }
             FsEventKind::Change(inner) => {
@@ -99,7 +98,7 @@ impl actix::Handler<FsEvent> for BsSystem {
                         self.inform_servers(input);
 
                         let evt = ExternalEvents::InputFileChanged(
-                            dto::FileChanged::from_path_buf(&inner.path),
+                            bsnext_dto::FileChanged::from_path_buf(&inner.path),
                         );
                         self.ext_evt(evt);
                     }
@@ -112,7 +111,7 @@ impl actix::Handler<FsEvent> for BsSystem {
                                 id,
                             })
                         }
-                        let evt = ExternalEvents::FileChanged(dto::FileChanged::from_path_buf(
+                        let evt = ExternalEvents::FileChanged(bsnext_dto::FileChanged::from_path_buf(
                             &inner.path,
                         ));
 

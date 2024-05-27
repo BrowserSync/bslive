@@ -1,10 +1,10 @@
-use crate::dto::ClientEvent;
 use crate::servers_supervisor::get_servers_handler::GetServersMessage;
 use actix::Recipient;
 use bsnext_input::route::Route;
 use std::fmt::Formatter;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
+use bsnext_dto::ClientEvent;
 
 #[derive(Clone)]
 pub struct ServerState {

@@ -10,6 +10,7 @@ bsnext_input = { path = "../bsnext_input" }
 bsnext_fs = { path = "../bsnext_fs" }
 bsnext_resp = { path = "../bsnext_resp" }
 bsnext_client = { path = "../bsnext_client" }
+bsnext_dto = { path = "../bsnext_dto" }
 
 axum-server = { version = "0.6.0", features = ["tls-rustls"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
@@ -41,4 +42,3 @@ tracing-subscriber = { workspace = true }
 serde_json = { workspace = true }
 bytes = { workspace = true }
 http = { workspace = true }
-typeshare = { workspace = true }

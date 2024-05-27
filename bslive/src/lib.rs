@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use clap::Parser;
 
-use bsnext_core::dto::ExternalEvents;
+use bsnext_dto::ExternalEvents;
 use bsnext_output::{OutputWriter, Writers};
 use bsnext_system::args::Args;
 use bsnext_system::start_kind::StartKind;

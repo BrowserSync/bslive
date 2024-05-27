@@ -1,7 +1,7 @@
-use crate::dto::ClientEvent;
 use axum_server::Handle;
 use tokio::sync::broadcast;
 use tokio::sync::oneshot::Receiver;
+use bsnext_dto::ClientEvent;
 
 pub struct ServerSignals {
     pub complete_mdg_receiver: Option<Receiver<()>>,

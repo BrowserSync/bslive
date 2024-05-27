@@ -7,6 +7,8 @@ fn main() {
     if env::var("CI").is_ok() {
         return;
     }
+    println!("cargo::rerun-if-changed=src/lib.rs");
+    println!("cargo::rerun-if-changed=../bsnext_dto");
     let curr = current_dir().expect("current dir");
     let root = curr
         .parent()
@@ -16,7 +18,7 @@ fn main() {
         .to_path_buf();
     let output = Command::new("typeshare")
         .args([
-            "crates/bsnext_core",
+            "crates/bsnext_dto",
             "--lang=typescript",
             "--output-file=crates/bsnext_client/generated/dto.ts",
         ])

@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod test {
-    use crate::dto::ClientEvent;
     use crate::server::router::make_router;
     use crate::server::state::ServerState;
     use axum::body::Body;
@@ -13,6 +12,7 @@ mod test {
     use std::sync::Arc;
     use tokio::sync::RwLock;
     use tower::ServiceExt;
+    use bsnext_dto::ClientEvent;
 
     impl From<ServerConfig> for ServerState {
         fn from(val: ServerConfig) -> ServerState {

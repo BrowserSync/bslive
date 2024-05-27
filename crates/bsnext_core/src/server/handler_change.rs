@@ -1,7 +1,7 @@
-use crate::dto::ClientEvent;
 use crate::server::actor::ServerActor;
 
 use std::path::{Path, PathBuf};
+use bsnext_dto::{ChangeDTO, ChangeKind, ClientEvent};
 
 #[derive(actix::Message, Clone, Debug)]
 #[rtype(result = "()")]
@@ -11,14 +11,6 @@ pub enum Change {
         change_kind: ChangeKind,
     },
     FsMany(Vec<Change>),
-}
-
-#[typeshare::typeshare]
-#[derive(Clone, Debug, serde::Serialize)]
-pub enum ChangeKind {
-    Changed,
-    Added,
-    Removed,
 }
 
 impl Change {
@@ -53,6 +45,59 @@ impl Change {
     }
 }
 
+
+impl From<&Change> for ChangeDTO {
+    fn from(value: &Change) -> Self {
+        match value {
+            Change::Fs { path, change_kind } => Self::Fs {
+                path: path.to_string_lossy().to_string(),
+                change_kind: change_kind.clone(),
+            },
+            Change::FsMany(changes) => Self::FsMany(
+                changes
+                    .iter()
+                    .map(|change| match change {
+                        Change::Fs { path, change_kind } => Self::Fs {
+                            path: path.to_string_lossy().to_string(),
+                            change_kind: change_kind.clone(),
+                        },
+                        Change::FsMany(_) => unreachable!("recursive not supported"),
+                    })
+                    .collect(),
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bsnext_dto::ClientEvent;
+    use super::*;
+    #[test]
+    fn test_serialize() -> anyhow::Result<()> {
+        let fs = Change::fs("./a.js");
+        let evt = ClientEvent::Change((&fs).into());
+        let _json = serde_json::to_string(&evt).unwrap();
+        Ok(())
+    }
+    #[test]
+    fn test_serialize_server_start() -> anyhow::Result<()> {
+        let fs = Change::fs("./a.js");
+        let evt = ClientEvent::Change((&fs).into());
+        let _json = serde_json::to_string(&evt).unwrap();
+        Ok(())
+    }
+
+    #[test]
+    fn test_serialize_2() -> anyhow::Result<()> {
+        let fs: ChangeDTO = (&Change::fs("./a.js")).into();
+        let json = serde_json::to_string(&fs).unwrap();
+        print!("{json}");
+        Ok(())
+    }
+}
+
+
 impl actix::Handler<Change> for ServerActor {
     type Result = ();
 
@@ -71,15 +116,4 @@ impl actix::Handler<Change> for ServerActor {
         }
     }
 }
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::dto::ChangeDTO;
-    #[test]
-    fn test_serialize() -> anyhow::Result<()> {
-        let fs: ChangeDTO = (&Change::fs("./a.js")).into();
-        let json = serde_json::to_string(&fs).unwrap();
-        print!("{json}");
-        Ok(())
-    }
-}
+

@@ -3,7 +3,7 @@ use std::env::current_dir;
 use std::io::Write;
 use std::path::PathBuf;
 
-use bsnext_core::dto::ExternalEvents;
+use bsnext_dto::ExternalEvents;
 use bsnext_output::{OutputWriter, Writers};
 use bsnext_system::args::Args;
 use bsnext_system::start_kind::StartKind;

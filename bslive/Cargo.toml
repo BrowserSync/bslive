@@ -13,6 +13,7 @@ bsnext_fs = { path = "../crates/bsnext_fs" }
 bsnext_tracing = { path = "../crates/bsnext_tracing" }
 bsnext_system = { path = "../crates/bsnext_system" }
 bsnext_output = { path = "../crates/bsnext_output" }
+bsnext_dto = { path = "../crates/bsnext_dto" }
 
 clap = { workspace = true }
 tokio = { workspace = true }

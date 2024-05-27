@@ -21,7 +21,6 @@ use tower::ServiceBuilder;
 use tower_http::catch_panic::CatchPanicLayer;
 
 use crate::dir_loader::serve_dir_loader;
-use crate::dto::{RouteDTO, ServerDesc};
 use crate::meta::MetaData;
 use crate::not_found::not_found_service::not_found_loader;
 use crate::raw_loader::raw_loader;
@@ -32,6 +31,7 @@ use crate::ws::ws_handler;
 use bsnext_client::html_with_base;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
+use bsnext_dto::{RouteDTO, ServerDesc};
 
 mod assets;
 mod pub_api;

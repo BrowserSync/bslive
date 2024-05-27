@@ -4,13 +4,13 @@ use axum::response::IntoResponse;
 
 use futures_util::{SinkExt, StreamExt};
 
-use crate::dto::ClientEvent;
 use crate::server::state::ServerState;
 use std::net::SocketAddr;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::Sender;
+use bsnext_dto::ClientEvent;
 
 /// The handler for the HTTP request (this gets called when the HTTP GET lands at the start
 /// of websocket negotiation). After this completes, the actual switching from HTTP to

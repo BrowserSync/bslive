@@ -4,7 +4,6 @@ use bsnext_input::InputError;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 
-use crate::server::handler_change::{Change, ChangeKind};
 use bsnext_fs::Debounce;
 use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
 use typeshare::typeshare;
@@ -298,44 +297,10 @@ pub enum ChangeDTO {
     FsMany(Vec<ChangeDTO>),
 }
 
-impl From<&Change> for ChangeDTO {
-    fn from(value: &Change) -> Self {
-        match value {
-            Change::Fs { path, change_kind } => Self::Fs {
-                path: path.to_string_lossy().to_string(),
-                change_kind: change_kind.clone(),
-            },
-            Change::FsMany(changes) => Self::FsMany(
-                changes
-                    .iter()
-                    .map(|change| match change {
-                        Change::Fs { path, change_kind } => Self::Fs {
-                            path: path.to_string_lossy().to_string(),
-                            change_kind: change_kind.clone(),
-                        },
-                        Change::FsMany(_) => unreachable!("recursive not supported"),
-                    })
-                    .collect(),
-            ),
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn test_serialize() -> anyhow::Result<()> {
-        let fs = Change::fs("./a.js");
-        let evt = ClientEvent::Change((&fs).into());
-        let _json = serde_json::to_string(&evt).unwrap();
-        Ok(())
-    }
-    #[test]
-    fn test_serialize_server_start() -> anyhow::Result<()> {
-        let fs = Change::fs("./a.js");
-        let evt = ClientEvent::Change((&fs).into());
-        let _json = serde_json::to_string(&evt).unwrap();
-        Ok(())
-    }
+#[typeshare::typeshare]
+#[derive(Clone, Debug, serde::Serialize)]
+pub enum ChangeKind {
+    Changed,
+    Added,
+    Removed,
 }
