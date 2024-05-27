@@ -55,7 +55,7 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
 
             if let Some(opts) = &watchable.spec_opts() {
                 if let Some(filter_kind) = &opts.filter {
-                    let filters = convert(&filter_kind);
+                    let filters = convert(filter_kind);
                     for filter in filters {
                         input_watcher.with_filter(filter);
                     }
@@ -100,7 +100,7 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
         FilterKind::Glob { glob } => vec![Filter::Glob {
             glob: glob.to_string(),
         }],
-        FilterKind::List(items) => items.into_iter().flat_map(convert).collect::<Vec<_>>(),
+        FilterKind::List(items) => items.iter().flat_map(convert).collect::<Vec<_>>(),
     }
 }
 

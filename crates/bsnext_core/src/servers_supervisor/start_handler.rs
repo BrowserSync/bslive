@@ -33,7 +33,7 @@ impl actix::Handler<StartMessage> for ServersSupervisor {
                     let c = server_config.clone();
                     actor_addr
                         .send(Listen {
-                            parent: self_addr.clone(),
+                            parent: self_addr.clone().recipient(),
                         })
                         .map(|r| (r, c))
                 })

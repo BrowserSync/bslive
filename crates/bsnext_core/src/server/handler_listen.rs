@@ -2,8 +2,8 @@ use crate::server::actor::ServerActor;
 use crate::server::error::ServerError;
 use crate::server::router::make_router;
 use crate::server::state::ServerState;
-use crate::servers_supervisor::actor::ServersSupervisor;
-use actix::{Addr, AsyncContext};
+use crate::servers_supervisor::get_servers_handler::GetServersMessage;
+use actix::{AsyncContext, Recipient};
 use actix_rt::Arbiter;
 use bsnext_input::server_config::Identity;
 use std::future::Future;
@@ -16,7 +16,7 @@ use tokio::sync::{oneshot, RwLock};
 #[derive(actix::Message)]
 #[rtype(result = "Result<(SocketAddr, actix::Addr<ServerActor>), ServerError>")]
 pub struct Listen {
-    pub(crate) parent: Addr<ServersSupervisor>,
+    pub(crate) parent: Recipient<GetServersMessage>,
 }
 
 impl actix::Handler<Listen> for ServerActor {
