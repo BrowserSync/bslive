@@ -79,6 +79,7 @@ impl actix::Handler<FsEvent> for BsSystem {
                         id: msg.ctx.id(),
                     })
                 }
+                // todo(alpha): need to exclude changes to the input file if this event has captured it
                 let evt =
                     ExternalEvents::FilesChanged(bsnext_dto::FilesChangedDTO { paths: as_strings });
                 self.publish_external_event(evt);
