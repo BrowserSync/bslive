@@ -1,6 +1,6 @@
 use crate::OutputWriter;
-use std::io::Write;
 use bsnext_dto::ExternalEvents;
+use std::io::Write;
 
 pub struct JsonPrint;
 

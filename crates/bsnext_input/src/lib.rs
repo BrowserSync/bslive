@@ -6,6 +6,9 @@ use std::fs::read_to_string;
 use std::net::AddrParseError;
 use std::path::{Path, PathBuf};
 
+use crate::md::MarkdownError;
+use crate::yml::YamlError;
+
 #[cfg(test)]
 pub mod input_test;
 pub mod md;
@@ -24,23 +27,37 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Self, anyhow::Error> {
+    pub fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
         match path.as_ref().extension().and_then(|x| x.to_str()) {
-            None => Err(anyhow::anyhow!(
-                "paths without extensions are not supported"
-            )),
+            None => Err(InputError::MissingExtension(path.as_ref().to_owned())),
             Some("yml") | Some("yaml") => Input::from_yaml_path(path),
             Some("md") | Some("markdown") => Input::from_md_path(path),
-            _ => Err(anyhow::anyhow!("unsupported extension")),
+            Some(other) => Err(InputError::UnsupportedExtension(other.to_string())),
         }
     }
-    fn from_yaml_path<P: AsRef<Path>>(path: P) -> Result<Self, anyhow::Error> {
-        let str = read_to_string(path)?;
-        let output = serde_yaml::from_str::<Self>(str.as_str())?;
-        // todo: don't allow duplicates.
+    fn from_yaml_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
+        let str = read_to_string(&path)?;
+        let output = serde_yaml::from_str::<Self>(str.as_str()).map_err(move |e| {
+            if let Some(location) = e.location() {
+                YamlError::ParseErrorWithLocation {
+                    serde_error: e,
+                    input: str,
+                    path: path.as_ref().to_string_lossy().to_string(),
+                    line: location.line(),
+                    column: location.column(),
+                }
+            } else {
+                YamlError::ParseError {
+                    serde_error: e,
+                    input: str,
+                    path: path.as_ref().to_string_lossy().to_string(),
+                }
+            }
+        })?;
+        // todo: don't allow duplicates?.
         Ok(output)
     }
-    fn from_md_path<P: AsRef<Path>>(path: P) -> Result<Self, anyhow::Error> {
+    fn from_md_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
         let str = read_to_string(path)?;
         let input = md::md_to_input(&str)?;
         // todo: don't allow duplicates.
@@ -54,8 +71,14 @@ pub enum InputError {
     MissingInputs,
     #[error("could not read input, error: {0}")]
     InvalidInput(String),
+    #[error("io error")]
+    Io(#[from] std::io::Error),
     #[error("Could not find the input file: {0}")]
     NotFound(PathBuf),
+    #[error("Paths without extensions are not supported: {0}")]
+    MissingExtension(PathBuf),
+    #[error("Unsupported extension: {0}")]
+    UnsupportedExtension(String),
     #[error("InputWriteError prevented startup {0}")]
     InputWriteError(#[from] InputWriteError),
     #[error("Input path error prevented startup {0}")]
@@ -64,6 +87,10 @@ pub enum InputError {
     PortError(#[from] PortError),
     #[error("Input directory error prevented startup {0}")]
     DirError(#[from] DirError),
+    #[error("Markdown error: {0}")]
+    MarkdownError(#[from] MarkdownError),
+    #[error("{0}")]
+    YamlError(#[from] YamlError),
 }
 
 #[derive(Debug, thiserror::Error)]

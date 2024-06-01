@@ -1,5 +1,5 @@
-use bsnext_dto::{GetServersMessageResponse, ServerDTO};
 use crate::servers_supervisor::actor::ServersSupervisor;
+use bsnext_dto::{GetServersMessageResponse, ServerDTO};
 
 #[derive(actix::Message)]
 #[rtype(result = "GetServersMessageResponse")]

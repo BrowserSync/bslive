@@ -9,19 +9,24 @@ use bsnext_fs::Debounce;
 use bsnext_input::route::{DebounceDuration, FilterKind, SpecOpts};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug_span, Span};
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
 pub struct MonitorAnyWatchables {
     pub watchables: Vec<AnyWatchable>,
     pub cwd: PathBuf,
+    pub span: Arc<Span>,
 }
 
 impl actix::Handler<MonitorAnyWatchables> for BsSystem {
     type Result = ();
 
     fn handle(&mut self, msg: MonitorAnyWatchables, ctx: &mut Self::Context) -> Self::Result {
+        let s = debug_span!(parent: msg.span.id(), "BsSystem handler for MonitorAnyWatchables");
+        let _g = s.enter();
         tracing::debug!("MonitorAnyWatchables {:?}", msg.watchables);
         tracing::trace!("MonitorAnyWatchables {:#?}", msg.watchables);
 
@@ -111,6 +116,7 @@ struct DropMonitor(AnyWatchable);
 impl actix::Handler<DropMonitor> for BsSystem {
     type Result = ();
 
+    #[tracing::instrument(skip_all, name = "BsSystem handler for DropMonitor")]
     fn handle(&mut self, msg: DropMonitor, _ctx: &mut Self::Context) -> Self::Result {
         tracing::trace!(watchable=?msg.0, "DropMonitor");
         self.any_monitors.remove(&msg.0);
@@ -125,6 +131,7 @@ struct InsertMonitor(AnyWatchable, Monitor);
 impl actix::Handler<InsertMonitor> for BsSystem {
     type Result = ();
 
+    #[tracing::instrument(skip_all, name = "BsSystem handler for InsertMonitor")]
     fn handle(&mut self, msg: InsertMonitor, _ctx: &mut Self::Context) -> Self::Result {
         tracing::trace!(watchable=?msg.0, "InsertMonitor");
         self.any_monitors.insert(msg.0, msg.1);

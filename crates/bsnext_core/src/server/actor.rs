@@ -3,6 +3,7 @@ use crate::server::signals::ServerSignals;
 use crate::server::state::ServerState;
 use actix::{ActorContext, AsyncContext, Running};
 use axum_server::Handle;
+use bsnext_dto::ClientEvent;
 use bsnext_input::route_manifest::RoutesManifest;
 use bsnext_input::server_config::ServerConfig;
 use std::net::SocketAddr;
@@ -10,7 +11,6 @@ use std::sync::Arc;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, oneshot};
 use tracing::{span, Level};
-use bsnext_dto::ClientEvent;
 
 pub struct ServerActor {
     pub config: ServerConfig,

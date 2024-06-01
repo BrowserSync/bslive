@@ -2,8 +2,8 @@ use crate::BsSystem;
 use actix::{Actor, Addr, AsyncContext};
 use std::hash::Hash;
 
-use bsnext_dto::{ExternalEvents, StoppedWatching, Watching};
 use bsnext_core::servers_supervisor::file_changed_handler::{FileChanged, FilesChanged};
+use bsnext_dto::{ExternalEvents, StoppedWatching, Watching};
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{Debounce, FsEvent, FsEventContext, FsEventKind};
 use bsnext_input::route::{
@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use bsnext_fs::actor::FsWatcher;
 
-use tracing::{span, Level};
+use tracing::{span, trace_span, Level};
 
 #[derive(Debug, Clone)]
 pub struct Monitor {
@@ -60,6 +60,9 @@ impl actix::Handler<FsEvent> for BsSystem {
     fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) -> Self::Result {
         match msg.kind {
             FsEventKind::ChangeBuffered(buffer_change) => {
+                let span = span!(Level::TRACE, "FsEventKind::ChangeBuffered");
+                let _guard = span.enter();
+                tracing::debug!(msg.event_count = buffer_change.events.len(), msg.ctx = ?msg.ctx, ?buffer_change);
                 // let id = msg.ctx_id();
                 let paths = buffer_change
                     .events
@@ -76,23 +79,26 @@ impl actix::Handler<FsEvent> for BsSystem {
                         id: msg.ctx.id(),
                     })
                 }
-                let evt = ExternalEvents::FilesChanged(bsnext_dto::FilesChangedDTO { paths: as_strings });
-                self.ext_evt(evt);
+                let evt =
+                    ExternalEvents::FilesChanged(bsnext_dto::FilesChangedDTO { paths: as_strings });
+                self.publish_external_event(evt);
             }
             FsEventKind::Change(inner) => {
-                let span = span!(Level::TRACE, "FsWatchEvent", ?inner.absolute_path);
+                let span = trace_span!("FsEventKind::Change", ?inner.absolute_path);
                 let _guard = span.enter();
                 match msg.ctx {
                     FsEventContext::InputFile { id: _ } => {
-                        tracing::info!("InputFile file changed");
+                        tracing::info!(?inner, "InputFile file changed");
                         let input = Input::from_input_path(&inner.absolute_path);
 
                         let Ok(input) = input else {
                             tracing::debug!("ignoring FsWatchEvent because the input was invalid");
                             let err = input.unwrap_err();
-                            tracing::error!("{}", err);
+                            tracing::error!(?err, "{}", err);
                             return;
                         };
+
+                        tracing::debug!("InputFile file was deserialized");
 
                         self.accept_input(&input);
                         self.inform_servers(input);
@@ -100,10 +106,10 @@ impl actix::Handler<FsEvent> for BsSystem {
                         let evt = ExternalEvents::InputFileChanged(
                             bsnext_dto::FileChanged::from_path_buf(&inner.path),
                         );
-                        self.ext_evt(evt);
+                        self.publish_external_event(evt);
                     }
                     FsEventContext::Other { id } => {
-                        tracing::trace!("Other");
+                        tracing::trace!(?inner, "Other file changed");
                         // todo: tie these changed to an input identity?
                         if let Some(servers) = &self.servers_addr {
                             servers.do_send(FileChanged {
@@ -111,25 +117,27 @@ impl actix::Handler<FsEvent> for BsSystem {
                                 id,
                             })
                         }
-                        let evt = ExternalEvents::FileChanged(bsnext_dto::FileChanged::from_path_buf(
-                            &inner.path,
-                        ));
+                        let evt = ExternalEvents::FileChanged(
+                            bsnext_dto::FileChanged::from_path_buf(&inner.path),
+                        );
 
-                        self.ext_evt(evt);
+                        self.publish_external_event(evt);
                     }
                 }
             }
             FsEventKind::PathAdded(path) => {
-                tracing::trace!(?path.path, "path added");
+                let span = trace_span!("FsEventKind::PathAdded", ?path);
+                let _guard = span.enter();
                 let evt =
                     ExternalEvents::Watching(Watching::from_path_buf(&path.path, path.debounce));
-                self.ext_evt(evt);
+                self.publish_external_event(evt);
             }
             FsEventKind::PathRemoved(path) => {
-                tracing::trace!(?path.path, "path removed");
+                let span = trace_span!("FsEventKind::PathRemoved", ?path);
+                let _guard = span.enter();
                 let evt =
                     ExternalEvents::WatchingStopped(StoppedWatching::from_path_buf(&path.path));
-                self.ext_evt(evt);
+                self.publish_external_event(evt);
             }
         }
     }

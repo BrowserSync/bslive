@@ -1,6 +1,8 @@
-use crate::server::handler_change::Change;
+use crate::server::handler_change::{Change, ChangeWithSpan};
 use crate::servers_supervisor::actor::ServersSupervisor;
 use std::path::PathBuf;
+
+
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
@@ -12,16 +14,20 @@ pub struct FileChanged {
 impl actix::Handler<FileChanged> for ServersSupervisor {
     type Result = ();
 
+    #[tracing::instrument(skip_all, name = "FileChanged for ServersSupervisor")]
     fn handle(&mut self, msg: FileChanged, _ctx: &mut Self::Context) -> Self::Result {
         for child in self.handlers.values() {
             if child.identity.as_id() == msg.id {
-                child.actor_address.do_send(Change::fs(&msg.path))
+                let outgoing = ChangeWithSpan {
+                    evt: Change::fs(&msg.path),
+                };
+                child.actor_address.do_send(outgoing)
             }
         }
     }
 }
 
-#[derive(actix::Message)]
+#[derive(Debug, actix::Message)]
 #[rtype(result = "()")]
 pub struct FilesChanged {
     pub paths: Vec<PathBuf>,
@@ -31,11 +37,14 @@ pub struct FilesChanged {
 impl actix::Handler<FilesChanged> for ServersSupervisor {
     type Result = ();
 
+    #[tracing::instrument(skip_all, name = "FilesChanged for ServersSupervisor")]
     fn handle(&mut self, msg: FilesChanged, _ctx: &mut Self::Context) -> Self::Result {
+        tracing::debug!("sending message to {} handlers", self.handlers.len());
         for child in self.handlers.values() {
-            if child.identity.as_id() == msg.id {
-                child.actor_address.do_send(Change::fs_many(&msg.paths))
-            }
+            let outgoing = ChangeWithSpan {
+                evt: Change::fs_many(&msg.paths),
+            };
+            child.actor_address.do_send(outgoing);
         }
     }
 }

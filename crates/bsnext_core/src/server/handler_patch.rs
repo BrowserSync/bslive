@@ -5,6 +5,8 @@ use actix_rt::Arbiter;
 use anyhow::anyhow;
 use bsnext_input::route_manifest::RoutesManifest;
 use bsnext_input::server_config::ServerConfig;
+use std::sync::Arc;
+use tracing::debug_span;
 
 #[derive(actix::Message, Clone)]
 #[rtype(result = "anyhow::Result<()>")]
@@ -16,6 +18,10 @@ impl actix::Handler<Patch> for ServerActor {
     type Result = anyhow::Result<()>;
 
     fn handle(&mut self, msg: Patch, ctx: &mut Self::Context) -> Self::Result {
+        let span = debug_span!("Patch for ServerActor");
+        // todo(alpha): remove this
+        let s = Arc::new(span);
+        let _g = s.enter();
         let addr = ctx.address();
         tracing::trace!("Handler<PatchOne> for ServerActor");
         let app_state = self
@@ -28,11 +34,13 @@ impl actix::Handler<Patch> for ServerActor {
         let changeset = self.routes_manifest.changeset_for(&next_manifest);
         self.routes_manifest = RoutesManifest::new(&routes);
 
+        let c = s.clone();
         let update_dn = async move {
             let mut mut_routes = app_state_clone.routes.write().await;
             *mut_routes = routes;
             addr.do_send(RoutesUpdated {
                 change_set: changeset,
+                span: c,
             })
         };
 

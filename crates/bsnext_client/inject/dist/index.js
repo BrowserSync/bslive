@@ -6402,6 +6402,26 @@ var inputErrorDTOSchema = z.union([
   z.object({
     kind: z.literal("DirError"),
     payload: z.string()
+  }),
+  z.object({
+    kind: z.literal("YamlError"),
+    payload: z.string()
+  }),
+  z.object({
+    kind: z.literal("MarkdownError"),
+    payload: z.string()
+  }),
+  z.object({
+    kind: z.literal("Io"),
+    payload: z.string()
+  }),
+  z.object({
+    kind: z.literal("UnsupportedExtension"),
+    payload: z.string()
+  }),
+  z.object({
+    kind: z.literal("MissingExtension"),
+    payload: z.string()
   })
 ]);
 var debounceDTOSchema = z.object({
@@ -6458,7 +6478,7 @@ var externalEventsSchema = z.union([
     payload: inputAcceptedSchema
   }),
   z.object({
-    kind: z.literal("StartupFailed"),
+    kind: z.literal("InputError"),
     payload: inputErrorDTOSchema
   })
 ]);
@@ -6517,7 +6537,7 @@ function changedPath(change) {
       r.reload(path, {
         liveCSS: true,
         liveImg: true,
-        reloadMissingCSS: false,
+        reloadMissingCSS: true,
         originalPath: "",
         overrideURL: "",
         serverURL: ``

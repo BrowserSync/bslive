@@ -1,7 +1,8 @@
+mod otlp;
+
 use std::fmt::{Display, Formatter};
-use std::fs::File;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+
+pub use crate::otlp::{init_tracing_subscriber, OtelGuard};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
 pub enum LogLevel {
@@ -40,6 +41,12 @@ pub enum WriteOption {
     None,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum OtelOption {
+    On,
+    Off,
+}
+
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -58,7 +65,8 @@ pub fn init_tracing(
     log_level: Option<LogLevel>,
     format: Option<OutputFormat>,
     write_option: WriteOption,
-) {
+    otel: OtelOption,
+) -> OtelGuard {
     let log_level = log_level.unwrap_or(LogLevel::Error);
     let level = log_level.to_string();
     let lines = [
@@ -66,62 +74,9 @@ pub fn init_tracing(
         format!("bsnext_core={level}"),
         "bsnext_fs::stream=info".to_string(),
         "bsnext_fs::watcher=info".to_string(),
+        "bsnext_fs::buffered_debounce=info".to_string(),
         // "bsnext_core::server_actor=info".to_string(),
     ];
     let debug_str = lines.join(",");
-
-    match (format.unwrap_or_default(), write_option) {
-        (OutputFormat::Json, WriteOption::None) => {
-            let fmt_layer = tracing_subscriber::fmt::layer()
-                .without_time()
-                .json()
-                .with_file(false);
-            tracing_subscriber::registry()
-                .with(
-                    tracing_subscriber::EnvFilter::try_from_default_env()
-                        .unwrap_or_else(|_| debug_str.into()),
-                )
-                .with(fmt_layer)
-                .init();
-        }
-        (OutputFormat::Json, WriteOption::File) => {
-            let file = File::create("bslive.log").expect("create bslive.log");
-            let fmt_layer = tracing_subscriber::fmt::layer()
-                .json()
-                .with_ansi(false)
-                .with_writer(file);
-            tracing_subscriber::registry()
-                .with(
-                    tracing_subscriber::EnvFilter::try_from_default_env()
-                        .unwrap_or_else(|_| debug_str.into()),
-                )
-                .with(fmt_layer)
-                .init();
-        }
-        (OutputFormat::Normal, WriteOption::None) => {
-            let fmt_layer = tracing_subscriber::fmt::layer()
-                .without_time()
-                .with_file(false);
-            tracing_subscriber::registry()
-                .with(
-                    tracing_subscriber::EnvFilter::try_from_default_env()
-                        .unwrap_or_else(|_| debug_str.into()),
-                )
-                .with(fmt_layer)
-                .init();
-        }
-        (OutputFormat::Normal, WriteOption::File) => {
-            let file = File::create("bslive.log").expect("create bslive.log");
-            let fmt_layer = tracing_subscriber::fmt::layer()
-                .with_ansi(false)
-                .with_writer(file);
-            tracing_subscriber::registry()
-                .with(
-                    tracing_subscriber::EnvFilter::try_from_default_env()
-                        .unwrap_or_else(|_| debug_str.into()),
-                )
-                .with(fmt_layer)
-                .init();
-        }
-    };
+    init_tracing_subscriber(&debug_str, format, write_option, otel)
 }

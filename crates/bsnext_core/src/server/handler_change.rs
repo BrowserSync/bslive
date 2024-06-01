@@ -1,16 +1,23 @@
 use crate::server::actor::ServerActor;
 
-use std::path::{Path, PathBuf};
 use bsnext_dto::{ChangeDTO, ChangeKind, ClientEvent};
+use std::path::{Path, PathBuf};
 
-#[derive(actix::Message, Clone, Debug)]
-#[rtype(result = "()")]
+use tracing::trace_span;
+
+#[derive(Clone, Debug)]
 pub enum Change {
     Fs {
         path: PathBuf,
         change_kind: ChangeKind,
     },
     FsMany(Vec<Change>),
+}
+
+#[derive(actix::Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct ChangeWithSpan {
+    pub evt: Change,
 }
 
 impl Change {
@@ -45,7 +52,6 @@ impl Change {
     }
 }
 
-
 impl From<&Change> for ChangeDTO {
     fn from(value: &Change) -> Self {
         match value {
@@ -69,10 +75,16 @@ impl From<&Change> for ChangeDTO {
     }
 }
 
+impl From<Change> for ChangeDTO {
+    fn from(value: Change) -> Self {
+        (&value).into()
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use bsnext_dto::ClientEvent;
     use super::*;
+    use bsnext_dto::ClientEvent;
     #[test]
     fn test_serialize() -> anyhow::Result<()> {
         let fs = Change::fs("./a.js");
@@ -97,15 +109,17 @@ mod test {
     }
 }
 
-
-impl actix::Handler<Change> for ServerActor {
+impl actix::Handler<ChangeWithSpan> for ServerActor {
     type Result = ();
 
-    fn handle(&mut self, msg: Change, _ctx: &mut Self::Context) -> Self::Result {
-        if let Some(sender) = self.signals.as_ref().and_then(|s| s.client_sender.as_ref()) {
+    fn handle(&mut self, msg: ChangeWithSpan, _ctx: &mut Self::Context) -> Self::Result {
+        // dbg!(msg.id);
+        let s = trace_span!("ChangeWithSpan for ServerActor");
+        let _g = s.enter();
+        if let Some(client_sender) = self.signals.as_ref().and_then(|s| s.client_sender.as_ref()) {
             // todo: what messages are the clients expecting?
             tracing::info!("forwarding `Change` event to connected web socket clients");
-            match sender.send(ClientEvent::Change((&msg).into())) {
+            match client_sender.send(ClientEvent::Change((&msg.evt).into())) {
                 Ok(_) => {
                     tracing::trace!("change event sent to clients");
                 }
@@ -116,4 +130,3 @@ impl actix::Handler<Change> for ServerActor {
         }
     }
 }
-

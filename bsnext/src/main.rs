@@ -8,11 +8,13 @@ use bsnext_output::{OutputWriter, Writers};
 use bsnext_system::args::Args;
 use bsnext_system::start_kind::StartKind;
 use bsnext_system::startup::{DidStart, StartupResult};
-use bsnext_system::{BsSystem, Start};
-use bsnext_tracing::{init_tracing, OutputFormat, WriteOption};
+use bsnext_system::{BsSystem, EventWithSpan, Start};
+use bsnext_tracing::{init_tracing, OtelOption, OutputFormat, WriteOption};
 use clap::Parser;
 use tokio::sync::{mpsc, oneshot};
+use tracing::debug_span;
 
+// todo(alpha): remove the duplicated impl of this
 #[actix_rt::main]
 async fn main() -> Result<(), anyhow::Error> {
     std::env::set_var("RUST_LIB_BACKTRACE", "0");
@@ -25,12 +27,17 @@ async fn main() -> Result<(), anyhow::Error> {
         WriteOption::None
     };
 
-    init_tracing(args.log_level, args.format, write_opt);
+    let otel = if args.otel {
+        OtelOption::On
+    } else {
+        OtelOption::Off
+    };
+    let _g = init_tracing(args.log_level, args.format, write_opt, otel);
     tracing::debug!("{:#?}", args);
 
     let (tx, rx) = oneshot::channel();
     let (startup_oneshot_sender, startup_oneshot_receiver) = oneshot::channel::<StartupResult>();
-    let (events_sender, mut events_receiver) = mpsc::channel::<ExternalEvents>(1);
+    let (events_sender, mut events_receiver) = mpsc::channel::<EventWithSpan>(1);
 
     let system = BsSystem::new();
     let sys_addr = system.start();
@@ -59,7 +66,9 @@ async fn main() -> Result<(), anyhow::Error> {
             None | Some(OutputFormat::Normal) => Writers::Pretty,
             Some(OutputFormat::Json) => Writers::Json,
         };
-        while let Some(evt) = events_receiver.recv().await {
+        while let Some(EventWithSpan { evt, .. }) = events_receiver.recv().await {
+            let span = debug_span!("External Event processor");
+            let _g2 = span.enter();
             tracing::debug!(external_event=?evt);
             match printer.handle_event(stdout, &evt) {
                 Ok(_v) => {}
@@ -100,7 +109,7 @@ async fn main() -> Result<(), anyhow::Error> {
             tracing::info!(?v, "events seen");
             let errors = v
                 .iter()
-                .filter(|e| matches!(e, ExternalEvents::StartupFailed(..)))
+                .filter(|e| matches!(e, ExternalEvents::InputError(..)))
                 .collect::<Vec<_>>();
             if !errors.is_empty() {
                 tracing::info!("stopped for the following reasons");

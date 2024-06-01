@@ -4,9 +4,9 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Json, Router};
+use bsnext_dto::{RouteDTO, ServerDesc};
 use http::{StatusCode, Uri};
 use std::sync::Arc;
-use bsnext_dto::{RouteDTO, ServerDesc};
 
 async fn all_servers_handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
     match &app.parent {

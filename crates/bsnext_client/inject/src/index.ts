@@ -48,7 +48,7 @@ function changedPath(change: ChangeDTO) {
       r.reload(path, {
         liveCSS: true,
         liveImg: true,
-        reloadMissingCSS: false,
+        reloadMissingCSS: true,
         originalPath: '',
         overrideURL: '',
         serverURL: ``,

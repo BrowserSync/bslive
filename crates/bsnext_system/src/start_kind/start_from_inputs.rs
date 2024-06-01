@@ -1,4 +1,4 @@
-use crate::startup::{StartupContext, SystemStart};
+use crate::startup::{StartupContext, SystemStart, SystemStartArgs};
 
 use bsnext_input::{Input, InputError};
 use std::path::{Path, PathBuf};
@@ -9,13 +9,12 @@ pub struct StartFromInputPaths {
 }
 
 impl SystemStart for StartFromInputPaths {
-    fn input(&self, ctx: &StartupContext) -> Result<(Input, Option<PathBuf>), InputError> {
-        let (input, path) = from_yml_paths(&ctx.cwd, &self.input_paths)?;
-        Ok((input, Some(path)))
+    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
+        from_yml_paths(&ctx.cwd, &self.input_paths)
     }
 }
 
-fn from_yml_paths<T: AsRef<str>>(cwd: &Path, inputs: &[T]) -> Result<(Input, PathBuf), InputError> {
+fn from_yml_paths<T: AsRef<str>>(cwd: &Path, inputs: &[T]) -> Result<SystemStartArgs, InputError> {
     let input_candidates = inputs
         .iter()
         .map(|path| cwd.join(path.as_ref()))
@@ -61,7 +60,17 @@ fn from_yml_paths<T: AsRef<str>>(cwd: &Path, inputs: &[T]) -> Result<(Input, Pat
 
     let result = Input::from_input_path(input_path);
     match result {
-        Ok(input) => Ok((input, input_path.to_path_buf())),
-        Err(e) => Err(InputError::InvalidInput(e.to_string())),
+        Ok(input) => Ok(SystemStartArgs::PathWithInput {
+            path: input_path.to_path_buf(),
+            input,
+        }),
+        Err(InputError::YamlError(yaml_error)) => Ok(SystemStartArgs::PathWithInvalidInput {
+            path: input_path.to_path_buf(),
+            input_error: InputError::YamlError(yaml_error),
+        }),
+        Err(e) => {
+            tracing::error!("cannot continue");
+            Err(e)
+        }
     }
 }

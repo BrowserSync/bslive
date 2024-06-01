@@ -87,7 +87,7 @@ export type ExternalEvents =
 	| { kind: "FilesChanged", payload: FilesChangedDTO }
 	| { kind: "InputFileChanged", payload: FileChanged }
 	| { kind: "InputAccepted", payload: InputAccepted }
-	| { kind: "StartupFailed", payload: InputErrorDTO };
+	| { kind: "InputError", payload: InputErrorDTO };
 
 export interface ExternalEvent {
 	level: EventLevel;
@@ -127,7 +127,12 @@ export type InputErrorDTO =
 	| { kind: "InputWriteError", payload: string }
 	| { kind: "PathError", payload: string }
 	| { kind: "PortError", payload: string }
-	| { kind: "DirError", payload: string };
+	| { kind: "DirError", payload: string }
+	| { kind: "YamlError", payload: string }
+	| { kind: "MarkdownError", payload: string }
+	| { kind: "Io", payload: string }
+	| { kind: "UnsupportedExtension", payload: string }
+	| { kind: "MissingExtension", payload: string };
 
 export type ClientEvent = 
 	| { kind: "Change", payload: ChangeDTO };

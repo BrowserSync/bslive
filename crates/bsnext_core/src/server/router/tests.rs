@@ -5,6 +5,7 @@ mod test {
     use axum::body::Body;
     use axum::extract::Request;
     use axum::response::Response;
+    use bsnext_dto::ClientEvent;
     use bsnext_input::route::{CorsOpts, Route, RouteKind};
     use bsnext_input::server_config::{Identity, ServerConfig};
     use http::HeaderValue;
@@ -12,7 +13,6 @@ mod test {
     use std::sync::Arc;
     use tokio::sync::RwLock;
     use tower::ServiceExt;
-    use bsnext_dto::ClientEvent;
 
     impl From<ServerConfig> for ServerState {
         fn from(val: ServerConfig) -> ServerState {

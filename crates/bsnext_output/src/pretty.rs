@@ -1,7 +1,7 @@
 use crate::OutputWriter;
 use bsnext_dto::{
-    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, ServerChange,
-    ServerChangeSetItem, ServersStarted, StoppedWatching, Watching,
+    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO,
+    ServerChange, ServerChangeSetItem, ServersStarted, StoppedWatching, Watching,
 };
 use std::io::Write;
 use std::path::PathBuf;
@@ -14,9 +14,7 @@ impl OutputWriter for PrettyPrint {
             ExternalEvents::ServersStarted(servers_started) => {
                 print_server_started(sink, servers_started)
             }
-            ExternalEvents::StartupFailed(_input_err) => {
-                unreachable!("StartupFailed")
-            }
+            ExternalEvents::InputError(input_err) => print_input_error(sink, input_err),
             ExternalEvents::Watching(watching) => print_watching(sink, watching),
             ExternalEvents::WatchingStopped(watching) => print_stopped_watching(sink, watching),
             ExternalEvents::InputAccepted(input_accepted) => {
@@ -80,6 +78,16 @@ pub fn print_input_accepted<W: Write>(w: &mut W, evt: &InputAccepted) -> anyhow:
 pub fn print_watching<W: Write>(w: &mut W, evt: &Watching) -> anyhow::Result<()> {
     for x in &evt.paths {
         writeln!(w, "[watching {}] {}", evt.debounce, x)?;
+    }
+    Ok(())
+}
+
+pub fn print_input_error<W: Write>(w: &mut W, evt: &InputErrorDTO) -> anyhow::Result<()> {
+    match evt {
+        InputErrorDTO::YamlError(yaml) => {
+            writeln!(w, "{}", yaml)?;
+        }
+        _ => todo!("more errors?"),
     }
     Ok(())
 }

@@ -11,10 +11,10 @@ use std::collections::HashSet;
 use std::future::Future;
 use std::net::SocketAddr;
 
+use bsnext_dto::{ServerChange, ServerChangeSet, ServerChangeSetItem};
 use std::pin::Pin;
 use tokio::sync::oneshot::Sender;
-use tracing::{span, Level};
-use bsnext_dto::{ServerChange, ServerChangeSet, ServerChangeSetItem};
+use tracing::{span, Instrument, Level};
 
 #[derive(Debug)]
 pub struct ServersSupervisor {
@@ -77,66 +77,69 @@ impl ServersSupervisor {
             })
             .collect::<Vec<_>>();
 
-        Box::pin(async move {
-            let mut changeset = ServerChangeSet { items: vec![] };
-            for x in shutdown_jobs {
-                tracing::debug!("stopping {:?}", x.identity);
-                changeset.items.push(ServerChangeSetItem {
-                    identity: (&x.identity).into(),
-                    change: ServerChange::Stopped {
-                        bind_address: x.socket_addr.to_string(),
-                    },
-                });
-                match x.actor_address.send(Stop).await {
-                    Ok(_) => {
-                        self_addr.do_send(ChildStopped {
-                            identity: x.identity.clone(),
-                        });
-                    }
-                    Err(_) => {
-                        tracing::error!("couldn't send Stop2 {:?}", x.identity);
-                    }
-                }
-            }
-
-            if !start_jobs.is_empty() {
-                tracing::debug!("starting {:?} servers", start_jobs.len());
-                let idens = start_jobs
-                    .iter()
-                    .map(|x| &x.identity)
-                    .map(|x| x.to_owned())
-                    .collect::<Vec<_>>();
-                match self_addr
-                    .send(StartMessage {
-                        server_configs: start_jobs,
-                    })
-                    .await
-                {
-                    Ok(_) => {
-                        for x in idens {
-                            changeset.items.push(ServerChangeSetItem {
-                                identity: (&x).into(),
-                                change: ServerChange::Started,
-                            })
+        Box::pin(
+            async move {
+                let mut changeset = ServerChangeSet { items: vec![] };
+                for x in shutdown_jobs {
+                    tracing::debug!("stopping {:?}", x.identity);
+                    changeset.items.push(ServerChangeSetItem {
+                        identity: (&x.identity).into(),
+                        change: ServerChange::Stopped {
+                            bind_address: x.socket_addr.to_string(),
+                        },
+                    });
+                    match x.actor_address.send(Stop).await {
+                        Ok(_) => {
+                            self_addr.do_send(ChildStopped {
+                                identity: x.identity.clone(),
+                            });
+                        }
+                        Err(_) => {
+                            tracing::error!("couldn't send Stop2 {:?}", x.identity);
                         }
                     }
-                    Err(_) => tracing::error!("could not send StartMessage to self"),
-                };
-            }
+                }
 
-            for (child, config) in patch_jobs {
-                tracing::debug!("patching {:?}", child.identity);
-                child.actor_address.do_send(Patch {
-                    server_config: config,
-                });
-                changeset.items.push(ServerChangeSetItem {
-                    identity: (&child.identity).into(),
-                    change: ServerChange::Patched,
-                })
-            }
+                if !start_jobs.is_empty() {
+                    tracing::debug!("starting {:?} servers", start_jobs.len());
+                    let idens = start_jobs
+                        .iter()
+                        .map(|x| &x.identity)
+                        .map(|x| x.to_owned())
+                        .collect::<Vec<_>>();
+                    match self_addr
+                        .send(StartMessage {
+                            server_configs: start_jobs,
+                        })
+                        .await
+                    {
+                        Ok(_) => {
+                            for x in idens {
+                                changeset.items.push(ServerChangeSetItem {
+                                    identity: (&x).into(),
+                                    change: ServerChange::Started,
+                                })
+                            }
+                        }
+                        Err(_) => tracing::error!("could not send StartMessage to self"),
+                    };
+                }
 
-            changeset
-        })
+                for (child, config) in patch_jobs {
+                    tracing::debug!("patching {:?}", child.identity);
+                    child.actor_address.do_send(Patch {
+                        server_config: config,
+                    });
+                    changeset.items.push(ServerChangeSetItem {
+                        identity: (&child.identity).into(),
+                        change: ServerChange::Patched,
+                    })
+                }
+
+                changeset
+            }
+            .instrument(span.clone()),
+        )
     }
 }
 

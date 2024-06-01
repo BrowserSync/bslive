@@ -1,7 +1,7 @@
 use crate::json::JsonPrint;
 use crate::pretty::PrettyPrint;
-use std::io::Write;
 use bsnext_dto::ExternalEvents;
+use std::io::Write;
 
 pub mod json;
 pub mod pretty;

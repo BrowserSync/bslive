@@ -7,6 +7,9 @@ pub struct Args {
     #[arg(short, long, value_enum)]
     pub log_level: Option<LogLevel>,
 
+    #[arg(long)]
+    pub otel: bool,
+
     /// output internal logs to bslive.log in the current directory
     #[arg(long, name = "write-log")]
     pub write_log: bool,

@@ -27,8 +27,22 @@ impl StartupContext {
     }
 }
 
+pub enum SystemStartArgs {
+    PathWithInput {
+        path: PathBuf,
+        input: Input,
+    },
+    InputOnly {
+        input: Input,
+    },
+    PathWithInvalidInput {
+        path: PathBuf,
+        input_error: InputError,
+    },
+}
+
 pub trait SystemStart {
-    fn input(&self, ctx: &StartupContext) -> Result<(Input, Option<PathBuf>), InputError>;
+    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError>;
 }
 
 impl Default for StartupContext {

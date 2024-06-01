@@ -161,6 +161,26 @@ export const inputErrorDTOSchema = z.union([
     kind: z.literal("DirError"),
     payload: z.string(),
   }),
+  z.object({
+    kind: z.literal("YamlError"),
+    payload: z.string(),
+  }),
+  z.object({
+    kind: z.literal("MarkdownError"),
+    payload: z.string(),
+  }),
+  z.object({
+    kind: z.literal("Io"),
+    payload: z.string(),
+  }),
+  z.object({
+    kind: z.literal("UnsupportedExtension"),
+    payload: z.string(),
+  }),
+  z.object({
+    kind: z.literal("MissingExtension"),
+    payload: z.string(),
+  }),
 ]);
 
 export const debounceDTOSchema = z.object({
@@ -221,7 +241,7 @@ export const externalEventsSchema = z.union([
     payload: inputAcceptedSchema,
   }),
   z.object({
-    kind: z.literal("StartupFailed"),
+    kind: z.literal("InputError"),
     payload: inputErrorDTOSchema,
   }),
 ]);

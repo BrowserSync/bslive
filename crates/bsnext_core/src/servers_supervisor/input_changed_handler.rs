@@ -4,6 +4,7 @@ use bsnext_input::Input;
 use std::future::Future;
 
 use std::pin::Pin;
+
 use bsnext_dto::ServerChangeSet;
 
 #[derive(actix::Message)]
@@ -15,6 +16,7 @@ pub struct InputChanged {
 impl actix::Handler<InputChanged> for ServersSupervisor {
     type Result = Pin<Box<dyn Future<Output = ServerChangeSet>>>;
 
+    #[tracing::instrument(skip_all, name = "InputChanged for ServersSupervisor")]
     fn handle(&mut self, msg: InputChanged, ctx: &mut Self::Context) -> Self::Result {
         self.input_changed(ctx.address(), msg.input)
     }

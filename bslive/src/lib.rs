@@ -16,8 +16,8 @@ use bsnext_output::{OutputWriter, Writers};
 use bsnext_system::args::Args;
 use bsnext_system::start_kind::StartKind;
 use bsnext_system::startup::{DidStart, StartupResult};
-use bsnext_system::{BsSystem, Start};
-use bsnext_tracing::{init_tracing, OutputFormat, WriteOption};
+use bsnext_system::{BsSystem, EventWithSpan, Start};
+use bsnext_tracing::{init_tracing, OtelOption, OutputFormat, WriteOption};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::sleep;
 
@@ -46,6 +46,7 @@ fn start_sync(args: Vec<String>) -> napi::bindgen_prelude::Result<i32> {
     Ok(result)
 }
 
+// todo(alpha): remove this duplicated `main` wrapper
 async fn main_sync(args: Vec<String>) -> Result<(), anyhow::Error> {
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
     let args = Args::parse_from(&args);
@@ -56,12 +57,17 @@ async fn main_sync(args: Vec<String>) -> Result<(), anyhow::Error> {
     } else {
         WriteOption::None
     };
-    init_tracing(args.log_level, args.format, write_opt);
+    let otel = if args.otel {
+        OtelOption::On
+    } else {
+        OtelOption::Off
+    };
+    init_tracing(args.log_level, args.format, write_opt, otel);
     tracing::debug!("{:#?}", args);
 
     let (tx, rx) = oneshot::channel();
     let (startup_oneshot_sender, startup_oneshot_receiver) = oneshot::channel::<StartupResult>();
-    let (events_sender, mut events_receiver) = mpsc::channel::<ExternalEvents>(1);
+    let (events_sender, mut events_receiver) = mpsc::channel::<EventWithSpan>(1);
 
     let system = BsSystem::new();
     let sys_addr = system.start();
@@ -91,7 +97,7 @@ async fn main_sync(args: Vec<String>) -> Result<(), anyhow::Error> {
             None | Some(OutputFormat::Normal) => Writers::Pretty,
             Some(OutputFormat::Json) => Writers::Json,
         };
-        while let Some(evt) = events_receiver.recv().await {
+        while let Some(EventWithSpan { evt, .. }) = events_receiver.recv().await {
             match printer.handle_event(stdout, &evt) {
                 Ok(_v) => {}
                 Err(e) => tracing::error!("could not write to stdout {e}"),
@@ -119,7 +125,7 @@ async fn main_sync(args: Vec<String>) -> Result<(), anyhow::Error> {
             tracing::info!(?v, "events seen");
             let errors = v
                 .iter()
-                .filter(|e| matches!(e, ExternalEvents::StartupFailed(..)))
+                .filter(|e| matches!(e, ExternalEvents::InputError(..)))
                 .collect::<Vec<_>>();
             if !errors.is_empty() {
                 tracing::info!("stopped for the following reasons");

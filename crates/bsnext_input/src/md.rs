@@ -34,6 +34,15 @@ pub enum BsLiveKinds {
     Ignored,
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+pub enum MarkdownError {
+    #[error("could not parse Markdown: {0}")]
+    ParseError(String),
+    #[error("invalid markdown format: {0}")]
+    InvalidFormat(String),
+}
+
 trait BsLive {
     fn kind(&self) -> BsLiveKinds;
     fn is_input(&self) -> bool;
@@ -64,7 +73,7 @@ impl TryInto<Input> for &Node {
 }
 
 impl TryInto<Input> for Vec<Node> {
-    type Error = anyhow::Error;
+    type Error = MarkdownError;
     fn try_into(self) -> Result<Input, Self::Error> {
         nodes_to_input(&self)
     }
@@ -181,7 +190,7 @@ enum Convert {
     Route(Route),
 }
 
-pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, anyhow::Error> {
+pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
     let mut routes = vec![];
     let mut server_config: Option<Input> = None;
     let mut parser = many0(alt((
@@ -230,7 +239,7 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, anyhow::Error> {
                 }
             }
         }
-        Err(e) => return Err(anyhow::anyhow!(e.to_string())),
+        Err(e) => return Err(MarkdownError::InvalidFormat(e.to_string())),
     }
 
     match server_config.take() {
@@ -254,7 +263,7 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, anyhow::Error> {
     }
 }
 
-pub fn str_to_nodes(input: &str) -> Result<Vec<Node>, anyhow::Error> {
+fn str_to_nodes(input: &str) -> Result<Vec<Node>, MarkdownError> {
     let opts = ParseOptions {
         constructs: Constructs {
             frontmatter: true,
@@ -262,7 +271,8 @@ pub fn str_to_nodes(input: &str) -> Result<Vec<Node>, anyhow::Error> {
         },
         ..Default::default()
     };
-    let root = markdown::to_mdast(input, &opts).map_err(|e| anyhow::anyhow!(e))?;
+    let root =
+        markdown::to_mdast(input, &opts).map_err(|e| MarkdownError::ParseError(e.to_string()))?;
     match root {
         Node::Root(root) => Ok(root.children),
         _ => {
@@ -271,7 +281,7 @@ pub fn str_to_nodes(input: &str) -> Result<Vec<Node>, anyhow::Error> {
     }
 }
 
-pub fn md_to_input(input: &str) -> Result<Input, anyhow::Error> {
+pub fn md_to_input(input: &str) -> Result<Input, MarkdownError> {
     let root = str_to_nodes(input)?;
     nodes_to_input(&root)
 }

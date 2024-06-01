@@ -1,10 +1,9 @@
-use crate::startup::{StartupContext, SystemStart};
+use crate::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_example::Example;
 use bsnext_input::server_config::Identity;
 use bsnext_input::target::TargetKind;
-use bsnext_input::{fs_write_input, rand_word, DirError, Input, InputError};
+use bsnext_input::{fs_write_input, rand_word, DirError, InputError};
 use std::fs;
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct StartFromExample {
@@ -17,7 +16,7 @@ pub struct StartFromExample {
 }
 
 impl SystemStart for StartFromExample {
-    fn input(&self, ctx: &StartupContext) -> Result<(Input, Option<PathBuf>), InputError> {
+    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
         let identity = Identity::from_port_or_named(self.port)?;
         let input = self.example.into_input(identity);
         let name = self.name.clone();
@@ -41,9 +40,9 @@ impl SystemStart for StartFromExample {
         };
         if self.write_input {
             let path = fs_write_input(&dir, &input, self.target_kind.clone())?;
-            Ok((input, Some(path)))
+            Ok(SystemStartArgs::PathWithInput { path, input })
         } else {
-            Ok((input, None))
+            Ok(SystemStartArgs::InputOnly { input })
         }
     }
 }

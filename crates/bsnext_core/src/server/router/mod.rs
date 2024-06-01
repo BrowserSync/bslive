@@ -29,9 +29,9 @@ use crate::server::router::pub_api::pub_api;
 use crate::server::state::ServerState;
 use crate::ws::ws_handler;
 use bsnext_client::html_with_base;
+use bsnext_dto::{RouteDTO, ServerDesc};
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
-use bsnext_dto::{RouteDTO, ServerDesc};
 
 mod assets;
 mod pub_api;

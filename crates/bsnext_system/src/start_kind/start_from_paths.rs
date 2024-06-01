@@ -1,9 +1,8 @@
-use crate::startup::{StartupContext, SystemStart};
+use crate::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::paths::from_paths;
 use bsnext_input::server_config::Identity;
 use bsnext_input::target::TargetKind;
-use bsnext_input::{fs_write_input, Input, InputError};
-use std::path::PathBuf;
+use bsnext_input::{fs_write_input, InputError};
 
 #[derive(Debug)]
 pub struct StartFromPaths {
@@ -13,15 +12,14 @@ pub struct StartFromPaths {
 }
 
 impl SystemStart for StartFromPaths {
-    fn input(&self, ctx: &StartupContext) -> Result<(Input, Option<PathBuf>), InputError> {
+    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
         let identity = Identity::from_port_or_named(self.port)?;
         let input = from_paths(&ctx.cwd, &self.paths, identity)?;
         if self.write_input {
             let path = fs_write_input(&ctx.cwd, &input, TargetKind::Yaml)?;
-
-            Ok((input, Some(path)))
+            Ok(SystemStartArgs::PathWithInput { input, path })
         } else {
-            Ok((input, None))
+            Ok(SystemStartArgs::InputOnly { input })
         }
     }
 }
@@ -43,9 +41,12 @@ mod test {
         };
         let i = v.input(&ctx);
         tmp_dir.close()?;
-        let (input, _) = i.unwrap();
-        insta::assert_debug_snapshot!(input);
-        insta::assert_yaml_snapshot!(input);
+        if let SystemStartArgs::PathWithInput { path: _, input } = i.unwrap() {
+            insta::assert_debug_snapshot!(input);
+            insta::assert_yaml_snapshot!(input);
+        } else {
+            unreachable!("cannot get here?")
+        }
         Ok(())
     }
 }

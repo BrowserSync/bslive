@@ -15,6 +15,7 @@ impl Handler<RequestWatchPath> for FsWatcher {
     type Result = Result<(), FsWatchError>;
 
     // todo: ensure this isn't sent for every input change
+    #[tracing::instrument(skip_all, name = "RequestWatchPath for FsWatcher")]
     fn handle(&mut self, msg: RequestWatchPath, _ctx: &mut Self::Context) -> Self::Result {
         tracing::trace!(path = ?msg.path, "-> WatchPath");
         if let Some(watcher) = self.watcher.as_mut() {

@@ -98,7 +98,7 @@ pub enum ExternalEvents {
     FilesChanged(FilesChangedDTO),
     InputFileChanged(FileChanged),
     InputAccepted(InputAccepted),
-    StartupFailed(InputErrorDTO),
+    InputError(InputErrorDTO),
 }
 
 #[typeshare]
@@ -263,6 +263,11 @@ pub enum InputErrorDTO {
     PathError(String),
     PortError(String),
     DirError(String),
+    YamlError(String),
+    MarkdownError(String),
+    Io(String),
+    UnsupportedExtension(String),
+    MissingExtension(String),
 }
 
 impl From<&InputError> for InputErrorDTO {
@@ -275,7 +280,20 @@ impl From<&InputError> for InputErrorDTO {
             e @ InputError::PathError(_) => InputErrorDTO::PathError(e.to_string()),
             e @ InputError::PortError(_) => InputErrorDTO::PortError(e.to_string()),
             e @ InputError::DirError(_) => InputErrorDTO::DirError(e.to_string()),
+            e @ InputError::MarkdownError(_) => InputErrorDTO::MarkdownError(e.to_string()),
+            e @ InputError::YamlError(_) => InputErrorDTO::YamlError(e.to_string()),
+            e @ InputError::Io(_) => InputErrorDTO::Io(e.to_string()),
+            e @ InputError::UnsupportedExtension(_) => {
+                InputErrorDTO::UnsupportedExtension(e.to_string())
+            }
+            e @ InputError::MissingExtension(_) => InputErrorDTO::MissingExtension(e.to_string()),
         }
+    }
+}
+
+impl From<InputError> for InputErrorDTO {
+    fn from(value: InputError) -> Self {
+        (&value).into()
     }
 }
 
