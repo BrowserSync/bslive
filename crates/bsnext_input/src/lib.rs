@@ -169,9 +169,9 @@ pub fn fs_write_input(
         TargetKind::Md => md::input_to_str(input),
     };
     let name = match target_kind {
-        TargetKind::Yaml => "input.yml",
-        TargetKind::Toml => "input.toml",
-        TargetKind::Md => "input.md",
+        TargetKind::Yaml => "bslive.yml",
+        TargetKind::Toml => "bslive.toml",
+        TargetKind::Md => "bslive.md",
     };
     let next_path = cwd.join(name);
     fs::write(&next_path, string)

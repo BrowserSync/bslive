@@ -3,6 +3,6 @@ servers:
   routes:
   - path: /
     watch: true
-    dir: .
+    dir: examples/basic/public
     headers: null
   watchers: []

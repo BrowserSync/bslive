@@ -6,7 +6,7 @@ use crate::Input;
 
 #[test]
 fn test_deserialize() {
-    let input = include_str!("../../../../examples/kitchen-sink/input.yml");
+    let input = include_str!("../../../../examples/kitchen-sink/bslive.yml");
     let _: Input = serde_yaml::from_str(input).unwrap();
 }
 

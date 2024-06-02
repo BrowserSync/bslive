@@ -20,7 +20,7 @@ fn from_yml_paths<T: AsRef<str>>(cwd: &Path, inputs: &[T]) -> Result<SystemStart
         .map(|path| cwd.join(path.as_ref()))
         .collect::<Vec<PathBuf>>();
 
-    let lookups = ["input.yml", "input.yaml"]
+    let lookups = ["bslive.yml", "bslive.yaml"]
         .iter()
         .map(|path| cwd.join(path))
         .collect::<Vec<PathBuf>>();
