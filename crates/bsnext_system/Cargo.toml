@@ -12,6 +12,7 @@ bsnext_core = { path = "../bsnext_core" }
 bsnext_fs = { path = "../bsnext_fs" }
 bsnext_dto = { path = "../bsnext_dto" }
 bsnext_example = { path = "../bsnext_example" }
+bsnext_output = { path = "../bsnext_output" }
 rand = "0.8.5"
 
 anyhow = { workspace = true }

@@ -2,8 +2,6 @@ use crate::server::handler_change::{Change, ChangeWithSpan};
 use crate::servers_supervisor::actor::ServersSupervisor;
 use std::path::PathBuf;
 
-
-
 #[derive(actix::Message)]
 #[rtype(result = "()")]
 pub struct FileChanged {

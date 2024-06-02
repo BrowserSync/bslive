@@ -41,7 +41,8 @@ mod test {
         };
         let i = v.input(&ctx);
         tmp_dir.close()?;
-        if let SystemStartArgs::PathWithInput { path: _, input } = i.unwrap() {
+        let start_args = i.unwrap();
+        if let SystemStartArgs::InputOnly { input } = start_args {
             insta::assert_debug_snapshot!(input);
             insta::assert_yaml_snapshot!(input);
         } else {
