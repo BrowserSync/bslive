@@ -22,10 +22,7 @@ fn start_sync(args: Vec<String>) -> napi::bindgen_prelude::Result<i32> {
     let result = sys.block_on(async move {
         match from_args(args).await {
             Ok(_) => 0,
-            Err(e) => {
-                eprintln!("{:?}", e);
-                1
-            }
+            Err(_) => 1,
         }
     });
     Ok(result)

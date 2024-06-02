@@ -3,6 +3,7 @@ use crate::start_kind::StartKind;
 use crate::startup::{DidStart, StartupResult};
 use crate::{BsSystem, EventWithSpan, Start};
 use actix::Actor;
+
 use bsnext_dto::ExternalEvents;
 use bsnext_output::{OutputWriter, Writers};
 use bsnext_tracing::{init_tracing, OtelOption, OutputFormat, WriteOption};
@@ -59,7 +60,11 @@ where
 
     match startup_oneshot_receiver.await? {
         Ok(DidStart::Started) => tracing::info!("started..."),
-        Err(e) => return Err(e.into()),
+        Err(e) => {
+            // todo(alpha): decide on the best place to output this?
+            eprintln!("{e:?}");
+            return Err(e.into());
+        }
     };
 
     let events_handler = tokio::spawn(async move {

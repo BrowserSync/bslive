@@ -13,7 +13,9 @@ use std::sync::Arc;
 
 use bsnext_example::Example;
 
-use crate::startup::{DidStart, StartupContext, StartupResult, SystemStart, SystemStartArgs};
+use crate::startup::{
+    DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
+};
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
@@ -260,7 +262,10 @@ impl Handler<Start> for BsSystem {
                 self.publish_external_event(ExternalEvents::InputError(input_error.into()));
             }
             Err(e) => {
-                tracing::error!(?e);
+                msg.startup_oneshot_sender
+                    .send(Err(StartupError::InputError(e)))
+                    .expect("oneshot must succeed");
+                return;
             }
         }
 
