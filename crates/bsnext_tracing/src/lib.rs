@@ -67,16 +67,22 @@ pub fn init_tracing(
     write_option: WriteOption,
     otel: OtelOption,
 ) -> OtelGuard {
-    let log_level = log_level.unwrap_or(LogLevel::Error);
-    let level = log_level.to_string();
-    let lines = [
-        format!("bsnext={level}"),
-        format!("bsnext_core={level}"),
-        "bsnext_fs::stream=info".to_string(),
-        "bsnext_fs::watcher=info".to_string(),
-        "bsnext_fs::buffered_debounce=info".to_string(),
-        // "bsnext_core::server_actor=info".to_string(),
-    ];
-    let debug_str = lines.join(",");
-    init_tracing_subscriber(&debug_str, format, write_option, otel)
+    match log_level {
+        None => OtelGuard {
+            meter_provider: None,
+        },
+        Some(level) => {
+            let level = level.to_string();
+            let lines = [
+                format!("bsnext={level}"),
+                format!("bsnext_core={level}"),
+                "bsnext_fs::stream=info".to_string(),
+                "bsnext_fs::watcher=info".to_string(),
+                "bsnext_fs::buffered_debounce=info".to_string(),
+                // "bsnext_core::server_actor=info".to_string(),
+            ];
+            let debug_str = lines.join(",");
+            init_tracing_subscriber(&debug_str, format, write_option, otel)
+        }
+    }
 }

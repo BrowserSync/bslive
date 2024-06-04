@@ -1,20 +1,28 @@
 use crate::OutputWriter;
 use bsnext_dto::{
     ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO,
-    ServerChange, ServerChangeSetItem, ServersStarted, StoppedWatching, Watching,
+    ServerChange, ServerChangeSetItem, ServersStarted, StartupErrorDTO, StartupEvent,
+    StoppedWatching, Watching,
 };
 use std::io::Write;
+use std::marker::PhantomData;
 use std::path::PathBuf;
 
 pub struct PrettyPrint;
 
 impl OutputWriter for PrettyPrint {
-    fn handle_event<W: Write>(&self, sink: &mut W, evt: &ExternalEvents) -> anyhow::Result<()> {
+    fn handle_external_event<W: Write>(
+        &self,
+        sink: &mut W,
+        evt: &ExternalEvents,
+    ) -> anyhow::Result<()> {
         match &evt {
             ExternalEvents::ServersStarted(servers_started) => {
                 print_server_started(sink, servers_started)
             }
-            ExternalEvents::InputError(input_err) => print_input_error(sink, input_err),
+            ExternalEvents::InputError(input_err) => {
+                print_input_error(sink, Indent::None, input_err)
+            }
             ExternalEvents::Watching(watching) => print_watching(sink, watching),
             ExternalEvents::WatchingStopped(watching) => print_stopped_watching(sink, watching),
             ExternalEvents::InputAccepted(input_accepted) => {
@@ -26,6 +34,80 @@ impl OutputWriter for PrettyPrint {
                 print_input_file_changed(sink, file_changed)
             }
         }
+    }
+
+    fn handle_startup_event<W: Write>(
+        &self,
+        sink: &mut W,
+        evt: &StartupEvent,
+    ) -> anyhow::Result<()> {
+        match evt {
+            StartupEvent::Started => {
+                write!(sink, "{}", Line::prefixed().info("started..."))?;
+            }
+            StartupEvent::FailedStartup(err) => {
+                writeln!(
+                    sink,
+                    "{}",
+                    Line::prefixed().info("An error prevented startup!")
+                )?;
+                writeln!(sink)?;
+                match err {
+                    StartupErrorDTO::InputError(input_err) => {
+                        print_input_error(sink, Indent::Some(4), input_err)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+// const prefix: ANSIGenericString<str> = ansi_term::Color::Red.paint("[bslive]");
+
+trait LineState {}
+struct Line<T: LineState = Orig> {
+    indent: Indent,
+    _state: PhantomData<T>,
+}
+struct Orig;
+impl LineState for Orig {}
+struct Prefixed;
+impl LineState for Prefixed {}
+
+struct Unprefixed;
+impl LineState for Unprefixed {}
+impl Line<Orig> {
+    pub fn prefixed() -> Line<Prefixed> {
+        Line {
+            indent: Indent::None,
+            _state: PhantomData,
+        }
+    }
+}
+impl Line<Orig> {
+    pub fn unprefixed() -> Line<Unprefixed> {
+        Line {
+            indent: Indent::None,
+            _state: PhantomData,
+        }
+    }
+}
+impl Line<Prefixed> {
+    pub fn info(self, str: &str) -> String {
+        format!("[bslive] {}", ansi_term::Color::Cyan.paint(str))
+    }
+}
+impl Line<Unprefixed> {
+    pub fn indent(self, size: Indent) -> Self {
+        Self {
+            indent: size,
+            _state: PhantomData,
+        }
+    }
+    pub fn error(self, str: &str) -> String {
+        let coloured = ansi_term::Color::Red.paint(str);
+        indent::indent_all_by(self.indent.indent_size(), coloured.to_string())
     }
 }
 
@@ -82,13 +164,40 @@ pub fn print_watching<W: Write>(w: &mut W, evt: &Watching) -> anyhow::Result<()>
     Ok(())
 }
 
-pub fn print_input_error<W: Write>(w: &mut W, evt: &InputErrorDTO) -> anyhow::Result<()> {
-    match evt {
-        InputErrorDTO::YamlError(yaml) => {
-            writeln!(w, "{}", yaml)?;
+enum Indent {
+    None,
+    Some(usize),
+}
+
+impl Indent {
+    pub fn indent_size(&self) -> usize {
+        match self {
+            Indent::None => 0,
+            Indent::Some(size) => *size,
         }
-        _ => todo!("more errors?"),
     }
+}
+
+fn print_input_error<W: Write>(
+    w: &mut W,
+    indent: Indent,
+    evt: &InputErrorDTO,
+) -> anyhow::Result<()> {
+    let v = match evt {
+        InputErrorDTO::MissingInputs(evt) => evt,
+        InputErrorDTO::InvalidInput(evt) => evt,
+        InputErrorDTO::NotFound(evt) => evt,
+        InputErrorDTO::InputWriteError(evt) => evt,
+        InputErrorDTO::PathError(evt) => evt,
+        InputErrorDTO::PortError(evt) => evt,
+        InputErrorDTO::DirError(evt) => evt,
+        InputErrorDTO::YamlError(evt) => evt,
+        InputErrorDTO::MarkdownError(evt) => evt,
+        InputErrorDTO::Io(evt) => evt,
+        InputErrorDTO::UnsupportedExtension(evt) => evt,
+        InputErrorDTO::MissingExtension(evt) => evt,
+    };
+    writeln!(w, "{}", Line::unprefixed().indent(indent).error(v))?;
     Ok(())
 }
 

@@ -10,8 +10,13 @@ bsnext_core = { path = "../bsnext_core" }
 bsnext_dto = { path = "../bsnext_dto" }
 
 ansi_term = { version = "0.12.1" }
+indent = { version = "0.1.1" }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+insta = { workspace = true }
+
+[dev-dependencies]
+strip-ansi-escapes = { version = "0.2.0" }

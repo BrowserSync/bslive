@@ -6428,11 +6428,25 @@ var debounceDTOSchema = z.object({
   kind: z.string(),
   ms: z.string()
 });
+var startupErrorDTOSchema = z.object({
+  kind: z.literal("InputError"),
+  payload: inputErrorDTOSchema
+});
 var changeKindSchema = z.nativeEnum(ChangeKind);
 var watchingSchema = z.object({
   paths: z.array(z.string()),
   debounce: debounceDTOSchema
 });
+var startupEventSchema = z.union([
+  z.object({
+    kind: z.literal("Started"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("FailedStartup"),
+    payload: startupErrorDTOSchema
+  })
+]);
 var changeDTOSchema = z.lazy(
   () => z.union([
     z.object({

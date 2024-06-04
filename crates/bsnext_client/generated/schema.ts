@@ -188,12 +188,28 @@ export const debounceDTOSchema = z.object({
   ms: z.string(),
 });
 
+export const startupErrorDTOSchema = z.object({
+  kind: z.literal("InputError"),
+  payload: inputErrorDTOSchema,
+});
+
 export const changeKindSchema = z.nativeEnum(ChangeKind);
 
 export const watchingSchema = z.object({
   paths: z.array(z.string()),
   debounce: debounceDTOSchema,
 });
+
+export const startupEventSchema = z.union([
+  z.object({
+    kind: z.literal("Started"),
+    payload: z.undefined().optional(),
+  }),
+  z.object({
+    kind: z.literal("FailedStartup"),
+    payload: startupErrorDTOSchema,
+  }),
+]);
 
 export const changeDTOSchema: z.ZodSchema<ChangeDTO> = z.lazy(() =>
   z.union([

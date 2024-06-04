@@ -1,4 +1,4 @@
-use crate::startup::{StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 
 use bsnext_input::{Input, InputError};
 use std::path::{Path, PathBuf};

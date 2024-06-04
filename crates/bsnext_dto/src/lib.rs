@@ -6,6 +6,7 @@ use std::path::Path;
 
 use bsnext_fs::Debounce;
 use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
+use bsnext_input::startup::StartupError;
 use typeshare::typeshare;
 
 #[typeshare]
@@ -99,6 +100,29 @@ pub enum ExternalEvents {
     InputFileChanged(FileChanged),
     InputAccepted(InputAccepted),
     InputError(InputErrorDTO),
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize)]
+#[serde(tag = "kind", content = "payload")]
+pub enum StartupEvent {
+    Started,
+    FailedStartup(StartupErrorDTO),
+}
+
+#[typeshare]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "kind", content = "payload")]
+pub enum StartupErrorDTO {
+    InputError(InputErrorDTO),
+}
+
+impl From<&StartupError> for StartupErrorDTO {
+    fn from(value: &StartupError) -> Self {
+        match value {
+            StartupError::InputError(e) => StartupErrorDTO::InputError(e.into()),
+        }
+    }
 }
 
 #[typeshare]

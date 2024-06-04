@@ -2,7 +2,7 @@ use crate::args::Args;
 use crate::start_kind::start_from_example::StartFromExample;
 use crate::start_kind::start_from_inputs::StartFromInputPaths;
 use crate::start_kind::start_from_paths::StartFromPaths;
-use crate::startup::{StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 
 use bsnext_input::InputError;
 

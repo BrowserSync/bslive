@@ -120,6 +120,13 @@ export interface StoppedWatching {
 	paths: string[];
 }
 
+export type StartupEvent = 
+	| { kind: "Started", payload?: undefined }
+	| { kind: "FailedStartup", payload: StartupErrorDTO };
+
+export type StartupErrorDTO = 
+	| { kind: "InputError", payload: InputErrorDTO };
+
 export type InputErrorDTO = 
 	| { kind: "MissingInputs", payload: string }
 	| { kind: "InvalidInput", payload: string }

@@ -1,4 +1,4 @@
-use bsnext_input::{Input, InputError};
+use crate::{Input, InputError};
 use std::env::current_dir;
 use std::path::PathBuf;
 
@@ -7,6 +7,7 @@ pub type StartupResult = Result<DidStart, StartupError>;
 pub struct Startup {
     pub tasks: Vec<StartupTask>,
 }
+
 #[derive(Debug)]
 pub struct StartupContext {
     pub cwd: PathBuf,
@@ -58,7 +59,7 @@ pub enum DidStart {
 
 #[derive(Debug, thiserror::Error)]
 pub enum StartupError {
-    #[error("An input error prevented startup")]
+    #[error("{0}")]
     InputError(#[from] InputError),
 }
 

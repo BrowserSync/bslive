@@ -1,10 +1,10 @@
 use crate::args::Args;
 use crate::start_kind::StartKind;
-use crate::startup::{DidStart, StartupResult};
 use crate::{BsSystem, EventWithSpan, Start};
 use actix::Actor;
 
-use bsnext_dto::ExternalEvents;
+use bsnext_dto::{ExternalEvents, StartupEvent};
+use bsnext_input::startup::{DidStart, StartupResult};
 use bsnext_output::{OutputWriter, Writers};
 use bsnext_tracing::{init_tracing, OtelOption, OutputFormat, WriteOption};
 use clap::Parser;
@@ -58,11 +58,25 @@ where
 
     sys_addr.do_send(start);
 
+    let printer = match format_clone {
+        None | Some(OutputFormat::Normal) => Writers::Pretty,
+        Some(OutputFormat::Json) => Writers::Json,
+    };
+
+    let stdout = &mut std::io::stdout();
+
     match startup_oneshot_receiver.await? {
         Ok(DidStart::Started) => tracing::info!("started..."),
         Err(e) => {
-            // todo(alpha): decide on the best place to output this?
-            eprintln!("{e:?}");
+            let evt = StartupEvent::FailedStartup((&e).into());
+            match printer.handle_startup_event(stdout, &evt) {
+                Ok(_) => {}
+                Err(e) => tracing::error!(?e),
+            };
+            match stdout.flush() {
+                Ok(_) => {}
+                Err(e) => tracing::error!("could not flush {e}"),
+            };
             return Err(e.into());
         }
     };
@@ -70,15 +84,12 @@ where
     let events_handler = tokio::spawn(async move {
         let events = vec![];
         let stdout = &mut std::io::stdout();
-        let printer = match format_clone {
-            None | Some(OutputFormat::Normal) => Writers::Pretty,
-            Some(OutputFormat::Json) => Writers::Json,
-        };
+
         while let Some(EventWithSpan { evt, .. }) = events_receiver.recv().await {
             let span = debug_span!("External Event processor");
             let _g2 = span.enter();
             tracing::debug!(external_event=?evt);
-            match printer.handle_event(stdout, &evt) {
+            match printer.handle_external_event(stdout, &evt) {
                 Ok(_v) => {}
                 Err(e) => tracing::error!("could not write to stdout {e}"),
             }

@@ -13,9 +13,6 @@ use std::sync::Arc;
 
 use bsnext_example::Example;
 
-use crate::startup::{
-    DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
-};
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
@@ -23,6 +20,9 @@ use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_fs::actor::FsWatcher;
 
 use crate::monitor_any_watchables::MonitorAnyWatchables;
+use bsnext_input::startup::{
+    DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
+};
 use start_kind::StartKind;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
@@ -33,7 +33,6 @@ pub mod cli;
 mod monitor;
 mod monitor_any_watchables;
 pub mod start_kind;
-pub mod startup;
 
 pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
@@ -241,6 +240,7 @@ impl Handler<Start> for BsSystem {
 
         match msg.kind.input(&start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
+                tracing::debug!("PathWithInput");
                 ctx.address().do_send(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
@@ -250,6 +250,7 @@ impl Handler<Start> for BsSystem {
                 self.inform_servers(input);
             }
             Ok(SystemStartArgs::InputOnly { input }) => {
+                tracing::debug!("InputOnly");
                 self.accept_input(&input);
                 self.inform_servers(input);
             }
@@ -262,6 +263,7 @@ impl Handler<Start> for BsSystem {
                 self.publish_external_event(ExternalEvents::InputError(input_error.into()));
             }
             Err(e) => {
+                tracing::error!(%e);
                 msg.startup_oneshot_sender
                     .send(Err(StartupError::InputError(e)))
                     .expect("oneshot must succeed");

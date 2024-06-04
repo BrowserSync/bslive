@@ -21,6 +21,8 @@ pub mod target;
 pub mod watch_opt_test;
 pub mod yml;
 
+pub mod startup;
+
 #[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
 pub struct Input {
     pub servers: Vec<server_config::ServerConfig>,
@@ -79,13 +81,13 @@ pub enum InputError {
     MissingExtension(PathBuf),
     #[error("Unsupported extension: {0}")]
     UnsupportedExtension(String),
-    #[error("InputWriteError prevented startup {0}")]
+    #[error("{0}")]
     InputWriteError(#[from] InputWriteError),
-    #[error("Input path error prevented startup {0}")]
+    #[error("{0}")]
     PathError(#[from] PathError),
-    #[error("Input port error prevented startup {0}")]
+    #[error("{0}")]
     PortError(#[from] PortError),
-    #[error("Input directory error prevented startup {0}")]
+    #[error("{0}")]
     DirError(#[from] DirError),
     #[error("Markdown error: {0}")]
     MarkdownError(#[from] MarkdownError),
@@ -142,8 +144,8 @@ struct PathDefinition {
 impl Display for PathDefs {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for pd in self.0.iter() {
-            writeln!(f, "  cwd:   {}", pd.cwd.display())?;
-            writeln!(f, "  input: {}", pd.input)?;
+            writeln!(f, "cwd:   {}", pd.cwd.display())?;
+            writeln!(f, "input: {}", pd.input)?;
         }
         Ok(())
     }
