@@ -66,7 +66,17 @@ where
     let stdout = &mut std::io::stdout();
 
     match startup_oneshot_receiver.await? {
-        Ok(DidStart::Started) => tracing::info!("started..."),
+        Ok(DidStart::Started) => {
+            let evt = StartupEvent::Started;
+            match printer.handle_startup_event(stdout, &evt) {
+                Ok(_) => {}
+                Err(e) => tracing::error!(?e),
+            };
+            match stdout.flush() {
+                Ok(_) => {}
+                Err(e) => tracing::error!("could not flush {e}"),
+            };
+        }
         Err(e) => {
             let evt = StartupEvent::FailedStartup((&e).into());
             match printer.handle_startup_event(stdout, &evt) {

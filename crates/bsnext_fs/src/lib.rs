@@ -11,7 +11,9 @@ pub mod watch_path_handler;
 mod watcher;
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
+use tracing::Span;
 
 // use tokio_stream::StreamExt;
 
@@ -77,6 +79,7 @@ impl Default for FsEventContext {
 pub struct FsEvent {
     pub kind: FsEventKind,
     pub ctx: FsEventContext,
+    pub span: Option<Arc<Span>>,
 }
 
 #[derive(Debug, Clone)]
@@ -84,7 +87,8 @@ pub enum FsEventKind {
     Change(ChangeEvent),
     ChangeBuffered(BufferedChangeEvent),
     PathAdded(PathAddedEvent),
-    PathRemoved(PathRemovedEvent),
+    PathRemoved(PathEvent),
+    PathNotFoundError(PathEvent),
 }
 
 #[derive(actix::Message, Debug, Clone)]
@@ -130,7 +134,7 @@ pub struct PathAddedEvent {
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "()")]
-pub struct PathRemovedEvent {
+pub struct PathEvent {
     pub path: PathBuf,
 }
 

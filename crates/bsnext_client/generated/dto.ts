@@ -139,7 +139,8 @@ export type InputErrorDTO =
 	| { kind: "MarkdownError", payload: string }
 	| { kind: "Io", payload: string }
 	| { kind: "UnsupportedExtension", payload: string }
-	| { kind: "MissingExtension", payload: string };
+	| { kind: "MissingExtension", payload: string }
+	| { kind: "EmptyInput", payload: string };
 
 export type ClientEvent = 
 	| { kind: "Change", payload: ChangeDTO };

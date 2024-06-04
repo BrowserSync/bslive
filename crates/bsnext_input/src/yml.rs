@@ -39,4 +39,6 @@ original error:
         input: String,
         serde_error: serde_yaml::Error,
     },
+    #[error("Input file was empty: {path}")]
+    EmptyError { path: String },
 }

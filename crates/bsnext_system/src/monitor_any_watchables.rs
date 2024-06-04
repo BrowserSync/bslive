@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug_span, Span};
+use tracing::Span;
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
@@ -24,9 +24,12 @@ pub struct MonitorAnyWatchables {
 impl actix::Handler<MonitorAnyWatchables> for BsSystem {
     type Result = ();
 
+    #[tracing::instrument(skip_all, name="BsSystem handler for MonitorAnyWatchables", parent=msg.span.id())]
     fn handle(&mut self, msg: MonitorAnyWatchables, ctx: &mut Self::Context) -> Self::Result {
-        let s = debug_span!(parent: msg.span.id(), "BsSystem handler for MonitorAnyWatchables");
-        let _g = s.enter();
+        let s = Span::current();
+        let span = Arc::new(s);
+        let span_c = span.clone();
+        let _g = span.enter();
         tracing::debug!("MonitorAnyWatchables {:?}", msg.watchables);
         tracing::trace!("MonitorAnyWatchables {:#?}", msg.watchables);
 
@@ -42,7 +45,7 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
 
         for any_watchable in to_remove {
             if let Some(mon) = self.any_monitors.get(any_watchable) {
-                mon.addr.do_send(StopWatcher);
+                mon.addr.do_send(StopWatcher(span.clone()));
                 ctx.notify(DropMonitor((*any_watchable).clone()))
             }
         }
@@ -87,6 +90,7 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
             monitor.addr.do_send(RequestWatchPath {
                 recipients: vec![ctx.address().recipient()],
                 path: monitor.path.clone(),
+                span: span_c.clone(),
             });
 
             ctx.notify(InsertMonitor((*watchable).clone(), monitor))

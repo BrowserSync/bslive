@@ -43,7 +43,7 @@ impl OutputWriter for PrettyPrint {
     ) -> anyhow::Result<()> {
         match evt {
             StartupEvent::Started => {
-                write!(sink, "{}", Line::prefixed().info("started..."))?;
+                writeln!(sink, "{}", Line::prefixed().info("started..."))?;
             }
             StartupEvent::FailedStartup(err) => {
                 writeln!(
@@ -196,6 +196,7 @@ fn print_input_error<W: Write>(
         InputErrorDTO::Io(evt) => evt,
         InputErrorDTO::UnsupportedExtension(evt) => evt,
         InputErrorDTO::MissingExtension(evt) => evt,
+        InputErrorDTO::EmptyInput(evt) => evt,
     };
     writeln!(w, "{}", Line::unprefixed().indent(indent).error(v))?;
     Ok(())

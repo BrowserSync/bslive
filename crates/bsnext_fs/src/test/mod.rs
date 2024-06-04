@@ -5,11 +5,13 @@ use actix::{Actor, Addr};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 
 use crate::filter::Filter;
 use tokio::time::sleep;
+use tracing::Span;
 
 struct A {
     events: Vec<FsEvent>,
@@ -76,6 +78,7 @@ impl TestCase {
         let r = RequestWatchPath {
             recipients: vec![self.recip_addr.clone().recipient()],
             path: self.dir.to_path_buf(),
+            span: Arc::new(Span::none()),
         };
 
         let _ = self.addr.send(r).await;
@@ -121,6 +124,7 @@ impl TestCase {
                     .collect(),
                 FsEventKind::PathAdded(_) => vec![],
                 FsEventKind::PathRemoved(_) => vec![],
+                FsEventKind::PathNotFoundError(_) => vec![],
             })
             .map(|pb| pb.file_name().unwrap().to_string_lossy().to_string())
             .collect()

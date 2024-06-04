@@ -79,7 +79,6 @@ impl BsSystem {
         let s = Arc::new(span);
         let c = s.clone();
         let _c2 = s.clone();
-
         let _g = s.enter();
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
@@ -169,7 +168,10 @@ impl BsSystem {
 
     #[tracing::instrument(skip(self))]
     fn publish_external_event(&mut self, evt: ExternalEvents) {
-        tracing::debug!(?evt);
+        match evt {
+            ExternalEvents::InputError(_) => tracing::error!(?evt),
+            _ => tracing::debug!(?evt),
+        }
         let outgoing = EventWithSpan { evt };
         if let Some(external_event_sender) = &self.external_event_sender {
             Arbiter::current().spawn({

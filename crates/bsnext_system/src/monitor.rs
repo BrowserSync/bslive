@@ -5,18 +5,22 @@ use std::hash::Hash;
 use bsnext_core::servers_supervisor::file_changed_handler::{FileChanged, FilesChanged};
 use bsnext_dto::{ExternalEvents, StoppedWatching, Watching};
 use bsnext_fs::watch_path_handler::RequestWatchPath;
-use bsnext_fs::{Debounce, FsEvent, FsEventContext, FsEventKind};
+use bsnext_fs::{
+    BufferedChangeEvent, ChangeEvent, Debounce, FsEvent, FsEventContext, FsEventKind,
+    PathAddedEvent, PathEvent,
+};
 use bsnext_input::route::{
     DebounceDuration, DirRoute, FilterKind, RouteKind, Spec, SpecOpts, WatchOpts,
 };
 use bsnext_input::server_config::Identity;
-use bsnext_input::Input;
+use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use bsnext_fs::actor::FsWatcher;
 
-use tracing::{span, trace_span, Level};
+use tracing::trace_span;
 
 #[derive(Debug, Clone)]
 pub struct Monitor {
@@ -35,6 +39,10 @@ impl actix::Handler<MonitorInput> for BsSystem {
     type Result = ();
 
     fn handle(&mut self, msg: MonitorInput, ctx: &mut Self::Context) -> Self::Result {
+        let span = trace_span!("monitor_input", ?msg.path, ?msg.cwd);
+        let s = Arc::new(span);
+        let span_c = s.clone();
+        let _guard = s.enter();
         let mut input_watcher = bsnext_fs::actor::FsWatcher::for_input(&msg.cwd, 0);
 
         // todo: does this need to be configurable (eg: by main config)?
@@ -50,96 +58,119 @@ impl actix::Handler<MonitorInput> for BsSystem {
         input_watcher_addr.do_send(RequestWatchPath {
             recipients: vec![ctx.address().recipient()],
             path: msg.path.to_path_buf(),
+            span: span_c.clone(),
         });
+    }
+}
+
+impl BsSystem {
+    #[tracing::instrument(skip(self))]
+    fn handle_buffered(
+        &mut self,
+        msg: &FsEvent,
+        buf: &BufferedChangeEvent,
+    ) -> Option<ExternalEvents> {
+        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?msg.ctx, ?buf);
+        let paths = buf
+            .events
+            .iter()
+            .map(|evt| evt.absolute.to_owned())
+            .collect::<Vec<_>>();
+        let as_strings = paths
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect::<Vec<String>>();
+        if let Some(servers) = &self.servers_addr {
+            servers.do_send(FilesChanged {
+                paths: paths.clone(),
+                id: msg.ctx.id(),
+            })
+        }
+        // todo(alpha): need to exclude changes to the input file if this event has captured it
+        Some(ExternalEvents::FilesChanged(bsnext_dto::FilesChangedDTO {
+            paths: as_strings,
+        }))
+    }
+    fn handle_change(&mut self, msg: &FsEvent, inner: &ChangeEvent) -> Option<ExternalEvents> {
+        let span = trace_span!("handle_change", ?inner.absolute_path);
+        let _guard = span.enter();
+        match msg.ctx {
+            FsEventContext::InputFile { id: _ } => {
+                tracing::info!(?inner, "InputFile file changed");
+                let input = Input::from_input_path(&inner.absolute_path);
+
+                let Ok(input) = input else {
+                    let err = input.unwrap_err();
+                    return Some(ExternalEvents::InputError(err.into()));
+                };
+
+                self.accept_input(&input);
+                self.inform_servers(input);
+
+                Some(ExternalEvents::InputFileChanged(
+                    bsnext_dto::FileChanged::from_path_buf(&inner.path),
+                ))
+            }
+            FsEventContext::Other { id } => {
+                tracing::trace!(?inner, "Other file changed");
+                // todo: tie these changed to an input identity?
+                if let Some(servers) = &self.servers_addr {
+                    servers.do_send(FileChanged {
+                        path: inner.absolute_path.clone(),
+                        id,
+                    })
+                }
+                Some(ExternalEvents::FileChanged(
+                    bsnext_dto::FileChanged::from_path_buf(&inner.path),
+                ))
+            }
+        }
+    }
+    #[tracing::instrument(skip(self))]
+    fn handle_path_added(&mut self, path: &PathAddedEvent) -> Option<ExternalEvents> {
+        Some(ExternalEvents::Watching(Watching::from_path_buf(
+            &path.path,
+            path.debounce,
+        )))
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn handle_path_removed(&mut self, path: &PathEvent) -> Option<ExternalEvents> {
+        Some(ExternalEvents::WatchingStopped(
+            StoppedWatching::from_path_buf(&path.path),
+        ))
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn handle_path_not_found(&mut self, pdo: &PathEvent) -> Option<ExternalEvents> {
+        let as_str = pdo.path.to_string_lossy().to_string();
+        let cwd = self.cwd.clone().unwrap();
+        let abs = cwd.join(&as_str);
+        let def = PathDefinition {
+            input: as_str,
+            cwd: self.cwd.clone().unwrap(),
+            absolute: abs,
+        };
+        let e = InputError::PathError(PathError::MissingPaths {
+            paths: PathDefs(vec![def]),
+        });
+        Some(ExternalEvents::InputError(e.into()))
     }
 }
 
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
-
+    #[tracing::instrument(skip(self, _ctx), name = "FsEvent handler for BsSystem", parent=msg.span.as_ref().and_then(|s|s.id()))]
     fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) -> Self::Result {
-        match msg.kind {
-            FsEventKind::ChangeBuffered(buffer_change) => {
-                let span = span!(Level::TRACE, "FsEventKind::ChangeBuffered");
-                let _guard = span.enter();
-                tracing::debug!(msg.event_count = buffer_change.events.len(), msg.ctx = ?msg.ctx, ?buffer_change);
-                // let id = msg.ctx_id();
-                let paths = buffer_change
-                    .events
-                    .iter()
-                    .map(|evt| evt.absolute.to_owned())
-                    .collect::<Vec<_>>();
-                let as_strings = paths
-                    .iter()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .collect::<Vec<String>>();
-                if let Some(servers) = &self.servers_addr {
-                    servers.do_send(FilesChanged {
-                        paths: paths.clone(),
-                        id: msg.ctx.id(),
-                    })
-                }
-                // todo(alpha): need to exclude changes to the input file if this event has captured it
-                let evt =
-                    ExternalEvents::FilesChanged(bsnext_dto::FilesChangedDTO { paths: as_strings });
-                self.publish_external_event(evt);
-            }
-            FsEventKind::Change(inner) => {
-                let span = trace_span!("FsEventKind::Change", ?inner.absolute_path);
-                let _guard = span.enter();
-                match msg.ctx {
-                    FsEventContext::InputFile { id: _ } => {
-                        tracing::info!(?inner, "InputFile file changed");
-                        let input = Input::from_input_path(&inner.absolute_path);
-
-                        let Ok(input) = input else {
-                            tracing::debug!("ignoring FsWatchEvent because the input was invalid");
-                            let err = input.unwrap_err();
-                            tracing::error!(?err, "{}", err);
-                            return;
-                        };
-
-                        tracing::debug!("InputFile file was deserialized");
-
-                        self.accept_input(&input);
-                        self.inform_servers(input);
-
-                        let evt = ExternalEvents::InputFileChanged(
-                            bsnext_dto::FileChanged::from_path_buf(&inner.path),
-                        );
-                        self.publish_external_event(evt);
-                    }
-                    FsEventContext::Other { id } => {
-                        tracing::trace!(?inner, "Other file changed");
-                        // todo: tie these changed to an input identity?
-                        if let Some(servers) = &self.servers_addr {
-                            servers.do_send(FileChanged {
-                                path: inner.absolute_path.clone(),
-                                id,
-                            })
-                        }
-                        let evt = ExternalEvents::FileChanged(
-                            bsnext_dto::FileChanged::from_path_buf(&inner.path),
-                        );
-
-                        self.publish_external_event(evt);
-                    }
-                }
-            }
-            FsEventKind::PathAdded(path) => {
-                let span = trace_span!("FsEventKind::PathAdded", ?path);
-                let _guard = span.enter();
-                let evt =
-                    ExternalEvents::Watching(Watching::from_path_buf(&path.path, path.debounce));
-                self.publish_external_event(evt);
-            }
-            FsEventKind::PathRemoved(path) => {
-                let span = trace_span!("FsEventKind::PathRemoved", ?path);
-                let _guard = span.enter();
-                let evt =
-                    ExternalEvents::WatchingStopped(StoppedWatching::from_path_buf(&path.path));
-                self.publish_external_event(evt);
-            }
+        let next = match &msg.kind {
+            FsEventKind::ChangeBuffered(buffer_change) => self.handle_buffered(&msg, buffer_change),
+            FsEventKind::Change(inner) => self.handle_change(&msg, inner),
+            FsEventKind::PathAdded(path) => self.handle_path_added(path),
+            FsEventKind::PathRemoved(path) => self.handle_path_removed(path),
+            FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),
+        };
+        if let Some(ext) = next {
+            self.publish_external_event(ext)
         }
     }
 }

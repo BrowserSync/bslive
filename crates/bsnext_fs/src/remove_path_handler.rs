@@ -1,5 +1,5 @@
 use crate::actor::FsWatcher;
-use crate::{FsEvent, FsEventKind, FsWatchError, PathRemovedEvent};
+use crate::{FsEvent, FsEventKind, FsWatchError, PathEvent};
 use actix::Handler;
 use notify::Watcher;
 use std::path::PathBuf;
@@ -27,12 +27,13 @@ impl Handler<RemoveWatchPath> for FsWatcher {
                         }
                     };
                     for recip in &self.receivers {
-                        let evt = FsEventKind::PathRemoved(PathRemovedEvent {
+                        let evt = FsEventKind::PathRemoved(PathEvent {
                             path: relative.clone(),
                         });
                         recip.do_send(FsEvent {
                             kind: evt,
                             ctx: self.ctx.clone(),
+                            span: None,
                         })
                     }
                 }

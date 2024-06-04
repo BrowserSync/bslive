@@ -292,6 +292,7 @@ pub enum InputErrorDTO {
     Io(String),
     UnsupportedExtension(String),
     MissingExtension(String),
+    EmptyInput(String),
 }
 
 impl From<&InputError> for InputErrorDTO {
@@ -311,6 +312,7 @@ impl From<&InputError> for InputErrorDTO {
                 InputErrorDTO::UnsupportedExtension(e.to_string())
             }
             e @ InputError::MissingExtension(_) => InputErrorDTO::MissingExtension(e.to_string()),
+            e @ InputError::EmptyInput => InputErrorDTO::EmptyInput(e.to_string()),
         }
     }
 }

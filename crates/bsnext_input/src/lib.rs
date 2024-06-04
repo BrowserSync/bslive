@@ -39,6 +39,11 @@ impl Input {
     }
     fn from_yaml_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
         let str = read_to_string(&path)?;
+        if str.trim().is_empty() {
+            return Err(InputError::YamlError(YamlError::EmptyError {
+                path: path.as_ref().to_string_lossy().to_string(),
+            }));
+        }
         let output = serde_yaml::from_str::<Self>(str.as_str()).map_err(move |e| {
             if let Some(location) = e.location() {
                 YamlError::ParseErrorWithLocation {
@@ -71,6 +76,8 @@ impl Input {
 pub enum InputError {
     #[error("no suitable inputs could be found")]
     MissingInputs,
+    #[error("input file is empty")]
+    EmptyInput,
     #[error("could not read input, error: {0}")]
     InvalidInput(String),
     #[error("io error")]
@@ -132,10 +139,10 @@ pub enum DirError {
 }
 
 #[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize)]
-pub struct PathDefs(Vec<PathDefinition>);
+pub struct PathDefs(pub Vec<PathDefinition>);
 
 #[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize)]
-struct PathDefinition {
+pub struct PathDefinition {
     pub input: String,
     pub cwd: PathBuf,
     pub absolute: PathBuf,

@@ -6422,6 +6422,10 @@ var inputErrorDTOSchema = z.union([
   z.object({
     kind: z.literal("MissingExtension"),
     payload: z.string()
+  }),
+  z.object({
+    kind: z.literal("EmptyInput"),
+    payload: z.string()
   })
 ]);
 var debounceDTOSchema = z.object({
