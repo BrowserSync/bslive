@@ -76,6 +76,7 @@ pub fn init_tracing(
             let lines = [
                 format!("bsnext={level}"),
                 format!("bsnext_core={level}"),
+                format!("tower_http={level}"),
                 "bsnext_fs::stream=info".to_string(),
                 "bsnext_fs::watcher=info".to_string(),
                 "bsnext_fs::buffered_debounce=info".to_string(),

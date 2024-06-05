@@ -119,14 +119,14 @@ pub fn print_file_changed<W: Write>(w: &mut W, evt: &FileChanged) -> anyhow::Res
 pub fn print_files_changed<W: Write>(w: &mut W, evt: &FilesChangedDTO) -> anyhow::Result<()> {
     match evt.paths.len() {
         0..=2 => {
-            writeln!(w, "[multi-change] {}", short_file_list(&evt.paths))?;
+            writeln!(w, "[change:multi] {}", short_file_list(&evt.paths))?;
         }
         3.. => {
             let other = evt.paths.len() - 2;
             let subset = evt.paths.iter().take(2).collect::<Vec<_>>();
             writeln!(
                 w,
-                "[multi-change] {} (and {} others)",
+                "[change:multi] {} (and {} others)",
                 short_file_list(&subset),
                 other
             )?;

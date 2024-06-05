@@ -4,7 +4,7 @@ use axum::extract::{Request, State};
 use axum::http::Uri;
 use axum::middleware::{from_fn_with_state, Next};
 use axum::response::IntoResponse;
-use axum::routing::{get, MethodRouter};
+use axum::routing::{any, get, MethodRouter};
 use axum::{http, Extension, Router};
 
 use axum::body::Body;
@@ -82,9 +82,9 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
 
     route("/__bslive", get(handler))
         .route("/__bs_js", get(js_handler))
+        .route("/__bs_ws", any(ws_handler))
         .nest("/__bs_api", pub_api(state.clone()))
         .nest("/__bs_assets/ui", pub_ui_assets(state.clone()))
-        .route("/__bs_ws", get(ws_handler))
         .with_state(state.clone())
 }
 

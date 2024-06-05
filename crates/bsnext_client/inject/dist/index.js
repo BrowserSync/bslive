@@ -6528,7 +6528,7 @@ var r = new import_reloader.Reloader(window, consoleApi, import_timer2.Timer);
 var url = new URL(window.location.href);
 url.protocol = url.protocol === "http:" ? "ws" : "wss";
 url.pathname = "/__bs_ws";
-var socket = webSocket(url.href);
+var socket = webSocket(url.origin + url.pathname);
 socket.pipe(retry({ delay: 5e3 })).subscribe((m) => {
   console.log(JSON.stringify(m, null, 2));
   const parsed = clientEventSchema.parse(m);

@@ -15,7 +15,7 @@ const r = new Reloader(window, consoleApi, Timer);
 const url = new URL(window.location.href);
 url.protocol = url.protocol === 'http:' ? 'ws' : 'wss';
 url.pathname = '/__bs_ws'
-const socket = webSocket<ClientEvent>(url.href);
+const socket = webSocket<ClientEvent>(url.origin + url.pathname);
 
 socket
   .pipe(retry({delay: 5000}))
