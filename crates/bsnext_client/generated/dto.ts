@@ -59,7 +59,10 @@ export type ServerChange =
 	bind_address: string;
 }}
 	| { kind: "Started", payload?: undefined }
-	| { kind: "Patched", payload?: undefined };
+	| { kind: "Patched", payload?: undefined }
+	| { kind: "Errored", payload: {
+	error: string;
+}};
 
 export interface ServerChangeSetItem {
 	identity: IdentityDTO;

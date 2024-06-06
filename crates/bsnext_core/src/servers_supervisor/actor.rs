@@ -2,7 +2,7 @@ use crate::server::handler_stop::Stop;
 use actix::{Actor, Addr, Running};
 
 use crate::server::actor::ServerActor;
-use crate::servers_supervisor::start_handler::StartMessage;
+use crate::servers_supervisor::start_handler::{ChildResult, StartMessage};
 
 use crate::server::handler_patch::Patch;
 use bsnext_input::server_config::Identity;
@@ -102,23 +102,34 @@ impl ServersSupervisor {
 
                 if !start_jobs.is_empty() {
                     tracing::debug!("starting {:?} servers", start_jobs.len());
-                    let idens = start_jobs
-                        .iter()
-                        .map(|x| &x.identity)
-                        .map(|x| x.to_owned())
-                        .collect::<Vec<_>>();
                     match self_addr
                         .send(StartMessage {
                             server_configs: start_jobs,
                         })
                         .await
                     {
-                        Ok(_) => {
-                            for x in idens {
-                                changeset.items.push(ServerChangeSetItem {
-                                    identity: (&x).into(),
-                                    change: ServerChange::Started,
-                                })
+                        Ok(output) => {
+                            for x in output {
+                                match x {
+                                    ChildResult::Ok(child_created) => {
+                                        tracing::info!("child_created");
+                                        let iden = child_created.server_handler.identity.clone();
+                                        self_addr.do_send(child_created);
+                                        changeset.items.push(ServerChangeSetItem {
+                                            identity: (&iden).into(),
+                                            change: ServerChange::Started,
+                                        })
+                                    }
+                                    ChildResult::Err(e) => {
+                                        tracing::info!(?e, "child not created");
+                                        changeset.items.push(ServerChangeSetItem {
+                                            identity: (&e.identity).into(),
+                                            change: ServerChange::Errored {
+                                                error: format!("{:?}", e.server_error),
+                                            },
+                                        })
+                                    }
+                                }
                             }
                         }
                         Err(_) => tracing::error!("could not send StartMessage to self"),

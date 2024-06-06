@@ -6348,6 +6348,12 @@ var serverChangeSchema = z.union([
   z.object({
     kind: z.literal("Patched"),
     payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Errored"),
+    payload: z.object({
+      error: z.string()
+    })
   })
 ]);
 var serverChangeSetItemSchema = z.object({

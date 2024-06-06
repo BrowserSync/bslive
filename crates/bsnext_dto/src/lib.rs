@@ -222,6 +222,7 @@ pub enum ServerChange {
     Stopped { bind_address: String },
     Started,
     Patched,
+    Errored { error: String },
 }
 
 #[typeshare]

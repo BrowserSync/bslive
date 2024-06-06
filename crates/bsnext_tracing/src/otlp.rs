@@ -103,6 +103,7 @@ pub fn init_tracing_subscriber(
             tracing_subscriber::fmt::layer()
                 .json()
                 .with_ansi(false)
+                // todo(alpha): use this example as a way to move this output into the terminal window
                 .with_writer(file)
                 .boxed()
         }

@@ -98,6 +98,12 @@ export const serverChangeSchema = z.union([
     kind: z.literal("Patched"),
     payload: z.undefined().optional(),
   }),
+  z.object({
+    kind: z.literal("Errored"),
+    payload: z.object({
+      error: z.string(),
+    }),
+  }),
 ]);
 
 export const serverChangeSetItemSchema = z.object({

@@ -10,8 +10,10 @@ pub enum ServerError {
     AddrInUse { socket_addr: SocketAddr },
     #[error("invalid bind address: {addr_parse_error}")]
     InvalidAddress { addr_parse_error: String },
-    #[error("could not determine the reason")]
-    Unknown,
+    #[error("could not determine the reason: `{0}`")]
+    Unknown(String),
+    #[error("io error {0}")]
+    Io(String),
     #[error("server was closed")]
     Closed,
 }

@@ -91,7 +91,7 @@ impl actix::Handler<Listen> for ServerActor {
                     }
                     _ => {
                         tracing::error!("{:?} [not-started] UNKNOWN {}", identity, e);
-                        Err(ServerError::Unknown)
+                        Err(ServerError::Unknown(format!("{}", e)))
                     }
                 },
             };
@@ -113,7 +113,7 @@ impl actix::Handler<Listen> for ServerActor {
                             Ok((socket_addr, self_addr.clone()))
                         }
                         None => {
-                            Err(ServerError::Unknown)
+                            Err(ServerError::Unknown("unknown".to_string()))
                         }
                     }
                 }
@@ -132,7 +132,7 @@ impl actix::Handler<Listen> for ServerActor {
                         }
                         Err(e) => {
                             tracing::error!("-->{e}");
-                            Err(ServerError::Unknown)
+                            Err(ServerError::Unknown(format!("{:?}", e)))
                         }
                     }
                 }
