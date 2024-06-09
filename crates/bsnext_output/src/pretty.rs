@@ -260,7 +260,7 @@ where
             },
             ServerChange::Patched => {}
             ServerChange::Errored { error } => {
-                writeln!(w, "[❌ server failed] {} {}", iden(&identity), error)?;
+                writeln!(w, "[❌ server failed] {} {}", iden(identity), error)?;
             }
         }
     }
@@ -270,7 +270,7 @@ where
 fn iden(identity_dto: &IdentityDTO) -> String {
     match identity_dto {
         IdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
-        IdentityDTO::Address { bind_address } => format!("{}", bind_address),
+        IdentityDTO::Address { bind_address } => bind_address.to_string(),
         IdentityDTO::Named { name } => format!("[{name}]"),
     }
 }
