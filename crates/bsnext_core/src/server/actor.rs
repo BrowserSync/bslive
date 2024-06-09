@@ -32,7 +32,6 @@ impl ServerActor {
         }
     }
     pub fn install_signals(&mut self) -> (Sender<()>, Handle, broadcast::Sender<ClientEvent>) {
-        // todo: make this an enum for more messages
         let (client_sender, client_receiver) = broadcast::channel::<ClientEvent>(5);
         let (shutdown_complete, shutdown_complete_receiver) = oneshot::channel();
         let axum_server_handle = Handle::new();

@@ -243,7 +243,7 @@ impl Handler<Start> for BsSystem {
         match msg.kind.input(&start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
                 tracing::debug!("PathWithInput");
-                ctx.address().do_send(MonitorInput {
+                ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
                 });
@@ -258,7 +258,7 @@ impl Handler<Start> for BsSystem {
             }
             Ok(SystemStartArgs::PathWithInvalidInput { path, input_error }) => {
                 tracing::debug!("PathWithInvalidInput");
-                ctx.address().do_send(MonitorInput {
+                ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
                 });

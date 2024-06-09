@@ -22,6 +22,13 @@ pub struct ServersSupervisor {
     tx: Option<Sender<()>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ChildHandler {
+    pub actor_address: Addr<ServerActor>,
+    pub identity: Identity,
+    pub socket_addr: SocketAddr,
+}
+
 impl ServersSupervisor {
     pub fn new(tx: Sender<()>) -> Self {
         Self {
@@ -183,13 +190,6 @@ impl Actor for ServersSupervisor {
             tracing::error!("could not access oneshot sender for completion message")
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct ChildHandler {
-    pub actor_address: Addr<ServerActor>,
-    pub identity: Identity,
-    pub socket_addr: SocketAddr,
 }
 
 #[derive(actix::Message)]
