@@ -104,8 +104,8 @@ impl BsSystem {
                     return Some(ExternalEvents::InputError(err.into()));
                 };
 
-                self.accept_input(&input);
-                self.inform_servers(input);
+                self.accept_watchables(&input);
+                self.resolve_servers(input);
 
                 Some(ExternalEvents::InputFileChanged(
                     bsnext_dto::FileChanged::from_path_buf(&inner.path),

@@ -2,16 +2,17 @@ use crate::server::handler_stop::Stop;
 use actix::{Actor, Addr, Running};
 
 use crate::server::actor::ServerActor;
-use crate::servers_supervisor::start_handler::{ChildResult, StartMessage};
+use crate::servers_supervisor::start_handler::{ChildCreated, ChildNotCreated, ChildResult};
 
-use crate::server::handler_patch::Patch;
 use bsnext_input::server_config::Identity;
 use bsnext_input::Input;
 use std::collections::HashSet;
 use std::future::Future;
 use std::net::SocketAddr;
 
-use bsnext_dto::{ServerChange, ServerChangeSet, ServerChangeSetItem};
+use crate::server::handler_listen::Listen;
+use futures_util::future::join_all;
+use futures_util::FutureExt;
 use std::pin::Pin;
 use tokio::sync::oneshot::Sender;
 use tracing::{span, Instrument, Level};
@@ -41,7 +42,7 @@ impl ServersSupervisor {
         &mut self,
         self_addr: Addr<ServersSupervisor>,
         input: Input,
-    ) -> Pin<Box<impl Future<Output = ServerChangeSet> + Sized>> {
+    ) -> Pin<Box<impl Future<Output = Vec<ChildResult>> + Sized>> {
         let span = span!(Level::TRACE, "input_changed");
         let _guard = span.enter();
 
@@ -68,7 +69,7 @@ impl ServersSupervisor {
             })
             .collect::<Vec<_>>();
 
-        let patch_jobs = patch
+        let _patch_jobs = patch
             .iter()
             .filter_map(|s| {
                 let child = self.handlers.get(s).map(ToOwned::to_owned);
@@ -86,75 +87,58 @@ impl ServersSupervisor {
 
         Box::pin(
             async move {
-                let mut changeset = ServerChangeSet { items: vec![] };
-                for x in shutdown_jobs {
-                    tracing::debug!("stopping {:?}", x.identity);
-                    changeset.items.push(ServerChangeSetItem {
-                        identity: (&x.identity).into(),
-                        change: ServerChange::Stopped {
-                            bind_address: x.socket_addr.to_string(),
-                        },
-                    });
-                    match x.actor_address.send(Stop).await {
-                        Ok(_) => {
-                            self_addr.do_send(ChildStopped {
-                                identity: x.identity.clone(),
-                            });
-                        }
-                        Err(_) => {
-                            tracing::error!("couldn't send Stop2 {:?}", x.identity);
-                        }
-                    }
-                }
+                let shutdown_futs = shutdown_jobs.iter().map(|x| x.actor_address.send(Stop));
+                let shutdown_results = join_all(shutdown_futs).await;
+                let shutdown_child_results =
+                    shutdown_results
+                        .iter()
+                        .zip(shutdown_jobs)
+                        .map(|(r, h)| match r {
+                            Ok(_) => ChildResult::Stopped(h.identity.clone()),
+                            Err(er) => unreachable!("{}", er),
+                        });
 
-                if !start_jobs.is_empty() {
-                    tracing::debug!("starting {:?} servers", start_jobs.len());
-                    match self_addr
-                        .send(StartMessage {
-                            server_configs: start_jobs,
+                tracing::debug!("starting {:?} servers", start_jobs.len());
+                let fts = start_jobs.into_iter().map(|server_config| {
+                    let server = ServerActor::new_from_config(server_config.clone());
+                    let actor_addr = server.start();
+                    let c = server_config.clone();
+                    actor_addr
+                        .send(Listen {
+                            parent: self_addr.clone().recipient(),
                         })
-                        .await
-                    {
-                        Ok(output) => {
-                            for x in output {
-                                match x {
-                                    ChildResult::Ok(child_created) => {
-                                        tracing::info!("child_created");
-                                        let iden = child_created.server_handler.identity.clone();
-                                        self_addr.do_send(child_created);
-                                        changeset.items.push(ServerChangeSetItem {
-                                            identity: (&iden).into(),
-                                            change: ServerChange::Started,
-                                        })
-                                    }
-                                    ChildResult::Err(e) => {
-                                        tracing::info!(?e, "child not created");
-                                        changeset.items.push(ServerChangeSetItem {
-                                            identity: (&e.identity).into(),
-                                            change: ServerChange::Errored {
-                                                error: format!("{:?}", e.server_error),
-                                            },
-                                        })
-                                    }
-                                }
-                            }
-                        }
-                        Err(_) => tracing::error!("could not send StartMessage to self"),
-                    };
-                }
+                        .map(|r| (r, c))
+                });
+                let results = join_all(fts).await;
+                let child_results = results.into_iter().map(|(r, c)| match r {
+                    Ok(Ok((socket, addr))) => ChildResult::Created(ChildCreated {
+                        server_handler: ChildHandler {
+                            actor_address: addr,
+                            identity: c.identity,
+                            socket_addr: socket,
+                        },
+                    }),
+                    Ok(Err(err)) => ChildResult::Err(ChildNotCreated {
+                        server_error: err,
+                        identity: c.identity.clone(),
+                    }),
+                    Err(e) => unreachable!("{}", e),
+                });
 
-                for (child, config) in patch_jobs {
-                    tracing::debug!("patching {:?}", child.identity);
-                    child.actor_address.do_send(Patch {
-                        server_config: config,
-                    });
-                    changeset.items.push(ServerChangeSetItem {
-                        identity: (&child.identity).into(),
-                        change: ServerChange::Patched,
-                    })
-                }
+                shutdown_child_results.chain(child_results).collect()
 
-                changeset
+                // todo(aloha): fix patching
+                // for (child, config) in patch_jobs {
+                //     tracing::debug!("patching {:?}", child.identity);
+                //     child.actor_address.do_send(Patch {
+                //         server_config: config,
+                //     });
+                //     changeset.items.push(ServerChangeSetItem {
+                //         identity: (&child.identity).into(),
+                //         change: ServerChange::Patched,
+                //     })
+                // }
+                // ServerChangeSet { items: vec![] }
             }
             .instrument(span.clone()),
         )

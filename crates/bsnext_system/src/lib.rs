@@ -7,19 +7,19 @@ use bsnext_input::Input;
 use std::collections::HashMap;
 
 use actix_rt::Arbiter;
-use bsnext_dto::{ExternalEvents, ServersStarted};
+use bsnext_dto::ExternalEvents;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use bsnext_example::Example;
 
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
-use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
+use bsnext_core::servers_supervisor::actor::{ChildStopped, ServersSupervisor};
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 
 use bsnext_fs::actor::FsWatcher;
 
 use crate::monitor_any_watchables::MonitorAnyWatchables;
+use bsnext_core::servers_supervisor::start_handler::ChildResult;
 use bsnext_input::startup::{
     DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
 };
@@ -74,7 +74,7 @@ impl BsSystem {
         }
     }
 
-    fn accept_input(&mut self, input: &Input) {
+    fn accept_watchables(&mut self, input: &Input) {
         let span = debug_span!("accept_input");
         let s = Arc::new(span);
         let c = s.clone();
@@ -130,37 +130,67 @@ impl BsSystem {
         );
     }
 
-    fn inform_servers(&mut self, input: Input) {
+    fn resolve_servers(&mut self, input: Input) {
         let Some(servers_addr) = &self.servers_addr else {
             unreachable!("self.servers_addr cannot exist?");
         };
         Arbiter::current().spawn({
             let addr = servers_addr.clone();
-            let external_event_sender = self.external_event_sender.as_ref().unwrap().clone();
+            let _external_event_sender = self.external_event_sender.as_ref().unwrap().clone();
             let inner = debug_span!("inform_servers");
             let _g = inner.enter();
 
             async move {
                 let results = addr.send(InputChanged { input }).await;
-                let Ok(changeset) = results else {
+
+                let Ok(result_set) = results else {
                     unreachable!("?1")
                 };
-                let servers = addr.send(GetServersMessage).await;
-                let Ok(servers_resp) = servers else {
-                    unreachable!("?2")
-                };
 
-                let evt = ExternalEvents::ServersStarted(ServersStarted {
-                    servers_resp,
-                    changeset,
-                });
+                for x in &result_set {
+                    match x {
+                        ChildResult::Created(created) => {
+                            println!(
+                                "created... {:?} {}",
+                                created.server_handler.identity, created.server_handler.socket_addr
+                            );
+                        }
+                        ChildResult::Stopped(stopped) => {
+                            println!("stopped... {:?}", stopped);
+                        }
+                        ChildResult::Err(errored) => {
+                            println!(
+                                "errorred... {:?} {} ",
+                                errored.identity, errored.server_error
+                            );
+                        }
+                    }
+                }
+                for x in result_set {
+                    match x {
+                        ChildResult::Created(c) => addr.do_send(c),
+                        ChildResult::Stopped(id) => addr.do_send(ChildStopped { identity: id }),
+                        ChildResult::Err(_) => {}
+                    }
+                }
 
-                let out = EventWithSpan { evt };
-
-                match external_event_sender.send(out).await {
-                    Ok(_) => tracing::trace!("Ok"),
-                    Err(_) => tracing::trace!("Err"),
-                };
+                // dbg!(result_set);
+                // let servers = addr.send(GetServersMessage).await;
+                // let Ok(servers_resp) = servers else {
+                //     unreachable!("?2")
+                // };
+                //
+                // let evt = ExternalEvents::ServersStarted(ServersStarted {
+                //     servers_resp,
+                //     changeset,
+                // });
+                //
+                // let out = EventWithSpan { evt };
+                //
+                // match external_event_sender.send(out).await {
+                //     Ok(_) => tracing::trace!("Ok"),
+                //     Err(_) => tracing::trace!("Err"),
+                // };
             }
             .in_current_span()
         });
@@ -248,13 +278,13 @@ impl Handler<Start> for BsSystem {
                     cwd: cwd.clone(),
                 });
 
-                self.accept_input(&input);
-                self.inform_servers(input);
+                self.accept_watchables(&input);
+                self.resolve_servers(input);
             }
             Ok(SystemStartArgs::InputOnly { input }) => {
                 tracing::debug!("InputOnly");
-                self.accept_input(&input);
-                self.inform_servers(input);
+                self.accept_watchables(&input);
+                self.resolve_servers(input);
             }
             Ok(SystemStartArgs::PathWithInvalidInput { path, input_error }) => {
                 tracing::debug!("PathWithInvalidInput");

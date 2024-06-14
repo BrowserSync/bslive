@@ -5,16 +5,16 @@ use std::future::Future;
 
 use std::pin::Pin;
 
-use bsnext_dto::ServerChangeSet;
+use crate::servers_supervisor::start_handler::ChildResult;
 
 #[derive(actix::Message)]
-#[rtype(result = "ServerChangeSet")]
+#[rtype(result = "Vec<ChildResult>")]
 pub struct InputChanged {
     pub input: Input,
 }
 
 impl actix::Handler<InputChanged> for ServersSupervisor {
-    type Result = Pin<Box<dyn Future<Output = ServerChangeSet>>>;
+    type Result = Pin<Box<dyn Future<Output = Vec<ChildResult>>>>;
 
     #[tracing::instrument(skip_all, name = "InputChanged for ServersSupervisor")]
     fn handle(&mut self, msg: InputChanged, ctx: &mut Self::Context) -> Self::Result {
