@@ -59,6 +59,9 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
                 AnyWatchable::Route(route_watchable) => {
                     FsWatcher::new(&msg.cwd, route_watchable.server_identity.as_id())
                 }
+                AnyWatchable::Input(input) => {
+                    todo!("implement input watcher")
+                }
             };
 
             if let Some(opts) = &watchable.spec_opts() {

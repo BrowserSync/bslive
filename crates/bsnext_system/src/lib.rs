@@ -98,7 +98,7 @@ impl BsSystem {
         };
 
         // todo: clean up this merging
-        let mut routes = route_watchables
+        let mut all_watchables = route_watchables
             .iter()
             .map(|r| AnyWatchable::Route(r.to_owned()))
             .collect::<Vec<_>>();
@@ -108,7 +108,7 @@ impl BsSystem {
             .map(|w| AnyWatchable::Server(w.to_owned()))
             .collect::<Vec<_>>();
 
-        routes.extend(servers);
+        all_watchables.extend(servers);
         let cwd = cwd.clone();
         let addr = self_address.clone();
 
@@ -116,7 +116,7 @@ impl BsSystem {
             async move {
                 match addr
                     .send(MonitorAnyWatchables {
-                        watchables: routes,
+                        watchables: all_watchables,
                         cwd,
                         span: c,
                     })

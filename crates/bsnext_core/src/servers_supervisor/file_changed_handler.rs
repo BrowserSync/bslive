@@ -38,6 +38,7 @@ impl actix::Handler<FilesChanged> for ServersSupervisor {
     #[tracing::instrument(skip_all, name = "FilesChanged for ServersSupervisor")]
     fn handle(&mut self, msg: FilesChanged, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("sending message to {} handlers", self.handlers.len());
+        // todo(alpha): limit this to only the relevant server?
         for child in self.handlers.values() {
             let outgoing = ChangeWithSpan {
                 evt: Change::fs_many(&msg.paths),

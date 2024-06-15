@@ -178,6 +178,7 @@ impl actix::Handler<FsEvent> for BsSystem {
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum AnyWatchable {
     Server(ServerWatchable),
+    Input(InputWatchable),
     Route(RouteWatchable),
 }
 
@@ -186,12 +187,14 @@ impl AnyWatchable {
         match self {
             AnyWatchable::Server(server) => server.spec.opts.as_ref(),
             AnyWatchable::Route(route) => route.spec.opts.as_ref(),
+            AnyWatchable::Input(_) => todo!("implement input spec opts"),
         }
     }
     pub fn watch_path(&self) -> &Path {
         match self {
             AnyWatchable::Server(server) => &server.dir,
             AnyWatchable::Route(route) => &route.dir,
+            AnyWatchable::Input(input) => &input.path,
         }
     }
 }
@@ -201,6 +204,11 @@ pub struct ServerWatchable {
     pub server_identity: Identity,
     pub dir: PathBuf,
     pub spec: Spec,
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+pub struct InputWatchable {
+    pub path: PathBuf,
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
