@@ -40,10 +40,8 @@ impl FsWatcher {
     }
 
     pub fn for_input(cwd: &Path, id: u64) -> Self {
-        let ctx = FsEventContext::Other { id };
-        let mut s = Self::new(cwd, ctx);
-        s.ctx = FsEventContext::InputFile { id };
-        s
+        let ctx = FsEventContext { id };
+        Self::new(cwd, ctx)
     }
 
     pub fn with_debounce(&mut self, d: Debounce) {

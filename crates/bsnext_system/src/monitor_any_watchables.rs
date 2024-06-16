@@ -51,24 +51,24 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
         }
 
         tracing::debug!("adding {} new watchables", to_add.len());
-        for watchable in to_add {
-            let mut input_watcher = match watchable {
+        for any_watchable in to_add {
+            let mut input_watcher = match any_watchable {
                 AnyWatchable::Server(server_watchable) => {
                     let id = server_watchable.server_identity.as_id();
-                    let ctx = FsEventContext::Other { id };
+                    let ctx = FsEventContext { id };
                     FsWatcher::new(&msg.cwd, ctx)
                 }
                 AnyWatchable::Route(route_watchable) => {
                     let id = route_watchable.server_identity.as_id();
-                    let ctx = FsEventContext::Other { id };
+                    let ctx = FsEventContext { id };
                     FsWatcher::new(&msg.cwd, ctx)
                 }
                 AnyWatchable::Input(input) => {
-                    todo!("implement input watcher")
+                    todo!("implement input watcher {:?}", input)
                 }
             };
 
-            if let Some(opts) = &watchable.spec_opts() {
+            if let Some(opts) = &any_watchable.spec_opts() {
                 if let Some(filter_kind) = &opts.filter {
                     let filters = convert(filter_kind);
                     for filter in filters {
@@ -77,7 +77,7 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
                 }
             }
 
-            let duration = match &watchable.spec_opts() {
+            let duration = match &any_watchable.spec_opts() {
                 Some(SpecOpts {
                     debounce: Some(DebounceDuration::Ms(ms)),
                     ..
@@ -91,7 +91,7 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
 
             let monitor = Monitor {
                 addr: input_watcher_addr.clone(),
-                path: watchable.watch_path().to_path_buf(),
+                path: any_watchable.watch_path().to_path_buf(),
             };
 
             monitor.addr.do_send(RequestWatchPath {
@@ -100,7 +100,7 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
                 span: span_c.clone(),
             });
 
-            ctx.notify(InsertMonitor((*watchable).clone(), monitor))
+            ctx.notify(InsertMonitor((*any_watchable).clone(), monitor))
         }
     }
 }

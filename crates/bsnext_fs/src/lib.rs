@@ -54,23 +54,19 @@ impl Debounce {
 }
 
 #[derive(Debug, Clone)]
-pub enum FsEventContext {
-    InputFile { id: u64 },
-    Other { id: u64 },
+pub struct FsEventContext {
+    pub id: u64,
 }
 
 impl FsEventContext {
     pub fn id(&self) -> u64 {
-        match self {
-            FsEventContext::InputFile { id } => *id,
-            FsEventContext::Other { id } => *id,
-        }
+        self.id
     }
 }
 
 impl Default for FsEventContext {
     fn default() -> Self {
-        Self::Other { id: 1 }
+        Self { id: 1 }
     }
 }
 

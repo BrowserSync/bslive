@@ -6,7 +6,7 @@ use bsnext_core::servers_supervisor::file_changed_handler::{FileChanged, FilesCh
 use bsnext_dto::{ExternalEvents, StoppedWatching, Watching};
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
-    BufferedChangeEvent, ChangeEvent, Debounce, FsEvent, FsEventContext, FsEventKind,
+    BufferedChangeEvent, ChangeEvent, Debounce, FsEvent, FsEventKind,
     PathAddedEvent, PathEvent,
 };
 use bsnext_input::route::{
@@ -94,8 +94,8 @@ impl BsSystem {
     fn handle_change(&mut self, msg: &FsEvent, inner: &ChangeEvent) -> Option<ExternalEvents> {
         let span = trace_span!("handle_change", ?inner.absolute_path);
         let _guard = span.enter();
-        match msg.ctx {
-            FsEventContext::InputFile { id: _ } => {
+        match msg.ctx.id() {
+            0 => {
                 tracing::info!(?inner, "InputFile file changed");
                 let input = Input::from_input_path(&inner.absolute_path);
 
@@ -111,7 +111,7 @@ impl BsSystem {
                     bsnext_dto::FileChanged::from_path_buf(&inner.path),
                 ))
             }
-            FsEventContext::Other { id } => {
+            _id => {
                 tracing::trace!(?inner, "Other file changed");
                 // todo: tie these changed to an input identity?
                 if let Some(servers) = &self.servers_addr {

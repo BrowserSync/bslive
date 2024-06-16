@@ -1,6 +1,6 @@
 use crate::actor::FsWatcher;
 use crate::watch_path_handler::RequestWatchPath;
-use crate::{Debounce, FsEvent, FsEventKind};
+use crate::{Debounce, FsEvent, FsEventContext, FsEventKind};
 use actix::{Actor, Addr};
 use std::fs::File;
 use std::io::Write;
@@ -58,7 +58,7 @@ struct TestCase {
 impl TestCase {
     pub fn new(debounce: Debounce, filter: Option<Filter>) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
-        let mut fs = FsWatcher::new(tmp_dir.path(), 0);
+        let mut fs = FsWatcher::new(tmp_dir.path(), FsEventContext { id: 0 });
         fs.with_debounce(debounce);
         if let Some(filter) = filter {
             fs.with_filter(filter);
