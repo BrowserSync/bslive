@@ -24,7 +24,7 @@ pub struct FsWatcher {
 }
 
 impl FsWatcher {
-    pub fn new(cwd: &Path, id: u64) -> Self {
+    pub fn new(cwd: &Path, ctx: FsEventContext) -> Self {
         // todo: does this need to be a broadcast::channel? would an unbounded mpsc be better?
         let (raw_fs_sender, _) = broadcast::channel::<InnerChangeEvent>(1000);
 
@@ -32,7 +32,7 @@ impl FsWatcher {
             watcher: None,
             raw_fs_stream: Arc::new(raw_fs_sender),
             receivers: vec![],
-            ctx: FsEventContext::Other { id },
+            ctx,
             cwd: cwd.to_path_buf(),
             filters: vec![],
             debounce: Default::default(),
@@ -40,7 +40,8 @@ impl FsWatcher {
     }
 
     pub fn for_input(cwd: &Path, id: u64) -> Self {
-        let mut s = Self::new(cwd, id);
+        let ctx = FsEventContext::Other { id };
+        let mut s = Self::new(cwd, ctx);
         s.ctx = FsEventContext::InputFile { id };
         s
     }

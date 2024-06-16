@@ -1,8 +1,10 @@
 servers:
-- bind_address: 0.0.0.0:3000
-  routes:
-  - path: /
-    watch: true
-    dir: examples/basic/public
-    headers: null
-  watchers: []
+  - bind_address: 0.0.0.0:3000
+    routes:
+      - path: /
+        dir: examples/basic/public
+  - bind_address: 0.0.0.0:3001
+    routes:
+      - path: /
+        watch: true
+        dir: examples/lit

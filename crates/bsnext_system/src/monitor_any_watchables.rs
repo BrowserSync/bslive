@@ -5,7 +5,7 @@ use bsnext_fs::actor::FsWatcher;
 use bsnext_fs::filter::Filter;
 use bsnext_fs::stop_handler::StopWatcher;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
-use bsnext_fs::Debounce;
+use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::{DebounceDuration, FilterKind, SpecOpts};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -54,10 +54,14 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
         for watchable in to_add {
             let mut input_watcher = match watchable {
                 AnyWatchable::Server(server_watchable) => {
-                    FsWatcher::new(&msg.cwd, server_watchable.server_identity.as_id())
+                    let id = server_watchable.server_identity.as_id();
+                    let ctx = FsEventContext::Other { id };
+                    FsWatcher::new(&msg.cwd, ctx)
                 }
                 AnyWatchable::Route(route_watchable) => {
-                    FsWatcher::new(&msg.cwd, route_watchable.server_identity.as_id())
+                    let id = route_watchable.server_identity.as_id();
+                    let ctx = FsEventContext::Other { id };
+                    FsWatcher::new(&msg.cwd, ctx)
                 }
                 AnyWatchable::Input(input) => {
                     todo!("implement input watcher")

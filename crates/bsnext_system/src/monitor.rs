@@ -83,7 +83,7 @@ impl BsSystem {
         if let Some(servers) = &self.servers_addr {
             servers.do_send(FilesChanged {
                 paths: paths.clone(),
-                id: msg.ctx.id(),
+                ctx: msg.ctx.clone(),
             })
         }
         // todo(alpha): need to exclude changes to the input file if this event has captured it
@@ -117,7 +117,7 @@ impl BsSystem {
                 if let Some(servers) = &self.servers_addr {
                     servers.do_send(FileChanged {
                         path: inner.absolute_path.clone(),
-                        id,
+                        ctx: msg.ctx.clone(),
                     })
                 }
                 Some(ExternalEvents::FileChanged(
