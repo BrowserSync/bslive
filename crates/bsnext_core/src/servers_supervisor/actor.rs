@@ -137,8 +137,9 @@ impl ServersSupervisor {
                 });
                 let results = join_all(fts).await;
                 let patch_child_results = results.into_iter().map(|(r, child_handler)| match r {
-                    Ok(Ok(_)) => ChildResult::Patched(ChildPatched {
+                    Ok(Ok(route_change_set)) => ChildResult::Patched(ChildPatched {
                         server_handler: child_handler,
+                        route_change_set,
                     }),
                     Ok(Err(err)) => ChildResult::PatchErr(ChildNotPatched {
                         patch_error: PatchError::DidNotPatch {

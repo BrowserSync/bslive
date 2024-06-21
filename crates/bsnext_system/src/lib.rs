@@ -166,10 +166,18 @@ impl BsSystem {
                         }
                         ChildResult::Patched(child) => {
                             // todo: determine WHICH changes were actually applied (instead of saying everything was patched)
-                            println!(
-                                "[--report--] patched... {:?} {}",
-                                child.server_handler.identity, child.server_handler.socket_addr
-                            );
+                            for x in &child.route_change_set.changed {
+                                println!(
+                                    "[--report--] PATCH changed... {:?} {:?}",
+                                    child.server_handler.identity, x
+                                );
+                            }
+                            for x in &child.route_change_set.added {
+                                println!(
+                                    "[--report--] PATCH added... {:?} {:?}",
+                                    child.server_handler.identity, x
+                                );
+                            }
                         }
                         ChildResult::PatchErr(errored) => {
                             println!(

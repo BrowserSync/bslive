@@ -1,5 +1,6 @@
 use crate::server::error::{PatchError, ServerError};
 use crate::servers_supervisor::actor::{ChildHandler, ServersSupervisor};
+use bsnext_input::route_manifest::RouteChangeSet;
 use bsnext_input::server_config::Identity;
 
 #[derive(Debug, actix::Message)]
@@ -11,6 +12,7 @@ pub struct ChildCreated {
 #[rtype(result = "()")]
 pub struct ChildPatched {
     pub server_handler: ChildHandler,
+    pub route_change_set: RouteChangeSet,
 }
 #[derive(Debug)]
 pub enum ChildResult {
