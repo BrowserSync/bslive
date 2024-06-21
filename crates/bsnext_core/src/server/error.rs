@@ -18,6 +18,14 @@ pub enum ServerError {
     Closed,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Error)]
+pub enum PatchError {
+    // The `#[from]` attribute generates `From<JsonRejection> for ApiError`
+    // implementation. See `thiserror` docs for more information
+    #[error("did not patch {reason}")]
+    DidNotPatch { reason: String },
+}
+
 #[test]
 fn test_api_error() {
     #[derive(serde::Serialize, serde::Deserialize, Debug)]

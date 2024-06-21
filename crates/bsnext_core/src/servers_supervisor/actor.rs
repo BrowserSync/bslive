@@ -2,7 +2,9 @@ use crate::server::handler_stop::Stop;
 use actix::{Actor, Addr, Running};
 
 use crate::server::actor::ServerActor;
-use crate::servers_supervisor::start_handler::{ChildCreated, ChildNotCreated, ChildResult};
+use crate::servers_supervisor::start_handler::{
+    ChildCreated, ChildNotCreated, ChildNotPatched, ChildPatched, ChildResult,
+};
 
 use bsnext_input::server_config::Identity;
 use bsnext_input::Input;
@@ -10,7 +12,9 @@ use std::collections::HashSet;
 use std::future::Future;
 use std::net::SocketAddr;
 
+use crate::server::error::PatchError;
 use crate::server::handler_listen::Listen;
+use crate::server::handler_patch::Patch;
 use futures_util::future::join_all;
 use futures_util::FutureExt;
 use std::pin::Pin;
@@ -69,7 +73,7 @@ impl ServersSupervisor {
             })
             .collect::<Vec<_>>();
 
-        let _patch_jobs = patch
+        let patch_jobs = patch
             .iter()
             .filter_map(|s| {
                 let child = self.handlers.get(s).map(ToOwned::to_owned);
@@ -110,7 +114,7 @@ impl ServersSupervisor {
                         .map(|r| (r, c))
                 });
                 let results = join_all(fts).await;
-                let child_results = results.into_iter().map(|(r, c)| match r {
+                let start_child_results = results.into_iter().map(|(r, c)| match r {
                     Ok(Ok((socket, addr))) => ChildResult::Created(ChildCreated {
                         server_handler: ChildHandler {
                             actor_address: addr,
@@ -125,20 +129,30 @@ impl ServersSupervisor {
                     Err(e) => unreachable!("{}", e),
                 });
 
-                shutdown_child_results.chain(child_results).collect()
+                let fts = patch_jobs.into_iter().map(|(child, server_config)| {
+                    child
+                        .actor_address
+                        .send(Patch { server_config })
+                        .map(|r| (r, child))
+                });
+                let results = join_all(fts).await;
+                let patch_child_results = results.into_iter().map(|(r, child_handler)| match r {
+                    Ok(Ok(_)) => ChildResult::Patched(ChildPatched {
+                        server_handler: child_handler,
+                    }),
+                    Ok(Err(err)) => ChildResult::PatchErr(ChildNotPatched {
+                        patch_error: PatchError::DidNotPatch {
+                            reason: err.to_string(),
+                        },
+                        identity: child_handler.identity.clone(),
+                    }),
+                    Err(_) => unreachable!("mailbox error on patch"),
+                });
 
-                // todo(aloha): fix patching
-                // for (child, config) in patch_jobs {
-                //     tracing::debug!("patching {:?}", child.identity);
-                //     child.actor_address.do_send(Patch {
-                //         server_config: config,
-                //     });
-                //     changeset.items.push(ServerChangeSetItem {
-                //         identity: (&child.identity).into(),
-                //         change: ServerChange::Patched,
-                //     })
-                // }
-                // ServerChangeSet { items: vec![] }
+                shutdown_child_results
+                    .chain(start_child_results)
+                    .chain(patch_child_results)
+                    .collect()
             }
             .instrument(span.clone()),
         )

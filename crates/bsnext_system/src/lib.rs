@@ -151,25 +151,40 @@ impl BsSystem {
                     match x {
                         ChildResult::Created(created) => {
                             println!(
-                                "created... {:?} {}",
+                                "[--report--] created... {:?} {}",
                                 created.server_handler.identity, created.server_handler.socket_addr
                             );
                         }
                         ChildResult::Stopped(stopped) => {
-                            println!("stopped... {:?}", stopped);
+                            println!("[--report--] stopped... {:?}", stopped);
                         }
                         ChildResult::Err(errored) => {
                             println!(
-                                "errorred... {:?} {} ",
+                                "[--report--] errored... {:?} {} ",
                                 errored.identity, errored.server_error
+                            );
+                        }
+                        ChildResult::Patched(child) => {
+                            // todo: determine WHICH changes were actually applied (instead of saying everything was patched)
+                            println!(
+                                "[--report--] patched... {:?} {}",
+                                child.server_handler.identity, child.server_handler.socket_addr
+                            );
+                        }
+                        ChildResult::PatchErr(errored) => {
+                            println!(
+                                "[--report--] patch errored... {:?} {} ",
+                                errored.identity, errored.patch_error
                             );
                         }
                     }
                 }
                 for x in result_set {
                     match x {
-                        ChildResult::Created(c) => addr.do_send(c),
                         ChildResult::Stopped(id) => addr.do_send(ChildStopped { identity: id }),
+                        ChildResult::Created(c) => addr.do_send(c),
+                        ChildResult::Patched(_) => {}
+                        ChildResult::PatchErr(_) => {}
                         ChildResult::Err(_) => {}
                     }
                 }

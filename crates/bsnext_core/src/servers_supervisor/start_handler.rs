@@ -1,4 +1,4 @@
-use crate::server::error::ServerError;
+use crate::server::error::{PatchError, ServerError};
 use crate::servers_supervisor::actor::{ChildHandler, ServersSupervisor};
 use bsnext_input::server_config::Identity;
 
@@ -7,9 +7,16 @@ use bsnext_input::server_config::Identity;
 pub struct ChildCreated {
     pub server_handler: ChildHandler,
 }
+#[derive(Debug, actix::Message)]
+#[rtype(result = "()")]
+pub struct ChildPatched {
+    pub server_handler: ChildHandler,
+}
 #[derive(Debug)]
 pub enum ChildResult {
     Created(ChildCreated),
+    Patched(ChildPatched),
+    PatchErr(ChildNotPatched),
     Stopped(Identity),
     Err(ChildNotCreated),
 }
@@ -30,6 +37,13 @@ impl actix::Handler<ChildCreated> for ServersSupervisor {
 #[rtype(result = "()")]
 pub struct ChildNotCreated {
     pub server_error: ServerError,
+    pub identity: Identity,
+}
+
+#[derive(Debug, actix::Message)]
+#[rtype(result = "()")]
+pub struct ChildNotPatched {
+    pub patch_error: PatchError,
     pub identity: Identity,
 }
 
