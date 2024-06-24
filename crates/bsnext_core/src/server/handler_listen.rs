@@ -3,27 +3,24 @@ use crate::server::error::ServerError;
 use crate::server::router::make_router;
 use crate::server::state::ServerState;
 use crate::servers_supervisor::get_servers_handler::GetServersMessage;
-use actix::{AsyncContext, Recipient};
+use actix::{Recipient, ResponseFuture};
 use actix_rt::Arbiter;
 use bsnext_input::server_config::Identity;
-use std::future::Future;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, TcpListener};
-use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
 
 #[derive(actix::Message)]
-#[rtype(result = "Result<(SocketAddr, actix::Addr<ServerActor>), ServerError>")]
+#[rtype(result = "Result<SocketAddr, ServerError>")]
 pub struct Listen {
     pub(crate) parent: Recipient<GetServersMessage>,
 }
 
 impl actix::Handler<Listen> for ServerActor {
-    type Result =
-        Pin<Box<dyn Future<Output = Result<(SocketAddr, actix::Addr<ServerActor>), ServerError>>>>;
+    type Result = ResponseFuture<Result<SocketAddr, ServerError>>;
 
-    fn handle(&mut self, msg: Listen, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: Listen, _ctx: &mut Self::Context) -> Self::Result {
         let identity = self.config.identity.clone();
         tracing::trace!("actor started for {:?}", identity);
         let (send_complete, handle, client_sender) = self.install_signals();
@@ -40,7 +37,6 @@ impl actix::Handler<Listen> for ServerActor {
         });
 
         self.app_state = Some(app_state.clone());
-        let self_addr = ctx.address();
 
         let server = async move {
             let router = make_router(&app_state);
@@ -102,15 +98,13 @@ impl actix::Handler<Listen> for ServerActor {
 
         Arbiter::current().spawn(server);
 
-        let self_addr = self_addr.clone();
-
         Box::pin(async move {
             tokio::select! {
                 listening = h2.listening() => {
                     match listening {
                         Some(socket_addr) => {
                             tracing::debug!("{} listening...", socket_addr);
-                            Ok((socket_addr, self_addr.clone()))
+                            Ok(socket_addr)
                         }
                         None => {
                             Err(ServerError::Unknown("unknown".to_string()))

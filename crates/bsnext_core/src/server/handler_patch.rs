@@ -1,5 +1,5 @@
 use crate::server::actor::ServerActor;
-use actix::{AsyncContext, ResponseFuture};
+use actix::{ResponseFuture};
 use bsnext_input::route_manifest::{RouteChangeSet, RoutesManifest};
 use bsnext_input::server_config::ServerConfig;
 use std::sync::Arc;
@@ -14,12 +14,12 @@ pub struct Patch {
 impl actix::Handler<Patch> for ServerActor {
     type Result = ResponseFuture<anyhow::Result<RouteChangeSet>>;
 
-    fn handle(&mut self, msg: Patch, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: Patch, _ctx: &mut Self::Context) -> Self::Result {
         let span = debug_span!("Patch for ServerActor");
         // todo(alpha): remove this
         let s = Arc::new(span);
         let _g = s.enter();
-        let addr = ctx.address();
+        // let addr = ctx.address();
         tracing::trace!("Handler<PatchOne> for ServerActor");
         let app_state = self.app_state.as_ref().expect("could not access state");
         let app_state_clone = app_state.clone();

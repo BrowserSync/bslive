@@ -1,5 +1,5 @@
 use crate::server::handler_stop::Stop;
-use actix::{Actor, Addr, Running};
+use actix::{Actor, Addr, ResponseFuture, Running};
 
 use crate::server::actor::ServerActor;
 use crate::servers_supervisor::start_handler::{
@@ -9,7 +9,6 @@ use crate::servers_supervisor::start_handler::{
 use bsnext_input::server_config::Identity;
 use bsnext_input::Input;
 use std::collections::HashSet;
-use std::future::Future;
 use std::net::SocketAddr;
 
 use crate::server::error::PatchError;
@@ -17,7 +16,6 @@ use crate::server::handler_listen::Listen;
 use crate::server::handler_patch::Patch;
 use futures_util::future::join_all;
 use futures_util::FutureExt;
-use std::pin::Pin;
 use tokio::sync::oneshot::Sender;
 use tracing::{span, Instrument, Level};
 
@@ -46,7 +44,7 @@ impl ServersSupervisor {
         &mut self,
         self_addr: Addr<ServersSupervisor>,
         input: Input,
-    ) -> Pin<Box<impl Future<Output = Vec<ChildResult>> + Sized>> {
+    ) -> ResponseFuture<Vec<ChildResult>> {
         let span = span!(Level::TRACE, "input_changed");
         let _guard = span.enter();
 
@@ -106,20 +104,21 @@ impl ServersSupervisor {
                 let fts = start_jobs.into_iter().map(|server_config| {
                     let server = ServerActor::new_from_config(server_config.clone());
                     let actor_addr = server.start();
+                    let actor_addr_c = actor_addr.clone();
                     let c = server_config.clone();
                     actor_addr
                         .send(Listen {
                             parent: self_addr.clone().recipient(),
                         })
-                        .map(|r| (r, c))
+                        .map(|r| (r, c, actor_addr_c))
                 });
                 let results = join_all(fts).await;
-                let start_child_results = results.into_iter().map(|(r, c)| match r {
-                    Ok(Ok((socket, addr))) => ChildResult::Created(ChildCreated {
+                let start_child_results = results.into_iter().map(|(r, c, addr)| match r {
+                    Ok(Ok(socket_addr)) => ChildResult::Created(ChildCreated {
                         server_handler: ChildHandler {
                             actor_address: addr,
                             identity: c.identity,
-                            socket_addr: socket,
+                            socket_addr,
                         },
                     }),
                     Ok(Err(err)) => ChildResult::Err(ChildNotCreated {
