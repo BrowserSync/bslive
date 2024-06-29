@@ -1,8 +1,9 @@
 use crate::OutputWriter;
 use bsnext_dto::internal::InternalEvents;
 use bsnext_dto::{
-    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO,
-    ServersChanged, StartupErrorDTO, StartupEvent, StoppedWatching, Watching,
+    ExternalEvents, FileChanged, FilesChangedDTO, GetServersMessageResponse, IdentityDTO,
+    InputAccepted, InputErrorDTO, ServerDTO, ServersChanged, StartupErrorDTO, StartupEvent,
+    StoppedWatching, Watching,
 };
 use std::io::Write;
 use std::marker::PhantomData;
@@ -14,7 +15,7 @@ impl OutputWriter for PrettyPrint {
     fn handle_external_event<W: Write>(
         &self,
         sink: &mut W,
-        evt: ExternalEvents,
+        evt: &ExternalEvents,
     ) -> anyhow::Result<()> {
         match &evt {
             ExternalEvents::ServersChanged(servers_started) => {
@@ -294,5 +295,19 @@ fn iden(identity_dto: &IdentityDTO) -> String {
         IdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
         IdentityDTO::Address { bind_address } => bind_address.to_string(),
         IdentityDTO::Named { name } => format!("[{name}]"),
+    }
+}
+
+pub fn server_display(s: &ServerDTO) -> String {
+    match &s.identity {
+        IdentityDTO::Both { name, .. } => {
+            format!("[server] [{}] http://{}", name, s.socket_addr)
+        }
+        IdentityDTO::Address { .. } => {
+            format!("[server] http://{}", s.socket_addr)
+        }
+        IdentityDTO::Named { name } => {
+            format!("[server] [{}] http://{}", name, &s.socket_addr)
+        }
     }
 }

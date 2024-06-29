@@ -69,7 +69,7 @@ impl From<RouteKind> for RouteKindDTO {
 }
 
 #[typeshare]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ServersChanged {
     pub servers_resp: GetServersMessageResponse,
 }
@@ -89,7 +89,7 @@ pub struct ExternalEvent {
 }
 
 #[typeshare]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
 pub enum ExternalEvents {
     ServersChanged(ServersChanged),
@@ -126,32 +126,32 @@ impl From<&StartupError> for StartupErrorDTO {
 }
 
 #[typeshare]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, Clone)]
 pub struct InputAccepted {
     pub path: String,
 }
 
 #[typeshare]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, Clone)]
 pub struct FileChanged {
     pub path: String,
 }
 
 #[typeshare]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, Clone)]
 pub struct FilesChangedDTO {
     pub paths: Vec<String>,
 }
 
 #[typeshare]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Watching {
     pub paths: Vec<String>,
     pub debounce: DebounceDTO,
 }
 
 #[typeshare]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct StoppedWatching {
     pub paths: Vec<String>,
 }
@@ -171,7 +171,7 @@ impl Display for Watching {
 }
 
 #[typeshare]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct DebounceDTO {
     kind: String,
     ms: String,

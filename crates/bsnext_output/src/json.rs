@@ -9,7 +9,7 @@ impl OutputWriter for JsonPrint {
     fn handle_external_event<W: Write>(
         &self,
         sink: &mut W,
-        evt: ExternalEvents,
+        evt: &ExternalEvents,
     ) -> anyhow::Result<()> {
         write!(sink, "{}", serde_json::to_string(&evt)?).map_err(|e| anyhow::anyhow!(e.to_string()))
     }

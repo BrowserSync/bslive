@@ -141,7 +141,7 @@ where
             tracing::debug!(external_event=?evt);
             let r = match evt {
                 AnyEvent::Internal(int) => printer.handle_internal_event(stdout, int),
-                AnyEvent::External(ext) => printer.handle_external_event(stdout, ext),
+                AnyEvent::External(ext) => printer.handle_external_event(stdout, &ext),
             };
             match r {
                 Ok(_) => {}

@@ -1,7 +1,7 @@
 use self::common::{init_terminal, install_hooks, restore_terminal, Tui};
 use crate::OutputWriter;
-use bsnext_dto::{ExternalEvents, StartupEvent};
-use std::io::Write;
+use bsnext_dto::{ExternalEvents, GetServersMessageResponse, StartupEvent};
+use std::io::{BufWriter, Write};
 use std::sync::mpsc;
 use std::sync::mpsc::{SendError, Sender};
 use std::thread::JoinHandle;
@@ -11,7 +11,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bsnext_dto::internal::InternalEvents;
+use crate::pretty::{server_display, PrettyPrint};
+use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
 use crossterm::event::KeyEventKind;
 use ratatui::{
     buffer::Buffer,
@@ -30,9 +31,12 @@ impl OutputWriter for RatatuiSender {
     fn handle_external_event<W: Write>(
         &self,
         sink: &mut W,
-        evt: ExternalEvents,
+        evt: &ExternalEvents,
     ) -> anyhow::Result<()> {
-        match self.0.send(RatatuiEvent::Ext(evt)) {
+        match self
+            .0
+            .send(RatatuiEvent::Evt(AnyEvent::External(evt.clone())))
+        {
             Ok(_) => tracing::info!("sent..."),
             Err(_) => tracing::error!("could not send"),
         }
@@ -43,7 +47,7 @@ impl OutputWriter for RatatuiSender {
         sink: &mut W,
         evt: InternalEvents,
     ) -> anyhow::Result<()> {
-        match self.0.send(RatatuiEvent::Int(evt)) {
+        match self.0.send(RatatuiEvent::Evt(AnyEvent::Internal(evt))) {
             Ok(_) => tracing::info!("sent..."),
             Err(_) => tracing::error!("could not send"),
         }
@@ -63,7 +67,7 @@ impl OutputWriter for Ratatui {
     fn handle_external_event<W: Write>(
         &self,
         sink: &mut W,
-        evt: ExternalEvents,
+        evt: &ExternalEvents,
     ) -> anyhow::Result<()> {
         // write!(sink, "{}", serde_json::to_string(&evt)?).map_err(|e| anyhow::anyhow!(e.to_string()))
         dbg!(&evt);
@@ -159,16 +163,15 @@ struct App {
     should_exit: bool,
     scroll: u16,
     last_tick: Instant,
-    events: Vec<ExternalEvents>,
-    int_events: Vec<InternalEvents>,
+    events: Vec<AnyEvent>,
+    server_status: Option<GetServersMessageResponse>,
 }
 
 enum RatatuiEvent {
     Input(crossterm::event::KeyEvent),
     Tick,
     Resize,
-    Ext(ExternalEvents),
-    Int(InternalEvents),
+    Evt(AnyEvent),
 }
 
 impl App {
@@ -182,7 +185,7 @@ impl App {
             scroll: 0,
             last_tick: Instant::now(),
             events: vec![],
-            int_events: vec![],
+            server_status: None,
         }
     }
 
@@ -194,7 +197,6 @@ impl App {
                 break;
             }
             if redraw {
-                // terminal.draw(|f| self.)?;
                 tracing::info!("drawing...");
                 self.draw(terminal)?;
             }
@@ -216,11 +218,16 @@ impl App {
                         self.last_tick = Instant::now();
                     }
                 }
-                RatatuiEvent::Ext(ext_event) => {
-                    self.events.push(ext_event);
+                RatatuiEvent::Evt(AnyEvent::Internal(evt)) => {
+                    match &evt {
+                        InternalEvents::ServersChanged { server_resp, .. } => {
+                            self.server_status = Some(server_resp.clone());
+                        }
+                    }
+                    self.events.push(AnyEvent::Internal(evt));
                 }
-                RatatuiEvent::Int(int_evt) => {
-                    self.int_events.push(int_evt);
+                RatatuiEvent::Evt(ext_event) => {
+                    self.events.push(ext_event);
                 }
             }
         }
@@ -252,37 +259,94 @@ impl App {
         Ok(())
     }
 
-    /// Handle events from the terminal.
-    fn handle_events(sender: Sender<RatatuiEvent>) -> io::Result<()> {
-        // let timeout = Self::TICK_RATE.saturating_sub(self.last_tick.elapsed());
-        while event::poll(Duration::from_millis(500))? {
-            match event::read()? {
-                Event::FocusGained => tracing::info!("TUI--> FocusGained"),
-                Event::FocusLost => tracing::info!("TUI--> FocusLost"),
-                Event::Key(ke) => tracing::info!("TUI--> Key"),
-                Event::Mouse(_) => tracing::info!("TUI--> Mouse"),
-                Event::Paste(_) => tracing::info!("TUI--> Paste"),
-                Event::Resize(c, r) => {
-                    tracing::info!("TUI--> Resize {} {}", c, r);
-                    match sender.send(crate::ratatui::RatatuiEvent::Resize) {
-                        Ok(_) => {}
-                        Err(_) => tracing::error!("TUI--> Resize {} {}", c, r),
-                    }
-                }
-            }
-            // if let  = event::read()? {
-            //     if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-            //         self.should_exit = true;
-            //     }
-            // }
-        }
-        tracing::info!("event::poll complete");
-        Ok(())
-    }
-
-    /// Update the app state on each tick.
     fn on_tick(&mut self) {
         self.scroll = (self.scroll + 1) % 10;
+    }
+
+    /// Create some lines to display in the paragraph.
+    fn create_servers(&self, area: Rect) -> Vec<Line<'static>> {
+        self.server_status
+            .as_ref()
+            .map(|server_resp| {
+                server_resp
+                    .servers
+                    .iter()
+                    .map(|s| Line::raw(server_display(s)))
+                    .collect()
+            })
+            .unwrap_or_else(Vec::new)
+    }
+
+    /// Create some lines to display in the paragraph.
+    fn create_events(&mut self, area: Rect) -> Vec<Line<'static>> {
+        self.events
+            .iter()
+            .map(|evt| match evt {
+                AnyEvent::Internal(int) => match int {
+                    InternalEvents::ServersChanged { child_results, .. } => {
+                        child_results
+                            .iter()
+                            .map(|r| match r {
+                                ChildResult::Created(created) => {
+                                    format!(
+                                        "[--report--] created... {:?} {}",
+                                        created.server_handler.identity,
+                                        created.server_handler.socket_addr
+                                    )
+                                }
+                                ChildResult::Stopped(stopped) => {
+                                    format!("[--report--] stopped... {:?}", stopped)
+                                }
+                                ChildResult::CreateErr(errored) => {
+                                    format!(
+                                        "[--report--] errored... {:?} {} ",
+                                        errored.identity, errored.server_error
+                                    )
+                                }
+                                ChildResult::Patched(child) => {
+                                    let mut lines = vec![];
+                                    // todo: determine WHICH changes were actually applied (instead of saying everything was patched)
+                                    for x in &child.route_change_set.changed {
+                                        lines.push(format!(
+                                            "[--report--] PATCH changed... {:?} {:?}",
+                                            child.server_handler.identity, x
+                                        ));
+                                    }
+                                    for x in &child.route_change_set.added {
+                                        lines.push(format!(
+                                            "[--report--] PATCH added... {:?} {:?}",
+                                            child.server_handler.identity, x
+                                        ));
+                                    }
+                                    lines.join("\n")
+                                }
+                                ChildResult::PatchErr(errored) => {
+                                    format!(
+                                        "[--report--] patch errored... {:?} {} ",
+                                        errored.identity, errored.patch_error
+                                    )
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    }
+                },
+                AnyEvent::External(ext) => {
+                    let mut writer = BufWriter::new(Vec::new());
+                    PrettyPrint
+                        .handle_external_event(&mut writer, ext)
+                        .expect("can write");
+                    String::from_utf8(writer.into_inner().expect("into_inner")).expect("as_utf8")
+                }
+            })
+            .map(|s| {
+                let lines = s.lines();
+                lines
+                    .map(|s| Line::raw(s.to_owned()))
+                    .collect::<Vec<Line>>()
+            })
+            .flatten()
+            .collect()
     }
 }
 
@@ -290,11 +354,11 @@ impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let areas = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
-        Paragraph::new(create_servers(area))
+        Paragraph::new(self.create_servers(area))
             .block(title_block("Servers"))
             .gray()
             .render(areas[0], buf);
-        Paragraph::new(create_events(area))
+        Paragraph::new(self.create_events(area))
             .block(title_block(
                 format!("Events ({})", self.events.len()).as_str(),
             ))
@@ -309,18 +373,6 @@ fn title_block(title: &str) -> Block {
     Block::bordered()
         .gray()
         .title(title.bold().into_centered_line())
-}
-
-/// Create some lines to display in the paragraph.
-fn create_servers(area: Rect) -> Vec<Line<'static>> {
-    vec![
-        Line::raw("http://localhost:3001"),
-        Line::raw("http://localhost:3002"),
-    ]
-}
-/// Create some lines to display in the paragraph.
-fn create_events(area: Rect) -> Vec<Line<'static>> {
-    vec![Line::raw("watching ./build")]
 }
 
 /// A module for common functionality used in the examples.

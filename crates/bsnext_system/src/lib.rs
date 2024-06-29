@@ -152,46 +152,6 @@ impl BsSystem {
 
                 for (maybe_addr, x) in &result_set {
                     match x {
-                        ChildResult::Created(created) => {
-                            println!(
-                                "[--report--] created... {:?} {}",
-                                created.server_handler.identity, created.server_handler.socket_addr
-                            );
-                        }
-                        ChildResult::Stopped(stopped) => {
-                            println!("[--report--] stopped... {:?}", stopped);
-                        }
-                        ChildResult::CreateErr(errored) => {
-                            println!(
-                                "[--report--] errored... {:?} {} ",
-                                errored.identity, errored.server_error
-                            );
-                        }
-                        ChildResult::Patched(child) => {
-                            // todo: determine WHICH changes were actually applied (instead of saying everything was patched)
-                            for x in &child.route_change_set.changed {
-                                println!(
-                                    "[--report--] PATCH changed... {:?} {:?}",
-                                    child.server_handler.identity, x
-                                );
-                            }
-                            for x in &child.route_change_set.added {
-                                println!(
-                                    "[--report--] PATCH added... {:?} {:?}",
-                                    child.server_handler.identity, x
-                                );
-                            }
-                        }
-                        ChildResult::PatchErr(errored) => {
-                            println!(
-                                "[--report--] patch errored... {:?} {} ",
-                                errored.identity, errored.patch_error
-                            );
-                        }
-                    }
-                }
-                for (maybe_addr, x) in &result_set {
-                    match x {
                         ChildResult::Stopped(id) => addr.do_send(ChildStopped {
                             identity: id.clone(),
                         }),

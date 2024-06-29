@@ -15,7 +15,7 @@ pub trait OutputWriter {
     fn handle_external_event<W: Write>(
         &self,
         sink: &mut W,
-        evt: ExternalEvents,
+        evt: &ExternalEvents,
     ) -> anyhow::Result<()>;
     fn handle_internal_event<W: Write>(
         &self,
@@ -39,7 +39,7 @@ impl OutputWriter for Writers {
     fn handle_external_event<W: Write>(
         &self,
         sink: &mut W,
-        evt: ExternalEvents,
+        evt: &ExternalEvents,
     ) -> anyhow::Result<()> {
         match self {
             Writers::Pretty => PrettyPrint.handle_external_event(sink, evt),
