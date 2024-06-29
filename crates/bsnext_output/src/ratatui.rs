@@ -11,6 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use bsnext_dto::internal::InternalEvents;
 use crossterm::event::KeyEventKind;
 use ratatui::{
     buffer::Buffer,
@@ -37,6 +38,17 @@ impl OutputWriter for RatatuiSender {
         }
         Ok(())
     }
+    fn handle_internal_event<W: Write>(
+        &self,
+        sink: &mut W,
+        evt: InternalEvents,
+    ) -> anyhow::Result<()> {
+        match self.0.send(RatatuiEvent::Int(evt)) {
+            Ok(_) => tracing::info!("sent..."),
+            Err(_) => tracing::error!("could not send"),
+        }
+        Ok(())
+    }
 
     fn handle_startup_event<W: Write>(
         &self,
@@ -54,6 +66,15 @@ impl OutputWriter for Ratatui {
         evt: ExternalEvents,
     ) -> anyhow::Result<()> {
         // write!(sink, "{}", serde_json::to_string(&evt)?).map_err(|e| anyhow::anyhow!(e.to_string()))
+        dbg!(&evt);
+        Ok(())
+    }
+
+    fn handle_internal_event<W: Write>(
+        &self,
+        sink: &mut W,
+        evt: InternalEvents,
+    ) -> anyhow::Result<()> {
         dbg!(&evt);
         Ok(())
     }
@@ -139,6 +160,7 @@ struct App {
     scroll: u16,
     last_tick: Instant,
     events: Vec<ExternalEvents>,
+    int_events: Vec<InternalEvents>,
 }
 
 enum RatatuiEvent {
@@ -146,6 +168,7 @@ enum RatatuiEvent {
     Tick,
     Resize,
     Ext(ExternalEvents),
+    Int(InternalEvents),
 }
 
 impl App {
@@ -159,6 +182,7 @@ impl App {
             scroll: 0,
             last_tick: Instant::now(),
             events: vec![],
+            int_events: vec![],
         }
     }
 
@@ -194,6 +218,9 @@ impl App {
                 }
                 RatatuiEvent::Ext(ext_event) => {
                     self.events.push(ext_event);
+                }
+                RatatuiEvent::Int(int_evt) => {
+                    self.int_events.push(int_evt);
                 }
             }
         }

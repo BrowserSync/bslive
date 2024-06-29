@@ -1,4 +1,5 @@
 use crate::OutputWriter;
+use bsnext_dto::internal::InternalEvents;
 use bsnext_dto::{
     ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO,
     ServersChanged, StartupErrorDTO, StartupEvent, StoppedWatching, Watching,
@@ -33,6 +34,14 @@ impl OutputWriter for PrettyPrint {
                 print_input_file_changed(sink, file_changed)
             }
         }
+    }
+
+    fn handle_internal_event<W: Write>(
+        &self,
+        sink: &mut W,
+        evt: InternalEvents,
+    ) -> anyhow::Result<()> {
+        todo!()
     }
 
     fn handle_startup_event<W: Write>(

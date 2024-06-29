@@ -1,30 +1,4 @@
-use std::net::SocketAddr;
-use thiserror::Error;
-
-// We derive `thiserror::Error`
-#[derive(serde::Serialize, serde::Deserialize, Debug, Error)]
-pub enum ServerError {
-    // The `#[from]` attribute generates `From<JsonRejection> for ApiError`
-    // implementation. See `thiserror` docs for more information
-    #[error("address in use {socket_addr}")]
-    AddrInUse { socket_addr: SocketAddr },
-    #[error("invalid bind address: {addr_parse_error}")]
-    InvalidAddress { addr_parse_error: String },
-    #[error("could not determine the reason: `{0}`")]
-    Unknown(String),
-    #[error("io error {0}")]
-    Io(String),
-    #[error("server was closed")]
-    Closed,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Error)]
-pub enum PatchError {
-    // The `#[from]` attribute generates `From<JsonRejection> for ApiError`
-    // implementation. See `thiserror` docs for more information
-    #[error("did not patch {reason}")]
-    DidNotPatch { reason: String },
-}
+use bsnext_dto::internal::ServerError;
 
 #[test]
 fn test_api_error() {

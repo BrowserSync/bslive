@@ -1,6 +1,6 @@
 use crate::args::Args;
 use crate::start_kind::StartKind;
-use crate::{BsSystem, EventWithSpan, Start};
+use crate::{AnyEvent, BsSystem, EventWithSpan, Start};
 use actix::Actor;
 
 use bsnext_dto::{ExternalEvents, StartupEvent};
@@ -44,7 +44,7 @@ where
 
     let (tx, rx) = oneshot::channel();
     let (startup_oneshot_sender, startup_oneshot_receiver) = oneshot::channel::<StartupResult>();
-    let (events_sender, mut events_receiver) = mpsc::channel::<ExternalEvents>(1);
+    let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);
 
     let system = BsSystem::new();
     let sys_addr = system.start();
@@ -139,10 +139,18 @@ where
             let span = debug_span!("External Event processor");
             let _g2 = span.enter();
             tracing::debug!(external_event=?evt);
-            match printer.handle_external_event(stdout, evt) {
-                Ok(_v) => {}
-                Err(e) => tracing::error!("could not write to stdout {e}"),
+            let r = match evt {
+                AnyEvent::Internal(int) => printer.handle_internal_event(stdout, int),
+                AnyEvent::External(ext) => printer.handle_external_event(stdout, ext),
+            };
+            match r {
+                Ok(_) => {}
+                Err(_) => tracing::error!("could not send"),
             }
+            // match printer.handle_external_event(stdout, evt) {
+            //     Ok(_v) => {}
+            //     Err(e) => tracing::error!("could not write to stdout {e}"),
+            // }
             // match stdout.flush() {
             //     Ok(_) => {}
             //     Err(e) => tracing::error!("could not flush {e}"),

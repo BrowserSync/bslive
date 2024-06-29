@@ -10,6 +10,7 @@ bsnext_input = { path = "../bsnext_input" }
 bsnext_fs = { path = "../bsnext_fs" }
 
 serde = { workspace = true }
+thiserror = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 actix = { workspace = true }

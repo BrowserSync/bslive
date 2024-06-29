@@ -8,6 +8,7 @@ use bsnext_fs::Debounce;
 use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
 use bsnext_input::startup::StartupError;
 use typeshare::typeshare;
+pub mod internal;
 
 #[typeshare]
 #[derive(Debug, serde::Serialize)]

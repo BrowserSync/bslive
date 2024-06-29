@@ -2,18 +2,18 @@ use crate::server::handler_stop::Stop;
 use actix::{Actor, Addr, ResponseFuture, Running};
 
 use crate::server::actor::ServerActor;
-use crate::servers_supervisor::start_handler::{
-    ChildCreated, ChildNotCreated, ChildNotPatched, ChildPatched, ChildResult,
-};
 
 use bsnext_input::server_config::Identity;
 use bsnext_input::Input;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 
-use crate::server::error::PatchError;
 use crate::server::handler_listen::Listen;
 use crate::server::handler_patch::Patch;
+use bsnext_dto::internal::{
+    ChildCreated, ChildHandlerMinimal, ChildNotCreated, ChildNotPatched, ChildPatched, ChildResult,
+    PatchError,
+};
 use futures_util::future::join_all;
 use futures_util::FutureExt;
 use tokio::sync::oneshot::Sender;
@@ -32,6 +32,15 @@ pub struct ChildHandler {
     pub socket_addr: SocketAddr,
 }
 
+impl ChildHandler {
+    pub fn minimal(&self) -> ChildHandlerMinimal {
+        ChildHandlerMinimal {
+            identity: self.identity.clone(),
+            socket_addr: self.socket_addr.clone(),
+        }
+    }
+}
+
 impl ServersSupervisor {
     pub fn new(tx: Sender<()>) -> Self {
         Self {
@@ -44,7 +53,7 @@ impl ServersSupervisor {
         &mut self,
         self_addr: Addr<ServersSupervisor>,
         input: Input,
-    ) -> ResponseFuture<Vec<ChildResult>> {
+    ) -> ResponseFuture<Vec<(Option<Addr<ServerActor>>, ChildResult)>> {
         let span = span!(Level::TRACE, "input_changed");
         let _guard = span.enter();
 
@@ -96,7 +105,7 @@ impl ServersSupervisor {
                         .iter()
                         .zip(shutdown_jobs)
                         .map(|(r, h)| match r {
-                            Ok(_) => ChildResult::Stopped(h.identity.clone()),
+                            Ok(_) => (None, ChildResult::Stopped(h.identity.clone())),
                             Err(er) => unreachable!("{}", er),
                         });
 
@@ -114,17 +123,22 @@ impl ServersSupervisor {
                 });
                 let results = join_all(fts).await;
                 let start_child_results = results.into_iter().map(|(r, c, addr)| match r {
-                    Ok(Ok(socket_addr)) => ChildResult::Created(ChildCreated {
-                        server_handler: ChildHandler {
-                            actor_address: addr,
-                            identity: c.identity,
-                            socket_addr,
-                        },
-                    }),
-                    Ok(Err(err)) => ChildResult::CreateErr(ChildNotCreated {
-                        server_error: err,
-                        identity: c.identity.clone(),
-                    }),
+                    Ok(Ok(socket_addr)) => {
+                        let evt = ChildResult::Created(ChildCreated {
+                            server_handler: ChildHandlerMinimal {
+                                identity: c.identity,
+                                socket_addr,
+                            },
+                        });
+                        (Some(addr), evt)
+                    }
+                    Ok(Err(err)) => {
+                        let evt = ChildResult::CreateErr(ChildNotCreated {
+                            server_error: err,
+                            identity: c.identity.clone(),
+                        });
+                        (None, evt)
+                    }
                     Err(e) => unreachable!("{}", e),
                 });
 
@@ -136,16 +150,22 @@ impl ServersSupervisor {
                 });
                 let results = join_all(fts).await;
                 let patch_child_results = results.into_iter().map(|(r, child_handler)| match r {
-                    Ok(Ok(route_change_set)) => ChildResult::Patched(ChildPatched {
-                        server_handler: child_handler,
-                        route_change_set,
-                    }),
-                    Ok(Err(err)) => ChildResult::PatchErr(ChildNotPatched {
-                        patch_error: PatchError::DidNotPatch {
-                            reason: err.to_string(),
-                        },
-                        identity: child_handler.identity.clone(),
-                    }),
+                    Ok(Ok(route_change_set)) => {
+                        let evt = ChildResult::Patched(ChildPatched {
+                            server_handler: child_handler.minimal(),
+                            route_change_set,
+                        });
+                        (None, evt)
+                    }
+                    Ok(Err(err)) => {
+                        let evt = ChildResult::PatchErr(ChildNotPatched {
+                            patch_error: PatchError::DidNotPatch {
+                                reason: err.to_string(),
+                            },
+                            identity: child_handler.identity.clone(),
+                        });
+                        (None, evt)
+                    }
                     Err(_) => unreachable!("mailbox error on patch"),
                 });
 

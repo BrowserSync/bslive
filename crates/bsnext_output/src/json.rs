@@ -1,4 +1,5 @@
 use crate::OutputWriter;
+use bsnext_dto::internal::InternalEvents;
 use bsnext_dto::{ExternalEvents, StartupEvent};
 use std::io::Write;
 
@@ -11,6 +12,14 @@ impl OutputWriter for JsonPrint {
         evt: ExternalEvents,
     ) -> anyhow::Result<()> {
         write!(sink, "{}", serde_json::to_string(&evt)?).map_err(|e| anyhow::anyhow!(e.to_string()))
+    }
+
+    fn handle_internal_event<W: Write>(
+        &self,
+        sink: &mut W,
+        evt: InternalEvents,
+    ) -> anyhow::Result<()> {
+        todo!()
     }
 
     fn handle_startup_event<W: Write>(

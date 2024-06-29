@@ -1,6 +1,7 @@
 use crate::json::JsonPrint;
 use crate::pretty::PrettyPrint;
-use crate::ratatui::{Ratatui, RatatuiSender};
+use crate::ratatui::RatatuiSender;
+use bsnext_dto::internal::InternalEvents;
 use bsnext_dto::{ExternalEvents, StartupEvent};
 use std::io::Write;
 
@@ -15,6 +16,11 @@ pub trait OutputWriter {
         &self,
         sink: &mut W,
         evt: ExternalEvents,
+    ) -> anyhow::Result<()>;
+    fn handle_internal_event<W: Write>(
+        &self,
+        sink: &mut W,
+        evt: InternalEvents,
     ) -> anyhow::Result<()>;
     fn handle_startup_event<W: Write>(
         &self,
@@ -39,6 +45,17 @@ impl OutputWriter for Writers {
             Writers::Pretty => PrettyPrint.handle_external_event(sink, evt),
             Writers::Json => JsonPrint.handle_external_event(sink, evt),
             Writers::Ratatui(r) => r.handle_external_event(sink, evt),
+        }
+    }
+    fn handle_internal_event<W: Write>(
+        &self,
+        sink: &mut W,
+        evt: InternalEvents,
+    ) -> anyhow::Result<()> {
+        match self {
+            Writers::Pretty => PrettyPrint.handle_internal_event(sink, evt),
+            Writers::Json => JsonPrint.handle_internal_event(sink, evt),
+            Writers::Ratatui(r) => r.handle_internal_event(sink, evt),
         }
     }
 

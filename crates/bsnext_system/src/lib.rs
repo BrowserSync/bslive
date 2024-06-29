@@ -7,20 +7,22 @@ use bsnext_input::Input;
 use std::collections::HashMap;
 
 use actix_rt::Arbiter;
-use bsnext_dto::{ExternalEvents, ServersChanged};
+use bsnext_dto::{ExternalEvents, GetServersMessageResponse, ServersChanged};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::process::Child;
 
 use bsnext_example::Example;
 
-use bsnext_core::servers_supervisor::actor::{ChildStopped, ServersSupervisor};
+use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 
 use bsnext_fs::actor::FsWatcher;
 
 use crate::monitor_any_watchables::MonitorAnyWatchables;
 use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
-use bsnext_core::servers_supervisor::start_handler::ChildResult;
+use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
+use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
 use bsnext_input::startup::{
     DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
 };
@@ -38,7 +40,7 @@ pub mod start_kind;
 pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
-    external_event_sender: Option<Sender<ExternalEvents>>,
+    external_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Vec<Addr<FsWatcher>>,
     any_monitors: HashMap<AnyWatchable, Monitor>,
     cwd: Option<PathBuf>,
@@ -148,7 +150,7 @@ impl BsSystem {
                     unreachable!("?1")
                 };
 
-                for x in &result_set {
+                for (maybe_addr, x) in &result_set {
                     match x {
                         ChildResult::Created(created) => {
                             println!(
@@ -188,10 +190,22 @@ impl BsSystem {
                         }
                     }
                 }
-                for x in result_set {
+                for (maybe_addr, x) in &result_set {
                     match x {
-                        ChildResult::Stopped(id) => addr.do_send(ChildStopped { identity: id }),
-                        ChildResult::Created(c) => addr.do_send(c),
+                        ChildResult::Stopped(id) => addr.do_send(ChildStopped {
+                            identity: id.clone(),
+                        }),
+                        ChildResult::Created(c) if maybe_addr.is_some() => {
+                            let child_handler = ChildHandler {
+                                actor_address: maybe_addr.clone().expect("guarded above"),
+                                identity: c.server_handler.identity.clone(),
+                                socket_addr: c.server_handler.socket_addr.clone(),
+                            };
+                            addr.do_send(ChildCreatedInsert { child_handler })
+                        }
+                        ChildResult::Created(c) => {
+                            unreachable!("can't be created without")
+                        }
                         ChildResult::Patched(_) => {}
                         ChildResult::PatchErr(_) => {}
                         ChildResult::CreateErr(_) => {}
@@ -204,12 +218,17 @@ impl BsSystem {
                     unreachable!("?2")
                 };
 
-                let evt = ExternalEvents::ServersChanged(ServersChanged {
-                    servers_resp,
-                    // changeset,
-                });
+                let res = result_set
+                    .into_iter()
+                    .map(|(_, child_result)| child_result)
+                    .collect();
 
-                match external_event_sender.send(evt).await {
+                let evt = InternalEvents::ServersChanged {
+                    server_resp: servers_resp,
+                    child_results: res,
+                };
+
+                match external_event_sender.send(AnyEvent::Internal(evt)).await {
                     Ok(_) => tracing::trace!("Ok"),
                     Err(_) => tracing::trace!("Err"),
                 };
@@ -228,7 +247,7 @@ impl BsSystem {
             Arbiter::current().spawn({
                 let events_sender = external_event_sender.clone();
                 async move {
-                    match events_sender.send(evt).await {
+                    match events_sender.send(AnyEvent::External(evt)).await {
                         Ok(_) => {}
                         Err(_) => tracing::error!("could not send"),
                     }
@@ -270,7 +289,7 @@ pub struct Start {
     pub kind: StartKind,
     pub cwd: Option<PathBuf>,
     pub ack: oneshot::Sender<()>,
-    pub events_sender: Sender<ExternalEvents>,
+    pub events_sender: Sender<AnyEvent>,
     pub startup_oneshot_sender: oneshot::Sender<StartupResult>,
 }
 

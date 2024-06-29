@@ -1,10 +1,10 @@
 use crate::server::actor::ServerActor;
-use crate::server::error::ServerError;
 use crate::server::router::make_router;
 use crate::server::state::ServerState;
 use crate::servers_supervisor::get_servers_handler::GetServersMessage;
 use actix::{Recipient, ResponseFuture};
 use actix_rt::Arbiter;
+use bsnext_dto::internal::ServerError;
 use bsnext_input::server_config::Identity;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, TcpListener};
