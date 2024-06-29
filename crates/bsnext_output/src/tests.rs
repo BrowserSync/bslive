@@ -1,8 +1,7 @@
 use crate::pretty::PrettyPrint;
 use crate::OutputWriter;
 use bsnext_dto::{
-    ExternalEvents, GetServersMessageResponse, IdentityDTO, ServerChange, ServerChangeSet,
-    ServerChangeSetItem, ServerDTO, ServersChanged, StartupEvent,
+    ExternalEvents, GetServersMessageResponse, IdentityDTO, ServerDTO, ServersChanged, StartupEvent,
 };
 use std::io::BufWriter;
 

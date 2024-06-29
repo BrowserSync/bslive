@@ -1,7 +1,6 @@
 use crate::OutputWriter;
 use bsnext_dto::{
-    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO,
-    ServerChange, ServerChangeSetItem, ServersChanged, StartupErrorDTO, StartupEvent,
+    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO, ServersChanged, StartupErrorDTO, StartupEvent,
     StoppedWatching, Watching,
 };
 use std::io::Write;
