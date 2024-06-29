@@ -38,7 +38,7 @@ pub mod start_kind;
 pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
-    external_event_sender: Option<Sender<EventWithSpan>>,
+    external_event_sender: Option<Sender<ExternalEvents>>,
     input_monitors: Vec<Addr<FsWatcher>>,
     any_monitors: HashMap<AnyWatchable, Monitor>,
     cwd: Option<PathBuf>,
@@ -209,9 +209,7 @@ impl BsSystem {
                     // changeset,
                 });
 
-                let out = EventWithSpan { evt };
-
-                match external_event_sender.send(out).await {
+                match external_event_sender.send(evt).await {
                     Ok(_) => tracing::trace!("Ok"),
                     Err(_) => tracing::trace!("Err"),
                 };
@@ -226,12 +224,11 @@ impl BsSystem {
             ExternalEvents::InputError(_) => tracing::error!(?evt),
             _ => tracing::debug!(?evt),
         }
-        let outgoing = EventWithSpan { evt };
         if let Some(external_event_sender) = &self.external_event_sender {
             Arbiter::current().spawn({
                 let events_sender = external_event_sender.clone();
                 async move {
-                    match events_sender.send(outgoing).await {
+                    match events_sender.send(evt).await {
                         Ok(_) => {}
                         Err(_) => tracing::error!("could not send"),
                     }
@@ -273,7 +270,7 @@ pub struct Start {
     pub kind: StartKind,
     pub cwd: Option<PathBuf>,
     pub ack: oneshot::Sender<()>,
-    pub events_sender: Sender<EventWithSpan>,
+    pub events_sender: Sender<ExternalEvents>,
     pub startup_oneshot_sender: oneshot::Sender<StartupResult>,
 }
 

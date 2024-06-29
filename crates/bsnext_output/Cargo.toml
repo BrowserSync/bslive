@@ -17,6 +17,10 @@ clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 insta = { workspace = true }
+tracing = { workspace = true }
+ratatui = { version = "0.27.0" }
+crossterm = { version = "0.27.0" }
+color-eyre = { version = "0.6.3" }
 
 [dev-dependencies]
 strip-ansi-escapes = { version = "0.2.0" }
