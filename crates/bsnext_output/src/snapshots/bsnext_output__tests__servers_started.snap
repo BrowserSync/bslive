@@ -2,5 +2,5 @@
 source: crates/bsnext_output/src/tests.rs
 expression: actual
 ---
-[server added] http://0.0.0.0:3000
-[server removed] http://0.0.0.0:4000
+[server] http://0.0.0.0:3000
+[server] http://0.0.0.0:4000

@@ -17,10 +17,10 @@ pub struct ChildPatched {
 #[derive(Debug)]
 pub enum ChildResult {
     Created(ChildCreated),
+    CreateErr(ChildNotCreated),
     Patched(ChildPatched),
     PatchErr(ChildNotPatched),
     Stopped(Identity),
-    Err(ChildNotCreated),
 }
 
 impl actix::Handler<ChildCreated> for ServersSupervisor {

@@ -83,41 +83,8 @@ export const getServersMessageResponseSchema = z.object({
   servers: z.array(serverDTOSchema),
 });
 
-export const serverChangeSchema = z.union([
-  z.object({
-    kind: z.literal("Stopped"),
-    payload: z.object({
-      bind_address: z.string(),
-    }),
-  }),
-  z.object({
-    kind: z.literal("Started"),
-    payload: z.undefined().optional(),
-  }),
-  z.object({
-    kind: z.literal("Patched"),
-    payload: z.undefined().optional(),
-  }),
-  z.object({
-    kind: z.literal("Errored"),
-    payload: z.object({
-      error: z.string(),
-    }),
-  }),
-]);
-
-export const serverChangeSetItemSchema = z.object({
-  identity: identityDTOSchema,
-  change: serverChangeSchema,
-});
-
-export const serverChangeSetSchema = z.object({
-  items: z.array(serverChangeSetItemSchema),
-});
-
-export const serversStartedSchema = z.object({
+export const serversChangedSchema = z.object({
   servers_resp: getServersMessageResponseSchema,
-  changeset: serverChangeSetSchema,
 });
 
 export const eventLevelSchema = z.nativeEnum(EventLevel);
@@ -198,6 +165,38 @@ export const debounceDTOSchema = z.object({
   ms: z.string(),
 });
 
+export const serverChangeSchema = z.union([
+  z.object({
+    kind: z.literal("Stopped"),
+    payload: z.object({
+      bind_address: z.string(),
+    }),
+  }),
+  z.object({
+    kind: z.literal("Started"),
+    payload: z.undefined().optional(),
+  }),
+  z.object({
+    kind: z.literal("Patched"),
+    payload: z.undefined().optional(),
+  }),
+  z.object({
+    kind: z.literal("Errored"),
+    payload: z.object({
+      error: z.string(),
+    }),
+  }),
+]);
+
+export const serverChangeSetItemSchema = z.object({
+  identity: identityDTOSchema,
+  change: serverChangeSchema,
+});
+
+export const serverChangeSetSchema = z.object({
+  items: z.array(serverChangeSetItemSchema),
+});
+
 export const startupErrorDTOSchema = z.object({
   kind: z.literal("InputError"),
   payload: inputErrorDTOSchema,
@@ -239,8 +238,8 @@ export const changeDTOSchema: z.ZodSchema<ChangeDTO> = z.lazy(() =>
 
 export const externalEventsSchema = z.union([
   z.object({
-    kind: z.literal("ServersStarted"),
-    payload: serversStartedSchema,
+    kind: z.literal("ServersChanged"),
+    payload: serversChangedSchema,
   }),
   z.object({
     kind: z.literal("Watching"),

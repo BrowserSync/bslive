@@ -2,7 +2,7 @@ use crate::pretty::PrettyPrint;
 use crate::OutputWriter;
 use bsnext_dto::{
     ExternalEvents, GetServersMessageResponse, IdentityDTO, ServerChange, ServerChangeSet,
-    ServerChangeSetItem, ServerDTO, ServersStarted, StartupEvent,
+    ServerChangeSetItem, ServerDTO, ServersChanged, StartupEvent,
 };
 use std::io::BufWriter;
 
@@ -48,23 +48,9 @@ fn exec_startup(evt: &StartupEvent) -> anyhow::Result<(String, String)> {
 
 #[test]
 fn test_servers_started() -> anyhow::Result<()> {
-    let evt = ExternalEvents::ServersStarted(ServersStarted {
+    let evt = ExternalEvents::ServersChanged(ServersChanged {
         servers_resp: GetServersMessageResponse {
             servers: vec![server_1(), server_2()],
-        },
-        changeset: ServerChangeSet {
-            items: vec![
-                ServerChangeSetItem {
-                    identity: iden_1(),
-                    change: ServerChange::Started,
-                },
-                ServerChangeSetItem {
-                    identity: iden_2(),
-                    change: ServerChange::Stopped {
-                        bind_address: server_2().socket_addr,
-                    },
-                },
-            ],
         },
     });
     let actual = exec(&evt).unwrap();

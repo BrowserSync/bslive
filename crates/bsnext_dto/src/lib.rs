@@ -69,9 +69,8 @@ impl From<RouteKind> for RouteKindDTO {
 
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
-pub struct ServersStarted {
+pub struct ServersChanged {
     pub servers_resp: GetServersMessageResponse,
-    pub changeset: ServerChangeSet,
 }
 
 #[typeshare]
@@ -92,7 +91,7 @@ pub struct ExternalEvent {
 #[derive(Debug, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
 pub enum ExternalEvents {
-    ServersStarted(ServersStarted),
+    ServersChanged(ServersChanged),
     Watching(Watching),
     WatchingStopped(StoppedWatching),
     FileChanged(FileChanged),

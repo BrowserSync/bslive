@@ -121,7 +121,7 @@ impl ServersSupervisor {
                             socket_addr,
                         },
                     }),
-                    Ok(Err(err)) => ChildResult::Err(ChildNotCreated {
+                    Ok(Err(err)) => ChildResult::CreateErr(ChildNotCreated {
                         server_error: err,
                         identity: c.identity.clone(),
                     }),

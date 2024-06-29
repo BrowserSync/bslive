@@ -6334,38 +6334,8 @@ var serverDTOSchema = z.object({
 var getServersMessageResponseSchema = z.object({
   servers: z.array(serverDTOSchema)
 });
-var serverChangeSchema = z.union([
-  z.object({
-    kind: z.literal("Stopped"),
-    payload: z.object({
-      bind_address: z.string()
-    })
-  }),
-  z.object({
-    kind: z.literal("Started"),
-    payload: z.undefined().optional()
-  }),
-  z.object({
-    kind: z.literal("Patched"),
-    payload: z.undefined().optional()
-  }),
-  z.object({
-    kind: z.literal("Errored"),
-    payload: z.object({
-      error: z.string()
-    })
-  })
-]);
-var serverChangeSetItemSchema = z.object({
-  identity: identityDTOSchema,
-  change: serverChangeSchema
-});
-var serverChangeSetSchema = z.object({
-  items: z.array(serverChangeSetItemSchema)
-});
-var serversStartedSchema = z.object({
-  servers_resp: getServersMessageResponseSchema,
-  changeset: serverChangeSetSchema
+var serversChangedSchema = z.object({
+  servers_resp: getServersMessageResponseSchema
 });
 var eventLevelSchema = z.nativeEnum(EventLevel);
 var stoppedWatchingSchema = z.object({
@@ -6438,6 +6408,35 @@ var debounceDTOSchema = z.object({
   kind: z.string(),
   ms: z.string()
 });
+var serverChangeSchema = z.union([
+  z.object({
+    kind: z.literal("Stopped"),
+    payload: z.object({
+      bind_address: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Started"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Patched"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Errored"),
+    payload: z.object({
+      error: z.string()
+    })
+  })
+]);
+var serverChangeSetItemSchema = z.object({
+  identity: identityDTOSchema,
+  change: serverChangeSchema
+});
+var serverChangeSetSchema = z.object({
+  items: z.array(serverChangeSetItemSchema)
+});
 var startupErrorDTOSchema = z.object({
   kind: z.literal("InputError"),
   payload: inputErrorDTOSchema
@@ -6474,8 +6473,8 @@ var changeDTOSchema = z.lazy(
 );
 var externalEventsSchema = z.union([
   z.object({
-    kind: z.literal("ServersStarted"),
-    payload: serversStartedSchema
+    kind: z.literal("ServersChanged"),
+    payload: serversChangedSchema
   }),
   z.object({
     kind: z.literal("Watching"),

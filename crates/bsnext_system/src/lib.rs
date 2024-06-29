@@ -7,7 +7,7 @@ use bsnext_input::Input;
 use std::collections::HashMap;
 
 use actix_rt::Arbiter;
-use bsnext_dto::ExternalEvents;
+use bsnext_dto::{ExternalEvents, ServersChanged};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -19,6 +19,7 @@ use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_fs::actor::FsWatcher;
 
 use crate::monitor_any_watchables::MonitorAnyWatchables;
+use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
 use bsnext_core::servers_supervisor::start_handler::ChildResult;
 use bsnext_input::startup::{
     DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
@@ -132,11 +133,11 @@ impl BsSystem {
 
     fn resolve_servers(&mut self, input: Input) {
         let Some(servers_addr) = &self.servers_addr else {
-            unreachable!("self.servers_addr cannot exist?");
+            unreachable!("self.servers_addr cannot be absent?");
         };
         Arbiter::current().spawn({
             let addr = servers_addr.clone();
-            let _external_event_sender = self.external_event_sender.as_ref().unwrap().clone();
+            let external_event_sender = self.external_event_sender.as_ref().unwrap().clone();
             let inner = debug_span!("inform_servers");
             let _g = inner.enter();
 
@@ -158,7 +159,7 @@ impl BsSystem {
                         ChildResult::Stopped(stopped) => {
                             println!("[--report--] stopped... {:?}", stopped);
                         }
-                        ChildResult::Err(errored) => {
+                        ChildResult::CreateErr(errored) => {
                             println!(
                                 "[--report--] errored... {:?} {} ",
                                 errored.identity, errored.server_error
@@ -193,27 +194,27 @@ impl BsSystem {
                         ChildResult::Created(c) => addr.do_send(c),
                         ChildResult::Patched(_) => {}
                         ChildResult::PatchErr(_) => {}
-                        ChildResult::Err(_) => {}
+                        ChildResult::CreateErr(_) => {}
                     }
                 }
 
                 // dbg!(result_set);
-                // let servers = addr.send(GetServersMessage).await;
-                // let Ok(servers_resp) = servers else {
-                //     unreachable!("?2")
-                // };
-                //
-                // let evt = ExternalEvents::ServersStarted(ServersStarted {
-                //     servers_resp,
-                //     changeset,
-                // });
-                //
-                // let out = EventWithSpan { evt };
-                //
-                // match external_event_sender.send(out).await {
-                //     Ok(_) => tracing::trace!("Ok"),
-                //     Err(_) => tracing::trace!("Err"),
-                // };
+                let servers = addr.send(GetServersMessage).await;
+                let Ok(servers_resp) = servers else {
+                    unreachable!("?2")
+                };
+
+                let evt = ExternalEvents::ServersChanged(ServersChanged {
+                    servers_resp,
+                    // changeset,
+                });
+
+                let out = EventWithSpan { evt };
+
+                match external_event_sender.send(out).await {
+                    Ok(_) => tracing::trace!("Ok"),
+                    Err(_) => tracing::trace!("Err"),
+                };
             }
             .in_current_span()
         });

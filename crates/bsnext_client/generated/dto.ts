@@ -54,28 +54,8 @@ export interface GetServersMessageResponse {
 	servers: ServerDTO[];
 }
 
-export type ServerChange = 
-	| { kind: "Stopped", payload: {
-	bind_address: string;
-}}
-	| { kind: "Started", payload?: undefined }
-	| { kind: "Patched", payload?: undefined }
-	| { kind: "Errored", payload: {
-	error: string;
-}};
-
-export interface ServerChangeSetItem {
-	identity: IdentityDTO;
-	change: ServerChange;
-}
-
-export interface ServerChangeSet {
-	items: ServerChangeSetItem[];
-}
-
-export interface ServersStarted {
+export interface ServersChanged {
 	servers_resp: GetServersMessageResponse;
-	changeset: ServerChangeSet;
 }
 
 export enum EventLevel {
@@ -83,7 +63,7 @@ export enum EventLevel {
 }
 
 export type ExternalEvents = 
-	| { kind: "ServersStarted", payload: ServersStarted }
+	| { kind: "ServersChanged", payload: ServersChanged }
 	| { kind: "Watching", payload: Watching }
 	| { kind: "WatchingStopped", payload: StoppedWatching }
 	| { kind: "FileChanged", payload: FileChanged }
@@ -121,6 +101,25 @@ export interface Watching {
 
 export interface StoppedWatching {
 	paths: string[];
+}
+
+export type ServerChange = 
+	| { kind: "Stopped", payload: {
+	bind_address: string;
+}}
+	| { kind: "Started", payload?: undefined }
+	| { kind: "Patched", payload?: undefined }
+	| { kind: "Errored", payload: {
+	error: string;
+}};
+
+export interface ServerChangeSetItem {
+	identity: IdentityDTO;
+	change: ServerChange;
+}
+
+export interface ServerChangeSet {
+	items: ServerChangeSetItem[];
 }
 
 export type StartupEvent = 
