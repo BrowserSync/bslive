@@ -16,17 +16,23 @@ pub trait OutputWriter {
         &self,
         sink: &mut W,
         evt: &ExternalEvents,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
     fn handle_internal_event<W: Write>(
         &self,
         sink: &mut W,
         evt: InternalEvents,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
     fn handle_startup_event<W: Write>(
         &self,
         sink: &mut W,
         evt: &StartupEvent,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 pub enum Writers {

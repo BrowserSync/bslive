@@ -3,7 +3,7 @@ use crate::OutputWriter;
 use bsnext_dto::{ExternalEvents, GetServersMessageResponse, StartupEvent};
 use std::io::{BufWriter, Write};
 use std::sync::mpsc;
-use std::sync::mpsc::{SendError, Sender};
+use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
 use std::{
     io::{self},
@@ -13,13 +13,12 @@ use std::{
 
 use crate::pretty::{server_display, PrettyPrint};
 use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
-use crossterm::event::KeyEventKind;
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{self, Event, KeyCode},
+    crossterm::event::{self, Event},
     layout::{Constraint, Layout, Rect},
     style::Stylize,
-    text::{Line, Masked, Span},
+    text::Line,
     widgets::{Block, Paragraph, Widget, Wrap},
 };
 
@@ -64,32 +63,12 @@ impl OutputWriter for RatatuiSender {
     }
 }
 impl OutputWriter for Ratatui {
-    fn handle_external_event<W: Write>(
-        &self,
-        sink: &mut W,
-        evt: &ExternalEvents,
-    ) -> anyhow::Result<()> {
-        // write!(sink, "{}", serde_json::to_string(&evt)?).map_err(|e| anyhow::anyhow!(e.to_string()))
-        dbg!(&evt);
-        Ok(())
-    }
-
-    fn handle_internal_event<W: Write>(
-        &self,
-        sink: &mut W,
-        evt: InternalEvents,
-    ) -> anyhow::Result<()> {
-        dbg!(&evt);
-        Ok(())
-    }
-
     fn handle_startup_event<W: Write>(
         &self,
         sink: &mut W,
         evt: &StartupEvent,
     ) -> anyhow::Result<()> {
-        dbg!(&evt);
-        Ok(())
+        PrettyPrint.handle_startup_event(sink, evt)
     }
 }
 
@@ -99,7 +78,7 @@ impl Ratatui {
         Ok(Ratatui(app))
     }
 
-    pub fn install(mut self) -> anyhow::Result<(RatatuiSender, JoinHandle<()>, JoinHandle<()>)> {
+    pub fn install(self) -> anyhow::Result<(RatatuiSender, JoinHandle<()>, JoinHandle<()>)> {
         tracing::info!("installing ratatui hooks");
         install_hooks()?;
         let mut terminal = init_terminal()?;
@@ -124,7 +103,7 @@ impl Ratatui {
 fn input_handling(tx: mpsc::Sender<RatatuiEvent>) -> JoinHandle<()> {
     let tick_rate = Duration::from_millis(500);
     thread::spawn(move || {
-        let mut last_tick = Instant::now();
+        let last_tick = Instant::now();
         loop {
             // poll for tick rate duration, if no events, sent tick event.
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());

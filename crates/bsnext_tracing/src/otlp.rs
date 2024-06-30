@@ -107,11 +107,13 @@ pub fn init_tracing_subscriber(
                 .with_writer(file)
                 .boxed()
         }
-        (OutputFormat::Normal, WriteOption::None) => tracing_subscriber::fmt::layer()
-            .without_time()
-            .with_file(false)
-            .boxed(),
-        (OutputFormat::Normal, WriteOption::File) => {
+        (OutputFormat::Normal, WriteOption::None) | (OutputFormat::Tui, WriteOption::None) => {
+            tracing_subscriber::fmt::layer()
+                .without_time()
+                .with_file(false)
+                .boxed()
+        }
+        (OutputFormat::Normal, WriteOption::File) | (OutputFormat::Tui, WriteOption::File) => {
             let file = File::create("bslive.log").expect("create bslive.log");
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)

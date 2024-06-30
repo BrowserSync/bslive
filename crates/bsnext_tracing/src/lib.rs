@@ -29,10 +29,22 @@ impl Default for LogLevel {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
 pub enum OutputFormat {
     Json,
     Normal,
+    #[default]
+    Tui,
+}
+
+impl Display for OutputFormat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutputFormat::Json => write!(f, "json"),
+            OutputFormat::Normal => write!(f, "normal"),
+            OutputFormat::Tui => write!(f, "tui"),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
@@ -45,21 +57,6 @@ pub enum WriteOption {
 pub enum OtelOption {
     On,
     Off,
-}
-
-impl Display for OutputFormat {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OutputFormat::Json => write!(f, "json"),
-            OutputFormat::Normal => write!(f, "normal"),
-        }
-    }
-}
-
-impl Default for OutputFormat {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 pub fn init_tracing(
     log_level: Option<LogLevel>,

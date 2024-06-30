@@ -11,7 +11,8 @@ impl OutputWriter for JsonPrint {
         sink: &mut W,
         evt: &ExternalEvents,
     ) -> anyhow::Result<()> {
-        write!(sink, "{}", serde_json::to_string(&evt)?).map_err(|e| anyhow::anyhow!(e.to_string()))
+        writeln!(sink, "{}", serde_json::to_string(&evt)?)
+            .map_err(|e| anyhow::anyhow!(e.to_string()))
     }
 
     fn handle_internal_event<W: Write>(
@@ -19,7 +20,13 @@ impl OutputWriter for JsonPrint {
         sink: &mut W,
         evt: InternalEvents,
     ) -> anyhow::Result<()> {
-        todo!()
+        match evt {
+            InternalEvents::ServersChanged { server_resp, .. } => {
+                writeln!(sink, "{}", serde_json::to_string(&server_resp)?)
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            }
+        }
+        Ok(())
     }
 
     fn handle_startup_event<W: Write>(
@@ -27,6 +34,7 @@ impl OutputWriter for JsonPrint {
         sink: &mut W,
         evt: &StartupEvent,
     ) -> anyhow::Result<()> {
-        write!(sink, "{}", serde_json::to_string(&evt)?).map_err(|e| anyhow::anyhow!(e.to_string()))
+        writeln!(sink, "{}", serde_json::to_string(&evt)?)
+            .map_err(|e| anyhow::anyhow!(e.to_string()))
     }
 }

@@ -1,9 +1,8 @@
 use crate::OutputWriter;
 use bsnext_dto::internal::InternalEvents;
 use bsnext_dto::{
-    ExternalEvents, FileChanged, FilesChangedDTO, GetServersMessageResponse, IdentityDTO,
-    InputAccepted, InputErrorDTO, ServerDTO, ServersChanged, StartupErrorDTO, StartupEvent,
-    StoppedWatching, Watching,
+    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO,
+    ServerDTO, ServersChanged, StartupErrorDTO, StartupEvent, StoppedWatching, Watching,
 };
 use std::io::Write;
 use std::marker::PhantomData;
@@ -42,7 +41,17 @@ impl OutputWriter for PrettyPrint {
         sink: &mut W,
         evt: InternalEvents,
     ) -> anyhow::Result<()> {
-        todo!()
+        match evt {
+            InternalEvents::ServersChanged {
+                server_resp,
+                child_results: _,
+            } => print_servers_changed(
+                sink,
+                &ServersChanged {
+                    servers_resp: server_resp,
+                },
+            ),
+        }
     }
 
     fn handle_startup_event<W: Write>(

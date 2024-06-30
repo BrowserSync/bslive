@@ -1,7 +1,6 @@
-use bsnext_dto::internal::ServerError;
-
 #[test]
 fn test_api_error() {
+    use bsnext_dto::internal::ServerError;
     #[derive(serde::Serialize, serde::Deserialize, Debug)]
     struct Output {
         error: ServerError,

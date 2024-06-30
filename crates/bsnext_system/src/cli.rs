@@ -1,9 +1,9 @@
 use crate::args::Args;
 use crate::start_kind::StartKind;
-use crate::{AnyEvent, BsSystem, EventWithSpan, Start};
+use crate::{AnyEvent, BsSystem, Start};
 use actix::Actor;
 
-use bsnext_dto::{ExternalEvents, StartupEvent};
+use bsnext_dto::StartupEvent;
 use bsnext_input::startup::{DidStart, StartupResult};
 use bsnext_output::ratatui::Ratatui;
 use bsnext_output::{OutputWriter, Writers};
@@ -13,8 +13,6 @@ use std::env::current_dir;
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::mpsc::Sender;
-use std::thread;
 use tokio::sync::{mpsc, oneshot};
 use tracing::debug_span;
 
@@ -59,52 +57,21 @@ where
         startup_oneshot_sender,
     };
 
-    // match startup_oneshot_receiver.await? {
-    //     Ok(DidStart::Started) => {
-    //         let evt = StartupEvent::Started;
-    //         // match printer.handle_startup_event(stdout, &evt) {
-    //         //     Ok(_) => {}
-    //         //     Err(e) => tracing::error!(?e),
-    //         // };
-    //         // match stdout.flush() {
-    //         //     Ok(_) => {}
-    //         //     Err(e) => tracing::error!("could not flush {e}"),
-    //         // };
-    //     }
-    //     Err(e) => {
-    //         let evt = StartupEvent::FailedStartup((&e).into());
-    //         match printer.handle_startup_event(stdout, &evt) {
-    //             Ok(_) => {}
-    //             Err(e) => tracing::error!(?e),
-    //         };
-    //         match stdout.flush() {
-    //             Ok(_) => {}
-    //             Err(e) => tracing::error!("could not flush {e}"),
-    //         };
-    //         return Err(e.into());
-    //     }
-    // };
-
-    let mut rr = Ratatui::try_new().expect("test");
-    let printer = rr;
-
     sys_addr.do_send(start);
 
-    // let printer = match format_clone {
-    //     None | Some(OutputFormat::Normal) => Writers::Pretty,
-    //     Some(OutputFormat::Json) => Writers::Json,
-    // };
-    // let (events_sender, mut events_receiver_2) = std::sync::mpsc::channel::<ExternalEvents>();
-    // let h = thread::spawn(move || {
-    //     let printer = Ratatui::try_new(events_receiver_2).expect("setup");
-    // });
+    // for the startup message, don't allow a TUI yet
+    let start_printer = match format_clone {
+        None | Some(OutputFormat::Tui) => Writers::Pretty,
+        Some(OutputFormat::Json) => Writers::Json,
+        Some(OutputFormat::Normal) => Writers::Pretty,
+    };
 
     let stdout = &mut std::io::stdout();
 
     match startup_oneshot_receiver.await? {
         Ok(DidStart::Started) => {
             let evt = StartupEvent::Started;
-            match printer.handle_startup_event(stdout, &evt) {
+            match start_printer.handle_startup_event(stdout, &evt) {
                 Ok(_) => {}
                 Err(e) => tracing::error!(?e),
             };
@@ -115,7 +82,7 @@ where
         }
         Err(e) => {
             let evt = StartupEvent::FailedStartup((&e).into());
-            match printer.handle_startup_event(stdout, &evt) {
+            match start_printer.handle_startup_event(stdout, &evt) {
                 Ok(_) => {}
                 Err(e) => tracing::error!(?e),
             };
@@ -127,9 +94,16 @@ where
         }
     };
 
-    let mut rr = Ratatui::try_new().expect("test");
-    let (sender, ui_handle, other) = rr.install().expect("thread install");
-    let printer = sender;
+    // at this point, we started, so we can choose a TUI
+    let printer = match format_clone {
+        None | Some(OutputFormat::Tui) => {
+            let rr = Ratatui::try_new().expect("test");
+            let (sender, ui_handle, other) = rr.install().expect("thread install");
+            Writers::Ratatui(sender)
+        }
+        Some(OutputFormat::Json) => Writers::Json,
+        Some(OutputFormat::Normal) => Writers::Pretty,
+    };
 
     let events_handler = tokio::spawn(async move {
         // let events = vec![];
@@ -143,23 +117,16 @@ where
                 AnyEvent::Internal(int) => printer.handle_internal_event(stdout, int),
                 AnyEvent::External(ext) => printer.handle_external_event(stdout, &ext),
             };
+            match stdout.flush() {
+                Ok(_) => {}
+                Err(e) => tracing::error!("could not flush {e}"),
+            };
             match r {
                 Ok(_) => {}
-                Err(_) => tracing::error!("could not send"),
+                Err(_) => tracing::error!("could not handle event"),
             }
-            // match printer.handle_external_event(stdout, evt) {
-            //     Ok(_v) => {}
-            //     Err(e) => tracing::error!("could not write to stdout {e}"),
-            // }
-            // match stdout.flush() {
-            //     Ok(_) => {}
-            //     Err(e) => tracing::error!("could not flush {e}"),
-            // };
         }
-        // events
     });
-
-    println!("after...");
 
     match rx.await {
         Ok(_) => {
