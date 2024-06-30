@@ -1,6 +1,6 @@
 use self::common::{init_terminal, install_hooks, restore_terminal, Tui};
 use crate::OutputWriter;
-use bsnext_dto::{ExternalEvents, GetServersMessageResponse, StartupEvent};
+use bsnext_dto::{ExternalEvents, GetServersMessageResponse, IdentityDTO, StartupEvent};
 use std::io::{BufWriter, Write};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
@@ -11,7 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::pretty::{server_display, PrettyPrint};
+use crate::pretty::{iden, server_display, PrettyPrint};
 use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
 use ratatui::{
     buffer::Buffer,
@@ -241,7 +241,7 @@ impl App {
                 server_resp
                     .servers
                     .iter()
-                    .map(|s| Line::raw(server_display(s)))
+                    .map(|s| Line::raw(server_display(&s.identity, &s.socket_addr)))
                     .collect()
             })
             .unwrap_or_else(Vec::new)
@@ -259,17 +259,19 @@ impl App {
                             .map(|r| match r {
                                 ChildResult::Created(created) => {
                                     format!(
-                                        "[--report--] created... {:?} {}",
-                                        created.server_handler.identity,
-                                        created.server_handler.socket_addr
+                                        "[created] {}",
+                                        server_display(
+                                            &IdentityDTO::from(&created.server_handler.identity),
+                                            &created.server_handler.socket_addr.to_string()
+                                        ),
                                     )
                                 }
                                 ChildResult::Stopped(stopped) => {
-                                    format!("[--report--] stopped... {:?}", stopped)
+                                    format!("[stopped] {}", iden(&IdentityDTO::from(stopped)))
                                 }
                                 ChildResult::CreateErr(errored) => {
                                     format!(
-                                        "[--report--] errored... {:?} {} ",
+                                        "[server] errored... {:?} {} ",
                                         errored.identity, errored.server_error
                                     )
                                 }
@@ -278,21 +280,25 @@ impl App {
                                     // todo: determine WHICH changes were actually applied (instead of saying everything was patched)
                                     for x in &child.route_change_set.changed {
                                         lines.push(format!(
-                                            "[--report--] PATCH changed... {:?} {:?}",
+                                            "[server] PATCH changed... {:?} {:?}",
                                             child.server_handler.identity, x
                                         ));
                                     }
                                     for x in &child.route_change_set.added {
                                         lines.push(format!(
-                                            "[--report--] PATCH added... {:?} {:?}",
+                                            "[server] PATCH added... {:?} {:?}",
                                             child.server_handler.identity, x
                                         ));
                                     }
-                                    lines.join("\n")
+                                    if !lines.is_empty() {
+                                        lines.join("\n")
+                                    } else {
+                                        String::new()
+                                    }
                                 }
                                 ChildResult::PatchErr(errored) => {
                                     format!(
-                                        "[--report--] patch errored... {:?} {} ",
+                                        "[server] patch errored... {:?} {} ",
                                         errored.identity, errored.patch_error
                                     )
                                 }
@@ -309,10 +315,18 @@ impl App {
                     String::from_utf8(writer.into_inner().expect("into_inner")).expect("as_utf8")
                 }
             })
-            .map(|s| {
+            .filter(|str| !str.trim().is_empty())
+            .enumerate()
+            .map(|(index, s)| {
                 let lines = s.lines();
                 lines
-                    .map(|s| Line::raw(s.to_owned()))
+                    .filter_map(|s| {
+                        if s.trim().is_empty() {
+                            None
+                        } else {
+                            Some(Line::raw(format!("{index}: {s}")))
+                        }
+                    })
                     .collect::<Vec<Line>>()
             })
             .flatten()
@@ -322,7 +336,7 @@ impl App {
 
 impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let areas = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+        let areas = Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)])
             .split(area);
         Paragraph::new(self.create_servers())
             .block(title_block("Servers"))

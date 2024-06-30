@@ -1,8 +1,7 @@
 use crate::OutputWriter;
 use bsnext_dto::internal::InternalEvents;
 use bsnext_dto::{
-    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO,
-    ServerDTO, ServersChanged, StartupErrorDTO, StartupEvent, StoppedWatching, Watching,
+    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO, ServersChanged, StartupErrorDTO, StartupEvent, StoppedWatching, Watching,
 };
 use std::io::Write;
 use std::marker::PhantomData;
@@ -299,24 +298,24 @@ where
     Ok(())
 }
 
-// fn iden(identity_dto: &IdentityDTO) -> String {
-//     match identity_dto {
-//         IdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
-//         IdentityDTO::Address { bind_address } => bind_address.to_string(),
-//         IdentityDTO::Named { name } => format!("[{name}]"),
-//     }
-// }
+pub fn iden(identity_dto: &IdentityDTO) -> String {
+    match identity_dto {
+        IdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
+        IdentityDTO::Address { bind_address } => bind_address.to_string(),
+        IdentityDTO::Named { name } => format!("[{name}]"),
+    }
+}
 
-pub fn server_display(s: &ServerDTO) -> String {
-    match &s.identity {
+pub fn server_display(identity_dto: &IdentityDTO, socket_addr: &str) -> String {
+    match &identity_dto {
         IdentityDTO::Both { name, .. } => {
-            format!("[server] [{}] http://{}", name, s.socket_addr)
+            format!("[server] [{}] http://{}", name, socket_addr)
         }
         IdentityDTO::Address { .. } => {
-            format!("[server] http://{}", s.socket_addr)
+            format!("[server] http://{}", socket_addr)
         }
         IdentityDTO::Named { name } => {
-            format!("[server] [{}] http://{}", name, &s.socket_addr)
+            format!("[server] [{}] http://{}", name, &socket_addr)
         }
     }
 }
