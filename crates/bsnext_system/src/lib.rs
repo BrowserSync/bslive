@@ -7,7 +7,7 @@ use bsnext_input::Input;
 use std::collections::HashMap;
 
 use actix_rt::Arbiter;
-use bsnext_dto::{ExternalEvents};
+use bsnext_dto::ExternalEvents;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -162,7 +162,7 @@ impl BsSystem {
                             };
                             addr.do_send(ChildCreatedInsert { child_handler })
                         }
-                        ChildResult::Created(c) => {
+                        ChildResult::Created(_c) => {
                             unreachable!("can't be created without")
                         }
                         ChildResult::Patched(_) => {}

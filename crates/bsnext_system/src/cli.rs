@@ -98,7 +98,7 @@ where
     let printer = match format_clone {
         None | Some(OutputFormat::Tui) => {
             let rr = Ratatui::try_new().expect("test");
-            let (sender, ui_handle, other) = rr.install().expect("thread install");
+            let (sender, _ui_handle, _other) = rr.install().expect("thread install");
             Writers::Ratatui(sender)
         }
         Some(OutputFormat::Json) => Writers::Json,

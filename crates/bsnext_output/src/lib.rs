@@ -14,22 +14,22 @@ mod tests;
 pub trait OutputWriter {
     fn handle_external_event<W: Write>(
         &self,
-        sink: &mut W,
-        evt: &ExternalEvents,
+        _sink: &mut W,
+        _evt: &ExternalEvents,
     ) -> anyhow::Result<()> {
         Ok(())
     }
     fn handle_internal_event<W: Write>(
         &self,
-        sink: &mut W,
-        evt: InternalEvents,
+        _sink: &mut W,
+        _evt: InternalEvents,
     ) -> anyhow::Result<()> {
         Ok(())
     }
     fn handle_startup_event<W: Write>(
         &self,
-        sink: &mut W,
-        evt: &StartupEvent,
+        _sink: &mut W,
+        _evt: &StartupEvent,
     ) -> anyhow::Result<()> {
         Ok(())
     }

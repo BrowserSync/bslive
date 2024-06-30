@@ -299,13 +299,13 @@ where
     Ok(())
 }
 
-fn iden(identity_dto: &IdentityDTO) -> String {
-    match identity_dto {
-        IdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
-        IdentityDTO::Address { bind_address } => bind_address.to_string(),
-        IdentityDTO::Named { name } => format!("[{name}]"),
-    }
-}
+// fn iden(identity_dto: &IdentityDTO) -> String {
+//     match identity_dto {
+//         IdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
+//         IdentityDTO::Address { bind_address } => bind_address.to_string(),
+//         IdentityDTO::Named { name } => format!("[{name}]"),
+//     }
+// }
 
 pub fn server_display(s: &ServerDTO) -> String {
     match &s.identity {

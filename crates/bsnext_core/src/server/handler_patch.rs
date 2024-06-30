@@ -1,5 +1,5 @@
 use crate::server::actor::ServerActor;
-use actix::{ResponseFuture};
+use actix::ResponseFuture;
 use bsnext_input::route_manifest::{RouteChangeSet, RoutesManifest};
 use bsnext_input::server_config::ServerConfig;
 use std::sync::Arc;

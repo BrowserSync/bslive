@@ -1,5 +1,5 @@
 use crate::servers_supervisor::actor::{ChildHandler, ServersSupervisor};
-use bsnext_dto::internal::{ChildNotCreated};
+use bsnext_dto::internal::ChildNotCreated;
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]

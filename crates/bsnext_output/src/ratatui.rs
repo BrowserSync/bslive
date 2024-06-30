@@ -29,7 +29,7 @@ pub struct RatatuiSender(Sender<RatatuiEvent>);
 impl OutputWriter for RatatuiSender {
     fn handle_external_event<W: Write>(
         &self,
-        sink: &mut W,
+        _sink: &mut W,
         evt: &ExternalEvents,
     ) -> anyhow::Result<()> {
         match self
@@ -43,22 +43,13 @@ impl OutputWriter for RatatuiSender {
     }
     fn handle_internal_event<W: Write>(
         &self,
-        sink: &mut W,
+        _sink: &mut W,
         evt: InternalEvents,
     ) -> anyhow::Result<()> {
         match self.0.send(RatatuiEvent::Evt(AnyEvent::Internal(evt))) {
             Ok(_) => tracing::info!("sent..."),
             Err(_) => tracing::error!("could not send"),
         }
-        Ok(())
-    }
-
-    fn handle_startup_event<W: Write>(
-        &self,
-        sink: &mut W,
-        evt: &StartupEvent,
-    ) -> anyhow::Result<()> {
-        dbg!(&evt);
         Ok(())
     }
 }
@@ -243,7 +234,7 @@ impl App {
     }
 
     /// Create some lines to display in the paragraph.
-    fn create_servers(&self, area: Rect) -> Vec<Line<'static>> {
+    fn create_servers(&self) -> Vec<Line<'static>> {
         self.server_status
             .as_ref()
             .map(|server_resp| {
@@ -257,7 +248,7 @@ impl App {
     }
 
     /// Create some lines to display in the paragraph.
-    fn create_events(&mut self, area: Rect) -> Vec<Line<'static>> {
+    fn create_events(&mut self) -> Vec<Line<'static>> {
         self.events
             .iter()
             .map(|evt| match evt {
@@ -333,11 +324,11 @@ impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let areas = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
-        Paragraph::new(self.create_servers(area))
+        Paragraph::new(self.create_servers())
             .block(title_block("Servers"))
             .gray()
             .render(areas[0], buf);
-        Paragraph::new(self.create_events(area))
+        Paragraph::new(self.create_events())
             .block(title_block(
                 format!("Events ({})", self.events.len()).as_str(),
             ))

@@ -6,8 +6,7 @@ use bsnext_core::servers_supervisor::file_changed_handler::{FileChanged, FilesCh
 use bsnext_dto::{ExternalEvents, StoppedWatching, Watching};
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
-    BufferedChangeEvent, ChangeEvent, Debounce, FsEvent, FsEventKind,
-    PathAddedEvent, PathEvent,
+    BufferedChangeEvent, ChangeEvent, Debounce, FsEvent, FsEventKind, PathAddedEvent, PathEvent,
 };
 use bsnext_input::route::{
     DebounceDuration, DirRoute, FilterKind, RouteKind, Spec, SpecOpts, WatchOpts,
