@@ -3,6 +3,8 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
+use crate::inject_opts::InjectOpts;
+use crate::watch_opts::WatchOpts;
 use typeshare::typeshare;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -15,6 +17,9 @@ pub struct Route {
     #[serde(rename = "watch")]
     #[serde(default)]
     pub watch_opts: WatchOpts,
+    #[serde(rename = "inject")]
+    #[serde(default)]
+    pub inject_opts: InjectOpts,
     #[serde(flatten)]
     pub kind: RouteKind,
     pub headers: Option<BTreeMap<String, String>>,
@@ -27,10 +32,11 @@ impl Default for Route {
             kind: RouteKind::Html {
                 html: "default".into(),
             },
-            delay_opts: None,
-            cors_opts: None,
-            watch_opts: Default::default(),
             headers: None,
+            cors_opts: None,
+            delay_opts: None,
+            watch_opts: Default::default(),
+            inject_opts: Default::default(),
         }
     }
 }
@@ -157,26 +163,6 @@ pub struct Spec {
 pub struct SpecOpts {
     pub debounce: Option<DebounceDuration>,
     pub filter: Option<FilterKind>,
-}
-
-#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(untagged)]
-pub enum WatchOpts {
-    Bool(bool),
-    InlineGlob(String),
-    Spec(Spec),
-}
-
-impl Default for WatchOpts {
-    fn default() -> Self {
-        Self::Bool(true)
-    }
-}
-
-impl WatchOpts {
-    pub fn is_enabled(&self) -> bool {
-        !matches!(self, WatchOpts::Bool(false))
-    }
 }
 
 #[derive(

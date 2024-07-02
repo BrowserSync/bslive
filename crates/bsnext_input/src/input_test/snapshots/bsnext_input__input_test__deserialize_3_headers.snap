@@ -11,6 +11,9 @@ Config {
             watch_opts: Bool(
                 true,
             ),
+            inject_opts: Bool(
+                true,
+            ),
             kind: Json {
                 json: JsonWrapper(
                     Array [

@@ -10,18 +10,21 @@ use crate::md::MarkdownError;
 use crate::yml::YamlError;
 
 #[cfg(test)]
+pub mod inject_opt_test;
+pub mod inject_opts;
+#[cfg(test)]
 pub mod input_test;
 pub mod md;
 pub mod paths;
 pub mod route;
 pub mod route_manifest;
 pub mod server_config;
+pub mod startup;
 pub mod target;
 #[cfg(test)]
 pub mod watch_opt_test;
+pub mod watch_opts;
 pub mod yml;
-
-pub mod startup;
 
 #[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
 pub struct Input {

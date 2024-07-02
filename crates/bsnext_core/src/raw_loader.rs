@@ -4,7 +4,7 @@ use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response, Sse};
 use axum::routing::any;
-use axum::{middleware, Json, Router};
+use axum::{middleware, Extension, Json, Router};
 use http::header::CONTENT_TYPE;
 
 use crate::meta::MetaData;
@@ -12,7 +12,7 @@ use crate::server::state::ServerState;
 use axum::body::Body;
 use axum::response::sse::Event;
 use bsnext_input::route::{DirRoute, ProxyRoute, RouteKind};
-use bsnext_resp::response_modifications_layer;
+use bsnext_resp::{response_modifications_layer, InjectHandling};
 use bytes::Bytes;
 use http::StatusCode;
 use http_body_util::BodyExt;
@@ -78,6 +78,7 @@ pub async fn raw_loader(
     let _params = matched.params;
 
     let mut app = Router::new();
+
     match &route.kind {
         RouteKind::Sse { sse } => {
             let raw = sse.to_owned();
@@ -133,6 +134,9 @@ pub async fn raw_loader(
 
     app.layer(middleware::from_fn(tag_raw))
         .layer(middleware::from_fn(response_modifications_layer))
+        .layer(Extension(InjectHandling {
+            items: route.inject_opts.injections(),
+        }))
         .oneshot(req)
         .await
         .into_response()

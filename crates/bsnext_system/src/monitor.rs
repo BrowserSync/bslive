@@ -8,9 +8,7 @@ use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, Debounce, FsEvent, FsEventKind, PathAddedEvent, PathEvent,
 };
-use bsnext_input::route::{
-    DebounceDuration, DirRoute, FilterKind, RouteKind, Spec, SpecOpts, WatchOpts,
-};
+use bsnext_input::route::{DebounceDuration, DirRoute, FilterKind, RouteKind, Spec, SpecOpts};
 use bsnext_input::server_config::Identity;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 use std::path::{Path, PathBuf};
@@ -19,6 +17,7 @@ use std::time::Duration;
 
 use bsnext_fs::actor::FsWatcher;
 
+use bsnext_input::watch_opts::WatchOpts;
 use tracing::trace_span;
 
 #[derive(Debug, Clone)]

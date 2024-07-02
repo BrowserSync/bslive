@@ -1,4 +1,5 @@
-use crate::route::{DebounceDuration, FilterKind, Spec, SpecOpts, WatchOpts};
+use crate::route::{DebounceDuration, FilterKind, Spec, SpecOpts};
+use crate::watch_opts::WatchOpts;
 
 #[test]
 fn test_watch_opts_debounce() {

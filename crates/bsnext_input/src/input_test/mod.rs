@@ -1,7 +1,7 @@
 use crate::route::{
-    CorsOpts, DebounceDuration, DelayKind, DelayOpts, FilterKind, Route, Spec, SpecOpts, WatchOpts,
-    Watcher,
+    CorsOpts, DebounceDuration, DelayKind, DelayOpts, FilterKind, Route, Spec, SpecOpts, Watcher,
 };
+use crate::watch_opts::WatchOpts;
 use crate::Input;
 
 #[test]

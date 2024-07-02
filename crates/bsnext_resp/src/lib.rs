@@ -2,6 +2,7 @@ use axum::body::Body;
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::IntoResponse;
+use axum::Extension;
 use bytes::Bytes;
 use http::header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE};
 use http::{Response, StatusCode};
@@ -24,17 +25,26 @@ impl RespMod {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct InjectHandling {
+    pub items: Vec<String>,
+}
+
 pub async fn response_modifications_layer(
+    Extension(inject): Extension<InjectHandling>,
     req: Request,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let span = span!(parent: None, Level::TRACE, "resp-mod", uri=req.uri().path());
     let _guard = span.enter();
     let accepts_html = RespMod::accepts_html(&req);
-
+    tracing::trace!(?inject);
     let mut r = next.run(req).await;
     let is_html = RespMod::is_html(&r);
-    if let (true, true) = (accepts_html, is_html) {
+    let has_injections = !inject.items.is_empty();
+
+    // todo(alpha): implement named injectors, such as 'bslive:connector'
+    if let (true, true, true) = (accepts_html, is_html, has_injections) {
         use http_body_util::BodyExt;
         r.headers_mut()
             .insert("x-bslive-inject", "true".parse().unwrap());

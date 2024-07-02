@@ -17,7 +17,7 @@ use crate::handlers::proxy;
 use crate::server::state::ServerState;
 use axum::routing::any;
 use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
-use bsnext_resp::{response_modifications_layer, RespMod};
+use bsnext_resp::{response_modifications_layer, InjectHandling, RespMod};
 use http::{HeaderValue, StatusCode};
 use http_body_util::BodyExt;
 use std::collections::HashMap;
@@ -79,6 +79,11 @@ pub async fn serve_dir_loader(
         };
         router = add_route_layers(router, route);
         app = app.merge(router);
+        app = app
+            .layer(middleware::from_fn(response_modifications_layer))
+            .layer(Extension(InjectHandling {
+                items: route.inject_opts.injections(),
+            }));
     }
 
     drop(routes);
@@ -92,7 +97,6 @@ fn service_for_dir(route: &Route, dir: &str) -> Router {
     Router::new()
         .nest_service(route.path.as_str(), ServeDir::new(dir))
         .layer(middleware::from_fn(tag_file))
-        .layer(middleware::from_fn(response_modifications_layer))
 }
 
 async fn tag_file(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {
@@ -115,11 +119,17 @@ fn service_for_proxy(handling: ResponseHandling, route: &Route) -> Router {
             .layer(
                 ServiceBuilder::new()
                     .layer(middleware::from_fn(response_modifications_layer))
+                    .layer(Extension(InjectHandling {
+                        items: route.inject_opts.injections(),
+                    }))
                     .layer(DecompressionLayer::new()),
             ),
         ResponseHandling::None => Router::new()
             .nest_service(route.path.as_str(), any(proxy::proxy_handler))
-            .layer(middleware::from_fn(response_modifications_layer)),
+            .layer(middleware::from_fn(response_modifications_layer))
+            .layer(Extension(InjectHandling {
+                items: route.inject_opts.injections(),
+            })),
     }
 }
 

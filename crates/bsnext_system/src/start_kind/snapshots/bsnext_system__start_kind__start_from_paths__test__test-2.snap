@@ -7,6 +7,7 @@ servers:
     routes:
       - path: /
         watch: true
+        inject: true
         dir: "."
         headers: ~
     watchers: []

@@ -16,6 +16,9 @@ Input {
                     watch_opts: Bool(
                         true,
                     ),
+                    inject_opts: Bool(
+                        true,
+                    ),
                     kind: Dir(
                         DirRoute {
                             dir: ".",
