@@ -1,6 +1,6 @@
 use self::common::{init_terminal, install_hooks, restore_terminal, Tui};
 use crate::OutputWriter;
-use bsnext_dto::{ExternalEvents, GetServersMessageResponse, IdentityDTO, StartupEvent};
+use bsnext_dto::{ExternalEvents, GetServersMessageResponse, StartupEvent};
 use std::io::{BufWriter, Write};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
@@ -11,8 +11,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::pretty::{iden, server_display, PrettyPrint};
-use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
+use crate::pretty::{print_server_updates, server_display, PrettyPrint};
+use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{self, Event},
@@ -70,21 +70,21 @@ impl Ratatui {
     }
 
     pub fn install(self) -> anyhow::Result<(RatatuiSender, JoinHandle<()>, JoinHandle<()>)> {
-        tracing::info!("installing ratatui hooks");
+        tracing::debug!("TUI: installing ratatui hooks");
         install_hooks()?;
         let mut terminal = init_terminal()?;
-        tracing::info!("init... terminal");
+        tracing::debug!("TUI: init... terminal");
         let mut app = self.0;
         let (tx, rx) = mpsc::channel();
         let sender = RatatuiSender(tx.clone());
         Ok((
             sender,
             thread::spawn(move || {
-                tracing::info!("on new thread... terminal");
+                tracing::debug!("TUI: on new thread... terminal");
                 app.run(&mut terminal, rx).expect("running");
-                tracing::info!("tui all done");
+                tracing::debug!("TUI: tui all done");
                 restore_terminal().expect("restore");
-                tracing::info!("terminal restored");
+                tracing::debug!("TUI: terminal restored");
             }),
             input_handling(tx.clone()),
         ))
@@ -133,7 +133,7 @@ struct App {
     should_exit: bool,
     scroll: u16,
     last_tick: Instant,
-    events: Vec<AnyEvent>,
+    events: FixedSizeQueue,
     server_status: Option<GetServersMessageResponse>,
 }
 
@@ -154,7 +154,7 @@ impl App {
             should_exit: false,
             scroll: 0,
             last_tick: Instant::now(),
-            events: vec![],
+            events: FixedSizeQueue::new(10),
             server_status: None,
         }
     }
@@ -194,10 +194,10 @@ impl App {
                             self.server_status = Some(server_resp.clone());
                         }
                     }
-                    self.events.push(AnyEvent::Internal(evt));
+                    self.events.add(RecordedEvent::new(AnyEvent::Internal(evt)));
                 }
                 RatatuiEvent::Evt(ext_event) => {
-                    self.events.push(ext_event);
+                    self.events.add(RecordedEvent::new(ext_event));
                 }
             }
         }
@@ -250,61 +250,12 @@ impl App {
     /// Create some lines to display in the paragraph.
     fn create_events(&mut self) -> Vec<Line<'static>> {
         self.events
+            .get()
             .iter()
-            .map(|evt| match evt {
+            .map(|evt| match &evt.evt {
                 AnyEvent::Internal(int) => match int {
                     InternalEvents::ServersChanged { child_results, .. } => {
-                        child_results
-                            .iter()
-                            .map(|r| match r {
-                                ChildResult::Created(created) => {
-                                    format!(
-                                        "[created] {}",
-                                        server_display(
-                                            &IdentityDTO::from(&created.server_handler.identity),
-                                            &created.server_handler.socket_addr.to_string()
-                                        ),
-                                    )
-                                }
-                                ChildResult::Stopped(stopped) => {
-                                    format!("[stopped] {}", iden(&IdentityDTO::from(stopped)))
-                                }
-                                ChildResult::CreateErr(errored) => {
-                                    format!(
-                                        "[server] errored... {:?} {} ",
-                                        errored.identity, errored.server_error
-                                    )
-                                }
-                                ChildResult::Patched(child) => {
-                                    let mut lines = vec![];
-                                    // todo: determine WHICH changes were actually applied (instead of saying everything was patched)
-                                    for x in &child.route_change_set.changed {
-                                        lines.push(format!(
-                                            "[server] PATCH changed... {:?} {:?}",
-                                            child.server_handler.identity, x
-                                        ));
-                                    }
-                                    for x in &child.route_change_set.added {
-                                        lines.push(format!(
-                                            "[server] PATCH added... {:?} {:?}",
-                                            child.server_handler.identity, x
-                                        ));
-                                    }
-                                    if !lines.is_empty() {
-                                        lines.join("\n")
-                                    } else {
-                                        String::new()
-                                    }
-                                }
-                                ChildResult::PatchErr(errored) => {
-                                    format!(
-                                        "[server] patch errored... {:?} {} ",
-                                        errored.identity, errored.patch_error
-                                    )
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n")
+                        (evt.now, print_server_updates(child_results))
                     }
                 },
                 AnyEvent::External(ext) => {
@@ -312,25 +263,22 @@ impl App {
                     PrettyPrint
                         .handle_external_event(&mut writer, ext)
                         .expect("can write");
-                    String::from_utf8(writer.into_inner().expect("into_inner")).expect("as_utf8")
+                    (
+                        evt.now,
+                        vec![String::from_utf8(writer.into_inner().expect("into_inner"))
+                            .expect("as_utf8")],
+                    )
                 }
             })
-            .filter(|str| !str.trim().is_empty())
-            .enumerate()
-            .map(|(index, s)| {
-                let lines = s.lines();
-                lines
-                    .filter_map(|s| {
-                        if s.trim().is_empty() {
-                            None
-                        } else {
-                            Some(Line::raw(format!("{index}: {s}")))
-                        }
-                    })
-                    .collect::<Vec<Line>>()
+            .map(|(dt, strs)| {
+                strs.iter()
+                    .map(|str| Line::raw(format!("{} {str}", dt.format("%-I.%M%P"))))
+                    .collect::<Vec<_>>()
             })
             .flatten()
             .collect()
+        // .flatten()
+        // .collect()
     }
 }
 
@@ -344,7 +292,7 @@ impl Widget for &mut App {
             .render(areas[0], buf);
         Paragraph::new(self.create_events())
             .block(title_block(
-                format!("Events ({})", self.events.len()).as_str(),
+                format!("Events ({})", self.events.get().len()).as_str(),
             ))
             .gray()
             .wrap(Wrap { trim: true })
@@ -428,3 +376,58 @@ mod common {
         Ok(())
     }
 }
+
+use std::collections::VecDeque;
+
+#[derive(Debug)]
+struct RecordedEvent {
+    evt: AnyEvent,
+    now: chrono::DateTime<chrono::Local>,
+}
+
+impl RecordedEvent {
+    pub fn new(evt: AnyEvent) -> Self {
+        Self {
+            evt,
+            now: chrono::Local::now(),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct FixedSizeQueue {
+    deque: VecDeque<RecordedEvent>,
+    capacity: usize,
+}
+
+impl FixedSizeQueue {
+    fn new(capacity: usize) -> Self {
+        FixedSizeQueue {
+            deque: VecDeque::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    fn add(&mut self, value: RecordedEvent) {
+        if self.deque.len() == self.capacity {
+            self.deque.pop_back();
+        }
+        self.deque.push_front(value);
+    }
+
+    fn get(&self) -> &VecDeque<RecordedEvent> {
+        &self.deque
+    }
+}
+
+// fn main() {
+// let mut queue = FixedSizeQueue::new(200);
+//
+// for i in 1..=201 {
+//     queue.add(format!("Element {}", i));
+// }
+//
+// for elem in queue.get() {
+//     println!("{}", elem);
+// }
+// }

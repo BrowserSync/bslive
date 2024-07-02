@@ -1,7 +1,8 @@
 use crate::OutputWriter;
-use bsnext_dto::internal::InternalEvents;
+use bsnext_dto::internal::{ChildResult, InternalEvents};
 use bsnext_dto::{
-    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO, ServersChanged, StartupErrorDTO, StartupEvent, StoppedWatching, Watching,
+    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO,
+    ServersChanged, StartupErrorDTO, StartupEvent, StoppedWatching, Watching,
 };
 use std::io::Write;
 use std::marker::PhantomData;
@@ -298,8 +299,61 @@ where
     Ok(())
 }
 
-pub fn iden(identity_dto: &IdentityDTO) -> String {
-    match identity_dto {
+pub fn print_server_updates(evts: &[ChildResult]) -> Vec<String> {
+    evts.iter()
+        .map(|r| match r {
+            ChildResult::Created(created) => {
+                vec![format!(
+                    "[created] {}",
+                    server_display(
+                        &IdentityDTO::from(&created.server_handler.identity),
+                        &created.server_handler.socket_addr.to_string()
+                    ),
+                )]
+            }
+            ChildResult::Stopped(stopped) => {
+                vec![format!("[stopped] {}", iden(stopped))]
+            }
+            ChildResult::CreateErr(errored) => {
+                vec![format!(
+                    "[server] errored... {:?} {} ",
+                    iden(&errored.identity),
+                    errored.server_error
+                )]
+            }
+            ChildResult::Patched(child) => {
+                let mut lines = vec![];
+                // todo: determine WHICH changes were actually applied (instead of saying everything was patched)
+                for x in &child.route_change_set.changed {
+                    lines.push(format!(
+                        "[patched] {} {:?}",
+                        iden(&child.server_handler.identity),
+                        x
+                    ));
+                }
+                for x in &child.route_change_set.added {
+                    lines.push(format!(
+                        "[patched] {} {:?}",
+                        iden(&child.server_handler.identity),
+                        x
+                    ));
+                }
+                lines
+            }
+            ChildResult::PatchErr(errored) => {
+                vec![format!(
+                    "[patch] error {} {} ",
+                    iden(&errored.identity),
+                    errored.patch_error
+                )]
+            }
+        })
+        .flatten()
+        .collect()
+}
+
+pub fn iden(identity_dto: impl Into<IdentityDTO>) -> String {
+    match identity_dto.into() {
         IdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
         IdentityDTO::Address { bind_address } => bind_address.to_string(),
         IdentityDTO::Named { name } => format!("[{name}]"),
