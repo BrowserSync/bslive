@@ -8,6 +8,7 @@ use std::time::Duration;
 use bsnext_system::cli::from_args;
 use tokio::time::sleep;
 
+#[allow(dead_code)]
 #[napi]
 async fn start(_args: Vec<String>) -> napi::bindgen_prelude::Result<i32> {
     eprintln!("async not supported yet");
@@ -16,6 +17,7 @@ async fn start(_args: Vec<String>) -> napi::bindgen_prelude::Result<i32> {
 }
 
 /// Launch in a blocking way
+#[allow(dead_code)]
 #[napi]
 fn start_sync(args: Vec<String>) -> napi::bindgen_prelude::Result<i32> {
     let sys = actix_rt::System::new();

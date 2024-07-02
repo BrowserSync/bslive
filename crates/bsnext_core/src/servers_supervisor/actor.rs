@@ -36,7 +36,7 @@ impl ChildHandler {
     pub fn minimal(&self) -> ChildHandlerMinimal {
         ChildHandlerMinimal {
             identity: self.identity.clone(),
-            socket_addr: self.socket_addr.clone(),
+            socket_addr: self.socket_addr,
         }
     }
 }

@@ -48,6 +48,7 @@ trait BsLive {
     fn is_input(&self) -> bool;
     fn is_route(&self) -> bool;
     fn is_body(&self) -> bool;
+    #[allow(dead_code)]
     fn raw_value(&self) -> Option<String>;
 }
 

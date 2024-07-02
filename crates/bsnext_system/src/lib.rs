@@ -158,7 +158,7 @@ impl BsSystem {
                             let child_handler = ChildHandler {
                                 actor_address: maybe_addr.clone().expect("guarded above"),
                                 identity: c.server_handler.identity.clone(),
-                                socket_addr: c.server_handler.socket_addr.clone(),
+                                socket_addr: c.server_handler.socket_addr,
                             };
                             addr.do_send(ChildCreatedInsert { child_handler })
                         }

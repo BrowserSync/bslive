@@ -98,7 +98,7 @@ fn input_handling(tx: mpsc::Sender<RatatuiEvent>) -> JoinHandle<()> {
         loop {
             // poll for tick rate duration, if no events, sent tick event.
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-            if event::poll(timeout).is_ok_and(|r| r == true) {
+            if event::poll(timeout).is_ok_and(|r| r) {
                 let evt = match crossterm::event::read() {
                     Ok(evt) => match evt {
                         Event::FocusGained => None,
@@ -139,6 +139,7 @@ struct App {
 
 enum RatatuiEvent {
     Input(crossterm::event::KeyEvent),
+    #[allow(dead_code)]
     Tick,
     Resize,
     Evt(AnyEvent),
@@ -244,7 +245,7 @@ impl App {
                     .map(|s| Line::raw(server_display(&s.identity, &s.socket_addr)))
                     .collect()
             })
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     /// Create some lines to display in the paragraph.
@@ -270,12 +271,11 @@ impl App {
                     )
                 }
             })
-            .map(|(dt, strs)| {
+            .flat_map(|(dt, strs)| {
                 strs.iter()
                     .map(|str| Line::raw(format!("{} {str}", dt.format("%-I.%M%P"))))
                     .collect::<Vec<_>>()
             })
-            .flatten()
             .collect()
         // .flatten()
         // .collect()

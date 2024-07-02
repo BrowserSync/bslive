@@ -301,7 +301,7 @@ where
 
 pub fn print_server_updates(evts: &[ChildResult]) -> Vec<String> {
     evts.iter()
-        .map(|r| match r {
+        .flat_map(|r| match r {
             ChildResult::Created(created) => {
                 vec![format!(
                     "[created] {}",
@@ -348,7 +348,6 @@ pub fn print_server_updates(evts: &[ChildResult]) -> Vec<String> {
                 )]
             }
         })
-        .flatten()
         .collect()
 }
 

@@ -17,11 +17,11 @@ fn server_1() -> ServerDTO {
         socket_addr: "0.0.0.0:3000".to_string(),
     }
 }
-fn iden_2() -> IdentityDTO {
-    IdentityDTO::Address {
-        bind_address: "0.0.0.0:4000".to_string(),
-    }
-}
+// fn iden_2() -> IdentityDTO {
+//     IdentityDTO::Address {
+//         bind_address: "0.0.0.0:4000".to_string(),
+//     }
+// }
 fn server_2() -> ServerDTO {
     ServerDTO {
         id: "abcdef".to_string(),
