@@ -12,12 +12,11 @@ use bytes::Bytes;
 use futures::channel::mpsc::unbounded;
 use futures::SinkExt;
 
-use crate::common_layers::add_route_layers;
+use crate::common_layers::{add_route_layers, Handling};
 use crate::handlers::proxy;
 use crate::server::state::ServerState;
 use axum::routing::any;
 use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
-use bsnext_resp::{response_modifications_layer, InjectHandling, RespMod};
 use http::{HeaderValue, StatusCode};
 use http_body_util::BodyExt;
 use std::collections::HashMap;
@@ -27,8 +26,7 @@ use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio_stream::StreamExt;
-use tower::{ServiceBuilder, ServiceExt};
-use tower_http::decompression::DecompressionLayer;
+use tower::ServiceExt;
 use tower_http::services::ServeDir;
 use tracing::{span, Instrument, Level};
 
@@ -41,7 +39,6 @@ pub async fn serve_dir_loader(
     let span = span!(parent: None, Level::INFO, "serve_dir_loader", path = req.uri().path());
     let _guard = span.enter();
 
-    let accepts_html = RespMod::accepts_html(&req);
     let routes = state.routes.read().instrument(span.clone()).await;
     let mut app = Router::new();
     let route_map = routes
@@ -62,22 +59,33 @@ pub async fn serve_dir_loader(
         }
 
         let route = routes.first().expect("guarded");
+        let handling = match &route.kind {
+            RouteKind::Proxy(_) => Handling::Proxy,
+            RouteKind::Dir(_) => Handling::Dir,
+            _ => unreachable!("Handling: {:?}", route.kind),
+        };
         let mut router = match &route.kind {
             RouteKind::Proxy(ProxyRoute { proxy }) => {
-                let response_handling = if accepts_html {
-                    ResponseHandling::Modify
-                } else {
-                    ResponseHandling::None
-                };
-                service_for_proxy(response_handling, route).layer(Extension(ProxyConfig {
-                    target: proxy.to_owned(),
-                    path: route.path.clone(),
-                }))
+                // let accepts_html = RespMod::accepts_html(&req);
+                // let response_handling = if accepts_html {
+                //     ResponseHandling::Modify
+                // } else {
+                //     ResponseHandling::None
+                // };
+                Router::new()
+                    .nest_service(route.path.as_str(), any(proxy::proxy_handler))
+                    .layer(Extension(ProxyConfig {
+                        target: proxy.to_owned(),
+                        path: route.path.clone(),
+                    }))
+                    .layer(middleware::from_fn(tag_proxy))
             }
-            RouteKind::Dir(DirRoute { dir }) => service_for_dir(route, dir),
+            RouteKind::Dir(DirRoute { dir }) => Router::new()
+                .nest_service(route.path.as_str(), ServeDir::new(dir))
+                .layer(middleware::from_fn(tag_file)),
             _ => unreachable!("{:?}", route.kind),
         };
-        router = add_route_layers(router, route);
+        router = add_route_layers(router, handling, route, &req);
         app = app.merge(router);
     }
 
@@ -88,12 +96,6 @@ pub async fn serve_dir_loader(
     r.into_response()
 }
 
-fn service_for_dir(route: &Route, dir: &str) -> Router {
-    Router::new()
-        .nest_service(route.path.as_str(), ServeDir::new(dir))
-        .layer(middleware::from_fn(tag_file))
-}
-
 async fn tag_file(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {
     let (mut parts, body) = next.run(req).await.into_parts();
     if parts.status.as_u16() == 200 {
@@ -102,30 +104,12 @@ async fn tag_file(req: Request, next: Next) -> Result<impl IntoResponse, (Status
     Ok(Response::from_parts(parts, body))
 }
 
-enum ResponseHandling {
-    Modify,
-    None,
-}
-
-fn service_for_proxy(handling: ResponseHandling, route: &Route) -> Router {
-    match handling {
-        ResponseHandling::Modify => Router::new()
-            .nest_service(route.path.as_str(), any(proxy::proxy_handler))
-            .layer(
-                ServiceBuilder::new()
-                    .layer(middleware::from_fn(response_modifications_layer))
-                    .layer(Extension(InjectHandling {
-                        items: route.inject_opts.clone(),
-                    }))
-                    .layer(DecompressionLayer::new()),
-            ),
-        ResponseHandling::None => Router::new()
-            .nest_service(route.path.as_str(), any(proxy::proxy_handler))
-            .layer(middleware::from_fn(response_modifications_layer))
-            .layer(Extension(InjectHandling {
-                items: route.inject_opts.clone(),
-            })),
+async fn tag_proxy(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let (mut parts, body) = next.run(req).await.into_parts();
+    if parts.status.as_u16() == 200 {
+        parts.extensions.insert(MetaData::Proxied);
     }
+    Ok(Response::from_parts(parts, body))
 }
 
 #[allow(dead_code)]

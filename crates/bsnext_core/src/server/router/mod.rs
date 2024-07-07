@@ -48,6 +48,8 @@ pub fn make_router(state: &Arc<ServerState>) -> Router {
         .layer(TraceLayer::new_for_http())
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
         .layer(Extension(client))
+    // todo: When to add this compression back in?
+    // .layer(CompressionLayer::new())
 }
 
 pub fn built_ins(state: Arc<ServerState>) -> Router {
@@ -109,9 +111,11 @@ async fn tagging_layer(
     req: Request,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let r = next.run(req).await;
-    if let Some(_metadata) = r.extensions().get::<MetaData>() {
-        // todo:
+    let mut r = next.run(req).await;
+    #[allow(unused_variables)]
+    if let Some(md) = r.extensions_mut().get::<MetaData>() {
+        // r.headers_mut()
+        //     .insert("abc", HeaderValue::from_static(md.as_header_value()));
     }
     Ok(r)
 }

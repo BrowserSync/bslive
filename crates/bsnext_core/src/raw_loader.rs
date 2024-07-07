@@ -4,7 +4,7 @@ use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response, Sse};
 use axum::routing::any;
-use axum::{middleware, Extension, Json, Router};
+use axum::{middleware, Json, Router};
 use http::header::CONTENT_TYPE;
 
 use crate::meta::MetaData;
@@ -12,7 +12,6 @@ use crate::server::state::ServerState;
 use axum::body::Body;
 use axum::response::sse::Event;
 use bsnext_input::route::{DirRoute, ProxyRoute, RouteKind};
-use bsnext_resp::{response_modifications_layer, InjectHandling};
 use bytes::Bytes;
 use http::StatusCode;
 use http_body_util::BodyExt;
@@ -22,7 +21,7 @@ use std::time::Duration;
 use tokio_stream::StreamExt;
 use tower::ServiceExt;
 
-use crate::common_layers::add_route_layers;
+use crate::common_layers::{add_route_layers, Handling};
 use tracing::{span, Level};
 
 // use futures_util::stream::{self, Stream};
@@ -130,7 +129,7 @@ pub async fn raw_loader(
         }
     }
 
-    app = add_route_layers(app, route);
+    app = add_route_layers(app, Handling::Raw, route, &req);
     app.layer(middleware::from_fn(tag_raw))
         .oneshot(req)
         .await

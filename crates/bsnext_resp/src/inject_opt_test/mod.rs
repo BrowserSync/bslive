@@ -1,4 +1,6 @@
-use crate::inject_opts::{BsLiveStrings, InjectDefinition, InjectOpts, Known};
+use crate::builtin_strings::BuiltinStrings;
+use crate::inject_defs::{InjectDefinition, Pos};
+use crate::inject_opts::{InjectOpts, Injection};
 
 #[test]
 fn test_inject_opts_bool() {
@@ -32,11 +34,11 @@ fn test_inject_opts_list() {
     "#;
     let expected = A {
         inject: InjectOpts::Items(vec![
-            Known::BsLive(BsLiveStrings::Connector),
-            Known::UnknownNamed(String::from("oops")),
-            Known::Def(InjectDefinition {
+            Injection::BsLive(BuiltinStrings::Connector),
+            Injection::UnknownNamed(String::from("oops")),
+            Injection::Def(InjectDefinition {
                 name: "abc".to_string(),
-                before: "</head>".to_string(),
+                pos: Pos::Before("</head>".to_string()),
                 content: "<!-- lol -->".to_string(),
             }),
         ]),
@@ -55,7 +57,7 @@ fn test_inject_custom_list() {
       - anything:else
     "#;
     let expected = A {
-        inject: InjectOpts::Items(vec![Known::UnknownNamed(String::from("anything:else"))]),
+        inject: InjectOpts::Items(vec![Injection::UnknownNamed(String::from("anything:else"))]),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
     assert_eq!(actual.unwrap().inject, expected.inject);
