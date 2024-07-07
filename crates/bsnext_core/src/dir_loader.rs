@@ -79,11 +79,6 @@ pub async fn serve_dir_loader(
         };
         router = add_route_layers(router, route);
         app = app.merge(router);
-        app = app
-            .layer(middleware::from_fn(response_modifications_layer))
-            .layer(Extension(InjectHandling {
-                items: route.inject_opts.clone(),
-            }));
     }
 
     drop(routes);

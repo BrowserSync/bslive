@@ -131,12 +131,7 @@ pub async fn raw_loader(
     }
 
     app = add_route_layers(app, route);
-
     app.layer(middleware::from_fn(tag_raw))
-        .layer(middleware::from_fn(response_modifications_layer))
-        .layer(Extension(InjectHandling {
-            items: route.inject_opts.clone(),
-        }))
         .oneshot(req)
         .await
         .into_response()
