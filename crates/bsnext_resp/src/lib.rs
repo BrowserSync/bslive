@@ -1,6 +1,9 @@
 pub mod builtin_strings;
-pub mod inject_defs;
+pub mod connector;
+pub mod debug;
+pub mod inject_addition;
 pub mod inject_opts;
+pub mod inject_replacement;
 pub mod injector_guard;
 use crate::inject_opts::Injection;
 #[cfg(test)]

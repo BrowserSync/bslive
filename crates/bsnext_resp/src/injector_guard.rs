@@ -1,18 +1,13 @@
-use crate::RespMod;
 use axum::extract::Request;
 use bytes::Bytes;
 use http::{HeaderMap, Response};
 
 pub trait InjectorGuard {
-    fn accept_req(&self, req: &Request) -> bool {
-        RespMod::accepts_html(req)
-    }
-    fn accept_res<T>(&self, res: &Response<T>) -> bool {
-        RespMod::is_html(res)
-    }
+    fn accept_req(&self, req: &Request) -> bool;
+    fn accept_res<T>(&self, res: &Response<T>) -> bool;
 }
 
-pub trait ByteReplacer {
+pub trait ByteReplacer: InjectorGuard {
     fn apply(&self, body: &'_ str) -> Option<String>;
 
     fn replace_bytes(

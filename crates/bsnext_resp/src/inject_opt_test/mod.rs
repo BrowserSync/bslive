@@ -1,6 +1,6 @@
 use crate::builtin_strings::BuiltinStrings;
-use crate::inject_defs::{InjectDefinition, Pos};
 use crate::inject_opts::{InjectOpts, Injection};
+use crate::inject_replacement::{InjectReplacement, Pos};
 
 #[test]
 fn test_inject_opts_bool() {
@@ -36,8 +36,7 @@ fn test_inject_opts_list() {
         inject: InjectOpts::Items(vec![
             Injection::BsLive(BuiltinStrings::Connector),
             Injection::UnknownNamed(String::from("oops")),
-            Injection::Def(InjectDefinition {
-                name: "abc".to_string(),
+            Injection::Replacement(InjectReplacement {
                 pos: Pos::Before("</head>".to_string()),
                 content: "<!-- lol -->".to_string(),
             }),

@@ -1,8 +1,10 @@
 use crate::injector_guard::{ByteReplacer, InjectorGuard};
+use crate::RespMod;
+use axum::extract::Request;
+use http::Response;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
-pub struct InjectDefinition {
-    pub name: String,
+pub struct InjectReplacement {
     #[serde(flatten)]
     pub pos: Pos,
     pub content: String,
@@ -16,8 +18,16 @@ pub enum Pos {
     Replace(String),
 }
 
-impl InjectorGuard for InjectDefinition {}
-impl ByteReplacer for InjectDefinition {
+impl InjectorGuard for InjectReplacement {
+    fn accept_req(&self, req: &Request) -> bool {
+        RespMod::accepts_html(req)
+    }
+
+    fn accept_res<T>(&self, res: &Response<T>) -> bool {
+        RespMod::is_html(res)
+    }
+}
+impl ByteReplacer for InjectReplacement {
     fn apply(&self, body: &'_ str) -> Option<String> {
         match &self.pos {
             Pos::Before(matcher) => {

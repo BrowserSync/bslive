@@ -1,6 +1,9 @@
 use crate::builtin_strings::BuiltinStrings;
-use crate::inject_defs::InjectDefinition;
+use crate::inject_addition::InjectAddition;
+use crate::inject_replacement::InjectReplacement;
 use crate::injector_guard::{ByteReplacer, InjectorGuard};
+use axum::extract::Request;
+use http::Response;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
@@ -36,16 +39,36 @@ impl Default for InjectOpts {
 pub enum Injection {
     BsLive(BuiltinStrings),
     UnknownNamed(String),
-    Def(InjectDefinition),
+    Replacement(InjectReplacement),
+    Addition(InjectAddition),
 }
 
-impl InjectorGuard for Injection {}
+impl InjectorGuard for Injection {
+    fn accept_req(&self, req: &Request) -> bool {
+        match self {
+            Injection::BsLive(built_ins) => built_ins.accept_req(req),
+            Injection::UnknownNamed(_) => todo!("accept_req Injection::UnknownNamed"),
+            Injection::Replacement(def) => def.accept_req(req),
+            Injection::Addition(add) => add.accept_req(req),
+        }
+    }
+
+    fn accept_res<T>(&self, res: &Response<T>) -> bool {
+        match self {
+            Injection::BsLive(built_ins) => built_ins.accept_res(res),
+            Injection::UnknownNamed(_) => todo!("accept_res Injection::UnknownNamed"),
+            Injection::Replacement(def) => def.accept_res(res),
+            Injection::Addition(add) => add.accept_res(res),
+        }
+    }
+}
 impl ByteReplacer for Injection {
     fn apply(&self, body: &'_ str) -> Option<String> {
         match self {
             Injection::BsLive(strs) => strs.apply(body),
             Injection::UnknownNamed(_) => todo!("Injection::UnknownNamed"),
-            Injection::Def(def) => def.apply(body),
+            Injection::Replacement(def) => def.apply(body),
+            Injection::Addition(add) => add.apply(body),
         }
     }
 }
