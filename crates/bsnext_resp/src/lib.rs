@@ -1,3 +1,8 @@
+pub mod inject_opts;
+use crate::inject_opts::InjectOpts;
+#[cfg(test)]
+pub mod inject_opt_test;
+
 use axum::body::Body;
 use axum::extract::Request;
 use axum::middleware::Next;
@@ -27,7 +32,7 @@ impl RespMod {
 
 #[derive(Debug, Clone)]
 pub struct InjectHandling {
-    pub items: Vec<String>,
+    pub items: InjectOpts,
 }
 
 pub async fn response_modifications_layer(
@@ -41,7 +46,8 @@ pub async fn response_modifications_layer(
     tracing::trace!(?inject);
     let mut r = next.run(req).await;
     let is_html = RespMod::is_html(&r);
-    let has_injections = !inject.items.is_empty();
+    let items = inject.items.injections();
+    let has_injections = !items.is_empty();
 
     // todo(alpha): implement named injectors, such as 'bslive:connector'
     if let (true, true, true) = (accepts_html, is_html, has_injections) {

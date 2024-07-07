@@ -10,9 +10,6 @@ use crate::md::MarkdownError;
 use crate::yml::YamlError;
 
 #[cfg(test)]
-pub mod inject_opt_test;
-pub mod inject_opts;
-#[cfg(test)]
 pub mod input_test;
 pub mod md;
 pub mod paths;

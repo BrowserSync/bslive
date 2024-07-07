@@ -82,7 +82,7 @@ pub async fn serve_dir_loader(
         app = app
             .layer(middleware::from_fn(response_modifications_layer))
             .layer(Extension(InjectHandling {
-                items: route.inject_opts.injections(),
+                items: route.inject_opts.clone(),
             }));
     }
 
@@ -120,7 +120,7 @@ fn service_for_proxy(handling: ResponseHandling, route: &Route) -> Router {
                 ServiceBuilder::new()
                     .layer(middleware::from_fn(response_modifications_layer))
                     .layer(Extension(InjectHandling {
-                        items: route.inject_opts.injections(),
+                        items: route.inject_opts.clone(),
                     }))
                     .layer(DecompressionLayer::new()),
             ),
@@ -128,7 +128,7 @@ fn service_for_proxy(handling: ResponseHandling, route: &Route) -> Router {
             .nest_service(route.path.as_str(), any(proxy::proxy_handler))
             .layer(middleware::from_fn(response_modifications_layer))
             .layer(Extension(InjectHandling {
-                items: route.inject_opts.injections(),
+                items: route.inject_opts.clone(),
             })),
     }
 }

@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bsnext_resp = { path = "../bsnext_resp" }
+
 markdown = { version = "1.0.0-alpha.16" }
 
 random_word = { workspace = true }

@@ -3,8 +3,8 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-use crate::inject_opts::InjectOpts;
 use crate::watch_opts::WatchOpts;
+use bsnext_resp::inject_opts::InjectOpts;
 use typeshare::typeshare;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]

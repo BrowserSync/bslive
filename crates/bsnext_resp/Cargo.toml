@@ -10,4 +10,6 @@ tracing = { workspace = true }
 axum = { workspace = true }
 http = { workspace = true }
 bytes = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
 http-body-util = { workspace = true }
