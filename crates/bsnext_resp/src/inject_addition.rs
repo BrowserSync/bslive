@@ -6,7 +6,7 @@ use http::Response;
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct InjectAddition {
     #[serde(flatten)]
-    pub end: AdditionPosition,
+    pub addition_position: AdditionPosition,
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -27,7 +27,7 @@ impl InjectorGuard for InjectAddition {
 }
 impl ByteReplacer for InjectAddition {
     fn apply(&self, body: &'_ str) -> Option<String> {
-        match &self.end {
+        match &self.addition_position {
             AdditionPosition::Append(content) => Some(format!("{body}{content}")),
             AdditionPosition::Prepend(content) => Some(format!("{content}{body}")),
         }
