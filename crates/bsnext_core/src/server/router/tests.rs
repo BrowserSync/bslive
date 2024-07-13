@@ -63,18 +63,14 @@ mod test {
     use crate::server::state::ServerState;
     use axum::body::Body;
     use axum::extract::Request;
-    
-    
+
     use bsnext_input::route::{CorsOpts, Route, RouteKind};
     use bsnext_input::server_config::{Identity, ServerConfig};
-    
-    
-    
-    
+
     use http::HeaderValue;
     use std::collections::BTreeMap;
     use std::sync::Arc;
-    
+
     use tower::ServiceExt;
 
     #[tokio::test]

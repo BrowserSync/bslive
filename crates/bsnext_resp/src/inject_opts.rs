@@ -73,7 +73,7 @@ pub struct UnknownStringDef {
 
 impl InjectorGuard for InjectionItem {
     fn accept_req(&self, req: &Request) -> bool {
-        let allowed = match self.only.as_ref() {
+        let path_is_allowed = match self.only.as_ref() {
             None => true,
             Some(MatcherList::None) => true,
             Some(MatcherList::Item(matcher)) => matcher.test(&req.uri().to_string()),
@@ -82,7 +82,7 @@ impl InjectorGuard for InjectionItem {
                 matchers.iter().any(|m| m.test(&uri))
             }
         };
-        if allowed {
+        if path_is_allowed {
             match &self.inner {
                 Injection::BsLive(built_ins) => built_ins.accept_req(req),
                 Injection::UnknownNamed(_) => todo!("accept_req Injection::UnknownNamed"),
@@ -113,33 +113,3 @@ impl ByteReplacer for InjectionItem {
         }
     }
 }
-
-// impl InjectorGuard for Injection {
-//     fn accept_req(&self, req: &Request) -> bool {
-//         match self {
-//             Injection::BsLive(built_ins) => built_ins.accept_req(req),
-//             Injection::UnknownNamed(_) => todo!("accept_req Injection::UnknownNamed"),
-//             Injection::Replacement(def) => def.accept_req(req),
-//             Injection::Addition(add) => add.accept_req(req),
-//         }
-//     }
-//
-//     fn accept_res<T>(&self, res: &Response<T>) -> bool {
-//         match self {
-//             Injection::BsLive(built_ins) => built_ins.accept_res(res),
-//             Injection::UnknownNamed(_) => todo!("accept_res Injection::UnknownNamed"),
-//             Injection::Replacement(def) => def.accept_res(res),
-//             Injection::Addition(add) => add.accept_res(res),
-//         }
-//     }
-// }
-// impl ByteReplacer for Injection {
-//     fn apply(&self, body: &'_ str) -> Option<String> {
-//         match self {
-//             Injection::BsLive(strs) => strs.apply(body),
-//             Injection::UnknownNamed(_) => todo!("Injection::UnknownNamed"),
-//             Injection::Replacement(def) => def.apply(body),
-//             Injection::Addition(add) => add.apply(body),
-//         }
-//     }
-// }
