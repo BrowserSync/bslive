@@ -1,6 +1,7 @@
-use crate::builtin_strings::BuiltinStrings;
+use crate::builtin_strings::BuiltinStrings::Connector;
+use crate::builtin_strings::{BuiltinStringDef, BuiltinStrings};
 use crate::inject_addition::{AdditionPosition, InjectAddition};
-use crate::inject_opts::{InjectOpts, Injection};
+use crate::inject_opts::{InjectOpts, Injection, InjectionItem, UnknownStringDef};
 use crate::inject_replacement::{InjectReplacement, Pos};
 
 #[test]
@@ -27,37 +28,48 @@ fn test_inject_opts_list() {
     }
     let input = r#"
     inject:
-    - bslive:connector
-    - oops
-    - name: "abc"
-      before: </head>
+    - name: bslive:connector
+    - name: oops
+    - before: </head>
       content: <!-- lol -->
     "#;
     let expected = A {
         inject: InjectOpts::Items(vec![
-            Injection::BsLive(BuiltinStrings::Connector),
-            Injection::UnknownNamed(String::from("oops")),
-            Injection::Replacement(InjectReplacement {
-                pos: Pos::Before("</head>".to_string()),
-                content: "<!-- lol -->".to_string(),
-            }),
+            InjectionItem {
+                inner: Injection::BsLive(BuiltinStringDef {
+                    name: BuiltinStrings::Connector,
+                }),
+            },
+            InjectionItem {
+                inner: Injection::UnknownNamed(UnknownStringDef {
+                    name: "oops".to_string(),
+                }),
+            },
+            InjectionItem {
+                inner: Injection::Replacement(InjectReplacement {
+                    pos: Pos::Before("</head>".to_string()),
+                    content: "<!-- lol -->".to_string(),
+                }),
+            },
         ]),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
     assert_eq!(actual.unwrap().inject, expected.inject);
 }
 #[test]
-fn test_inject_custom_list() {
+fn test_inject_builtin() {
     #[derive(Debug, serde::Deserialize)]
     struct A {
         inject: InjectOpts,
     }
     let input = r#"
     inject:
-      - anything:else
+      - name: bslive:connector
     "#;
     let expected = A {
-        inject: InjectOpts::Items(vec![Injection::UnknownNamed(String::from("anything:else"))]),
+        inject: InjectOpts::Items(vec![InjectionItem {
+            inner: Injection::BsLive(BuiltinStringDef { name: Connector }),
+        }]),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
     assert_eq!(actual.unwrap().inject, expected.inject);
@@ -80,18 +92,24 @@ fn test_inject_replace() {
     "#;
     let expected = A {
         inject: InjectOpts::Items(vec![
-            Injection::Replacement(InjectReplacement {
-                pos: Pos::Replace("Basic".to_string()),
-                content: "huh?".to_string(),
-            }),
-            Injection::Replacement(InjectReplacement {
-                pos: Pos::Before("</body>".to_string()),
-                content: "</BODY>".to_string(),
-            }),
-            Injection::Replacement(InjectReplacement {
-                pos: Pos::After("<html>".to_string()),
-                content: "woop".to_string(),
-            }),
+            InjectionItem {
+                inner: Injection::Replacement(InjectReplacement {
+                    pos: Pos::Replace("Basic".to_string()),
+                    content: "huh?".to_string(),
+                }),
+            },
+            InjectionItem {
+                inner: Injection::Replacement(InjectReplacement {
+                    pos: Pos::Before("</body>".to_string()),
+                    content: "</BODY>".to_string(),
+                }),
+            },
+            InjectionItem {
+                inner: Injection::Replacement(InjectReplacement {
+                    pos: Pos::After("<html>".to_string()),
+                    content: "woop".to_string(),
+                }),
+            },
         ]),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
@@ -110,10 +128,12 @@ fn test_inject_replace_single() {
         content: huh?
     "#;
     let expected = A {
-        inject: InjectOpts::Item(Injection::Replacement(InjectReplacement {
-            pos: Pos::Replace("Basic".to_string()),
-            content: "huh?".to_string(),
-        })),
+        inject: InjectOpts::Item(InjectionItem {
+            inner: Injection::Replacement(InjectReplacement {
+                pos: Pos::Replace("Basic".to_string()),
+                content: "huh?".to_string(),
+            }),
+        }),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
     assert_eq!(actual.unwrap().inject, expected.inject);
@@ -132,12 +152,16 @@ fn test_inject_append_prepend() {
     "#;
     let expected = A {
         inject: InjectOpts::Items(vec![
-            Injection::Addition(InjectAddition {
-                addition_position: AdditionPosition::Append("lol".to_string()),
-            }),
-            Injection::Addition(InjectAddition {
-                addition_position: AdditionPosition::Prepend("lol2".to_string()),
-            }),
+            InjectionItem {
+                inner: Injection::Addition(InjectAddition {
+                    addition_position: AdditionPosition::Append("lol".to_string()),
+                }),
+            },
+            InjectionItem {
+                inner: Injection::Addition(InjectAddition {
+                    addition_position: AdditionPosition::Prepend("lol2".to_string()),
+                }),
+            },
         ]),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);

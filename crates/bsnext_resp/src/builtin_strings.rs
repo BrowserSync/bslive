@@ -5,6 +5,10 @@ use axum::extract::Request;
 use http::Response;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+pub struct BuiltinStringDef {
+    pub name: BuiltinStrings,
+}
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub enum BuiltinStrings {
     #[serde(rename = "bslive:connector")]
     Connector,
@@ -12,25 +16,25 @@ pub enum BuiltinStrings {
     Debug,
 }
 
-impl InjectorGuard for BuiltinStrings {
+impl InjectorGuard for BuiltinStringDef {
     fn accept_req(&self, req: &Request) -> bool {
-        match self {
+        match self.name {
             BuiltinStrings::Connector => Connector.accept_req(req),
             BuiltinStrings::Debug => Debug.accept_req(req),
         }
     }
 
     fn accept_res<T>(&self, res: &Response<T>) -> bool {
-        match self {
+        match self.name {
             BuiltinStrings::Connector => Connector.accept_res(res),
             BuiltinStrings::Debug => Debug.accept_res(res),
         }
     }
 }
 
-impl ByteReplacer for BuiltinStrings {
+impl ByteReplacer for BuiltinStringDef {
     fn apply(&self, body: &'_ str) -> Option<String> {
-        match self {
+        match self.name {
             BuiltinStrings::Connector => Connector.apply(body),
             BuiltinStrings::Debug => Debug.apply(body),
         }

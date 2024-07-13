@@ -5,7 +5,7 @@ pub mod inject_addition;
 pub mod inject_opts;
 pub mod inject_replacement;
 pub mod injector_guard;
-use crate::inject_opts::Injection;
+use crate::inject_opts::InjectionItem;
 #[cfg(test)]
 pub mod inject_opt_test;
 
@@ -39,7 +39,7 @@ impl RespMod {
 
 #[derive(Debug, Clone)]
 pub struct InjectHandling {
-    pub items: Vec<Injection>,
+    pub items: Vec<InjectionItem>,
 }
 
 pub async fn response_modifications_layer(
@@ -52,7 +52,7 @@ pub async fn response_modifications_layer(
     let req_headers = req.headers().clone();
 
     // bail when there are no accepting modifications
-    let req_accepted: Vec<Injection> = inject
+    let req_accepted: Vec<InjectionItem> = inject
         .items
         .into_iter()
         .filter(|item| item.accept_req(&req))
@@ -64,7 +64,7 @@ pub async fn response_modifications_layer(
     let mut res = next.run(req).await;
 
     // also bail if no responses are accepted
-    let res_accepted: Vec<Injection> = req_accepted
+    let res_accepted: Vec<InjectionItem> = req_accepted
         .into_iter()
         .filter(|item| item.accept_res(&res))
         .collect();
