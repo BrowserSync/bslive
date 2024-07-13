@@ -34,6 +34,7 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 mod assets;
+mod inject_tests;
 mod pub_api;
 mod tests;
 

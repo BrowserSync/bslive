@@ -39,17 +39,20 @@ fn test_inject_opts_list() {
                 inner: Injection::BsLive(BuiltinStringDef {
                     name: BuiltinStrings::Connector,
                 }),
+                only: None,
             },
             InjectionItem {
                 inner: Injection::UnknownNamed(UnknownStringDef {
                     name: "oops".to_string(),
                 }),
+                only: None,
             },
             InjectionItem {
                 inner: Injection::Replacement(InjectReplacement {
                     pos: Pos::Before("</head>".to_string()),
                     content: "<!-- lol -->".to_string(),
                 }),
+                only: None,
             },
         ]),
     };
@@ -69,6 +72,7 @@ fn test_inject_builtin() {
     let expected = A {
         inject: InjectOpts::Items(vec![InjectionItem {
             inner: Injection::BsLive(BuiltinStringDef { name: Connector }),
+            only: None,
         }]),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
@@ -97,18 +101,21 @@ fn test_inject_replace() {
                     pos: Pos::Replace("Basic".to_string()),
                     content: "huh?".to_string(),
                 }),
+                only: None,
             },
             InjectionItem {
                 inner: Injection::Replacement(InjectReplacement {
                     pos: Pos::Before("</body>".to_string()),
                     content: "</BODY>".to_string(),
                 }),
+                only: None,
             },
             InjectionItem {
                 inner: Injection::Replacement(InjectReplacement {
                     pos: Pos::After("<html>".to_string()),
                     content: "woop".to_string(),
                 }),
+                only: None,
             },
         ]),
     };
@@ -133,6 +140,7 @@ fn test_inject_replace_single() {
                 pos: Pos::Replace("Basic".to_string()),
                 content: "huh?".to_string(),
             }),
+            only: None,
         }),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
@@ -156,11 +164,13 @@ fn test_inject_append_prepend() {
                 inner: Injection::Addition(InjectAddition {
                     addition_position: AdditionPosition::Append("lol".to_string()),
                 }),
+                only: None,
             },
             InjectionItem {
                 inner: Injection::Addition(InjectAddition {
                     addition_position: AdditionPosition::Prepend("lol2".to_string()),
                 }),
+                only: None,
             },
         ]),
     };

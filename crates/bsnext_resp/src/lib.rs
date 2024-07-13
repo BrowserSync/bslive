@@ -5,6 +5,7 @@ pub mod inject_addition;
 pub mod inject_opts;
 pub mod inject_replacement;
 pub mod injector_guard;
+pub mod path_matcher;
 use crate::inject_opts::InjectionItem;
 #[cfg(test)]
 pub mod inject_opt_test;

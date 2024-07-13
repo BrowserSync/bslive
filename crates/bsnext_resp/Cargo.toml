@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+urlpattern = { version = "0.2.0" }
+
 tracing = { workspace = true }
 axum = { workspace = true }
 http = { workspace = true }
@@ -13,3 +15,4 @@ bytes = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 http-body-util = { workspace = true }
+anyhow = "1.0.86"

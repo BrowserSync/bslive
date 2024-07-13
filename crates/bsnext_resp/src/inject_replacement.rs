@@ -1,5 +1,4 @@
 use crate::injector_guard::{ByteReplacer, InjectorGuard};
-use crate::RespMod;
 use axum::extract::Request;
 use http::Response;
 
@@ -19,12 +18,12 @@ pub enum Pos {
 }
 
 impl InjectorGuard for InjectReplacement {
-    fn accept_req(&self, req: &Request) -> bool {
-        RespMod::accepts_html(req)
+    fn accept_req(&self, _req: &Request) -> bool {
+        true
     }
 
-    fn accept_res<T>(&self, res: &Response<T>) -> bool {
-        RespMod::is_html(res)
+    fn accept_res<T>(&self, _res: &Response<T>) -> bool {
+        true
     }
 }
 impl ByteReplacer for InjectReplacement {

@@ -2,6 +2,7 @@ use crate::builtin_strings::{BuiltinStringDef, BuiltinStrings};
 use crate::inject_addition::InjectAddition;
 use crate::inject_replacement::InjectReplacement;
 use crate::injector_guard::{ByteReplacer, InjectorGuard};
+use crate::path_matcher::PathMatcher;
 use axum::extract::Request;
 use http::Response;
 
@@ -21,6 +22,7 @@ impl InjectOpts {
                     inner: Injection::BsLive(BuiltinStringDef {
                         name: BuiltinStrings::Connector,
                     }),
+                    only: None,
                 }]
             }
             InjectOpts::Bool(false) => {
@@ -44,6 +46,15 @@ impl Default for InjectOpts {
 pub struct InjectionItem {
     #[serde(flatten)]
     pub inner: Injection,
+    pub only: Option<MatcherList>,
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
+pub enum MatcherList {
+    None,
+    Item(PathMatcher),
+    Items(Vec<PathMatcher>),
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -62,11 +73,24 @@ pub struct UnknownStringDef {
 
 impl InjectorGuard for InjectionItem {
     fn accept_req(&self, req: &Request) -> bool {
-        match &self.inner {
-            Injection::BsLive(built_ins) => built_ins.accept_req(req),
-            Injection::UnknownNamed(_) => todo!("accept_req Injection::UnknownNamed"),
-            Injection::Replacement(def) => def.accept_req(req),
-            Injection::Addition(add) => add.accept_req(req),
+        let allowed = match self.only.as_ref() {
+            None => true,
+            Some(MatcherList::None) => true,
+            Some(MatcherList::Item(matcher)) => matcher.test(&req.uri().to_string()),
+            Some(MatcherList::Items(matchers)) => {
+                let uri = req.uri().to_string();
+                matchers.iter().any(|m| m.test(&uri))
+            }
+        };
+        if allowed {
+            match &self.inner {
+                Injection::BsLive(built_ins) => built_ins.accept_req(req),
+                Injection::UnknownNamed(_) => todo!("accept_req Injection::UnknownNamed"),
+                Injection::Replacement(def) => def.accept_req(req),
+                Injection::Addition(add) => add.accept_req(req),
+            }
+        } else {
+            false
         }
     }
 

@@ -1,15 +1,15 @@
 #[cfg(test)]
-mod test {
+pub mod common {
     use crate::server::router::make_router;
     use crate::server::state::ServerState;
     use axum::body::Body;
     use axum::extract::Request;
     use axum::response::Response;
     use bsnext_dto::ClientEvent;
-    use bsnext_input::route::{CorsOpts, Route, RouteKind};
-    use bsnext_input::server_config::{Identity, ServerConfig};
+    use bsnext_input::server_config::ServerConfig;
+    use http::header::ACCEPT;
     use http::HeaderValue;
-    use std::collections::BTreeMap;
+    use mime_guess::mime::TEXT_HTML;
     use std::sync::Arc;
     use tokio::sync::RwLock;
     use tower::ServiceExt;
@@ -26,7 +26,7 @@ mod test {
         }
     }
 
-    async fn to_resp_body(res: Response) -> String {
+    pub async fn to_resp_body(res: Response) -> String {
         use http_body_util::BodyExt;
         let (_parts, body) = res.into_parts();
         let b = body.collect().await.unwrap();
@@ -34,6 +34,48 @@ mod test {
         let as_str = std::str::from_utf8(&b).unwrap();
         as_str.to_owned()
     }
+
+    pub async fn req_to_body(state: ServerState, uri: &str) -> String {
+        let app = make_router(&Arc::new(state));
+        let req = Request::get(uri).body(Body::empty()).unwrap();
+        let res = app.oneshot(req).await.unwrap();
+        let body = to_resp_body(res).await;
+        body
+    }
+
+    pub async fn accept_html_req_to_body(state: ServerState, uri: &str) -> String {
+        let app = make_router(&Arc::new(state));
+        let mut req = Request::get(uri).body(Body::empty()).unwrap();
+        req.headers_mut().insert(
+            ACCEPT,
+            HeaderValue::from_str(&TEXT_HTML.to_string()).unwrap(),
+        );
+        let res = app.oneshot(req).await.unwrap();
+        let body = to_resp_body(res).await;
+        body
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::server::router::make_router;
+    use crate::server::router::tests::common::to_resp_body;
+    use crate::server::state::ServerState;
+    use axum::body::Body;
+    use axum::extract::Request;
+    
+    
+    use bsnext_input::route::{CorsOpts, Route, RouteKind};
+    use bsnext_input::server_config::{Identity, ServerConfig};
+    
+    
+    
+    
+    use http::HeaderValue;
+    use std::collections::BTreeMap;
+    use std::sync::Arc;
+    
+    use tower::ServiceExt;
 
     #[tokio::test]
     async fn test_handlers() -> Result<(), anyhow::Error> {
@@ -96,6 +138,7 @@ mod test {
         assert_eq!(body, "body{}");
         Ok(())
     }
+
     #[tokio::test]
     async fn test_cors_handlers() -> Result<(), anyhow::Error> {
         let state: ServerState = ServerConfig {

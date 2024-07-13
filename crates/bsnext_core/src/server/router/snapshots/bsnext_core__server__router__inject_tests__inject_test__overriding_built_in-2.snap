@@ -1,0 +1,6 @@
+---
+source: crates/bsnext_core/src/server/router/inject_tests.rs
+expression: body2
+---
+<body>hey!<!-- source: snippet.html--><script type="module" src="/__bs_js"></script><!-- end: snippet.html-->
+                </body>
