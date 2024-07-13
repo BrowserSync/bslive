@@ -9,6 +9,7 @@ use http::Response;
 #[serde(untagged)]
 pub enum InjectOpts {
     Bool(bool),
+    Item(Injection),
     Items(Vec<Injection>),
 }
 
@@ -24,6 +25,7 @@ impl InjectOpts {
             InjectOpts::Items(items) if items.is_empty() => vec![],
             // todo: is this too expensive?
             InjectOpts::Items(items) => items.to_owned(),
+            InjectOpts::Item(item) => vec![item.to_owned()],
         }
     }
 }

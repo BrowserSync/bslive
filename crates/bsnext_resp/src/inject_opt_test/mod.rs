@@ -99,6 +99,27 @@ fn test_inject_replace() {
 }
 
 #[test]
+fn test_inject_replace_single() {
+    #[derive(Debug, serde::Deserialize)]
+    struct A {
+        inject: InjectOpts,
+    }
+    let input = r#"
+    inject:
+        replace: Basic
+        content: huh?
+    "#;
+    let expected = A {
+        inject: InjectOpts::Item(Injection::Replacement(InjectReplacement {
+            pos: Pos::Replace("Basic".to_string()),
+            content: "huh?".to_string(),
+        })),
+    };
+    let actual: Result<A, _> = serde_yaml::from_str(input);
+    assert_eq!(actual.unwrap().inject, expected.inject);
+}
+
+#[test]
 fn test_inject_append_prepend() {
     #[derive(Debug, serde::Deserialize)]
     struct A {
