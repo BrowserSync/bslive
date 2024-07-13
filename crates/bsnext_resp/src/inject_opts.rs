@@ -73,14 +73,15 @@ pub struct UnknownStringDef {
 
 impl InjectorGuard for InjectionItem {
     fn accept_req(&self, req: &Request) -> bool {
+        // right now, we only support matching on the pathname
+        let path_and_query = req.uri().path_and_query().expect("?");
+        let path = path_and_query.path();
+
         let path_is_allowed = match self.only.as_ref() {
             None => true,
             Some(MatcherList::None) => true,
-            Some(MatcherList::Item(matcher)) => matcher.test(&req.uri().to_string()),
-            Some(MatcherList::Items(matchers)) => {
-                let uri = req.uri().to_string();
-                matchers.iter().any(|m| m.test(&uri))
-            }
+            Some(MatcherList::Item(matcher)) => matcher.test(path),
+            Some(MatcherList::Items(matchers)) => matchers.iter().any(|m| m.test(path)),
         };
         if path_is_allowed {
             match &self.inner {

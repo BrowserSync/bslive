@@ -39,6 +39,11 @@ servers:
         let state = yaml_server_01();
         let body = req_to_body(state, "/styles.css").await;
         assert_eq!(body, "body{}lol");
+
+        // with param
+        let state = yaml_server_01();
+        let body = req_to_body(state, "/styles.css?oops=does_not_affect").await;
+        assert_eq!(body, "body{}lol");
         Ok(())
     }
 
