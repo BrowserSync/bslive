@@ -19,6 +19,7 @@ use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_fs::actor::FsWatcher;
 
 use crate::monitor_any_watchables::MonitorAnyWatchables;
+use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
 use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
@@ -165,7 +166,21 @@ impl BsSystem {
                         ChildResult::Created(_c) => {
                             unreachable!("can't be created without")
                         }
-                        ChildResult::Patched(_) => {}
+                        ChildResult::Patched(p) if maybe_addr.is_some() => {
+                            let inner = debug_span!("patching...");
+                            let _g = inner.enter();
+                            if let Some(addr) = maybe_addr {
+                                addr.do_send(RoutesUpdated {
+                                    change_set: p.route_change_set.clone(),
+                                    span: Arc::new(inner.clone()),
+                                })
+                            } else {
+                                tracing::error!("missing actor addr where it was needed")
+                            }
+                        }
+                        ChildResult::Patched(_p) => {
+                            todo!("not implemented yet")
+                        }
                         ChildResult::PatchErr(_) => {}
                         ChildResult::CreateErr(_) => {}
                     }

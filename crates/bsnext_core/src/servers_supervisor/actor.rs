@@ -155,7 +155,7 @@ impl ServersSupervisor {
                             server_handler: child_handler.minimal(),
                             route_change_set,
                         });
-                        (None, evt)
+                        (Some(child_handler.actor_address), evt)
                     }
                     Ok(Err(err)) => {
                         let evt = ChildResult::PatchErr(ChildNotPatched {
