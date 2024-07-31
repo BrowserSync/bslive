@@ -32,7 +32,7 @@ export interface ServerDesc {
 	id: string;
 }
 
-export type IdentityDTO = 
+export type ServerIdentityDTO = 
 	| { kind: "Both", payload: {
 	name: string;
 	bind_address: string;
@@ -46,7 +46,7 @@ export type IdentityDTO =
 
 export interface ServerDTO {
 	id: string;
-	identity: IdentityDTO;
+	identity: ServerIdentityDTO;
 	socket_addr: string;
 }
 
@@ -114,7 +114,7 @@ export type ServerChange =
 }};
 
 export interface ServerChangeSetItem {
-	identity: IdentityDTO;
+	identity: ServerIdentityDTO;
 	change: ServerChange;
 }
 

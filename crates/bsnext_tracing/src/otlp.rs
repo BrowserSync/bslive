@@ -85,14 +85,14 @@ fn init_tracer() -> Tracer {
 // Initialize tracing-subscriber and return OtelGuard for opentelemetry-related termination processing
 pub fn init_tracing_subscriber(
     debug_str: &str,
-    format: Option<OutputFormat>,
+    format: OutputFormat,
     write_option: WriteOption,
     otel: OtelOption,
 ) -> OtelGuard {
     let filter =
         tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| debug_str.into());
 
-    let fmt_layer = match (format.unwrap_or_default(), write_option) {
+    let fmt_layer = match (format, write_option) {
         (OutputFormat::Json, WriteOption::None) => tracing_subscriber::fmt::layer()
             .without_time()
             .json()

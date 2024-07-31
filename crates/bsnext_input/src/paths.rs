@@ -1,12 +1,12 @@
 use crate::route::{DirRoute, Route, RouteKind};
-use crate::server_config::{Identity, ServerConfig};
+use crate::server_config::{ServerConfig, ServerIdentity};
 use crate::{Input, PathDefinition, PathDefs, PathError};
 use std::path::{Path, PathBuf};
 
 pub fn from_paths<T: AsRef<str>>(
     cwd: &Path,
     paths: &[T],
-    identity: Identity,
+    identity: ServerIdentity,
 ) -> Result<Input, PathError> {
     let path_defs = paths
         .iter()

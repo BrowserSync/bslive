@@ -1,7 +1,7 @@
 use crate::OutputWriter;
 use bsnext_dto::internal::{ChildResult, InternalEvents};
 use bsnext_dto::{
-    ExternalEvents, FileChanged, FilesChangedDTO, IdentityDTO, InputAccepted, InputErrorDTO,
+    ExternalEvents, FileChanged, FilesChangedDTO, InputAccepted, InputErrorDTO, ServerIdentityDTO,
     ServersChanged, StartupErrorDTO, StartupEvent, StoppedWatching, Watching,
 };
 use std::io::Write;
@@ -238,13 +238,13 @@ where
 
     for server_dto in &servers_resp.servers {
         match &server_dto.identity {
-            IdentityDTO::Both { name, .. } => {
+            ServerIdentityDTO::Both { name, .. } => {
                 writeln!(w, "[server] [{}] http://{}", name, server_dto.socket_addr)?;
             }
-            IdentityDTO::Address { .. } => {
+            ServerIdentityDTO::Address { .. } => {
                 writeln!(w, "[server] http://{}", server_dto.socket_addr)?;
             }
-            IdentityDTO::Named { name } => {
+            ServerIdentityDTO::Named { name } => {
                 writeln!(w, "[server] [{}] http://{}", name, &server_dto.socket_addr)?
             }
         }
@@ -306,7 +306,7 @@ pub fn print_server_updates(evts: &[ChildResult]) -> Vec<String> {
                 vec![format!(
                     "[created] {}",
                     server_display(
-                        &IdentityDTO::from(&created.server_handler.identity),
+                        &ServerIdentityDTO::from(&created.server_handler.identity),
                         &created.server_handler.socket_addr.to_string()
                     ),
                 )]
@@ -351,23 +351,23 @@ pub fn print_server_updates(evts: &[ChildResult]) -> Vec<String> {
         .collect()
 }
 
-pub fn iden(identity_dto: impl Into<IdentityDTO>) -> String {
+pub fn iden(identity_dto: impl Into<ServerIdentityDTO>) -> String {
     match identity_dto.into() {
-        IdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
-        IdentityDTO::Address { bind_address } => bind_address.to_string(),
-        IdentityDTO::Named { name } => format!("[{name}]"),
+        ServerIdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
+        ServerIdentityDTO::Address { bind_address } => bind_address.to_string(),
+        ServerIdentityDTO::Named { name } => format!("[{name}]"),
     }
 }
 
-pub fn server_display(identity_dto: &IdentityDTO, socket_addr: &str) -> String {
+pub fn server_display(identity_dto: &ServerIdentityDTO, socket_addr: &str) -> String {
     match &identity_dto {
-        IdentityDTO::Both { name, .. } => {
+        ServerIdentityDTO::Both { name, .. } => {
             format!("[server] [{}] http://{}", name, socket_addr)
         }
-        IdentityDTO::Address { .. } => {
+        ServerIdentityDTO::Address { .. } => {
             format!("[server] http://{}", socket_addr)
         }
-        IdentityDTO::Named { name } => {
+        ServerIdentityDTO::Named { name } => {
             format!("[server] [{}] http://{}", name, &socket_addr)
         }
     }

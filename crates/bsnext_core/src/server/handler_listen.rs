@@ -5,7 +5,7 @@ use crate::servers_supervisor::get_servers_handler::GetServersMessage;
 use actix::{Recipient, ResponseFuture};
 use actix_rt::Arbiter;
 use bsnext_dto::internal::ServerError;
-use bsnext_input::server_config::Identity;
+use bsnext_input::server_config::ServerIdentity;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use tokio::sync::{oneshot, RwLock};
 #[derive(actix::Message)]
 #[rtype(result = "Result<SocketAddr, ServerError>")]
 pub struct Listen {
-    pub(crate) parent: Recipient<GetServersMessage>,
+    pub parent: Recipient<GetServersMessage>,
 }
 
 impl actix::Handler<Listen> for ServerActor {
@@ -42,11 +42,11 @@ impl actix::Handler<Listen> for ServerActor {
             let router = make_router(&app_state);
 
             let maybe_socket_addr: Result<SocketAddr, _> = match identity {
-                Identity::Both {
+                ServerIdentity::Both {
                     ref bind_address, ..
                 } => bind_address.parse(),
-                Identity::Address { ref bind_address } => bind_address.parse(),
-                Identity::Named { .. } => {
+                ServerIdentity::Address { ref bind_address } => bind_address.parse(),
+                ServerIdentity::Named { .. } => {
                     format!("127.0.0.1:{}", get_available_port().expect("port?")).parse()
                 }
             };

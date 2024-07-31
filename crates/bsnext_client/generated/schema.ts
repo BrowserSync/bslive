@@ -51,7 +51,7 @@ export const serverDescSchema = z.object({
   id: z.string(),
 });
 
-export const identityDTOSchema = z.union([
+export const serverIdentityDTOSchema = z.union([
   z.object({
     kind: z.literal("Both"),
     payload: z.object({
@@ -75,7 +75,7 @@ export const identityDTOSchema = z.union([
 
 export const serverDTOSchema = z.object({
   id: z.string(),
-  identity: identityDTOSchema,
+  identity: serverIdentityDTOSchema,
   socket_addr: z.string(),
 });
 
@@ -189,7 +189,7 @@ export const serverChangeSchema = z.union([
 ]);
 
 export const serverChangeSetItemSchema = z.object({
-  identity: identityDTOSchema,
+  identity: serverIdentityDTOSchema,
   change: serverChangeSchema,
 });
 

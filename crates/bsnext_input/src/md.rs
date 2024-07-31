@@ -290,7 +290,7 @@ pub fn md_to_input(input: &str) -> Result<Input, MarkdownError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::server_config::Identity;
+    use crate::server_config::ServerIdentity;
 
     #[test]
     fn test_single() -> anyhow::Result<()> {
@@ -410,7 +410,7 @@ path: /abc
         "#;
         let config = md_to_input(&input).expect("unwrap");
         let server_1 = config.servers.first().unwrap();
-        let expected_id = Identity::Address {
+        let expected_id = ServerIdentity::Address {
             bind_address: "0.0.0.0:3001".into(),
         };
         assert_eq!(server_1.identity, expected_id);
@@ -449,7 +449,7 @@ path: /abc
     fn default_md_assertions(input: &str) -> anyhow::Result<()> {
         let input = md_to_input(&input).expect("unwrap");
         let server_1 = input.servers.first().unwrap();
-        let expected_id = Identity::Address {
+        let expected_id = ServerIdentity::Address {
             bind_address: "0.0.0.0:5001".into(),
         };
         assert_eq!(server_1.identity, expected_id);

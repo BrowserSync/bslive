@@ -1,5 +1,5 @@
 use bsnext_input::paths::from_paths;
-use bsnext_input::server_config::Identity;
+use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::target::TargetKind;
 use bsnext_input::{fs_write_input, InputError};
@@ -13,7 +13,7 @@ pub struct StartFromPaths {
 
 impl SystemStart for StartFromPaths {
     fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
-        let identity = Identity::from_port_or_named(self.port)?;
+        let identity = ServerIdentity::from_port_or_named(self.port)?;
         let input = from_paths(&ctx.cwd, &self.paths, identity)?;
         if self.write_input {
             let path = fs_write_input(&ctx.cwd, &input, TargetKind::Yaml)?;

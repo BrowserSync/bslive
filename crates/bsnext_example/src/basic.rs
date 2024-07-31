@@ -1,5 +1,5 @@
 use bsnext_input::route::{Route, RouteKind};
-use bsnext_input::server_config::Identity;
+use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::{
     server_config::{self},
     Input,
@@ -9,9 +9,9 @@ use bsnext_input::{
 pub struct BasicExample;
 
 impl BasicExample {
-    pub fn into_input(self, identity: Option<Identity>) -> Input {
+    pub fn into_input(self, identity: Option<ServerIdentity>) -> Input {
         let server = server_config::ServerConfig {
-            identity: identity.unwrap_or_else(Identity::named),
+            identity: identity.unwrap_or_else(ServerIdentity::named),
             routes: vec![
                 Route {
                     path: "/".to_string(),

@@ -39,7 +39,7 @@ async fn handle_socket(
     } else {
         tracing::trace!("Could not send ping {who}!");
         // no Error here since the only thing we can do is to close the connection.
-        // If we can not send messages, there is no way to salvage the statemachine anyway.
+        // If we can not send messages, there is no way to salvage the state machine anyway.
         return;
     }
 

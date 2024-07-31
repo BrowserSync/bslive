@@ -9,7 +9,7 @@ use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, Debounce, FsEvent, FsEventKind, PathAddedEvent, PathEvent,
 };
 use bsnext_input::route::{DebounceDuration, DirRoute, FilterKind, RouteKind, Spec, SpecOpts};
-use bsnext_input::server_config::Identity;
+use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -199,7 +199,7 @@ impl AnyWatchable {
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct ServerWatchable {
-    pub server_identity: Identity,
+    pub server_identity: ServerIdentity,
     pub dir: PathBuf,
     pub spec: Spec,
 }
@@ -211,7 +211,7 @@ pub struct InputWatchable {
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct RouteWatchable {
-    pub server_identity: Identity,
+    pub server_identity: ServerIdentity,
     pub route_path: String,
     pub dir: PathBuf,
     pub spec: Spec,

@@ -14,8 +14,8 @@ pub struct Args {
     #[arg(long, name = "write-log")]
     pub write_log: bool,
 
-    #[arg(short, long, value_enum)]
-    pub format: Option<OutputFormat>,
+    #[arg(short, long, value_enum, default_value_t)]
+    pub format: OutputFormat,
 
     /// Input files
     #[arg(short, long)]

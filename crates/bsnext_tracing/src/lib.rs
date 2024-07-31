@@ -32,8 +32,8 @@ impl Default for LogLevel {
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
 pub enum OutputFormat {
     Json,
-    Normal,
     #[default]
+    Normal,
     Tui,
 }
 
@@ -60,7 +60,7 @@ pub enum OtelOption {
 }
 pub fn init_tracing(
     log_level: Option<LogLevel>,
-    format: Option<OutputFormat>,
+    format: OutputFormat,
     write_option: WriteOption,
     otel: OtelOption,
 ) -> OtelGuard {

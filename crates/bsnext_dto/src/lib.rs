@@ -1,5 +1,5 @@
 use actix::MessageResponse;
-use bsnext_input::server_config::Identity;
+use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
@@ -228,7 +228,7 @@ pub enum ServerChange {
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
 pub struct ServerChangeSetItem {
-    pub identity: IdentityDTO,
+    pub identity: ServerIdentityDTO,
     pub change: ServerChange,
 }
 #[typeshare]
@@ -247,30 +247,30 @@ pub struct GetServersMessageResponse {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ServerDTO {
     pub id: String,
-    pub identity: IdentityDTO,
+    pub identity: ServerIdentityDTO,
     pub socket_addr: String,
 }
 
 #[typeshare::typeshare]
 #[derive(Debug, PartialEq, Hash, Eq, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
-pub enum IdentityDTO {
+pub enum ServerIdentityDTO {
     Both { name: String, bind_address: String },
     Address { bind_address: String },
     Named { name: String },
 }
 
-impl From<&Identity> for IdentityDTO {
-    fn from(value: &Identity) -> Self {
+impl From<&ServerIdentity> for ServerIdentityDTO {
+    fn from(value: &ServerIdentity) -> Self {
         match value {
-            Identity::Both { name, bind_address } => IdentityDTO::Both {
+            ServerIdentity::Both { name, bind_address } => ServerIdentityDTO::Both {
                 name: name.to_owned(),
                 bind_address: bind_address.to_owned(),
             },
-            Identity::Address { bind_address } => IdentityDTO::Address {
+            ServerIdentity::Address { bind_address } => ServerIdentityDTO::Address {
                 bind_address: bind_address.to_owned(),
             },
-            Identity::Named { name } => IdentityDTO::Named {
+            ServerIdentity::Named { name } => ServerIdentityDTO::Named {
                 name: name.to_owned(),
             },
         }

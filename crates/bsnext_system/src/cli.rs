@@ -61,9 +61,9 @@ where
 
     // for the startup message, don't allow a TUI yet
     let start_printer = match format_clone {
-        None | Some(OutputFormat::Tui) => Writers::Pretty,
-        Some(OutputFormat::Json) => Writers::Json,
-        Some(OutputFormat::Normal) => Writers::Pretty,
+        OutputFormat::Tui => Writers::Pretty,
+        OutputFormat::Json => Writers::Json,
+        OutputFormat::Normal => Writers::Pretty,
     };
 
     let stdout = &mut std::io::stdout();
@@ -96,13 +96,13 @@ where
 
     // at this point, we started, so we can choose a TUI
     let printer = match format_clone {
-        None | Some(OutputFormat::Tui) => {
+        OutputFormat::Tui => {
             let rr = Ratatui::try_new().expect("test");
             let (sender, _ui_handle, _other) = rr.install().expect("thread install");
             Writers::Ratatui(sender)
         }
-        Some(OutputFormat::Json) => Writers::Json,
-        Some(OutputFormat::Normal) => Writers::Pretty,
+        OutputFormat::Json => Writers::Json,
+        OutputFormat::Normal => Writers::Pretty,
     };
 
     let events_handler = tokio::spawn(async move {

@@ -1,12 +1,13 @@
 use crate::pretty::PrettyPrint;
 use crate::OutputWriter;
 use bsnext_dto::{
-    ExternalEvents, GetServersMessageResponse, IdentityDTO, ServerDTO, ServersChanged, StartupEvent,
+    ExternalEvents, GetServersMessageResponse, ServerDTO, ServerIdentityDTO, ServersChanged,
+    StartupEvent,
 };
 use std::io::BufWriter;
 
-fn iden_1() -> IdentityDTO {
-    IdentityDTO::Address {
+fn iden_1() -> ServerIdentityDTO {
+    ServerIdentityDTO::Address {
         bind_address: "0.0.0.0:3000".to_string(),
     }
 }

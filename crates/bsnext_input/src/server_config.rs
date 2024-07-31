@@ -7,7 +7,7 @@ use std::str::FromStr;
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ServerConfig {
     #[serde(flatten)]
-    pub identity: Identity,
+    pub identity: ServerIdentity,
     #[serde(default)]
     pub routes: Vec<Route>,
     #[serde(default)]
@@ -18,19 +18,19 @@ pub struct ServerConfig {
     Debug, Ord, PartialOrd, PartialEq, Hash, Eq, Clone, serde::Deserialize, serde::Serialize,
 )]
 #[serde(untagged)]
-pub enum Identity {
+pub enum ServerIdentity {
     Both { name: String, bind_address: String },
     Address { bind_address: String },
     Named { name: String },
 }
 
-impl Default for Identity {
+impl Default for ServerIdentity {
     fn default() -> Self {
         Self::named()
     }
 }
 
-impl Identity {
+impl ServerIdentity {
     pub fn named() -> Self {
         Self::Named { name: rand_word() }
     }
@@ -47,8 +47,8 @@ impl Identity {
                 .map_err(|err| PortError::InvalidPort { port, err })
         });
         match result {
-            None => Ok(Identity::named()),
-            Some(Ok(addr)) => Ok(Identity::address(addr.to_string())),
+            None => Ok(ServerIdentity::named()),
+            Some(Ok(addr)) => Ok(ServerIdentity::address(addr.to_string())),
             Some(Err(err)) => Err(err),
         }
     }
@@ -79,7 +79,7 @@ servers:
     let c: C = serde_yaml::from_str(input).unwrap();
 
     // let baseline = ServerConfigInput::Named { name: "server_1".into() };
-    let baseline = Identity::Address {
+    let baseline = ServerIdentity::Address {
         bind_address: "127.0.0.1x:3000".into(),
     };
     for x in &c.servers {

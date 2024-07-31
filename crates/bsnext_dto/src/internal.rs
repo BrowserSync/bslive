@@ -1,5 +1,5 @@
 use crate::{ExternalEvents, GetServersMessageResponse};
-use bsnext_input::server_config::Identity;
+use bsnext_input::server_config::ServerIdentity;
 use std::net::SocketAddr;
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ pub enum InternalEvents {
 
 #[derive(Debug, Clone)]
 pub struct ChildHandlerMinimal {
-    pub identity: Identity,
+    pub identity: ServerIdentity,
     pub socket_addr: SocketAddr,
 }
 
@@ -37,14 +37,14 @@ pub struct ChildPatched {
 #[rtype(result = "()")]
 pub struct ChildNotCreated {
     pub server_error: ServerError,
-    pub identity: bsnext_input::server_config::Identity,
+    pub identity: bsnext_input::server_config::ServerIdentity,
 }
 
 #[derive(Debug, actix::Message)]
 #[rtype(result = "()")]
 pub struct ChildNotPatched {
     pub patch_error: PatchError,
-    pub identity: bsnext_input::server_config::Identity,
+    pub identity: bsnext_input::server_config::ServerIdentity,
 }
 #[derive(Debug)]
 pub enum ChildResult {
@@ -52,7 +52,7 @@ pub enum ChildResult {
     CreateErr(ChildNotCreated),
     Patched(ChildPatched),
     PatchErr(ChildNotPatched),
-    Stopped(Identity),
+    Stopped(ServerIdentity),
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, thiserror::Error)]

@@ -65,7 +65,7 @@ mod test {
     use axum::extract::Request;
 
     use bsnext_input::route::{CorsOpts, Route, RouteKind};
-    use bsnext_input::server_config::{Identity, ServerConfig};
+    use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 
     use http::HeaderValue;
     use std::collections::BTreeMap;
@@ -78,7 +78,7 @@ mod test {
         let headers: BTreeMap<String, String> =
             [("a".to_string(), "b".to_string())].into_iter().collect();
         let state: ServerState = ServerConfig {
-            identity: Identity::Address {
+            identity: ServerIdentity::Address {
                 bind_address: "127.0.0.1:3000".to_string(),
             },
             routes: vec![Route {
@@ -109,7 +109,7 @@ mod test {
     #[tokio::test]
     async fn test_handlers_raw() -> Result<(), anyhow::Error> {
         let state: ServerState = ServerConfig {
-            identity: Identity::Address {
+            identity: ServerIdentity::Address {
                 bind_address: "127.0.0.1".to_string(),
             },
             routes: vec![Route {
@@ -138,7 +138,7 @@ mod test {
     #[tokio::test]
     async fn test_cors_handlers() -> Result<(), anyhow::Error> {
         let state: ServerState = ServerConfig {
-            identity: Identity::Address {
+            identity: ServerIdentity::Address {
                 bind_address: "127.0.0.1:3000".to_string(),
             },
             routes: vec![
@@ -183,7 +183,7 @@ mod test {
     #[tokio::test]
     async fn test_not_found_handler() -> Result<(), anyhow::Error> {
         let state: ServerState = ServerConfig {
-            identity: Identity::Address {
+            identity: ServerIdentity::Address {
                 bind_address: "127.0.0.1:3000".to_string(),
             },
             routes: vec![Route {
@@ -215,7 +215,7 @@ mod test {
     #[tokio::test]
     async fn test_route_list() -> Result<(), anyhow::Error> {
         let state: ServerState = ServerConfig {
-            identity: Identity::Address {
+            identity: ServerIdentity::Address {
                 bind_address: "127.0.0.1:3000".to_string(),
             },
             routes: vec![Route {

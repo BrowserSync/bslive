@@ -1,5 +1,5 @@
 use bsnext_example::Example;
-use bsnext_input::server_config::Identity;
+use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::target::TargetKind;
 use bsnext_input::{fs_write_input, rand_word, DirError, InputError};
@@ -17,7 +17,7 @@ pub struct StartFromExample {
 
 impl SystemStart for StartFromExample {
     fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
-        let identity = Identity::from_port_or_named(self.port)?;
+        let identity = ServerIdentity::from_port_or_named(self.port)?;
         let input = self.example.into_input(identity);
         let name = self.name.clone();
         let dir = if self.temp {

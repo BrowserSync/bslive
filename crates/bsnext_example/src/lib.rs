@@ -1,7 +1,7 @@
 use crate::basic::BasicExample;
 use crate::lit::LitExample;
 use crate::md::MdExample;
-use bsnext_input::server_config::Identity;
+use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::Input;
 
 pub mod basic;
@@ -16,7 +16,7 @@ pub enum Example {
 }
 
 impl Example {
-    pub fn into_input(self, identity: Identity) -> Input {
+    pub fn into_input(self, identity: ServerIdentity) -> Input {
         match self {
             Example::Basic => BasicExample.into_input(Some(identity)),
             Example::Lit => LitExample.into_input(Some(identity)),

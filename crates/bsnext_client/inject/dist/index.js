@@ -6305,7 +6305,7 @@ var serverDescSchema = z.object({
   routes: z.array(routeDTOSchema),
   id: z.string()
 });
-var identityDTOSchema = z.union([
+var serverIdentityDTOSchema = z.union([
   z.object({
     kind: z.literal("Both"),
     payload: z.object({
@@ -6328,7 +6328,7 @@ var identityDTOSchema = z.union([
 ]);
 var serverDTOSchema = z.object({
   id: z.string(),
-  identity: identityDTOSchema,
+  identity: serverIdentityDTOSchema,
   socket_addr: z.string()
 });
 var getServersMessageResponseSchema = z.object({
@@ -6431,7 +6431,7 @@ var serverChangeSchema = z.union([
   })
 ]);
 var serverChangeSetItemSchema = z.object({
-  identity: identityDTOSchema,
+  identity: serverIdentityDTOSchema,
   change: serverChangeSchema
 });
 var serverChangeSetSchema = z.object({

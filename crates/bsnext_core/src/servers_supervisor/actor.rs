@@ -3,7 +3,7 @@ use actix::{Actor, Addr, ResponseFuture, Running};
 
 use crate::server::actor::ServerActor;
 
-use bsnext_input::server_config::Identity;
+use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::Input;
 use std::collections::HashSet;
 use std::net::SocketAddr;
@@ -21,14 +21,14 @@ use tracing::{span, Instrument, Level};
 
 #[derive(Debug)]
 pub struct ServersSupervisor {
-    pub(crate) handlers: std::collections::HashMap<Identity, ChildHandler>,
+    pub(crate) handlers: std::collections::HashMap<ServerIdentity, ChildHandler>,
     tx: Option<Sender<()>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ChildHandler {
     pub actor_address: Addr<ServerActor>,
-    pub identity: Identity,
+    pub identity: ServerIdentity,
     pub socket_addr: SocketAddr,
 }
 
@@ -213,7 +213,7 @@ impl Actor for ServersSupervisor {
 #[derive(actix::Message)]
 #[rtype(result = "()")]
 pub struct ChildStopped {
-    pub identity: Identity,
+    pub identity: ServerIdentity,
 }
 
 impl actix::Handler<ChildStopped> for ServersSupervisor {
