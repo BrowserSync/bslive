@@ -65,7 +65,7 @@ pub enum RouteKind {
 }
 
 #[derive(Debug, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
-pub struct JsonWrapper(serde_json::Value);
+pub struct JsonWrapper(pub serde_json::Value);
 
 impl Display for JsonWrapper {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
