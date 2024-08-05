@@ -31,7 +31,6 @@ pub async fn raw_loader(
     req: Request,
     next: Next,
 ) -> impl IntoResponse {
-    dbg!(&req);
     let span = span!(parent: None, Level::INFO, "raw_loader", path = req.uri().path());
     let _guard = span.enter();
 

@@ -44,14 +44,15 @@ impl OutputWriter for PrettyPrint {
         match evt {
             InternalEvents::ServersChanged {
                 server_resp,
-                child_results: _,
-            } => print_servers_changed(
-                sink,
-                &ServersChanged {
-                    servers_resp: server_resp,
-                },
-            ),
+                child_results,
+            } => {
+                let lines = print_server_updates(&child_results);
+                for x in lines {
+                    writeln!(sink, "{x}");
+                }
+            }
         }
+        Ok(())
     }
 
     fn handle_startup_event<W: Write>(
@@ -249,53 +250,6 @@ where
             }
         }
     }
-
-    // for ServerChangeSetItem { change, identity } in &changeset.items {
-    //     let running = servers_resp
-    //         .servers
-    //         .iter()
-    //         .find(|x| x.identity == *identity);
-    //     match change {
-    //         ServerChange::Stopped { bind_address } => match &identity {
-    //             IdentityDTO::Both { name, bind_address } => {
-    //                 writeln!(w, "[server removed] [{name}] http://{bind_address}")?;
-    //             }
-    //             IdentityDTO::Address { bind_address } => {
-    //                 writeln!(w, "[server removed] http://{bind_address}")?;
-    //             }
-    //             IdentityDTO::Named { name } => {
-    //                 writeln!(w, "[server removed] [{name}] http://{}", bind_address)?;
-    //             }
-    //         },
-    //         ServerChange::Started => match &identity {
-    //             IdentityDTO::Both { name, bind_address } => {
-    //                 if running.is_some() {
-    //                     writeln!(w, "[server added] [{}] http://{}", name, bind_address)?;
-    //                 }
-    //             }
-    //             IdentityDTO::Address { bind_address } => {
-    //                 if running.is_some() {
-    //                     writeln!(w, "[server added] http://{}", bind_address)?;
-    //                 }
-    //             }
-    //             IdentityDTO::Named { name } => {
-    //                 if let Some(running) = running {
-    //                     writeln!(
-    //                         w,
-    //                         "[server added] [{}] http://{}",
-    //                         name, &running.socket_addr
-    //                     )?;
-    //                 } else {
-    //                     unreachable!("?");
-    //                 }
-    //             }
-    //         },
-    //         ServerChange::Patched => {}
-    //         ServerChange::Errored { error } => {
-    //             writeln!(w, "[❌ server failed] {} {}", iden(identity), error)?;
-    //         }
-    //     }
-    // }
     Ok(())
 }
 
