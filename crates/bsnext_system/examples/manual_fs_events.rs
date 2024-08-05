@@ -31,7 +31,9 @@ servers:
     let start_kind = StartKind::from_input(input);
 
     // this will be something like `/Users/shaneosbourne/WebstormProjects/bslive`
+    //                         or  `/Users/shaneosbourne/WebstormProjects/bslive/crates/bsnext_system`
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
+    dbg!(&cwd);
 
     let (tx, rx) = oneshot::channel();
     let (startup_oneshot_sender, startup_oneshot_receiver) = oneshot::channel::<StartupResult>();
