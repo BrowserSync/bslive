@@ -28,6 +28,7 @@ impl StartupContext {
     }
 }
 
+#[derive(Debug)]
 pub enum SystemStartArgs {
     PathWithInput {
         path: PathBuf,

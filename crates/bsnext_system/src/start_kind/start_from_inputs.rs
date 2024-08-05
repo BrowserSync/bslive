@@ -14,6 +14,19 @@ impl SystemStart for StartFromInputPaths {
     }
 }
 
+#[derive(Debug)]
+pub struct StartFromInput {
+    pub input: Input,
+}
+
+impl SystemStart for StartFromInput {
+    fn input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
+        Ok(SystemStartArgs::InputOnly {
+            input: self.input.clone(),
+        })
+    }
+}
+
 fn from_yml_paths<T: AsRef<str>>(cwd: &Path, inputs: &[T]) -> Result<SystemStartArgs, InputError> {
     let input_candidates = inputs
         .iter()

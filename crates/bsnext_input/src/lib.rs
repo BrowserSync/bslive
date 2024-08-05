@@ -1,13 +1,13 @@
 use crate::target::TargetKind;
 
+use crate::md::MarkdownError;
+use crate::yml::YamlError;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::fs::read_to_string;
 use std::net::AddrParseError;
 use std::path::{Path, PathBuf};
-
-use crate::md::MarkdownError;
-use crate::yml::YamlError;
+use std::str::FromStr;
 
 #[cfg(test)]
 pub mod input_test;
@@ -23,9 +23,32 @@ pub mod watch_opt_test;
 pub mod watch_opts;
 pub mod yml;
 
-#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Input {
     pub servers: Vec<server_config::ServerConfig>,
+}
+
+impl FromStr for Input {
+    type Err = InputError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_yaml::from_str::<Self>(s).map_err(move |e| {
+            let err = if let Some(location) = e.location() {
+                YamlError::ParseRawInputErrorWithLocation {
+                    serde_error: e,
+                    input: s.to_string(),
+                    line: location.line(),
+                    column: location.column(),
+                }
+            } else {
+                YamlError::ParseRawInputError {
+                    serde_error: e,
+                    input: s.to_string(),
+                }
+            };
+            InputError::YamlError(err)
+        })
+    }
 }
 
 impl Input {

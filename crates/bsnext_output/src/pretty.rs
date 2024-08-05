@@ -43,12 +43,14 @@ impl OutputWriter for PrettyPrint {
     ) -> anyhow::Result<()> {
         match evt {
             InternalEvents::ServersChanged {
-                server_resp,
+                server_resp: _,
                 child_results,
             } => {
                 let lines = print_server_updates(&child_results);
                 for x in lines {
-                    writeln!(sink, "{x}");
+                    if let Err(e) = writeln!(sink, "{x}") {
+                        tracing::error!(?e);
+                    }
                 }
             }
         }

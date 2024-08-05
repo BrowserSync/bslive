@@ -1,10 +1,10 @@
 use crate::args::Args;
 use crate::start_kind::start_from_example::StartFromExample;
-use crate::start_kind::start_from_inputs::StartFromInputPaths;
+use crate::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
 use crate::start_kind::start_from_paths::StartFromPaths;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 
-use bsnext_input::InputError;
+use bsnext_input::{Input, InputError};
 
 pub mod start_from_example;
 pub mod start_from_inputs;
@@ -12,7 +12,8 @@ pub mod start_from_paths;
 
 #[derive(Debug)]
 pub enum StartKind {
-    FromInputs(StartFromInputPaths),
+    FromInput(StartFromInput),
+    FromInputPaths(StartFromInputPaths),
     FromExample(StartFromExample),
     FromPaths(StartFromPaths),
 }
@@ -37,19 +38,23 @@ impl StartKind {
                 port: args.port,
             })
         } else {
-            StartKind::FromInputs(StartFromInputPaths {
+            StartKind::FromInputPaths(StartFromInputPaths {
                 input_paths: args.input.clone(),
             })
         }
+    }
+    pub fn from_input(input: Input) -> Self {
+        Self::FromInput(StartFromInput { input })
     }
 }
 
 impl SystemStart for StartKind {
     fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
         match self {
-            Self::FromInputs(from_inputs) => from_inputs.input(ctx),
-            Self::FromExample(from_example) => from_example.input(ctx),
-            Self::FromPaths(from_paths) => from_paths.input(ctx),
+            StartKind::FromInputPaths(from_inputs) => from_inputs.input(ctx),
+            StartKind::FromExample(from_example) => from_example.input(ctx),
+            StartKind::FromPaths(from_input_paths) => from_input_paths.input(ctx),
+            StartKind::FromInput(from_inputs) => from_inputs.input(ctx),
         }
     }
 }
