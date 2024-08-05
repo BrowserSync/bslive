@@ -29,6 +29,8 @@ servers:
     let ids: Vec<u64> = input.servers.iter().map(|x| x.identity.as_id()).collect();
     let id = ids.get(0).expect("first").to_owned();
     let start_kind = StartKind::from_input(input);
+
+    // this will be something like `/Users/shaneosbourne/WebstormProjects/bslive`
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
 
     let (tx, rx) = oneshot::channel();
