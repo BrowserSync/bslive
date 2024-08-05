@@ -156,6 +156,21 @@ impl BsSystem {
     }
 }
 
+#[derive(actix::Message)]
+#[rtype(result = "()")]
+pub struct OverrideInput {
+    pub input: Input,
+}
+
+impl actix::Handler<OverrideInput> for BsSystem {
+    type Result = ();
+
+    fn handle(&mut self, msg: OverrideInput, _ctx: &mut Self::Context) -> Self::Result {
+        self.accept_watchables(&msg.input);
+        self.resolve_servers(msg.input);
+    }
+}
+
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
     #[tracing::instrument(skip(self, _ctx), name = "FsEvent handler for BsSystem", parent=msg.span.as_ref().and_then(|s|s.id()))]

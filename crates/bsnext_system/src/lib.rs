@@ -33,7 +33,7 @@ use tracing::{debug_span, Instrument};
 
 pub mod args;
 pub mod cli;
-mod monitor;
+pub mod monitor;
 mod monitor_any_watchables;
 pub mod start_kind;
 
