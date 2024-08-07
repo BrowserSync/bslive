@@ -258,17 +258,16 @@ impl Actor for BsSystem {
 pub struct StopSystem;
 
 #[derive(actix::Message)]
-#[rtype(result = "()")]
+#[rtype(result = "StartupResult")]
 pub struct Start {
     pub kind: StartKind,
     pub cwd: Option<PathBuf>,
     pub ack: oneshot::Sender<()>,
     pub events_sender: Sender<AnyEvent>,
-    pub startup_oneshot_sender: oneshot::Sender<StartupResult>,
 }
 
 impl Handler<Start> for BsSystem {
-    type Result = ();
+    type Result = StartupResult;
 
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
         self.external_event_sender = Some(msg.events_sender.clone());
@@ -294,11 +293,13 @@ impl Handler<Start> for BsSystem {
 
                 self.accept_watchables(&input);
                 self.resolve_servers(input);
+                Ok(DidStart::Started)
             }
             Ok(SystemStartArgs::InputOnly { input }) => {
                 tracing::debug!("InputOnly");
                 self.accept_watchables(&input);
                 self.resolve_servers(input);
+                Ok(DidStart::Started)
             }
             Ok(SystemStartArgs::PathWithInvalidInput { path, input_error }) => {
                 tracing::debug!("PathWithInvalidInput");
@@ -307,18 +308,12 @@ impl Handler<Start> for BsSystem {
                     cwd: cwd.clone(),
                 });
                 self.publish_external_event(ExternalEvents::InputError(input_error.into()));
+                Ok(DidStart::Started)
             }
             Err(e) => {
                 tracing::error!(%e);
-                msg.startup_oneshot_sender
-                    .send(Err(StartupError::InputError(e)))
-                    .expect("oneshot must succeed");
-                return;
+                Err(StartupError::InputError(e))
             }
         }
-
-        msg.startup_oneshot_sender
-            .send(Ok(DidStart::Started))
-            .expect("oneshot started must succeed")
     }
 }

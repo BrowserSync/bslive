@@ -4,7 +4,7 @@ use crate::{AnyEvent, BsSystem, Start};
 use actix::Actor;
 
 use bsnext_dto::StartupEvent;
-use bsnext_input::startup::{DidStart, StartupResult};
+use bsnext_input::startup::DidStart;
 use bsnext_output::ratatui::Ratatui;
 use bsnext_output::{OutputWriter, Writers};
 use bsnext_tracing::{init_tracing, OtelOption, OutputFormat, WriteOption};
@@ -41,7 +41,6 @@ where
     tracing::debug!("{:#?}", args);
 
     let (tx, rx) = oneshot::channel();
-    let (startup_oneshot_sender, startup_oneshot_receiver) = oneshot::channel::<StartupResult>();
     let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);
 
     let system = BsSystem::new();
@@ -54,10 +53,7 @@ where
         cwd: Some(cwd),
         ack: tx,
         events_sender,
-        startup_oneshot_sender,
     };
-
-    sys_addr.do_send(start);
 
     // for the startup message, don't allow a TUI yet
     let start_printer = match format_clone {
@@ -68,7 +64,7 @@ where
 
     let stdout = &mut std::io::stdout();
 
-    match startup_oneshot_receiver.await? {
+    match sys_addr.send(start).await? {
         Ok(DidStart::Started) => {
             let evt = StartupEvent::Started;
             match start_printer.handle_startup_event(stdout, &evt) {

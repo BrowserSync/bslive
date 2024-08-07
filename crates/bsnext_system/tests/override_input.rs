@@ -1,6 +1,6 @@
 use actix::Actor;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
-use bsnext_input::startup::{DidStart, StartupResult};
+use bsnext_input::startup::DidStart;
 use bsnext_input::Input;
 use bsnext_system::monitor::OverrideInput;
 use bsnext_system::start_kind::StartKind;
@@ -13,8 +13,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
 
-#[actix_rt::test]
-pub async fn main() -> Result<(), anyhow::Error> {
+async fn test() -> anyhow::Result<()> {
     let input = r#"
 servers:
     - name: api
@@ -31,8 +30,6 @@ servers:
           html: def
     "#;
     let input2 = Input::from_str(input2).expect("ay?");
-    let ids: Vec<u64> = input.servers.iter().map(|x| x.identity.as_id()).collect();
-    let id = ids.get(0).expect("first").to_owned();
     let start_kind = StartKind::from_input(input);
 
     // this will be something like `/Users/shaneosbourne/WebstormProjects/bslive`
@@ -40,8 +37,7 @@ servers:
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
     dbg!(&cwd);
 
-    let (tx, rx) = oneshot::channel();
-    let (startup_oneshot_sender, startup_oneshot_receiver) = oneshot::channel::<StartupResult>();
+    let (tx, _rx) = oneshot::channel();
     let (events_sender, events_receiver) = mpsc::channel::<AnyEvent>(1);
 
     let start = Start {
@@ -49,16 +45,13 @@ servers:
         cwd: Some(cwd),
         ack: tx,
         events_sender,
-        startup_oneshot_sender,
     };
 
     let system = BsSystem::new();
     let sys_addr = system.start();
     let sys_clone = sys_addr.clone();
 
-    sys_addr.do_send(start);
-
-    match startup_oneshot_receiver.await {
+    match sys_addr.send(start).await {
         Ok(Ok(DidStart::Started)) => {
             // after 100ms, send an override for an input
             tokio::spawn(async move {
@@ -89,4 +82,9 @@ servers:
         }
     };
     Ok(())
+}
+
+#[actix_rt::test]
+pub async fn main() -> Result<(), anyhow::Error> {
+    test().await
 }

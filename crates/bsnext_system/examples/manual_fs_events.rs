@@ -1,7 +1,7 @@
 use actix::Actor;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_fs::{ChangeEvent, FsEvent, FsEventContext, FsEventKind};
-use bsnext_input::startup::{DidStart, StartupResult};
+use bsnext_input::startup::DidStart;
 use bsnext_input::Input;
 use bsnext_system::start_kind::StartKind;
 use bsnext_system::{BsSystem, Start};
@@ -35,8 +35,7 @@ servers:
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
     dbg!(&cwd);
 
-    let (tx, rx) = oneshot::channel();
-    let (startup_oneshot_sender, startup_oneshot_receiver) = oneshot::channel::<StartupResult>();
+    let (tx, _rx) = oneshot::channel();
     let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);
 
     let start = Start {
@@ -44,16 +43,13 @@ servers:
         cwd: Some(cwd),
         ack: tx,
         events_sender,
-        startup_oneshot_sender,
     };
 
     let system = BsSystem::new();
     let sys_addr = system.start();
     let sys_clone = sys_addr.clone();
 
-    sys_addr.do_send(start);
-
-    match startup_oneshot_receiver.await {
+    match sys_addr.send(start).await {
         Ok(Ok(DidStart::Started)) => {
             tokio::spawn(async move {
                 loop {
@@ -72,7 +68,7 @@ servers:
                 match evt {
                     AnyEvent::Internal(InternalEvents::ServersChanged {
                         server_resp,
-                        child_results,
+                        child_results: _,
                     }) => {
                         dbg!(server_resp);
                     }
