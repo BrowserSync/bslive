@@ -1,5 +1,6 @@
-use crate::panic_handler::handle_panic;
+pub mod common;
 
+use crate::panic_handler::handle_panic;
 use axum::extract::{Request, State};
 use axum::http::Uri;
 use axum::middleware::{from_fn_with_state, Next};
@@ -34,9 +35,7 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 mod assets;
-mod inject_tests;
 mod pub_api;
-mod tests;
 
 pub fn make_router(state: &Arc<ServerState>) -> Router {
     let https = HttpsConnector::new();

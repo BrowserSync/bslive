@@ -1,0 +1,10 @@
+---
+source: crates/bsnext_core/tests/every_route_kind.rs
+expression: "(status, header)"
+---
+(
+    200,
+    Some(
+        "text/x-toml",
+    ),
+)

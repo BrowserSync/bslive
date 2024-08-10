@@ -1,5 +1,5 @@
 ---
-source: crates/bsnext_core/src/server/router/tests.rs
+source: crates/bsnext_core/tests/tests.rs
 expression: res.headers()
 ---
 {

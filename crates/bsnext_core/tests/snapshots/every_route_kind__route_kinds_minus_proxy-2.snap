@@ -1,0 +1,5 @@
+---
+source: crates/bsnext_core/tests/every_route_kind.rs
+expression: body2
+---
+{"a":{"b":[1,2]}}

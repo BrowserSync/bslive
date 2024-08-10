@@ -1,5 +1,5 @@
 ---
-source: crates/bsnext_core/src/server/router/inject_tests.rs
+source: crates/bsnext_core/tests/inject_tests.rs
 expression: body3
 ---
 <body>Should be excluded, since the `only` doesn't match</body>

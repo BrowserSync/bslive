@@ -1,0 +1,9 @@
+---
+source: crates/bsnext_core/tests/every_route_kind.rs
+expression: body4
+---
+data: a
+
+data: b
+
+data: c

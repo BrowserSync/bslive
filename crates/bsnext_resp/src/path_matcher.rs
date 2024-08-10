@@ -1,6 +1,6 @@
-use urlpattern::UrlPattern;
 use urlpattern::UrlPatternInit;
 use urlpattern::UrlPatternMatchInput;
+use urlpattern::{UrlPattern, UrlPatternOptions};
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
@@ -43,7 +43,8 @@ impl PathMatcher {
             pathname: Some(to_pathname.to_owned()),
             ..Default::default()
         };
-        let Ok(pattern) = <UrlPattern>::parse(init) else {
+        let opts = UrlPatternOptions::default();
+        let Ok(pattern) = <UrlPattern>::parse(init, opts) else {
             tracing::error!(?to_pathname, "could not parse the input");
             return false;
         };

@@ -1,0 +1,6 @@
+---
+source: crates/bsnext_core/tests/every_route_kind.rs
+expression: body
+---
+<body>HTML route kind<!-- source: snippet.html--><script type="module" src="/__bs_js"></script><!-- end: snippet.html-->
+                </body>

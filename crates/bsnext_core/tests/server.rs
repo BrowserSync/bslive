@@ -1,5 +1,4 @@
 use actix::Actor;
-use axum::body::Body;
 use bsnext_core::server::actor::ServerActor;
 use bsnext_core::server::handler_listen::Listen;
 use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
@@ -7,16 +6,11 @@ use bsnext_dto::GetServersMessageResponse;
 use bsnext_input::route::{JsonWrapper, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use http::header::ACCEPT;
-use http::response::Parts;
-use http::{HeaderMap, Request, Uri};
-use http_body_util::BodyExt;
-use hyper_tls::HttpsConnector;
-use hyper_util::client::legacy::connect::HttpConnector;
-use hyper_util::client::legacy::Client;
-use hyper_util::rt::TokioExecutor;
 use mime_guess::mime::{APPLICATION_JSON, TEXT_HTML_UTF_8};
 use serde_json::Value;
-use std::net::SocketAddr;
+
+mod inject_tests;
+mod tests;
 
 async fn system_test_01() {
     let route1 = Route {
@@ -47,14 +41,14 @@ async fn system_test_01() {
     match a {
         Ok(Ok(addr)) => {
             assert!(addr.is_ipv4());
-            let (_parts, body) = request_str(addr, "/", |a| {
+            let (_parts, body) = bsnext_utils::req_to_str(addr, "/", |a| {
                 a.insert(ACCEPT, TEXT_HTML_UTF_8.to_string().parse().expect("s"));
                 a
             })
             .await
             .expect("html response");
             assert_eq!(body, "hello world!".to_string());
-            let (_parts, body) = request_str(addr, "/j", |a| {
+            let (_parts, body) = bsnext_utils::req_to_str(addr, "/j", |a| {
                 a.insert(ACCEPT, APPLICATION_JSON.to_string().parse().expect("s"));
                 a
             })
@@ -67,40 +61,6 @@ async fn system_test_01() {
             unreachable!("{:?}", e)
         }
         Err(e) => unreachable!("{:?}", e),
-    }
-}
-
-async fn request_str(
-    socket_addr: SocketAddr,
-    uri: &str,
-    headers: fn(&mut HeaderMap) -> &mut HeaderMap,
-) -> anyhow::Result<(Parts, String)> {
-    let https = HttpsConnector::new();
-    let client: Client<HttpsConnector<HttpConnector>, Body> =
-        Client::builder(TokioExecutor::new()).build(https);
-
-    let uri = Uri::builder()
-        .scheme("http")
-        .authority(socket_addr.to_string())
-        .path_and_query(uri)
-        .build()
-        .expect("valid uri");
-
-    let mut r = Request::builder().uri(uri).body(Body::empty()).unwrap();
-    headers(r.headers_mut());
-
-    let resp = client.request(r).await.expect("result");
-
-    let (parts, body) = resp.into_parts();
-
-    let bytes = match body.collect().await {
-        Ok(c) => c.to_bytes(),
-        Err(_) => unreachable!("cannot error"),
-    };
-
-    match std::str::from_utf8(&bytes[..]) {
-        Ok(s) => Ok((parts, String::from(s))),
-        Err(_e) => Err(anyhow::anyhow!("oops")),
     }
 }
 
