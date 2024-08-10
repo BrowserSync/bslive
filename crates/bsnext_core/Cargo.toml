@@ -5,6 +5,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dev-dependencies]
+bsnext_utils = { path = "../bsnext_utils" }
+
 [dependencies]
 bsnext_input = { path = "../bsnext_input" }
 bsnext_fs = { path = "../bsnext_fs" }
