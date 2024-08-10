@@ -1,4 +1,6 @@
 use crate::servers_supervisor::actor::ServersSupervisor;
+use crate::servers_supervisor::file_changed_handler::FilesChanged;
+use actix::AsyncContext;
 use bsnext_dto::{GetServersMessageResponse, ServerDTO};
 
 #[derive(actix::Message)]
@@ -19,6 +21,22 @@ impl actix::Handler<GetServersMessage> for ServersSupervisor {
                     socket_addr: child_handler.socket_addr.to_string(),
                 })
                 .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, actix::Message)]
+#[rtype(result = "()")]
+pub enum IncomingEvents {
+    FilesChanged(FilesChanged),
+}
+
+impl actix::Handler<IncomingEvents> for ServersSupervisor {
+    type Result = ();
+
+    fn handle(&mut self, msg: IncomingEvents, ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            IncomingEvents::FilesChanged(files_changed) => ctx.notify(files_changed),
         }
     }
 }

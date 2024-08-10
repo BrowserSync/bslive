@@ -1,7 +1,7 @@
 use crate::server::actor::ServerActor;
 use crate::server::router::make_router;
 use crate::server::state::ServerState;
-use crate::servers_supervisor::get_servers_handler::GetServersMessage;
+use crate::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
 use actix::{Recipient, ResponseFuture};
 use actix_rt::Arbiter;
 use bsnext_dto::internal::ServerError;
@@ -15,6 +15,7 @@ use tokio::sync::{oneshot, RwLock};
 #[rtype(result = "Result<SocketAddr, ServerError>")]
 pub struct Listen {
     pub parent: Recipient<GetServersMessage>,
+    pub evt_receiver: Recipient<IncomingEvents>,
 }
 
 impl actix::Handler<Listen> for ServerActor {
@@ -33,6 +34,7 @@ impl actix::Handler<Listen> for ServerActor {
             routes: Arc::new(RwLock::new(self.config.routes.clone())),
             id: self.config.identity.as_id(),
             parent: Some(msg.parent.clone()),
+            evt_receiver: Some(msg.evt_receiver.clone()),
             client_sender: Arc::new(client_sender),
         });
 

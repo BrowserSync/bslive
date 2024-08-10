@@ -1,7 +1,7 @@
 use actix::Actor;
 use bsnext_core::server::actor::ServerActor;
 use bsnext_core::server::handler_listen::Listen;
-use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
+use bsnext_core::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
 use bsnext_dto::GetServersMessageResponse;
 use bsnext_input::route::{JsonWrapper, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
@@ -32,7 +32,8 @@ async fn main() {
 
     let a = s
         .send(Listen {
-            parent: parent.recipient(),
+            parent: parent.clone().recipient(),
+            evt_receiver: parent.recipient(),
         })
         .await;
 
@@ -79,6 +80,13 @@ impl actix::Handler<GetServersMessage> for ServerParent {
     type Result = GetServersMessageResponse;
 
     fn handle(&mut self, _msg: GetServersMessage, _ctx: &mut Self::Context) -> Self::Result {
+        todo!("woop!")
+    }
+}
+impl actix::Handler<IncomingEvents> for ServerParent {
+    type Result = ();
+
+    fn handle(&mut self, _msg: IncomingEvents, _ctx: &mut Self::Context) -> Self::Result {
         todo!("woop!")
     }
 }

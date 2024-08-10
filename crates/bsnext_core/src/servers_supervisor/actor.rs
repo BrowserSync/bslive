@@ -118,6 +118,7 @@ impl ServersSupervisor {
                     actor_addr
                         .send(Listen {
                             parent: self_addr.clone().recipient(),
+                            evt_receiver: self_addr.clone().recipient(),
                         })
                         .map(|r| (r, c, actor_addr_c))
                 });

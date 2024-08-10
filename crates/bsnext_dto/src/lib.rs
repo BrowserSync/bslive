@@ -325,14 +325,14 @@ impl From<InputError> for InputErrorDTO {
 }
 
 #[typeshare::typeshare]
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind", content = "payload")]
 pub enum ClientEvent {
     Change(ChangeDTO),
 }
 
 #[typeshare::typeshare]
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind", content = "payload")]
 pub enum ChangeDTO {
     Fs {
@@ -343,7 +343,7 @@ pub enum ChangeDTO {
 }
 
 #[typeshare::typeshare]
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ChangeKind {
     Changed,
     Added,

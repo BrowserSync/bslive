@@ -1,4 +1,4 @@
-use crate::servers_supervisor::get_servers_handler::GetServersMessage;
+use crate::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
 use actix::Recipient;
 use bsnext_dto::ClientEvent;
 use bsnext_input::route::Route;
@@ -11,6 +11,7 @@ pub struct ServerState {
     pub routes: Arc<RwLock<Vec<Route>>>,
     pub id: u64,
     pub parent: Option<Recipient<GetServersMessage>>,
+    pub evt_receiver: Option<Recipient<IncomingEvents>>,
     pub client_sender: Arc<broadcast::Sender<ClientEvent>>,
 }
 

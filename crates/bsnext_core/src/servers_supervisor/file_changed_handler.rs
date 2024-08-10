@@ -26,7 +26,7 @@ impl actix::Handler<FileChanged> for ServersSupervisor {
     }
 }
 
-#[derive(Debug, actix::Message)]
+#[derive(Debug, Clone, actix::Message)]
 #[rtype(result = "()")]
 pub struct FilesChanged {
     pub paths: Vec<PathBuf>,
