@@ -8,7 +8,9 @@ use axum::response::Response;
 use axum::Router;
 use bsnext_dto::ClientEvent;
 use bsnext_input::server_config::ServerConfig;
+use bsnext_input::Input;
 use http::header::ACCEPT;
+use http::response::Parts;
 use http::HeaderValue;
 use mime_guess::mime::TEXT_HTML;
 use std::sync::Arc;
@@ -35,6 +37,15 @@ pub async fn to_resp_body(res: Response) -> String {
     as_str.to_owned()
 }
 
+pub async fn to_resp_parts_and_body(res: Response) -> (Parts, String) {
+    use http_body_util::BodyExt;
+    let (parts, body) = res.into_parts();
+    let b = body.collect().await.unwrap();
+    let b = b.to_bytes();
+    let as_str = std::str::from_utf8(&b).unwrap();
+    (parts, as_str.to_owned())
+}
+
 pub async fn req_to_body(state: ServerState, uri: &str) -> String {
     let app = make_router(&Arc::new(state));
     let req = Request::get(uri).body(Body::empty()).unwrap();
@@ -55,6 +66,20 @@ pub async fn uri_to_res(state: ServerState, uri: &str) -> Response {
     let app = make_router(&Arc::new(state));
     let req = Request::get(uri).body(Body::empty()).unwrap();
     app.oneshot(req).await.unwrap()
+}
+
+pub async fn uri_to_res_parts(state: ServerState, uri: &str) -> (Parts, String) {
+    let app = make_router(&Arc::new(state));
+    let req = Request::get(uri).body(Body::empty()).unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    to_resp_parts_and_body(res).await
+}
+
+pub fn from_yaml(yaml: &str) -> anyhow::Result<ServerState> {
+    let input: Input = serde_yaml::from_str(yaml)?;
+    let config: ServerConfig = input.servers.get(0).expect("first").to_owned();
+    let state = into_state(config);
+    Ok(state)
 }
 
 pub struct TestProxy {
