@@ -1,0 +1,15 @@
+---
+source: crates/bsnext_core/tests/headers.rs
+expression: "(parts2.headers, body2)"
+---
+(
+    {
+        "content-type": "text/plain",
+        "content-length": "11",
+        "vary": "origin, access-control-request-method, access-control-request-headers",
+        "access-control-allow-origin": "localhost",
+        "access-control-expose-headers": "*",
+        "abc": "def",
+    },
+    "other route",
+)

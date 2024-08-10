@@ -1,0 +1,11 @@
+---
+source: crates/bsnext_core/tests/headers.rs
+expression: "(parts1.headers, body1)"
+---
+(
+    {
+        "content-type": "application/json",
+        "content-length": "8",
+    },
+    "[ 1, 2 ]",
+)

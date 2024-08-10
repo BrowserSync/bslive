@@ -1,0 +1,17 @@
+servers:
+  - name: headers
+    routes:
+      - path: /
+        raw: "[ 1, 2 ]"
+        headers:
+          content-type: "application/json"
+      - path: /other
+        raw: "other route"
+        cors: true
+        headers:
+          # example of overriding 1 of the 'cors' headers above
+          access-control-allow-origin: 'localhost'
+          abc: def
+
+
+
