@@ -43,7 +43,11 @@ async fn test_proxy_delay() -> Result<(), anyhow::Error> {
 
     // update the proxy target to use local test proxy
     let mut config: ServerConfig = input.servers.first().expect("first").to_owned();
-    let proxy_route = config.routes.get_mut(2).unwrap();
+    let proxy_route = config.routes.get_mut(3).unwrap();
+    assert!(
+        matches!(proxy_route.kind, RouteKind::Proxy(..)),
+        "must be a proxy route, check delays.yml"
+    );
     proxy_route.kind = RouteKind::Proxy(ProxyRoute {
         proxy: proxy.http_addr.clone(),
     });

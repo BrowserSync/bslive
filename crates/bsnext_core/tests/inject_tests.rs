@@ -1,4 +1,8 @@
-use bsnext_core::server::router::common::{accept_html_req_to_body, into_state, req_to_body};
+use axum::routing::any;
+use axum::Router;
+use bsnext_core::server::router::common::{
+    accept_html_req_to_body, from_yaml, into_state, req_to_body, test_proxy, TestProxy,
+};
 use bsnext_core::server::state::ServerState;
 use bsnext_input::server_config::ServerConfig;
 use bsnext_input::Input;
@@ -66,5 +70,45 @@ async fn overriding_built_in() -> Result<(), anyhow::Error> {
     let state = yaml_server_01();
     let body3 = accept_html_req_to_body(state, "/form.html").await;
     assert_snapshot!(body3);
+    Ok(())
+}
+
+#[tokio::test]
+async fn inject_to_proxy() -> Result<(), anyhow::Error> {
+    let router = Router::new().route("/", any(|| async { "proxy target" }));
+    let proxy = test_proxy(router).await?;
+    let TestProxy { http_addr, .. } = proxy;
+    let input = format!(
+        r#"
+servers:
+  - bind_address: 127.0.0.1:9000
+    routes:
+      - path: /
+        proxy: {http_addr}
+        inject:
+          - append: --after--
+"#
+    );
+    let state = from_yaml(&input)?;
+    let actual = accept_html_req_to_body(state, "/").await;
+
+    assert_eq!(actual, "proxy target--after--");
+    Ok(())
+}
+#[tokio::test]
+async fn inject_to_dir() -> Result<(), anyhow::Error> {
+    let input = r#"
+servers:
+  - bind_address: 127.0.0.1:9000
+    routes:
+      - path: /
+        dir: .
+        inject:
+          - prepend: --before--
+"#;
+    let state = from_yaml(&input)?;
+    let actual = accept_html_req_to_body(state, "/Cargo.toml").await;
+    assert!(actual.starts_with("--before--"));
+    assert!(actual.len() > "--before--".len());
     Ok(())
 }
