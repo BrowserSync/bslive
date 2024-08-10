@@ -14,6 +14,7 @@ use http::response::Parts;
 use http::HeaderValue;
 use mime_guess::mime::TEXT_HTML;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tower::ServiceExt;
@@ -68,16 +69,20 @@ pub async fn uri_to_res(state: ServerState, uri: &str) -> Response {
     app.oneshot(req).await.unwrap()
 }
 
-pub async fn uri_to_res_parts(state: ServerState, uri: &str) -> (Parts, String) {
+pub async fn uri_to_res_parts(state: ServerState, uri: &str) -> (Parts, String, Duration) {
     let app = make_router(&Arc::new(state));
     let req = Request::get(uri).body(Body::empty()).unwrap();
+    let start = Instant::now();
     let res = app.oneshot(req).await.unwrap();
-    to_resp_parts_and_body(res).await
+    let end = Instant::now();
+    let diff = end - start;
+    let (parts, body) = to_resp_parts_and_body(res).await;
+    (parts, body, diff)
 }
 
 pub fn from_yaml(yaml: &str) -> anyhow::Result<ServerState> {
     let input: Input = serde_yaml::from_str(yaml)?;
-    let config: ServerConfig = input.servers.get(0).expect("first").to_owned();
+    let config: ServerConfig = input.servers.first().expect("first").to_owned();
     let state = into_state(config);
     Ok(state)
 }
@@ -88,6 +93,15 @@ pub struct TestProxy {
     pub shutdown: tokio::sync::oneshot::Sender<()>,
     pub join_handle: JoinHandle<()>,
 }
+
+impl TestProxy {
+    pub async fn destroy(self) -> anyhow::Result<()> {
+        self.shutdown.send(()).expect("did send");
+        self.join_handle.await?;
+        Ok(())
+    }
+}
+
 pub async fn test_proxy(router: Router) -> anyhow::Result<TestProxy> {
     let (address_sender, address_receiver) = tokio::sync::oneshot::channel::<SocketAddr>();
     let (complete_sender, complete_receiver) = tokio::sync::oneshot::channel::<()>();
