@@ -1,0 +1,11 @@
+---
+source: crates/bsnext_core/tests/delays.rs
+expression: "(parts1.headers, body1)"
+---
+(
+    {
+        "content-type": "text/html; charset=utf-8",
+        "content-length": "19",
+    },
+    "first - 200ms delay",
+)
