@@ -23,7 +23,7 @@ const messageSchema = z.discriminatedUnion("kind", [
 ]);
 type Msg = z.infer<typeof messageSchema>;
 const inputSchema = z.object({
-  path: z.string()
+  input: z.string()
 });
 
 export function bstest(input: z.infer<typeof inputSchema>) {
@@ -34,11 +34,13 @@ interface NextArgs {
   stdout: { lines: { count: number; after: number } };
 }
 
+type TServersResp = z.infer<typeof getServersMessageResponseSchema>;
+
 export const test = base.extend<{
   bs: {
     url: string;
     cwd: string;
-    data: z.infer<typeof getServersMessageResponseSchema>,
+    data: TServersResp,
     servers: { url: string }[],
     child: any;
     path: (path: string) => string;
@@ -55,22 +57,22 @@ export const test = base.extend<{
     const file = join(base, "..", "bin.js");
     const stdout: string[] = [];
 
-    const exampleInput = join(cwd, ann.path);
+    const exampleInput = join(cwd, ann.input);
     if (!existsSync(exampleInput)) {
       throw new Error('example input not found')
     }
 
     const child = fork(file, [
-      '-i', ann.path,
+      '-i', ann.input,
       '-f', 'json'
     ], {
       cwd,
       stdio: "pipe"
     });
 
-    const lines = [];
-    const msg = new Promise((res, rej) => {
-      const handler = (chunk) => {
+    const lines: string[] = [];
+    const servers_changed_msg: Promise<TServersResp> = new Promise((res, rej) => {
+      const handler = (chunk: Buffer) => {
         for (let line of chunk.toString().split('\n')) {
           if (line.trim() === "") continue;
           lines.push(line);
@@ -82,16 +84,15 @@ export const test = base.extend<{
             // rej(parsed.error)
           } else {
             if (parsed.data.kind === "ServersChanged") {
-              res(parsed.data.payload)
-              child.stdout.off("data", handler);
+              res(parsed.data.payload as TServersResp)
+              child.stdout?.off("data", handler);
             }
           }
         }
-
       }
-      child.stdout.on("data", handler);
+      child.stdout?.on("data", handler);
     });
-    child.stderr.on("data", d => console.error(d.toString()));
+    child.stderr?.on("data", d => console.error(d.toString()));
     const closed = new Promise((res, rej) => {
       child.on('disconnect', (...args) => {
         console.log('did disconnect', ...args)
@@ -114,7 +115,7 @@ export const test = base.extend<{
         console.error('did error', err)
       })
     })
-    const data: Awaited<z.infer<typeof getServersMessageResponseSchema>> = await msg;
+    const data = await servers_changed_msg;
     const servers = data.servers.map(s => {
       return {url: 'http://' + s.socket_addr}
     });
@@ -141,6 +142,6 @@ export const test = base.extend<{
   }
 })
 
-function touchFile(filePath) {
+function touchFile(filePath: string) {
   execSync(`touch ${filePath}`);
 }

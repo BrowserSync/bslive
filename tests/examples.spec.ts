@@ -4,12 +4,19 @@ import {expect} from "@playwright/test";
 test.describe('examples/basic', {
   annotation: {
     type: bstest({
-      path: 'examples/basic/headers.yml'
+      input: 'examples/basic/headers.yml'
     }),
     description: ''
   }
 }, () => {
-  test('headers', async ({request, bs}) => {
+  test('first item /', async ({request, bs}) => {
+    const response = await request.get(bs.path('/'));
+    const headers = response.headers();
+    const body = await response.body();
+    expect(headers['content-type']).toBe('application/json')
+    expect(body.toString()).toBe(`[ 1, 2 ]`)
+  });
+  test('/other', async ({request, bs}) => {
     const response = await request.get(bs.path('/other'));
     const headers = response.headers();
     const expected = {

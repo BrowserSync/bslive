@@ -27,9 +27,12 @@
     "build": "napi build --cargo-name bslive --platform --release",
     "build:debug": "napi build --cargo-name bslive --platform",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "ava",
+    "test": "npm run tsc && ava",
+    "posttest": "npm run test --workspaces",
     "universal": "napi universal",
-    "version": "napi version"
+    "version": "napi version",
+    "tsc": "tsc",
+    "tsc:watch": "tsc --watch"
   },
   "napi": {
     "name": "bslive",
