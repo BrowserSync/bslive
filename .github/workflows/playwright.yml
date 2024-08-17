@@ -44,7 +44,7 @@ jobs:
         run: npm run build:debug -- --target aarch64-apple-darwin
 
       - name: Npm test (binary)
-        run: npm test:build
+        run: npm run test:build
 
       - name: Install Playwright Browsers
         run: npx playwright install chromium --with-deps
