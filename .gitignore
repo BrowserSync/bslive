@@ -191,3 +191,7 @@ Cargo.lock
 !.yarn/versions
 
 *.node
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

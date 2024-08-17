@@ -7,9 +7,13 @@
     "tsc": "tsc",
     "build": "npm run build --workspaces",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "schema": "ts-to-zod generated/dto.ts generated/schema.ts"
+    "schema": "ts-to-zod generated/dto.ts generated/schema.ts",
+    "postschema": "esbuild --bundle --external:zod --format=esm generated/schema.ts > generated/schema.js"
   },
-  "workspaces": ["inject", "ui"],
+  "workspaces": [
+    "inject",
+    "ui"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -20,7 +24,7 @@
     "rxjs": "^7.8.1",
     "typescript": "^5.4.5",
     "@types/node": "18.19.25",
-    "ts-to-zod": "^3.8.2",
+    "ts-to-zod": "^3.11.0",
     "zod": "^3.22.4",
     "prettier": "^3.2.5"
   }

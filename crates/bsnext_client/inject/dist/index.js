@@ -6437,6 +6437,10 @@ var serverChangeSetItemSchema = z.object({
 var serverChangeSetSchema = z.object({
   items: z.array(serverChangeSetItemSchema)
 });
+var internalEventsDTOSchema = z.object({
+  kind: z.literal("ServersChanged"),
+  payload: getServersMessageResponseSchema
+});
 var startupErrorDTOSchema = z.object({
   kind: z.literal("InputError"),
   payload: inputErrorDTOSchema

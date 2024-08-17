@@ -1,6 +1,7 @@
 use crate::{ExternalEvents, GetServersMessageResponse};
 use bsnext_input::server_config::ServerIdentity;
 use std::net::SocketAddr;
+use typeshare::typeshare;
 
 #[derive(Debug)]
 pub enum AnyEvent {
@@ -13,6 +14,15 @@ pub enum InternalEvents {
         server_resp: GetServersMessageResponse,
         child_results: Vec<ChildResult>,
     },
+}
+
+/// public version of internal events
+/// todo(alpha): clean this up
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "kind", content = "payload")]
+pub enum InternalEventsDTO {
+    ServersChanged(GetServersMessageResponse),
 }
 
 #[derive(Debug, Clone)]
