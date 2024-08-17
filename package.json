@@ -31,7 +31,7 @@
     "build:client": "npm run build:client --workspaces --if-present",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "npm run tsc",
-    "posttest": "npm run test --workspaces",
+    "posttest": "npm run test --workspaces --if-present",
     "test:build": "ava",
     "universal": "napi universal",
     "version": "napi version",
