@@ -26,7 +26,7 @@ jobs:
             ~/.cargo/git/db/
             .cargo-cache
             target/
-          key: aarch64-apple-darwin-cargo-macos-latest
+          key: aarch64-apple-darwin-cargo-macos-latest-2
 
       # Install dependencies
       - uses: actions/setup-node@v4
