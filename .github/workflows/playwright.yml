@@ -46,7 +46,7 @@ jobs:
           node-version: lts/*
 
       - name: Install npm dependencies
-        run: npm ci
+        run: yarn
 
       # Build the Rust binary with napi
       - name: Build Rust Binary with napi
@@ -61,7 +61,7 @@ jobs:
         with:
           node-version: lts/*
       - name: Install dependencies
-        run: npm ci
+        run: yarn
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
       - name: Run Playwright tests
