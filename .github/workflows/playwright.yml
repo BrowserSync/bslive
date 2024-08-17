@@ -46,11 +46,11 @@ jobs:
           node-version: lts/*
 
       - name: Install npm dependencies
-        run: yarn
+        run: npm ci
 
       # Build the Rust binary with napi
       - name: Build Rust Binary with napi
-        run: yarn build --target aarch64-apple-darwin
+        run: npm run build -- --target aarch64-apple-darwin
 
       - name: Install Playwright Browsers
         run: npx playwright install chromium --with-deps
