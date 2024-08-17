@@ -60,3 +60,23 @@ test.describe('examples/basic/delays.yml', {
     expect(diff).toBeLessThan(600)
   });
 })
+
+
+test.describe('examples/basic/inject.yml', {
+  annotation: {
+    type: bstest({
+      input: 'examples/basic/inject.yml'
+    }),
+    description: ''
+  }
+}, () => {
+  test('inject bslive:connector', async ({request, bs}) => {
+    const response = await request.get(bs.path('/'), {
+      headers: {
+        accept: 'text/html'
+      }
+    });
+    const body = await response.body();
+    expect(body.toString()).toMatchSnapshot();
+  });
+})

@@ -1,0 +1,19 @@
+servers:
+  - name: 'inject'
+    routes:
+      - path: /
+        html: <body>hey!</body>
+      - path: /other
+        html: <body>hey from other!</body>
+      - path: /form.html
+        html: <body>Should be excluded, since the `only` doesn't match</body>
+        inject:
+          name: bslive:connector
+          only: /index.html
+      - path: /app.js
+        raw: console.log("test!")
+      - path: /styles.css
+        raw: 'body{}'
+        inject:
+          - append: lol
+            only: '/*.css'
