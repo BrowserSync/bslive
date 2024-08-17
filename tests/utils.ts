@@ -7,6 +7,7 @@ import {
   getServersMessageResponseSchema,
   internalEventsDTOSchema,
 } from "../crates/bsnext_client/generated/schema.mjs";
+import {existsSync} from "node:fs";
 
 const either = z.union([internalEventsDTOSchema, externalEventsSchema]);
 
@@ -21,6 +22,13 @@ const messageSchema = z.discriminatedUnion("kind", [
   })
 ]);
 type Msg = z.infer<typeof messageSchema>;
+const inputSchema = z.object({
+  path: z.string()
+});
+
+export function bstest(input: z.infer<typeof inputSchema>) {
+  return JSON.stringify(input);
+}
 
 interface NextArgs {
   stdout: { lines: { count: number; after: number } };
@@ -39,15 +47,21 @@ export const test = base.extend<{
     // next: (args: NextArgs) => Promise<string[]>;
   };
 }>({
-  bs: async ({}, use) => {
+  bs: async ({}, use, testInfo) => {
+    const ann = inputSchema.parse(JSON.parse(testInfo.annotations[0].type));
     const test_dir = ['tests'];
     const cwd = process.cwd();
     const base = join(cwd, ...test_dir);
     const file = join(base, "..", "bin.js");
     const stdout: string[] = [];
 
+    const exampleInput = join(cwd, ann.path);
+    if (!existsSync(exampleInput)) {
+      throw new Error('example input not found')
+    }
+
     const child = fork(file, [
-      '-i', 'examples/basic/headers.yml',
+      '-i', ann.path,
       '-f', 'json'
     ], {
       cwd,
