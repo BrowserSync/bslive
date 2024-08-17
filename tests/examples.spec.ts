@@ -78,5 +78,15 @@ test.describe('examples/basic/inject.yml', {
     });
     const body = await response.body();
     expect(body.toString()).toMatchSnapshot();
+
+    {
+      const response = await request.get(bs.path('/form.html'), {
+        headers: {
+          accept: 'text/html'
+        }
+      });
+      const body = await response.body();
+      expect(body.toString()).toMatchSnapshot();
+    }
   });
 })
