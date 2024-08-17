@@ -165,6 +165,11 @@ export const debounceDTOSchema = z.object({
   ms: z.string(),
 });
 
+export const watchingSchema = z.object({
+  paths: z.array(z.string()),
+  debounce: debounceDTOSchema,
+});
+
 export const serverChangeSchema = z.union([
   z.object({
     kind: z.literal("Stopped"),
@@ -197,28 +202,17 @@ export const serverChangeSetSchema = z.object({
   items: z.array(serverChangeSetItemSchema),
 });
 
+export const internalEventsDTOSchema = z.object({
+  kind: z.literal("ServersChanged"),
+  payload: getServersMessageResponseSchema,
+});
+
 export const startupErrorDTOSchema = z.object({
   kind: z.literal("InputError"),
   payload: inputErrorDTOSchema,
 });
 
 export const changeKindSchema = z.nativeEnum(ChangeKind);
-
-export const watchingSchema = z.object({
-  paths: z.array(z.string()),
-  debounce: debounceDTOSchema,
-});
-
-export const startupEventSchema = z.union([
-  z.object({
-    kind: z.literal("Started"),
-    payload: z.undefined().optional(),
-  }),
-  z.object({
-    kind: z.literal("FailedStartup"),
-    payload: startupErrorDTOSchema,
-  }),
-]);
 
 export const changeDTOSchema: z.ZodSchema<ChangeDTO> = z.lazy(() =>
   z.union([
@@ -275,6 +269,17 @@ export const externalEventSchema = z.object({
   level: eventLevelSchema,
   fields: externalEventsSchema,
 });
+
+export const startupEventSchema = z.union([
+  z.object({
+    kind: z.literal("Started"),
+    payload: z.undefined().optional(),
+  }),
+  z.object({
+    kind: z.literal("FailedStartup"),
+    payload: startupErrorDTOSchema,
+  }),
+]);
 
 export const clientEventSchema = z.object({
   kind: z.literal("Change"),

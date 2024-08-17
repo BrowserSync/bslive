@@ -1,11 +1,11 @@
-import { html, LitElement} from "lit";
+import {html, LitElement} from "lit";
 import {property} from "lit/decorators.js";
-import {IdentityDTO} from "../../../generated/dto";
+import {ServerIdentityDTO} from "../../../generated/dto";
 import {base} from "../../styles/base.css";
 
 class BsServerIdentity extends LitElement {
   @property({type: Object})
-  identity!: IdentityDTO
+  identity!: ServerIdentityDTO
 
   static styles = [base];
 

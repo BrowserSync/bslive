@@ -122,6 +122,13 @@ export interface ServerChangeSet {
 	items: ServerChangeSetItem[];
 }
 
+/**
+ * public version of internal events
+ * todo(alpha): clean this up
+ */
+export type InternalEventsDTO = 
+	| { kind: "ServersChanged", payload: GetServersMessageResponse };
+
 export type StartupEvent = 
 	| { kind: "Started", payload?: undefined }
 	| { kind: "FailedStartup", payload: StartupErrorDTO };

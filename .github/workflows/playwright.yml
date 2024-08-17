@@ -1,0 +1,60 @@
+name: Playwright Tests
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+jobs:
+  build-rust-binary:
+    runs-on: macos-latest
+    env:
+      # Ensure the correct target architecture is set
+      CARGO_TARGET_DIR: target
+      RUST_BACKTRACE: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      # Set up Rust with the appropriate toolchain
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            .cargo-cache
+            target/
+          key: aarch64-apple-darwin-cargo-macos-latest-2
+
+      # Install dependencies
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Npm test unit
+        run: npm test
+
+      # Build the Rust binary with napi
+      - name: Build Rust Binary with napi
+        run: npm run build:debug
+
+      - name: Npm test (binary)
+        run: npm run test:build
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Playwright tests
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30

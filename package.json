@@ -11,6 +11,30 @@
     "index.d.ts",
     "bin.js"
   ],
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.3",
+    "@playwright/test": "^1.46.1",
+    "@types/node": "20.14.8",
+    "ava": "^6.0.1",
+    "typescript": "^5.5.4",
+    "zod": "^3.23.8"
+  },
+  "workspaces": [
+    "./crates/bsnext_client"
+  ],
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --cargo-name bslive --platform --release",
+    "build:debug": "napi build --cargo-name bslive --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "npm run tsc",
+    "posttest": "npm run test --workspaces",
+    "test:build": "ava",
+    "universal": "napi universal",
+    "version": "napi version",
+    "tsc": "tsc",
+    "tsc:watch": "tsc --watch"
+  },
   "napi": {
     "name": "bslive",
     "triples": {
@@ -32,23 +56,10 @@
     }
   },
   "license": "MIT",
-  "devDependencies": {
-    "@napi-rs/cli": "^2.18.3",
-    "ava": "^6.0.1"
-  },
   "ava": {
     "timeout": "3m"
   },
   "engines": {
-    "node": ">= 10"
-  },
-  "scripts": {
-    "artifacts": "napi artifacts",
-    "build": "napi build --cargo-name bslive --platform --release",
-    "build:debug": "napi build --cargo-name bslive --platform",
-    "prepublishOnly": "napi prepublish -t npm",
-    "test": "ava",
-    "universal": "napi universal",
-    "version": "napi version"
+    "node": "22"
   }
 }
