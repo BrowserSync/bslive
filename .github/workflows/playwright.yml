@@ -50,14 +50,14 @@ jobs:
 
       # Build the Rust binary with napi
       - name: Build Rust Binary with napi
-        run: npx napi build --cargo-name bslive --platform aarch64-apple-darwin
+        run: yarn build --target aarch64-apple-darwin
 
       - name: Install Playwright Browsers
         run: npx playwright install chromium --with-deps
 
       - name: Run Playwright tests
         run: npx playwright test
-        
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
