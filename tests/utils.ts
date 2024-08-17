@@ -89,9 +89,6 @@ export const test = base.extend<{
       }
       child.stdout.on("data", handler);
     });
-
-    const data: Awaited<z.infer<typeof getServersMessageResponseSchema>> = await msg;
-
     child.stderr.on("data", d => console.error(d.toString()));
     const closed = new Promise((res, rej) => {
       child.on('disconnect', (...args) => {
@@ -101,6 +98,7 @@ export const test = base.extend<{
         if (err) {
           if (err !== 0) {
             console.log('did close with error code', err)
+            console.log(lines);
             return rej(err)
           }
         }
@@ -113,7 +111,7 @@ export const test = base.extend<{
         console.error('did error', err)
       })
     })
-
+    const data: Awaited<z.infer<typeof getServersMessageResponseSchema>> = await msg;
     const servers = data.servers.map(s => {
       return {url: 'http://' + s.socket_addr}
     });
