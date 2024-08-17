@@ -51,21 +51,13 @@ jobs:
       # Build the Rust binary with napi
       - name: Build Rust Binary with napi
         run: npx napi build --cargo-name bslive --platform aarch64-apple-darwin
-  playwright-tests:
-    needs: build-rust-binary
-    timeout-minutes: 10
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-      - name: Install dependencies
-        run: yarn
+
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install chromium --with-deps
+
       - name: Run Playwright tests
         run: npx playwright test
+        
       - uses: actions/upload-artifact@v4
         if: always()
         with:
