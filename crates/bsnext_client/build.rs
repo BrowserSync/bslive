@@ -43,8 +43,8 @@ fn main() {
     assert!(output.status.success());
 
     let output = Command::new("npm")
-        .args(["run", "build"])
-        .current_dir(root.join("crates").join("bsnext_client"))
+        .args(["run", "build:client"])
+        .current_dir(root)
         .output()
         .expect("sh command failed to start");
 

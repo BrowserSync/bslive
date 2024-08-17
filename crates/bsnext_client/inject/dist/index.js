@@ -24,9 +24,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../node_modules/livereload-js/src/reloader.js
+// ../../../node_modules/livereload-js/src/reloader.js
 var require_reloader = __commonJS({
-  "../node_modules/livereload-js/src/reloader.js"(exports) {
+  "../../../node_modules/livereload-js/src/reloader.js"(exports) {
     function splitUrl(url2) {
       let hash = "";
       let params = "";
@@ -463,9 +463,9 @@ var require_reloader = __commonJS({
   }
 });
 
-// ../node_modules/livereload-js/src/timer.js
+// ../../../node_modules/livereload-js/src/timer.js
 var require_timer = __commonJS({
-  "../node_modules/livereload-js/src/timer.js"(exports) {
+  "../../../node_modules/livereload-js/src/timer.js"(exports) {
     var Timer2 = class {
       constructor(func) {
         this.func = func;
@@ -501,7 +501,7 @@ var require_timer = __commonJS({
 var import_reloader = __toESM(require_reloader());
 var import_timer2 = __toESM(require_timer());
 
-// ../node_modules/tslib/tslib.es6.mjs
+// ../../../node_modules/tslib/tslib.es6.mjs
 var extendStatics = function(d, b) {
   extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
     d2.__proto__ = b2;
@@ -689,16 +689,24 @@ function __asyncGenerator(thisArg, _arguments, generator) {
   if (!Symbol.asyncIterator)
     throw new TypeError("Symbol.asyncIterator is not defined.");
   var g = generator.apply(thisArg, _arguments || []), i, q = [];
-  return i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function() {
+  return i = {}, verb("next"), verb("throw"), verb("return", awaitReturn), i[Symbol.asyncIterator] = function() {
     return this;
   }, i;
-  function verb(n) {
-    if (g[n])
+  function awaitReturn(f) {
+    return function(v) {
+      return Promise.resolve(v).then(f, reject);
+    };
+  }
+  function verb(n, f) {
+    if (g[n]) {
       i[n] = function(v) {
         return new Promise(function(a, b) {
           q.push([n, v, a, b]) > 1 || resume(n, v);
         });
       };
+      if (f)
+        i[n] = f(i[n]);
+    }
   }
   function resume(n, v) {
     try {
@@ -742,12 +750,12 @@ function __asyncValues(o) {
   }
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/isFunction.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/isFunction.js
 function isFunction(value) {
   return typeof value === "function";
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/createErrorClass.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/createErrorClass.js
 function createErrorClass(createImpl) {
   var _super = function(instance) {
     Error.call(instance);
@@ -759,7 +767,7 @@ function createErrorClass(createImpl) {
   return ctorFunc;
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/UnsubscriptionError.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/UnsubscriptionError.js
 var UnsubscriptionError = createErrorClass(function(_super) {
   return function UnsubscriptionErrorImpl(errors) {
     _super(this);
@@ -771,7 +779,7 @@ var UnsubscriptionError = createErrorClass(function(_super) {
   };
 });
 
-// ../node_modules/rxjs/dist/esm5/internal/util/arrRemove.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/arrRemove.js
 function arrRemove(arr, item) {
   if (arr) {
     var index = arr.indexOf(item);
@@ -779,7 +787,7 @@ function arrRemove(arr, item) {
   }
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/Subscription.js
+// ../../../node_modules/rxjs/dist/esm5/internal/Subscription.js
 var Subscription = function() {
   function Subscription2(initialTeardown) {
     this.initialTeardown = initialTeardown;
@@ -916,7 +924,7 @@ function execFinalizer(finalizer) {
   }
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/config.js
+// ../../../node_modules/rxjs/dist/esm5/internal/config.js
 var config = {
   onUnhandledError: null,
   onStoppedNotification: null,
@@ -925,7 +933,7 @@ var config = {
   useDeprecatedNextContext: false
 };
 
-// ../node_modules/rxjs/dist/esm5/internal/scheduler/timeoutProvider.js
+// ../../../node_modules/rxjs/dist/esm5/internal/scheduler/timeoutProvider.js
 var timeoutProvider = {
   setTimeout: function(handler, timeout) {
     var args = [];
@@ -945,7 +953,7 @@ var timeoutProvider = {
   delegate: void 0
 };
 
-// ../node_modules/rxjs/dist/esm5/internal/util/reportUnhandledError.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/reportUnhandledError.js
 function reportUnhandledError(err) {
   timeoutProvider.setTimeout(function() {
     var onUnhandledError = config.onUnhandledError;
@@ -957,11 +965,11 @@ function reportUnhandledError(err) {
   });
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/noop.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/noop.js
 function noop() {
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/NotificationFactories.js
+// ../../../node_modules/rxjs/dist/esm5/internal/NotificationFactories.js
 var COMPLETE_NOTIFICATION = function() {
   return createNotification("C", void 0, void 0);
 }();
@@ -979,7 +987,7 @@ function createNotification(kind, value, error) {
   };
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/errorContext.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/errorContext.js
 var context = null;
 function errorContext(cb) {
   if (config.useDeprecatedSynchronousErrorHandling) {
@@ -1006,7 +1014,7 @@ function captureError(err) {
   }
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/Subscriber.js
+// ../../../node_modules/rxjs/dist/esm5/internal/Subscriber.js
 var Subscriber = function(_super) {
   __extends(Subscriber2, _super);
   function Subscriber2(destination) {
@@ -1171,17 +1179,17 @@ var EMPTY_OBSERVER = {
   complete: noop
 };
 
-// ../node_modules/rxjs/dist/esm5/internal/symbol/observable.js
+// ../../../node_modules/rxjs/dist/esm5/internal/symbol/observable.js
 var observable = function() {
   return typeof Symbol === "function" && Symbol.observable || "@@observable";
 }();
 
-// ../node_modules/rxjs/dist/esm5/internal/util/identity.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/identity.js
 function identity(x) {
   return x;
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/pipe.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/pipe.js
 function pipeFromArray(fns) {
   if (fns.length === 0) {
     return identity;
@@ -1196,7 +1204,7 @@ function pipeFromArray(fns) {
   };
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/Observable.js
+// ../../../node_modules/rxjs/dist/esm5/internal/Observable.js
 var Observable = function() {
   function Observable3(subscribe) {
     if (subscribe) {
@@ -1288,7 +1296,7 @@ function isSubscriber(value) {
   return value && value instanceof Subscriber || isObserver(value) && isSubscription(value);
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/ObjectUnsubscribedError.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/ObjectUnsubscribedError.js
 var ObjectUnsubscribedError = createErrorClass(function(_super) {
   return function ObjectUnsubscribedErrorImpl() {
     _super(this);
@@ -1297,7 +1305,7 @@ var ObjectUnsubscribedError = createErrorClass(function(_super) {
   };
 });
 
-// ../node_modules/rxjs/dist/esm5/internal/Subject.js
+// ../../../node_modules/rxjs/dist/esm5/internal/Subject.js
 var Subject = function(_super) {
   __extends(Subject2, _super);
   function Subject2() {
@@ -1454,7 +1462,7 @@ var AnonymousSubject = function(_super) {
   return AnonymousSubject2;
 }(Subject);
 
-// ../node_modules/rxjs/dist/esm5/internal/scheduler/dateTimestampProvider.js
+// ../../../node_modules/rxjs/dist/esm5/internal/scheduler/dateTimestampProvider.js
 var dateTimestampProvider = {
   now: function() {
     return (dateTimestampProvider.delegate || Date).now();
@@ -1462,7 +1470,7 @@ var dateTimestampProvider = {
   delegate: void 0
 };
 
-// ../node_modules/rxjs/dist/esm5/internal/ReplaySubject.js
+// ../../../node_modules/rxjs/dist/esm5/internal/ReplaySubject.js
 var ReplaySubject = function(_super) {
   __extends(ReplaySubject2, _super);
   function ReplaySubject2(_bufferSize, _windowTime, _timestampProvider) {
@@ -1523,7 +1531,7 @@ var ReplaySubject = function(_super) {
   return ReplaySubject2;
 }(Subject);
 
-// ../node_modules/rxjs/dist/esm5/internal/observable/dom/WebSocketSubject.js
+// ../../../node_modules/rxjs/dist/esm5/internal/observable/dom/WebSocketSubject.js
 var DEFAULT_WEBSOCKET_CONFIG = {
   url: "",
   deserializer: function(e) {
@@ -1735,12 +1743,12 @@ var WebSocketSubject = function(_super) {
   return WebSocketSubject2;
 }(AnonymousSubject);
 
-// ../node_modules/rxjs/dist/esm5/internal/observable/dom/webSocket.js
+// ../../../node_modules/rxjs/dist/esm5/internal/observable/dom/webSocket.js
 function webSocket(urlConfigOrSource) {
   return new WebSocketSubject(urlConfigOrSource);
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/lift.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/lift.js
 function hasLift(source) {
   return isFunction(source === null || source === void 0 ? void 0 : source.lift);
 }
@@ -1759,7 +1767,7 @@ function operate(init) {
   };
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/operators/OperatorSubscriber.js
+// ../../../node_modules/rxjs/dist/esm5/internal/operators/OperatorSubscriber.js
 function createOperatorSubscriber(destination, onNext, onComplete, onError, onFinalize) {
   return new OperatorSubscriber(destination, onNext, onComplete, onError, onFinalize);
 }
@@ -1807,7 +1815,7 @@ var OperatorSubscriber = function(_super) {
   return OperatorSubscriber2;
 }(Subscriber);
 
-// ../node_modules/rxjs/dist/esm5/internal/scheduler/Action.js
+// ../../../node_modules/rxjs/dist/esm5/internal/scheduler/Action.js
 var Action = function(_super) {
   __extends(Action2, _super);
   function Action2(scheduler, work) {
@@ -1822,7 +1830,7 @@ var Action = function(_super) {
   return Action2;
 }(Subscription);
 
-// ../node_modules/rxjs/dist/esm5/internal/scheduler/intervalProvider.js
+// ../../../node_modules/rxjs/dist/esm5/internal/scheduler/intervalProvider.js
 var intervalProvider = {
   setInterval: function(handler, timeout) {
     var args = [];
@@ -1842,7 +1850,7 @@ var intervalProvider = {
   delegate: void 0
 };
 
-// ../node_modules/rxjs/dist/esm5/internal/scheduler/AsyncAction.js
+// ../../../node_modules/rxjs/dist/esm5/internal/scheduler/AsyncAction.js
 var AsyncAction = function(_super) {
   __extends(AsyncAction2, _super);
   function AsyncAction2(scheduler, work) {
@@ -1932,7 +1940,7 @@ var AsyncAction = function(_super) {
   return AsyncAction2;
 }(Action);
 
-// ../node_modules/rxjs/dist/esm5/internal/Scheduler.js
+// ../../../node_modules/rxjs/dist/esm5/internal/Scheduler.js
 var Scheduler = function() {
   function Scheduler2(schedulerActionCtor, now) {
     if (now === void 0) {
@@ -1951,7 +1959,7 @@ var Scheduler = function() {
   return Scheduler2;
 }();
 
-// ../node_modules/rxjs/dist/esm5/internal/scheduler/AsyncScheduler.js
+// ../../../node_modules/rxjs/dist/esm5/internal/scheduler/AsyncScheduler.js
 var AsyncScheduler = function(_super) {
   __extends(AsyncScheduler2, _super);
   function AsyncScheduler2(SchedulerAction, now) {
@@ -1987,41 +1995,41 @@ var AsyncScheduler = function(_super) {
   return AsyncScheduler2;
 }(Scheduler);
 
-// ../node_modules/rxjs/dist/esm5/internal/scheduler/async.js
+// ../../../node_modules/rxjs/dist/esm5/internal/scheduler/async.js
 var asyncScheduler = new AsyncScheduler(AsyncAction);
 var async = asyncScheduler;
 
-// ../node_modules/rxjs/dist/esm5/internal/util/isScheduler.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/isScheduler.js
 function isScheduler(value) {
   return value && isFunction(value.schedule);
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/isArrayLike.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/isArrayLike.js
 var isArrayLike = function(x) {
   return x && typeof x.length === "number" && typeof x !== "function";
 };
 
-// ../node_modules/rxjs/dist/esm5/internal/util/isPromise.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/isPromise.js
 function isPromise(value) {
   return isFunction(value === null || value === void 0 ? void 0 : value.then);
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/isInteropObservable.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/isInteropObservable.js
 function isInteropObservable(input) {
   return isFunction(input[observable]);
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/isAsyncIterable.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/isAsyncIterable.js
 function isAsyncIterable(obj) {
   return Symbol.asyncIterator && isFunction(obj === null || obj === void 0 ? void 0 : obj[Symbol.asyncIterator]);
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/throwUnobservableError.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/throwUnobservableError.js
 function createInvalidObservableTypeError(input) {
   return new TypeError("You provided " + (input !== null && typeof input === "object" ? "an invalid object" : "'" + input + "'") + " where a stream was expected. You can provide an Observable, Promise, ReadableStream, Array, AsyncIterable, or Iterable.");
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/symbol/iterator.js
+// ../../../node_modules/rxjs/dist/esm5/internal/symbol/iterator.js
 function getSymbolIterator() {
   if (typeof Symbol !== "function" || !Symbol.iterator) {
     return "@@iterator";
@@ -2030,12 +2038,12 @@ function getSymbolIterator() {
 }
 var iterator = getSymbolIterator();
 
-// ../node_modules/rxjs/dist/esm5/internal/util/isIterable.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/isIterable.js
 function isIterable(input) {
   return isFunction(input === null || input === void 0 ? void 0 : input[iterator]);
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/isReadableStreamLike.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/isReadableStreamLike.js
 function readableStreamLikeToAsyncGenerator(readableStream) {
   return __asyncGenerator(this, arguments, function readableStreamLikeToAsyncGenerator_1() {
     var reader, _a, value, done;
@@ -2080,7 +2088,7 @@ function isReadableStreamLike(obj) {
   return isFunction(obj === null || obj === void 0 ? void 0 : obj.getReader);
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/observable/innerFrom.js
+// ../../../node_modules/rxjs/dist/esm5/internal/observable/innerFrom.js
 function innerFrom(input) {
   if (input instanceof Observable) {
     return input;
@@ -2225,12 +2233,12 @@ function process(asyncIterable, subscriber) {
   });
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/util/isDate.js
+// ../../../node_modules/rxjs/dist/esm5/internal/util/isDate.js
 function isValidDate(value) {
   return value instanceof Date && !isNaN(value);
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/observable/timer.js
+// ../../../node_modules/rxjs/dist/esm5/internal/observable/timer.js
 function timer(dueTime, intervalOrScheduler, scheduler) {
   if (dueTime === void 0) {
     dueTime = 0;
@@ -2265,7 +2273,7 @@ function timer(dueTime, intervalOrScheduler, scheduler) {
   });
 }
 
-// ../node_modules/rxjs/dist/esm5/internal/operators/retry.js
+// ../../../node_modules/rxjs/dist/esm5/internal/operators/retry.js
 function retry(configOrCount) {
   if (configOrCount === void 0) {
     configOrCount = Infinity;
@@ -2326,7 +2334,7 @@ function retry(configOrCount) {
   });
 }
 
-// ../node_modules/zod/lib/index.mjs
+// ../../../node_modules/zod/lib/index.mjs
 var util;
 (function(util2) {
   util2.assertEqual = (val) => val;
@@ -6246,7 +6254,7 @@ var z = /* @__PURE__ */ Object.freeze({
   ZodError
 });
 
-// ../generated/dto.ts
+// ../generated/schema.js
 var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
   EventLevel2["External"] = "BSLIVE_EXTERNAL";
   return EventLevel2;
@@ -6257,8 +6265,6 @@ var ChangeKind = /* @__PURE__ */ ((ChangeKind2) => {
   ChangeKind2["Removed"] = "Removed";
   return ChangeKind2;
 })(ChangeKind || {});
-
-// ../generated/schema.ts
 var routeKindDTOSchema = z.union([
   z.object({
     kind: z.literal("Html"),
@@ -6408,6 +6414,10 @@ var debounceDTOSchema = z.object({
   kind: z.string(),
   ms: z.string()
 });
+var watchingSchema = z.object({
+  paths: z.array(z.string()),
+  debounce: debounceDTOSchema
+});
 var serverChangeSchema = z.union([
   z.object({
     kind: z.literal("Stopped"),
@@ -6446,20 +6456,6 @@ var startupErrorDTOSchema = z.object({
   payload: inputErrorDTOSchema
 });
 var changeKindSchema = z.nativeEnum(ChangeKind);
-var watchingSchema = z.object({
-  paths: z.array(z.string()),
-  debounce: debounceDTOSchema
-});
-var startupEventSchema = z.union([
-  z.object({
-    kind: z.literal("Started"),
-    payload: z.undefined().optional()
-  }),
-  z.object({
-    kind: z.literal("FailedStartup"),
-    payload: startupErrorDTOSchema
-  })
-]);
 var changeDTOSchema = z.lazy(
   () => z.union([
     z.object({
@@ -6513,6 +6509,16 @@ var externalEventSchema = z.object({
   level: eventLevelSchema,
   fields: externalEventsSchema
 });
+var startupEventSchema = z.union([
+  z.object({
+    kind: z.literal("Started"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("FailedStartup"),
+    payload: startupErrorDTOSchema
+  })
+]);
 var clientEventSchema = z.object({
   kind: z.literal("Change"),
   payload: changeDTOSchema

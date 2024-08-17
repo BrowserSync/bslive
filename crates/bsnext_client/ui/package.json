@@ -6,7 +6,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --outdir=dist --format=esm",
+    "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm",
     "dev": "npm run build -- --watch"
   },
   "keywords": [],

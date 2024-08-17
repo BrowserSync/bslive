@@ -6,15 +6,10 @@
   "scripts": {
     "tsc": "tsc",
     "tsc:watch": "tsc --watch",
-    "build": "npm run build --workspaces",
     "test": "npm run tsc && npm run schema",
     "schema": "ts-to-zod generated/dto.ts generated/schema.ts",
     "postschema": "esbuild --bundle --external:zod --format=esm generated/schema.ts > generated/schema.js"
   },
-  "workspaces": [
-    "inject",
-    "ui"
-  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
