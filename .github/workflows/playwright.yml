@@ -41,7 +41,7 @@ jobs:
 
       # Build the Rust binary with napi
       - name: Build Rust Binary with napi
-        run: npm run build:debug -- --target aarch64-apple-darwin
+        run: npm run build:debug
 
       - name: Npm test (binary)
         run: npm run test:build
