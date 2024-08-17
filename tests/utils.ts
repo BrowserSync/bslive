@@ -6,19 +6,7 @@ import {
   externalEventsSchema,
   getServersMessageResponseSchema,
   internalEventsDTOSchema,
-  serversChangedSchema
 } from "../crates/bsnext_client/generated/schema.mjs";
-
-internalEventsDTOSchema.parse({
-  "kind": "ServersChanged",
-  "payload": {
-    "servers": [{
-      "id": "5239045876396376737",
-      "identity": {"kind": "Named", "payload": {"name": "headers"}},
-      "socket_addr": "127.0.0.1:49297"
-    }]
-  }
-})
 
 const either = z.union([internalEventsDTOSchema, externalEventsSchema]);
 
@@ -51,11 +39,11 @@ export const test = base.extend<{
     // next: (args: NextArgs) => Promise<string[]>;
   };
 }>({
-  bs: async ({}, use, testInfo) => {
+  bs: async ({}, use) => {
     const test_dir = ['tests'];
     const cwd = process.cwd();
     const base = join(cwd, ...test_dir);
-    const file = join(base, "../", "bin.js");
+    const file = join(base, "..", "bin.js");
     const stdout: string[] = [];
 
     const child = fork(file, [
@@ -102,6 +90,7 @@ export const test = base.extend<{
             return rej(err)
           }
         }
+        console.log('did close cleanly', {signal})
         res(signal)
       })
       child.on('exit', (err, signal) => {
