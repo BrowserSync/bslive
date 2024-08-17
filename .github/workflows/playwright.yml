@@ -51,7 +51,7 @@ jobs:
 
       # Build the Rust binary with napi
       - name: Build Rust Binary with napi
-        run: npx napi build --cargo-name bslive --platform
+        run: npx napi build --cargo-name bslive --platform aarch64-apple-darwin
   playwright-tests:
     needs: build-rust-binary
     timeout-minutes: 10
