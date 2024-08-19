@@ -22,7 +22,8 @@
   "workspaces": [
     "./crates/bsnext_client",
     "./crates/bsnext_client/ui",
-    "./crates/bsnext_client/inject"
+    "./crates/bsnext_client/inject",
+    "./examples/openai"
   ],
   "scripts": {
     "artifacts": "napi artifacts",

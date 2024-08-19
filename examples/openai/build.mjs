@@ -9,8 +9,8 @@ let ctx = await esbuild.build({
     plugins: [],
     format: 'esm',
     define: {
-        'import.meta.env.OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY)
+        'import.meta.env.OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY || '""')
     }
 })
 
-console.log(esbuild.analyzeMetafileSync(ctx.metafile));
+// console.log(esbuild.analyzeMetafileSync(ctx.metafile));

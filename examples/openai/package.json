@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node --env-file .env build.mjs"
+    "start": "node --env-file .env build.mjs",
+    "build:client": "node build.mjs"
   },
   "engines": {
     "node": "20"
