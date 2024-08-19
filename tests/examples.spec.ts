@@ -90,3 +90,23 @@ test.describe('examples/basic/inject.yml', {
     }
   });
 })
+
+test.describe('examples/basic/live-reload.yml', {
+  annotation: {
+    type: bstest({
+      input: 'examples/basic/live-reload.yml'
+    }),
+    description: ''
+  }
+}, () => {
+  test('live-reloading css', async ({page, bs}) => {
+    await page.goto(bs.path('/'), {waitUntil: 'networkidle'})
+    const requestPromise = page.waitForRequest((req) => {
+      const url = new URL(req.url());
+      return url.searchParams.has('livereload')
+        && url.pathname === "/styles.css"
+    }, {timeout: 2000});
+    bs.touch('examples/basic/public/styles.css')
+    await requestPromise;
+  });
+})

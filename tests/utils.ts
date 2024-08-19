@@ -132,7 +132,7 @@ export const test = base.extend<{
       },
       stdout,
       touch: (path: string) => {
-        touchFile(join('msg.cwd', path));
+        touchFile(join(cwd, path));
       },
     });
 

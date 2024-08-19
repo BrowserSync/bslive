@@ -1,0 +1,13 @@
+servers:
+  - name: 'live-reload'
+    routes:
+      - path: /
+        html: |
+          <head>
+            <link href="/styles.css" rel="stylesheet" />
+          </head>
+          <body>hey from live-reload!</body>
+      - path: /reset.css
+        dir: examples/basic/public/reset.css
+      - path: /styles.css
+        dir: examples/basic/public/styles.css
