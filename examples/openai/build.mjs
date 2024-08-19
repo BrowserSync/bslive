@@ -1,10 +1,11 @@
 import esbuild from "esbuild";
 
-let ctx = await esbuild.context({
+let ctx = await esbuild.build({
     entryPoints: ['./src/index.js'],
     bundle: true,
     outdir: 'dist',
     sourcemap: 'inline',
+    metafile: true,
     plugins: [],
     format: 'esm',
     define: {
@@ -12,10 +13,4 @@ let ctx = await esbuild.context({
     }
 })
 
-await ctx.watch()
-
-let {host, port} = await ctx.serve({
-    servedir: '.',
-})
-
-console.log(`http://${host}:${port}`)
+console.log(esbuild.analyzeMetafileSync(ctx.metafile));

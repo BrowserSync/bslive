@@ -51,6 +51,7 @@ pub async fn raw_loader(
                     *prev.value = route.clone();
                     tracing::trace!("updated mutable route at {}", path)
                 } else if let Err(err) = existing {
+                    tracing::trace!("temp_router.insert {:?}", path);
                     match temp_router.insert(path, route.clone()) {
                         Ok(_) => {
                             tracing::trace!(path, "+")
@@ -70,8 +71,12 @@ pub async fn raw_loader(
     let matched = temp_router.at(req.uri().path());
 
     let Ok(matched) = matched else {
+        // let e = matched.unwrap_err();
+        // tracing::trace!(?e, ?attempt, "passing...");
         return next.run(req).await;
     };
+
+    tracing::trace!(?matched, "did match");
 
     let route = matched.value;
     let _params = matched.params;

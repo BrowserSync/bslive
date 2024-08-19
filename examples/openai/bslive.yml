@@ -1,50 +1,16 @@
 servers:
-  - bind_address: 0.0.0.0:4000
+  - name: openai
     routes:
-      #      - path: /
-      #        proxy: example.com
-      - path: /dogs
-        proxy: https://dog.ceo
-      - path: /jobs
-        proxy: https://jobicy.com
       - path: /
         dir: ./examples/openai
-      - path: /_
-        html: |
-          <!doctype html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport"
-                    content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-              <meta http-equiv="X-UA-Compatible" content="ie=edge">
-              <title>Document</title>
-          </head>
-          <body>
-          <img src=""/>
-          <script type="module">
-              // fetch("/pulls/users.json?page=2").then(x => x.json()).then(console.log)
-              fetch("/dogs/api/breeds/image/random").then(x => x.json()).then((json) => update(json))
-          
-              function update(json) {
-                  document.querySelector('img').src = json.message;
-              }
-          </script>
-          </body>
-          </html>
-      - path: /pulls
-        proxy: https://24pullrequests.com
-      - path: /shane
-        json: [ ]
-        cors: true
       - path: /openai
         proxy: https://api.openai.com
-      - path: /_api/chat/completions
+      - path: /openai/v1/chat/completions
         cors: true
         sse: |
           data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}]}
           
-          data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"content":"This"},"logprobs":null,"finish_reason":null}]}
+          data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"content":"Thsis"},"logprobs":null,"finish_reason":null}]}
           
           data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"content":" is"},"logprobs":null,"finish_reason":null}]}
           
@@ -55,5 +21,3 @@ servers:
           data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"content":"."},"logprobs":null,"finish_reason":null}]}
           
           data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}]}
-  
-          
