@@ -8,9 +8,6 @@
     "start": "node --env-file .env build.mjs",
     "build:client": "node build.mjs"
   },
-  "engines": {
-    "node": "20"
-  },
   "keywords": [],
   "author": "",
   "license": "ISC",
