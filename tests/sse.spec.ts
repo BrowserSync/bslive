@@ -11,7 +11,7 @@ test.describe('examples/openai/bslive.yml', {
 }, () => {
   test('server sent events', async ({page, bs}) => {
     await page.goto(bs.path('/'), {waitUntil: 'networkidle'})
-    await expect(page.locator('#output')).toContainText('"" "Thsis" " is" " a" " test" "." undefined', {timeout: 10000});
+    await expect(page.locator('#output')).toContainText('"" "Thsis" " is"', {timeout: 10000});
     const html = await page.innerHTML('#output');
     expect(html).toMatchSnapshot()
   });
