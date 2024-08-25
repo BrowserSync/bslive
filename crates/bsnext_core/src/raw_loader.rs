@@ -81,50 +81,42 @@ pub async fn raw_loader(
     let route = matched.value;
     let _params = matched.params;
 
-    let mut app = Router::new();
-
-    match &route.kind {
+    let mut app = match &route.kind {
         RouteKind::Sse { sse } => {
             let raw = sse.to_owned();
-            app = app.route(
-                req.uri().path(),
-                any(|| async move {
-                    let l = raw
-                        .lines()
-                        .map(|l| l.to_owned())
-                        .map(|l| l.strip_prefix("data:").unwrap_or(&l).to_owned())
-                        .filter(|l| !l.trim().is_empty())
-                        .collect::<Vec<_>>();
+            Router::new().fallback_service(any(|| async move {
+                let l = raw
+                    .lines()
+                    .map(|l| l.to_owned())
+                    .map(|l| l.strip_prefix("data:").unwrap_or(&l).to_owned())
+                    .filter(|l| !l.trim().is_empty())
+                    .collect::<Vec<_>>();
 
-                    tracing::trace!(lines.count = l.len(), "sending EventStream");
+                tracing::trace!(lines.count = l.len(), "sending EventStream");
 
-                    let stream = tokio_stream::iter(l)
-                        .throttle(Duration::from_millis(500))
-                        .map(|chu| Event::default().data(chu))
-                        .map(Ok::<_, Infallible>);
+                let stream = tokio_stream::iter(l)
+                    .throttle(Duration::from_millis(500))
+                    .map(|chu| Event::default().data(chu))
+                    .map(Ok::<_, Infallible>);
 
-                    Sse::new(stream)
-                }),
-            )
+                Sse::new(stream)
+            }))
         }
         RouteKind::Raw { raw } => {
             tracing::trace!("-> served Route::Raw {} {} bytes", route.path, raw.len());
             let moved = raw.clone();
             let p = req.uri().path().to_owned();
-            app = app.route(
-                req.uri().path(),
-                any(|| async move { text_asset_response(&p, &moved) }),
-            );
+            Router::new().fallback_service(any(|| async move { text_asset_response(&p, &moved) }))
         }
         RouteKind::Html { html } => {
             tracing::trace!("-> served Route::Html {} {} bytes", route.path, html.len());
             let moved = html.clone();
-            app = app.route(req.uri().path(), any(|| async { Html(moved) }));
+            Router::new().fallback_service(any(|| async { Html(moved) }))
         }
         RouteKind::Json { json } => {
             tracing::trace!("-> served Route::Json {} {}", route.path, json);
             let moved = json.to_owned();
-            app = app.route(req.uri().path(), any(|| async move { Json(moved) }));
+            Router::new().fallback_service(any(|| async move { Json(moved) }))
         }
         RouteKind::Dir(DirRoute { dir: _ }) => {
             unreachable!("should never reach RouteKind::Dir")
@@ -132,7 +124,7 @@ pub async fn raw_loader(
         RouteKind::Proxy(ProxyRoute { proxy: _ }) => {
             unreachable!("should never reach RouteKind::Proxy")
         }
-    }
+    };
 
     app = add_route_layers(app, Handling::Raw, route, &req);
     app.layer(middleware::from_fn(tag_raw))

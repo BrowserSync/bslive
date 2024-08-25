@@ -44,12 +44,16 @@ pub async fn serve_dir_loader(
     let route_map = routes
         .iter()
         .filter(|r| matches!(&r.kind, RouteKind::Proxy(_) | RouteKind::Dir(_)))
-        .fold(HashMap::<&str, Vec<&Route>>::new(), |mut acc, route| {
-            acc.entry(route.path.as_str())
-                .and_modify(|acc| acc.push(route))
-                .or_insert(vec![route]);
+        .fold(HashMap::<String, Vec<Route>>::new(), |mut acc, route| {
+            acc.entry(route.path.clone())
+                .and_modify(|acc| acc.push(route.clone()))
+                .or_insert(vec![route.clone()]);
             acc
         });
+
+    tracing::debug!("{:#?}", route_map);
+
+    drop(routes);
 
     for (_, routes) in route_map.iter() {
         if routes.len() > 1 {
@@ -89,11 +93,7 @@ pub async fn serve_dir_loader(
         app = app.merge(router);
     }
 
-    drop(routes);
-
-    let r = app.oneshot(req).await;
-
-    r.into_response()
+    app.oneshot(req).await.into_response()
 }
 
 async fn tag_file(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {
