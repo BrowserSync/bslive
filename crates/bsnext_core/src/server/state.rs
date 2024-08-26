@@ -1,5 +1,6 @@
 use crate::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
 use actix::Recipient;
+use axum::Router;
 use bsnext_dto::ClientEvent;
 use bsnext_input::route::Route;
 use std::fmt::Formatter;
@@ -9,6 +10,7 @@ use tokio::sync::{broadcast, RwLock};
 #[derive(Clone)]
 pub struct ServerState {
     pub routes: Arc<RwLock<Vec<Route>>>,
+    pub router: Arc<RwLock<Router>>,
     pub id: u64,
     pub parent: Option<Recipient<GetServersMessage>>,
     pub evt_receiver: Option<Recipient<IncomingEvents>>,

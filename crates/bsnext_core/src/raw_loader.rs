@@ -1,23 +1,24 @@
+use std::collections::HashMap;
 use std::convert::Infallible;
 
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response, Sse};
-use axum::routing::any;
+use axum::routing::{any, get_service};
 use axum::{middleware, Json, Router};
 use http::header::CONTENT_TYPE;
 
 use crate::meta::MetaData;
 use crate::server::state::ServerState;
 use axum::body::Body;
+use axum::handler::Handler;
 use axum::response::sse::Event;
-use bsnext_input::route::{DirRoute, ProxyRoute, RouteKind};
+use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
 use bytes::Bytes;
-use http::StatusCode;
+use http::{StatusCode, Uri};
 use http_body_util::BodyExt;
 use std::sync::Arc;
 use std::time::Duration;
-
 use tokio_stream::StreamExt;
 use tower::ServiceExt;
 
@@ -131,6 +132,112 @@ pub async fn raw_loader(
         .oneshot(req)
         .await
         .into_response()
+}
+
+async fn create_raw_router(routes: &[Route]) -> Router {
+    let route_map = routes
+        .iter()
+        .filter(|r| match &r.kind {
+            RouteKind::Html { .. } => true,
+            RouteKind::Json { .. } => true,
+            RouteKind::Raw { .. } => true,
+            RouteKind::Sse { .. } => true,
+            RouteKind::Proxy(_) => false,
+            RouteKind::Dir(_) => false,
+        })
+        .fold(HashMap::<String, Vec<Route>>::new(), |mut acc, route| {
+            acc.entry(route.path.clone())
+                .and_modify(|acc| acc.push(route.clone()))
+                .or_insert(vec![route.clone()]);
+            acc
+        });
+
+    async fn serve_raw(uri: Uri, state: State<Vec<Route>>, req: Request) -> Response {
+        if state.len() > 1 {
+            tracing::error!(
+                "more than 1 matching route for {}, only the last will take effect",
+                uri
+            )
+        }
+        match state.last() {
+            None => StatusCode::NOT_FOUND.into_response(),
+            Some(route) => resp_for(uri, route).await.into_response(),
+        }
+    }
+
+    let mut router = Router::new();
+    for (path, route_list) in route_map {
+        // todo(alpha):
+        router = router.nest_service(&path, get_service(serve_raw.with_state(route_list)));
+    }
+    router
+}
+
+async fn resp_for(uri: Uri, route: &Route) -> impl IntoResponse {
+    match &route.kind {
+        RouteKind::Html { html } => Html(html.clone()).into_response(),
+        RouteKind::Json { .. } => todo!("not supported yet"),
+        RouteKind::Raw { raw } => text_asset_response(uri.path(), &raw).into_response(),
+        RouteKind::Sse { .. } => todo!("not cupported yet"),
+        RouteKind::Proxy(_) => todo!("not cupported yet"),
+        RouteKind::Dir(_) => todo!("not cupported yet"),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[tokio::test]
+    async fn test_router_from_routes() -> anyhow::Result<()> {
+        // Mock a Route. Change this part depending on your specific Route implementation
+        let routes: Vec<Route> = vec![
+            Route {
+                path: "/route1".to_string(),
+                kind: RouteKind::Raw {
+                    raw: "<h1>Welcome to Route 1</h1>".to_string(),
+                },
+                ..Default::default()
+            },
+            Route {
+                path: "/route1".to_string(),
+                kind: RouteKind::Raw {
+                    raw: "<h1>Welcome to Route 1.1</h1>".to_string(),
+                },
+                ..Default::default()
+            },
+            Route {
+                path: "/route1/abc".to_string(),
+                kind: RouteKind::Html {
+                    html: "This is HTML".to_string(),
+                },
+                ..Default::default()
+            },
+            Route {
+                path: "/route4".to_string(),
+                kind: RouteKind::Sse {
+                    sse: "This is a server-sent event for Route 4".to_string(),
+                },
+                ..Default::default()
+            },
+        ];
+
+        let router = create_raw_router(&routes).await;
+
+        // Define the request
+        let request = http::Request::builder()
+            .uri("/route1")
+            .body(Body::empty())
+            .unwrap();
+
+        // Make a one-shot request on the router
+        let response = router.oneshot(request).await?;
+        let (parts, body) = response.into_parts();
+        dbg!(parts);
+        let response_body = body.collect().await?.to_bytes();
+        let response_body_str = std::str::from_utf8(&response_body)?;
+        assert_eq!(response_body_str, "<h1>Welcome to Route 1.1</h1>");
+        Ok(())
+    }
 }
 
 async fn tag_raw(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {

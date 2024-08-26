@@ -4,6 +4,7 @@ use crate::server::state::ServerState;
 use crate::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
 use actix::{Recipient, ResponseFuture};
 use actix_rt::Arbiter;
+use axum::Router;
 use bsnext_dto::internal::ServerError;
 use bsnext_input::server_config::ServerIdentity;
 use std::io::ErrorKind;
@@ -32,6 +33,7 @@ impl actix::Handler<Listen> for ServerActor {
         let app_state = Arc::new(ServerState {
             // parent: ,
             routes: Arc::new(RwLock::new(self.config.routes.clone())),
+            router: Arc::new(RwLock::new(Router::new())),
             id: self.config.identity.as_id(),
             parent: Some(msg.parent.clone()),
             evt_receiver: Some(msg.evt_receiver.clone()),

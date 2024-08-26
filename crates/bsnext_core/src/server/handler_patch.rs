@@ -1,5 +1,6 @@
 use crate::server::actor::ServerActor;
 use actix::ResponseFuture;
+use axum::Router;
 use bsnext_input::route_manifest::{RouteChangeSet, RoutesManifest};
 use bsnext_input::server_config::ServerConfig;
 use std::sync::Arc;
@@ -33,6 +34,10 @@ impl actix::Handler<Patch> for ServerActor {
         Box::pin(async move {
             let mut mut_routes = app_state_clone.routes.write().await;
             *mut_routes = routes;
+
+            let mut mut_router = app_state_clone.router.write().await;
+            *mut_router = Router::new();
+
             Ok(changeset)
         })
     }

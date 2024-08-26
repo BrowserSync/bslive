@@ -23,6 +23,7 @@ pub fn into_state(val: ServerConfig) -> ServerState {
     let (sender, _) = tokio::sync::broadcast::channel::<ClientEvent>(10);
     ServerState {
         routes: Arc::new(RwLock::new(val.routes.clone())),
+        router: Arc::new(RwLock::new(Router::new())),
         id: val.identity.as_id(),
         parent: None,
         evt_receiver: None,

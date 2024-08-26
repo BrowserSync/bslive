@@ -31,7 +31,6 @@ use crate::server::state::ServerState;
 use crate::ws::ws_handler;
 use bsnext_client::html_with_base;
 use bsnext_dto::{RouteDTO, ServerDesc};
-use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 mod assets;
@@ -41,12 +40,15 @@ pub fn make_router(state: &Arc<ServerState>) -> Router {
     let https = HttpsConnector::new();
     let client: Client<HttpsConnector<HttpConnector>, Body> =
         Client::builder(TokioExecutor::new()).build(https);
+
     let router = Router::new()
         .merge(built_ins(state.clone()))
         .merge(dynamic_loaders(state.clone()));
+
     router
         .layer(TraceLayer::new_for_http())
-        .layer(TimeoutLayer::new(Duration::from_secs(10)))
+        // todo(alpha): re-enable in the correct place?
+        // .layer(TimeoutLayer::new(Duration::from_secs(10)))
         .layer(Extension(client))
     // todo: When to add this compression back in?
     // .layer(CompressionLayer::new())
