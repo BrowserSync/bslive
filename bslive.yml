@@ -3,8 +3,18 @@ servers:
     routes:
       - path: /
         dir: examples/basic/public
-  - bind_address: 0.0.0.0:3001
-    routes:
       - path: /
-        watch: true
-        dir: examples/lit
+        dir: examples/kitchen-sink
+      - path: /
+        proxy: https://shaneddg.ngrok.io
+      #      - path: /
+      #        dir: examples/kitchen-sink
+      #      - path: /raw
+      #        raw: '123'
+      #        cors: true
+      - path: /raw
+        raw: '1234'
+      - path: /styles.css
+        raw: '/* css */'
+      - path: /styles.css
+        raw: '/* css2 */'

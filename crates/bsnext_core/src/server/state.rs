@@ -10,7 +10,7 @@ use tokio::sync::{broadcast, RwLock};
 #[derive(Clone)]
 pub struct ServerState {
     pub routes: Arc<RwLock<Vec<Route>>>,
-    pub router: Arc<RwLock<Router>>,
+    pub raw_router: Arc<RwLock<Router>>,
     pub id: u64,
     pub parent: Option<Recipient<GetServersMessage>>,
     pub evt_receiver: Option<Recipient<IncomingEvents>>,

@@ -4,14 +4,14 @@ use std::convert::Infallible;
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response, Sse};
-use axum::routing::{any, get_service};
+use axum::routing::{any, any_service, get_service};
 use axum::{middleware, Json, Router};
 use http::header::CONTENT_TYPE;
 
 use crate::meta::MetaData;
 use crate::server::state::ServerState;
 use axum::body::Body;
-use axum::handler::Handler;
+use axum::handler::{Handler, HandlerWithoutStateExt};
 use axum::response::sse::Event;
 use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
 use bytes::Bytes;
@@ -35,106 +35,17 @@ pub async fn raw_loader(
     let span = span!(parent: None, Level::INFO, "raw_loader", path = req.uri().path());
     let _guard = span.enter();
 
-    let routes = app.routes.read().await;
-    let mut temp_router = matchit::Router::new();
-    // let mut app = Router::new();
+    let raw_router = app.raw_router.read().await;
 
-    // which route kinds can be hard-matched first
-    for route in routes.iter() {
-        let path = route.path();
-        match &route.kind {
-            RouteKind::Html { .. }
-            | RouteKind::Json { .. }
-            | RouteKind::Raw { .. }
-            | RouteKind::Sse { .. } => {
-                let existing = temp_router.at_mut(path);
-                if let Ok(prev) = existing {
-                    *prev.value = route.clone();
-                    tracing::trace!("updated mutable route at {}", path)
-                } else if let Err(err) = existing {
-                    tracing::trace!("temp_router.insert {:?}", path);
-                    match temp_router.insert(path, route.clone()) {
-                        Ok(_) => {
-                            tracing::trace!(path, "+")
-                        }
-                        Err(_) => {
-                            tracing::error!("❌ {:?}", err.to_string())
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    drop(routes);
-
-    let matched = temp_router.at(req.uri().path());
-
-    let Ok(matched) = matched else {
-        // let e = matched.unwrap_err();
-        // tracing::trace!(?e, ?attempt, "passing...");
-        return next.run(req).await;
-    };
-
-    tracing::trace!(?matched, "did match");
-
-    let route = matched.value;
-    let _params = matched.params;
-
-    let mut app = match &route.kind {
-        RouteKind::Sse { sse } => {
-            let raw = sse.to_owned();
-            Router::new().fallback_service(any(|| async move {
-                let l = raw
-                    .lines()
-                    .map(|l| l.to_owned())
-                    .map(|l| l.strip_prefix("data:").unwrap_or(&l).to_owned())
-                    .filter(|l| !l.trim().is_empty())
-                    .collect::<Vec<_>>();
-
-                tracing::trace!(lines.count = l.len(), "sending EventStream");
-
-                let stream = tokio_stream::iter(l)
-                    .throttle(Duration::from_millis(500))
-                    .map(|chu| Event::default().data(chu))
-                    .map(Ok::<_, Infallible>);
-
-                Sse::new(stream)
-            }))
-        }
-        RouteKind::Raw { raw } => {
-            tracing::trace!("-> served Route::Raw {} {} bytes", route.path, raw.len());
-            let moved = raw.clone();
-            let p = req.uri().path().to_owned();
-            Router::new().fallback_service(any(|| async move { text_asset_response(&p, &moved) }))
-        }
-        RouteKind::Html { html } => {
-            tracing::trace!("-> served Route::Html {} {} bytes", route.path, html.len());
-            let moved = html.clone();
-            Router::new().fallback_service(any(|| async { Html(moved) }))
-        }
-        RouteKind::Json { json } => {
-            tracing::trace!("-> served Route::Json {} {}", route.path, json);
-            let moved = json.to_owned();
-            Router::new().fallback_service(any(|| async move { Json(moved) }))
-        }
-        RouteKind::Dir(DirRoute { dir: _ }) => {
-            unreachable!("should never reach RouteKind::Dir")
-        }
-        RouteKind::Proxy(ProxyRoute { proxy: _ }) => {
-            unreachable!("should never reach RouteKind::Proxy")
-        }
-    };
-
-    app = add_route_layers(app, Handling::Raw, route, &req);
-    app.layer(middleware::from_fn(tag_raw))
+    raw_router
+        .clone()
+        .layer(middleware::from_fn(tag_raw))
         .oneshot(req)
         .await
         .into_response()
 }
 
-async fn create_raw_router(routes: &[Route]) -> Router {
+pub fn create_raw_router(routes: &[Route]) -> Router {
     let route_map = routes
         .iter()
         .filter(|r| match &r.kind {
@@ -153,6 +64,7 @@ async fn create_raw_router(routes: &[Route]) -> Router {
         });
 
     async fn serve_raw(uri: Uri, state: State<Vec<Route>>, req: Request) -> Response {
+        tracing::trace!("serve_raw {}", req.uri().to_string());
         if state.len() > 1 {
             tracing::error!(
                 "more than 1 matching route for {}, only the last will take effect",
@@ -161,81 +73,115 @@ async fn create_raw_router(routes: &[Route]) -> Router {
         }
         match state.last() {
             None => StatusCode::NOT_FOUND.into_response(),
-            Some(route) => resp_for(uri, route).await.into_response(),
+            Some(route) => raw_resp_for(uri, route).await.into_response(),
         }
     }
 
     let mut router = Router::new();
     for (path, route_list) in route_map {
-        // todo(alpha):
-        router = router.nest_service(&path, get_service(serve_raw.with_state(route_list)));
+        // todo(alpha): support more use-cases here?
+        router = router.route_service(&path, any_service(serve_raw.with_state(route_list)));
     }
     router
 }
 
-async fn resp_for(uri: Uri, route: &Route) -> impl IntoResponse {
+async fn raw_resp_for(uri: Uri, route: &Route) -> impl IntoResponse {
     match &route.kind {
         RouteKind::Html { html } => Html(html.clone()).into_response(),
-        RouteKind::Json { .. } => todo!("not supported yet"),
+        RouteKind::Json { json } => Json(&json.0).into_response(),
         RouteKind::Raw { raw } => text_asset_response(uri.path(), &raw).into_response(),
-        RouteKind::Sse { .. } => todo!("not cupported yet"),
+        RouteKind::Sse { sse } => {
+            let l = sse
+                .lines()
+                .map(|l| l.to_owned())
+                .map(|l| l.strip_prefix("data:").unwrap_or(&l).to_owned())
+                .filter(|l| !l.trim().is_empty())
+                .collect::<Vec<_>>();
+
+            tracing::trace!(lines.count = l.len(), "sending EventStream");
+
+            let stream = tokio_stream::iter(l)
+                .throttle(Duration::from_millis(10))
+                .map(|chu| Event::default().data(chu))
+                .map(Ok::<_, Infallible>);
+
+            Sse::new(stream).into_response()
+        }
         RouteKind::Proxy(_) => todo!("not cupported yet"),
         RouteKind::Dir(_) => todo!("not cupported yet"),
     }
 }
 
 #[cfg(test)]
-mod test {
+mod raw_test {
     use super::*;
+    use crate::server::router::common::to_resp_parts_and_body;
+
     #[tokio::test]
-    async fn test_router_from_routes() -> anyhow::Result<()> {
-        // Mock a Route. Change this part depending on your specific Route implementation
-        let routes: Vec<Route> = vec![
-            Route {
-                path: "/route1".to_string(),
-                kind: RouteKind::Raw {
-                    raw: "<h1>Welcome to Route 1</h1>".to_string(),
-                },
-                ..Default::default()
-            },
-            Route {
-                path: "/route1".to_string(),
-                kind: RouteKind::Raw {
-                    raw: "<h1>Welcome to Route 1.1</h1>".to_string(),
-                },
-                ..Default::default()
-            },
-            Route {
-                path: "/route1/abc".to_string(),
-                kind: RouteKind::Html {
-                    html: "This is HTML".to_string(),
-                },
-                ..Default::default()
-            },
-            Route {
-                path: "/route4".to_string(),
-                kind: RouteKind::Sse {
-                    sse: "This is a server-sent event for Route 4".to_string(),
-                },
-                ..Default::default()
-            },
-        ];
+    async fn duplicate_path() -> anyhow::Result<()> {
+        let routes_input = r#"
+            - path: /route1
+              html: <h1>Welcome to Route 1</h1>
+            - path: /route1
+              html: <h1>Welcome to Route 1.1</h1>
+            - path: /raw1
+              raw: raw1
+            - path: /json
+              json: [1]
+            - path: /sse
+              sse: |
+                a
+                b
+                c"#;
 
-        let router = create_raw_router(&routes).await;
+        {
+            let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
+            let router = create_raw_router(&routes);
+            // Define the request
+            let request = Request::get("/route1").body(Body::empty())?;
+            // Make a one-shot request on the router
+            let response = router.oneshot(request).await?;
+            let (parts, body) = to_resp_parts_and_body(response).await;
+            assert_eq!(body, "<h1>Welcome to Route 1.1</h1>");
+        }
 
-        // Define the request
-        let request = http::Request::builder()
-            .uri("/route1")
-            .body(Body::empty())
-            .unwrap();
+        {
+            let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
+            let router = create_raw_router(&routes);
+            // Define the request
+            let request = Request::get("/raw1").body(Body::empty())?;
+            // Make a one-shot request on the router
+            let response = router.oneshot(request).await?;
+            let (parts, body) = to_resp_parts_and_body(response).await;
+            assert_eq!(body, "raw1");
+        }
 
-        // Make a one-shot request on the router
-        let response = router.oneshot(request).await?;
-        let (parts, body) = response.into_parts();
-        dbg!(parts);
-        let response_body = body.collect().await?.to_bytes();
-        let response_body_str = std::str::from_utf8(&response_body)?;
-        assert_eq!(response_body_str, "<h1>Welcome to Route 1.1</h1>");
+        {
+            let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
+            let router = create_raw_router(&routes);
+            // Define the request
+            let request = Request::get("/json").body(Body::empty())?;
+            // Make a one-shot request on the router
+            let response = router.oneshot(request).await?;
+            let (parts, body) = to_resp_parts_and_body(response).await;
+            assert_eq!(body, "[1]");
+        }
+
+        {
+            let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
+            let router = create_raw_router(&routes);
+            // Define the request
+            let request = Request::get("/sse").body(Body::empty())?;
+            // Make a one-shot request on the router
+            let response = router.oneshot(request).await?;
+            let (parts, body) = to_resp_parts_and_body(response).await;
+            let lines = body
+                .lines()
+                .filter(|x| !x.trim().is_empty())
+                .collect::<Vec<_>>();
+            assert_eq!("data: a,data: b,data: c", lines.join(","));
+        }
+
         Ok(())
     }
 }
@@ -290,9 +236,11 @@ where
     Ok(bytes)
 }
 
-pub fn text_asset_response(path: &str, css: &str) -> Response {
+#[tracing::instrument]
+pub fn text_asset_response(path: &str, content: &str) -> Response {
     let mime = mime_guess::from_path(path);
+    tracing::trace!(?mime, ?path);
     let aas_str = mime.first_or_text_plain();
-    let cloned = css.to_owned();
+    let cloned = content.to_owned();
     ([(CONTENT_TYPE, aas_str.to_string())], cloned).into_response()
 }

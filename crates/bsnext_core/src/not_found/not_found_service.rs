@@ -16,7 +16,9 @@ pub async fn not_found_loader(req: Request, next: Next) -> Result<Response, AnyA
     let span = span!(parent: None, Level::INFO, "not_found", path = req.uri().path());
     let _guard = span.enter();
 
+    tracing::info!("not_found->");
     let r = next.run(req).await;
+    tracing::info!("<-not_found");
     if r.status().as_u16() != 404 {
         return Ok(r);
     };
@@ -32,4 +34,18 @@ pub async fn not_found_loader(req: Request, next: Next) -> Result<Response, AnyA
         markup,
     )
         .into_response())
+}
+
+pub async fn maybe_proxy(req: Request, next: Next) -> impl IntoResponse {
+    let span = span!(parent: None, Level::INFO, "maybe_proxy", path = req.uri().path());
+    let _guard = span.enter();
+
+    tracing::info!("p->");
+    let r = next.run(req).await;
+    tracing::info!("<-p");
+    if r.status().as_u16() != 404 {
+        return r.into_response();
+    };
+
+    "what can I do?".into_response()
 }
