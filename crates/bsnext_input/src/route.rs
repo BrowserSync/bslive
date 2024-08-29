@@ -25,6 +25,13 @@ pub struct Route {
     pub headers: Option<BTreeMap<String, String>>,
 }
 
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+pub struct Route2 {
+    pub path: String,
+    #[serde(flatten)]
+    pub kind: RouteKind2,
+}
+
 impl Default for Route {
     fn default() -> Self {
         Self {
@@ -60,6 +67,14 @@ pub enum RouteKind {
     Json { json: JsonWrapper },
     Raw { raw: String },
     Sse { sse: String },
+    Proxy(ProxyRoute),
+    Dir(DirRoute),
+}
+
+#[derive(Debug, Hash, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
+pub enum RouteKind2 {
+    Raw(RawRoute),
     Proxy(ProxyRoute),
     Dir(DirRoute),
 }
@@ -108,6 +123,15 @@ pub struct DirRoute {
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ProxyRoute {
     pub proxy: String,
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
+pub enum RawRoute {
+    Html { html: String },
+    Json { json: JsonWrapper },
+    Raw { raw: String },
+    Sse { sse: String },
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
