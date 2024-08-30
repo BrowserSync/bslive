@@ -19,7 +19,7 @@ async fn test_handlers() -> Result<(), anyhow::Error> {
         },
         routes: vec![Route {
             path: "/hello".to_string(),
-            kind: RouteKind::html("🐥"),
+            kind: RouteKind::new_html("🐥"),
             headers: Some(headers),
             ..Default::default()
         }],
@@ -51,9 +51,7 @@ async fn test_handlers_raw() -> Result<(), anyhow::Error> {
         },
         routes: vec![Route {
             path: "/styles.css".to_string(),
-            kind: RouteKind::Raw {
-                raw: "body{}".into(),
-            },
+            kind: RouteKind::new_raw("body{}"),
             ..Default::default()
         }],
         ..Default::default()
@@ -82,12 +80,12 @@ async fn test_cors_handlers() -> Result<(), anyhow::Error> {
             Route {
                 path: "/".to_string(),
                 cors_opts: Some(CorsOpts::Cors(true)),
-                kind: RouteKind::html("home"),
+                kind: RouteKind::new_html("home"),
                 ..Default::default()
             },
             Route {
                 path: "/hello".to_string(),
-                kind: RouteKind::html("🐥"),
+                kind: RouteKind::new_html("🐥"),
                 ..Default::default()
             },
         ],
@@ -125,7 +123,7 @@ async fn test_not_found_handler() -> Result<(), anyhow::Error> {
         routes: vec![Route {
             path: "/".to_string(),
             cors_opts: Some(CorsOpts::Cors(true)),
-            kind: RouteKind::html("home"),
+            kind: RouteKind::new_html("home"),
             ..Default::default()
         }],
         ..Default::default()
@@ -157,7 +155,7 @@ async fn test_route_list() -> Result<(), anyhow::Error> {
         routes: vec![Route {
             path: "/abc".to_string(),
             cors_opts: Some(CorsOpts::Cors(true)),
-            kind: RouteKind::html("home"),
+            kind: RouteKind::new_html("home"),
             ..Default::default()
         }],
         watchers: vec![],

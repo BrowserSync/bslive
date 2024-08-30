@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 use std::path::Path;
 
 use bsnext_fs::Debounce;
-use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
+use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
 use bsnext_input::startup::StartupError;
 use typeshare::typeshare;
 pub mod internal;
@@ -56,12 +56,14 @@ pub enum RouteKindDTO {
 impl From<RouteKind> for RouteKindDTO {
     fn from(value: RouteKind) -> Self {
         match value {
-            RouteKind::Html { html } => RouteKindDTO::Html { html },
-            RouteKind::Json { json } => RouteKindDTO::Json {
-                json_str: serde_json::to_string(&json).expect("unreachable"),
+            RouteKind::Raw(raw) => match raw {
+                RawRoute::Html { html } => RouteKindDTO::Html { html },
+                RawRoute::Json { json } => RouteKindDTO::Json {
+                    json_str: serde_json::to_string(&json).expect("unreachable"),
+                },
+                RawRoute::Raw { raw } => RouteKindDTO::Raw { raw },
+                RawRoute::Sse { sse } => RouteKindDTO::Sse { sse },
             },
-            RouteKind::Raw { raw } => RouteKindDTO::Raw { raw },
-            RouteKind::Sse { sse } => RouteKindDTO::Sse { sse },
             RouteKind::Proxy(ProxyRoute { proxy }) => RouteKindDTO::Proxy { proxy },
             RouteKind::Dir(DirRoute { dir }) => RouteKindDTO::Dir { dir },
         }

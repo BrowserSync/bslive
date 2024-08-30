@@ -1,34 +1,22 @@
 #![allow(clippy::redundant_pattern_matching)]
 #![allow(clippy::single_match)]
-use crate::handlers::proxy::ProxyConfig;
 use crate::meta::MetaData;
 use axum::body::Body;
-use axum::extract::{Request, State};
+use axum::extract::Request;
 
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::{middleware, Extension, Router};
 use bytes::Bytes;
 use futures::channel::mpsc::unbounded;
 use futures::SinkExt;
 
-use crate::common_layers::{add_route_layers, Handling};
-use crate::handlers::proxy;
-use crate::server::state::ServerState;
-use axum::routing::any;
-use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
 use http::{HeaderValue, StatusCode};
 use http_body_util::BodyExt;
-use std::collections::HashMap;
 use std::convert::Infallible;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio_stream::StreamExt;
-use tower::ServiceExt;
-use tower_http::services::ServeDir;
-use tracing::{span, Instrument, Level};
 
 async fn tag_file(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {
     let (mut parts, body) = next.run(req).await.into_parts();

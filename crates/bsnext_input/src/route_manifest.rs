@@ -56,10 +56,7 @@ impl From<&Route> for RouteIdentity {
         Self {
             path: value.path.clone(),
             kind_str: match value.kind {
-                RouteKind::Html { .. } => "RouteKind::Html",
-                RouteKind::Json { .. } => "RouteKind::Json",
-                RouteKind::Raw { .. } => "RouteKind::Raw",
-                RouteKind::Sse { .. } => "RouteKind::Sse",
+                RouteKind::Raw(_) => "RouteKind::Raw",
                 RouteKind::Proxy(_) => "RouteKind::Proxy",
                 RouteKind::Dir(_) => "RouteKind::Dir",
             }
@@ -83,9 +80,7 @@ mod test {
     fn test_route_hash() -> anyhow::Result<()> {
         let r1 = Route {
             path: "/".to_string(),
-            kind: RouteKind::Html {
-                html: String::from("hello world!"),
-            },
+            kind: RouteKind::new_html("hello world!"),
             ..Default::default()
         };
         let r2 = r#"

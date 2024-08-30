@@ -1,4 +1,4 @@
-use crate::route::{Route, RouteKind};
+use crate::route::{RawRoute, Route, RouteKind};
 use crate::server_config::ServerConfig;
 use crate::Input;
 
@@ -117,12 +117,10 @@ fn route_kind_from_body_node(node: &Node) -> anyhow::Result<RouteKind> {
         Node::Code(code) => {
             let value = code.value.clone();
             let rk = match code.lang.as_deref() {
-                Some("html") => RouteKind::Html { html: value },
-                Some("json") => RouteKind::Json {
-                    json: serde_json::from_str(&value)?,
-                },
-                Some("sse") => RouteKind::Sse { sse: value },
-                Some(..) | None => RouteKind::Raw { raw: value },
+                Some("html") => RouteKind::new_html(&value),
+                Some("json") => RouteKind::new_json(serde_json::from_str(&value)?),
+                Some("sse") => RouteKind::new_sse(value),
+                Some(..) | None => RouteKind::new_raw(value),
             };
             Ok(rk)
         }
@@ -315,9 +313,7 @@ body {
             server_1.routes[0],
             Route {
                 path: "/app.css".into(),
-                kind: RouteKind::Raw {
-                    raw: "body {\n    background: blue\n}".into(),
-                },
+                kind: RouteKind::new_raw("body {\n    background: blue\n}"),
                 ..Default::default()
             }
         );
@@ -357,9 +353,7 @@ body {
             server_1.routes[0],
             Route {
                 path: "/app.css".into(),
-                kind: RouteKind::Raw {
-                    raw: "body {\n    background: blue\n}".into(),
-                },
+                kind: RouteKind::new_raw("body {\n    background: blue\n}"),
                 ..Default::default()
             }
         );
@@ -367,9 +361,7 @@ body {
             server_1.routes[1],
             Route {
                 path: "/app2.css".into(),
-                kind: RouteKind::Raw {
-                    raw: "body {\n    background: blue\n}".into(),
-                },
+                kind: RouteKind::new_raw("body {\n    background: blue\n}"),
                 ..Default::default()
             }
         );
@@ -419,7 +411,7 @@ path: /abc
             server_1.routes[0],
             Route {
                 path: "/health".into(),
-                kind: RouteKind::Raw { raw: "OK".into() },
+                kind: RouteKind::new_raw("OK"),
                 ..Default::default()
             }
         );
@@ -427,9 +419,7 @@ path: /abc
             server_1.routes[1],
             Route {
                 path: "/".into(),
-                kind: RouteKind::Html {
-                    html: "<p>hello world</p>".into(),
-                },
+                kind: RouteKind::new_html("<p>hello world</p>"),
                 ..Default::default()
             }
         );
@@ -437,9 +427,7 @@ path: /abc
             server_1.routes[2],
             Route {
                 path: "/abc".into(),
-                kind: RouteKind::Html {
-                    html: "<p>hello world 2</p>".into(),
-                },
+                kind: RouteKind::new_html("<p>hello world 2</p>"),
                 ..Default::default()
             }
         );
@@ -506,19 +494,21 @@ pub fn input_to_str(input: &Input) -> String {
 
 fn route_to_markdown(kind: &RouteKind, path: &str) -> String {
     match kind {
-        RouteKind::Html { html } => fenced_body("html", html),
-        RouteKind::Json { .. } => todo!("unsupported json"),
-        RouteKind::Raw { raw } => {
-            let mime = mime_guess::from_path(path);
-            let as_str = mime.first_or_text_plain();
-            let as_str = get_mime_extensions_str(as_str.as_ref());
-            if let Some(v) = as_str.and_then(|x| x.first()) {
-                fenced_body(v, raw)
-            } else {
-                fenced_body("", raw)
+        RouteKind::Raw(raw) => match raw {
+            RawRoute::Html { html } => fenced_body("html", html),
+            RawRoute::Json { .. } => todo!("unsupported json"),
+            RawRoute::Raw { raw } => {
+                let mime = mime_guess::from_path(path);
+                let as_str = mime.first_or_text_plain();
+                let as_str = get_mime_extensions_str(as_str.as_ref());
+                if let Some(v) = as_str.and_then(|x| x.first()) {
+                    fenced_body(v, raw)
+                } else {
+                    fenced_body("", raw)
+                }
             }
-        }
-        RouteKind::Sse { .. } => todo!("unsupported"),
+            RawRoute::Sse { .. } => todo!("unsupported"),
+        },
         RouteKind::Proxy(_) => todo!("unsupported"),
         RouteKind::Dir(_) => todo!("unsupported"),
     }

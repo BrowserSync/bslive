@@ -5,7 +5,6 @@ use std::ops::Deref;
 
 use crate::watch_opts::WatchOpts;
 use bsnext_resp::inject_opts::InjectOpts;
-use typeshare::typeshare;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Route {
@@ -25,20 +24,11 @@ pub struct Route {
     pub headers: Option<BTreeMap<String, String>>,
 }
 
-#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
-pub struct Route2 {
-    pub path: String,
-    #[serde(flatten)]
-    pub kind: RouteKind2,
-}
-
 impl Default for Route {
     fn default() -> Self {
         Self {
             path: "/".to_string(),
-            kind: RouteKind::Html {
-                html: "default".into(),
-            },
+            kind: RouteKind::new_html("default"),
             headers: None,
             cors_opts: None,
             delay_opts: None,
@@ -63,20 +53,24 @@ impl Route {
 #[derive(Debug, Hash, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
 pub enum RouteKind {
-    Html { html: String },
-    Json { json: JsonWrapper },
-    Raw { raw: String },
-    Sse { sse: String },
+    Raw(RawRoute),
     Proxy(ProxyRoute),
     Dir(DirRoute),
 }
 
-#[derive(Debug, Hash, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(untagged)]
-pub enum RouteKind2 {
-    Raw(RawRoute),
-    Proxy(ProxyRoute),
-    Dir(DirRoute),
+impl RouteKind {
+    pub fn new_html(html: impl Into<String>) -> Self {
+        RouteKind::Raw(RawRoute::Html { html: html.into() })
+    }
+    pub fn new_raw(raw: impl Into<String>) -> Self {
+        RouteKind::Raw(RawRoute::Raw { raw: raw.into() })
+    }
+    pub fn new_json(json: JsonWrapper) -> Self {
+        RouteKind::Raw(RawRoute::Json { json })
+    }
+    pub fn new_sse(raw: impl Into<String>) -> Self {
+        RouteKind::Raw(RawRoute::Sse { sse: raw.into() })
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
@@ -104,14 +98,6 @@ impl Hash for JsonWrapper {
         } else {
             todo!("handle error here?")
         }
-    }
-}
-
-#[typeshare]
-impl RouteKind {
-    #[allow(dead_code)]
-    pub fn html(s: &str) -> Self {
-        Self::Html { html: s.into() }
     }
 }
 

@@ -4,16 +4,16 @@ use std::convert::Infallible;
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response, Sse};
-use axum::routing::{any, any_service, get_service};
+use axum::routing::any_service;
 use axum::{middleware, Json, Router};
 use http::header::CONTENT_TYPE;
 
 use crate::meta::MetaData;
 use crate::server::state::ServerState;
 use axum::body::Body;
-use axum::handler::{Handler, HandlerWithoutStateExt};
+use axum::handler::Handler;
 use axum::response::sse::Event;
-use bsnext_input::route::{DirRoute, ProxyRoute, Route, RouteKind};
+use bsnext_input::route::{RawRoute, Route, RouteKind};
 use bytes::Bytes;
 use http::{StatusCode, Uri};
 use http_body_util::BodyExt;
@@ -22,7 +22,6 @@ use std::time::Duration;
 use tokio_stream::StreamExt;
 use tower::ServiceExt;
 
-use crate::common_layers::{add_route_layers, Handling};
 use tracing::{span, Level};
 
 // use futures_util::stream::{self, Stream};
@@ -49,10 +48,12 @@ pub fn create_raw_router(routes: &[Route]) -> Router {
     let route_map = routes
         .iter()
         .filter(|r| match &r.kind {
-            RouteKind::Html { .. } => true,
-            RouteKind::Json { .. } => true,
-            RouteKind::Raw { .. } => true,
-            RouteKind::Sse { .. } => true,
+            RouteKind::Raw(raw) => match raw {
+                RawRoute::Html { .. } => true,
+                RawRoute::Json { .. } => true,
+                RawRoute::Raw { .. } => true,
+                RawRoute::Sse { .. } => true,
+            },
             RouteKind::Proxy(_) => false,
             RouteKind::Dir(_) => false,
         })
@@ -87,26 +88,28 @@ pub fn create_raw_router(routes: &[Route]) -> Router {
 
 async fn raw_resp_for(uri: Uri, route: &Route) -> impl IntoResponse {
     match &route.kind {
-        RouteKind::Html { html } => Html(html.clone()).into_response(),
-        RouteKind::Json { json } => Json(&json.0).into_response(),
-        RouteKind::Raw { raw } => text_asset_response(uri.path(), &raw).into_response(),
-        RouteKind::Sse { sse } => {
-            let l = sse
-                .lines()
-                .map(|l| l.to_owned())
-                .map(|l| l.strip_prefix("data:").unwrap_or(&l).to_owned())
-                .filter(|l| !l.trim().is_empty())
-                .collect::<Vec<_>>();
+        RouteKind::Raw(raw) => match raw {
+            RawRoute::Html { html } => Html(html.clone()).into_response(),
+            RawRoute::Json { json } => Json(&json.0).into_response(),
+            RawRoute::Raw { raw } => text_asset_response(uri.path(), raw).into_response(),
+            RawRoute::Sse { sse } => {
+                let l = sse
+                    .lines()
+                    .map(|l| l.to_owned())
+                    .map(|l| l.strip_prefix("data:").unwrap_or(&l).to_owned())
+                    .filter(|l| !l.trim().is_empty())
+                    .collect::<Vec<_>>();
 
-            tracing::trace!(lines.count = l.len(), "sending EventStream");
+                tracing::trace!(lines.count = l.len(), "sending EventStream");
 
-            let stream = tokio_stream::iter(l)
-                .throttle(Duration::from_millis(10))
-                .map(|chu| Event::default().data(chu))
-                .map(Ok::<_, Infallible>);
+                let stream = tokio_stream::iter(l)
+                    .throttle(Duration::from_millis(10))
+                    .map(|chu| Event::default().data(chu))
+                    .map(Ok::<_, Infallible>);
 
-            Sse::new(stream).into_response()
-        }
+                Sse::new(stream).into_response()
+            }
+        },
         RouteKind::Proxy(_) => todo!("not cupported yet"),
         RouteKind::Dir(_) => todo!("not cupported yet"),
     }
@@ -141,7 +144,7 @@ mod raw_test {
             let request = Request::get("/route1").body(Body::empty())?;
             // Make a one-shot request on the router
             let response = router.oneshot(request).await?;
-            let (parts, body) = to_resp_parts_and_body(response).await;
+            let (_parts, body) = to_resp_parts_and_body(response).await;
             assert_eq!(body, "<h1>Welcome to Route 1.1</h1>");
         }
 
@@ -152,7 +155,7 @@ mod raw_test {
             let request = Request::get("/raw1").body(Body::empty())?;
             // Make a one-shot request on the router
             let response = router.oneshot(request).await?;
-            let (parts, body) = to_resp_parts_and_body(response).await;
+            let (_parts, body) = to_resp_parts_and_body(response).await;
             assert_eq!(body, "raw1");
         }
 
@@ -163,7 +166,7 @@ mod raw_test {
             let request = Request::get("/json").body(Body::empty())?;
             // Make a one-shot request on the router
             let response = router.oneshot(request).await?;
-            let (parts, body) = to_resp_parts_and_body(response).await;
+            let (_parts, body) = to_resp_parts_and_body(response).await;
             assert_eq!(body, "[1]");
         }
 
@@ -174,7 +177,7 @@ mod raw_test {
             let request = Request::get("/sse").body(Body::empty())?;
             // Make a one-shot request on the router
             let response = router.oneshot(request).await?;
-            let (parts, body) = to_resp_parts_and_body(response).await;
+            let (_parts, body) = to_resp_parts_and_body(response).await;
             let lines = body
                 .lines()
                 .filter(|x| !x.trim().is_empty())

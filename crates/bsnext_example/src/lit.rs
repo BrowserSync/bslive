@@ -15,16 +15,12 @@ impl LitExample {
             routes: vec![
                 Route {
                     path: "/".to_string(),
-                    kind: RouteKind::Html {
-                        html: include_str!("../../../examples/lit/index.html").to_owned(),
-                    },
+                    kind: RouteKind::new_html(include_str!("../../../examples/lit/index.html")),
                     ..Default::default()
                 },
                 Route {
                     path: "/lit.js".to_string(),
-                    kind: RouteKind::Raw {
-                        raw: include_str!("../../../examples/lit/lit.js").to_owned(),
-                    },
+                    kind: RouteKind::new_raw(include_str!("../../../examples/lit/lit.js")),
                     ..Default::default()
                 },
             ],

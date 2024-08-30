@@ -1,17 +1,14 @@
-use crate::server::state::ServerState;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::Handler;
 use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
-use axum::routing::get_service;
+use axum::response::IntoResponse;
 use axum::{middleware, Router};
-use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, Route2, RouteKind, RouteKind2};
+use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
 use http::{StatusCode, Uri};
 use http_body_util::BodyExt;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
 use tracing::trace_span;
@@ -88,37 +85,37 @@ pub enum HandlerStack {
     DirsProxy(Vec<DirRoute>, ProxyRoute),
 }
 
-pub fn routes_to_stack(state: HandlerStack, route: Route2) -> HandlerStack {
+pub fn routes_to_stack(state: HandlerStack, route: Route) -> HandlerStack {
     match state {
         HandlerStack::None => match route.kind {
-            RouteKind2::Raw(route) => HandlerStack::Raw(route),
-            RouteKind2::Proxy(pr) => HandlerStack::Proxy(pr),
-            RouteKind2::Dir(dir) => HandlerStack::Dirs(vec![dir]),
+            RouteKind::Raw(route) => HandlerStack::Raw(route),
+            RouteKind::Proxy(pr) => HandlerStack::Proxy(pr),
+            RouteKind::Dir(dir) => HandlerStack::Dirs(vec![dir]),
         },
         HandlerStack::Raw(..) => match route.kind {
-            RouteKind2::Raw(route) => HandlerStack::Raw(route),
+            // if a second 'raw' is seen, just use it, discarding the previous
+            RouteKind::Raw(route) => HandlerStack::Raw(route),
+            // 'raw' handlers never get updated
             _ => state,
         },
         HandlerStack::Dirs(mut dirs) => match route.kind {
-            RouteKind2::Raw(..) => HandlerStack::Dirs(dirs),
-            RouteKind2::Proxy(proxy) => HandlerStack::DirsProxy(dirs, proxy),
-            RouteKind2::Dir(next_dir) => {
+            RouteKind::Dir(next_dir) => {
                 dirs.push(next_dir);
                 HandlerStack::Dirs(dirs)
             }
+            RouteKind::Proxy(proxy) => HandlerStack::DirsProxy(dirs, proxy),
+            _ => HandlerStack::Dirs(dirs),
         },
         HandlerStack::Proxy(proxy) => match route.kind {
-            RouteKind2::Raw(..) => HandlerStack::Proxy(proxy),
-            RouteKind2::Proxy(..) => HandlerStack::Proxy(proxy),
-            RouteKind2::Dir(dir) => HandlerStack::DirsProxy(vec![dir], proxy),
+            RouteKind::Dir(dir) => HandlerStack::DirsProxy(vec![dir], proxy),
+            _ => HandlerStack::Proxy(proxy),
         },
         HandlerStack::DirsProxy(mut dirs, proxy) => match route.kind {
-            RouteKind2::Raw(..) => HandlerStack::DirsProxy(dirs, proxy),
-            RouteKind2::Proxy(..) => HandlerStack::DirsProxy(dirs, proxy),
-            RouteKind2::Dir(dir) => {
+            RouteKind::Dir(dir) => {
                 dirs.push(dir);
                 HandlerStack::DirsProxy(dirs, proxy)
             }
+            _ => HandlerStack::DirsProxy(dirs, proxy),
         },
     }
 }
@@ -139,7 +136,7 @@ fn test_route_stack() -> anyhow::Result<()> {
     - path: /dir1
       proxy: 'example.com'
     "#;
-    let routes = serde_yaml::from_str::<Vec<Route2>>(&routes)?;
+    let routes = serde_yaml::from_str::<Vec<Route>>(&routes)?;
     dbg!(&routes);
 
     let output = routes
@@ -154,10 +151,7 @@ fn test_route_stack() -> anyhow::Result<()> {
 pub fn create_dir_router(routes: &[Route]) -> Router {
     let route_map = routes
         .iter()
-        .filter(|r| match &r.kind {
-            RouteKind::Dir(_) => true,
-            _ => false,
-        })
+        .filter(|r| matches!(&r.kind, RouteKind::Dir(_)))
         .fold(HashMap::<String, Vec<Route>>::new(), |mut acc, route| {
             acc.entry(route.path.clone())
                 .and_modify(|acc| acc.push(route.clone()))

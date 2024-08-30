@@ -264,10 +264,7 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                 .iter()
                 .filter(|r| r.watch_opts.is_enabled())
                 .filter_map(|r| match &r.kind {
-                    RouteKind::Html { .. } => None,
-                    RouteKind::Json { .. } => None,
-                    RouteKind::Raw { .. } => None,
-                    RouteKind::Sse { .. } => None,
+                    RouteKind::Raw(_) => None,
                     RouteKind::Proxy(_) => None,
                     RouteKind::Dir(DirRoute { dir }) => {
                         let spec = to_spec(&r.watch_opts);

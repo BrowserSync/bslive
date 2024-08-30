@@ -2,7 +2,6 @@ use crate::raw_loader::create_raw_router;
 use crate::serve_dir::create_dir_router;
 use crate::server::actor::ServerActor;
 use actix::ResponseFuture;
-use axum::Router;
 use bsnext_input::route_manifest::{RouteChangeSet, RoutesManifest};
 use bsnext_input::server_config::ServerConfig;
 use std::sync::Arc;

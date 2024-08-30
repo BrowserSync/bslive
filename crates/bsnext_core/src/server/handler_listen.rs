@@ -1,4 +1,3 @@
-use crate::handlers::proxy::{proxy_handler, ProxyConfig};
 use crate::raw_loader::create_raw_router;
 use crate::serve_dir::create_dir_router;
 use crate::server::actor::ServerActor;
@@ -10,10 +9,9 @@ use actix_rt::Arbiter;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::HandlerWithoutStateExt;
-use axum::middleware::{from_fn, from_fn_with_state, Next};
+use axum::middleware::Next;
 use axum::response::IntoResponse;
-use axum::routing::{any, any_service};
-use axum::{Extension, Router};
+use axum::Router;
 use bsnext_dto::internal::ServerError;
 use bsnext_input::server_config::ServerIdentity;
 use http::StatusCode;
@@ -41,12 +39,12 @@ impl actix::Handler<Listen> for ServerActor {
         let h1 = handle.clone();
         let h2 = handle.clone();
 
-        let p = Router::new()
-            .nest_service("/", any(proxy_handler))
-            .layer(Extension(ProxyConfig {
-                target: "https://shaneddg.ngrok.io".to_string(),
-                path: "/".to_string(),
-            }));
+        // let p = Router::new()
+        //     .nest_service("/", any(proxy_handler))
+        //     .layer(Extension(ProxyConfig {
+        //         target: "https://shaneddg.ngrok.io".to_string(),
+        //         path: "/".to_string(),
+        //     }));
 
         async fn try_proxy(s: State<Router>, r: Request, n: Next) -> impl IntoResponse {
             let (p, b) = r.into_parts();
@@ -63,12 +61,8 @@ impl actix::Handler<Listen> for ServerActor {
             // parent: ,
             routes: Arc::new(RwLock::new(self.config.routes.clone())),
             raw_router: Arc::new(RwLock::new(
-                // create_raw_router(&self.config.routes).fallback_service(
-                //     create_dir_router(&self.config.routes).fallback(|| async { "here?" }),
-                // ),
-                create_raw_router(&self.config.routes).fallback_service(
-                    create_dir_router(&self.config.routes).layer(from_fn_with_state(p, try_proxy)),
-                ),
+                create_raw_router(&self.config.routes)
+                    .fallback_service(create_dir_router(&self.config.routes)),
             )),
             id: self.config.identity.as_id(),
             parent: Some(msg.parent.clone()),

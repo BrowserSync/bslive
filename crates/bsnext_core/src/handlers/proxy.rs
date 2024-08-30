@@ -1,7 +1,6 @@
 use anyhow::Context;
 use axum::body::Body;
 use axum::extract::Request;
-use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::Extension;
 

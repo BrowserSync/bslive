@@ -15,30 +15,30 @@ impl BasicExample {
             routes: vec![
                 Route {
                     path: "/".to_string(),
-                    kind: RouteKind::Html {
-                        html: include_str!("../../../examples/basic/public/index.html").to_owned(),
-                    },
+                    kind: RouteKind::new_html(include_str!(
+                        "../../../examples/basic/public/index.html"
+                    )),
                     ..Default::default()
                 },
                 Route {
                     path: "/styles.css".to_string(),
-                    kind: RouteKind::Raw {
-                        raw: include_str!("../../../examples/basic/public/styles.css").to_owned(),
-                    },
+                    kind: RouteKind::new_raw(include_str!(
+                        "../../../examples/basic/public/styles.css"
+                    )),
                     ..Default::default()
                 },
                 Route {
                     path: "/script.js".to_string(),
-                    kind: RouteKind::Raw {
-                        raw: include_str!("../../../examples/basic/public/script.js").to_owned(),
-                    },
+                    kind: RouteKind::new_raw(include_str!(
+                        "../../../examples/basic/public/script.js"
+                    )),
                     ..Default::default()
                 },
                 Route {
                     path: "/reset.css".to_string(),
-                    kind: RouteKind::Raw {
-                        raw: include_str!("../../../examples/basic/public/reset.css").to_owned(),
-                    },
+                    kind: RouteKind::new_raw(include_str!(
+                        "../../../examples/basic/public/reset.css"
+                    )),
                     ..Default::default()
                 },
             ],
