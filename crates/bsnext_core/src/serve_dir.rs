@@ -19,21 +19,33 @@ pub struct ServeDirItem {
 }
 
 pub async fn try_many_serve_dir(
-    state: State<Vec<ServeDirItem>>,
+    State((items, root_path)): State<(Vec<ServeDirItem>, Option<PathBuf>)>,
     uri: Uri,
     r: Request,
     next: Next,
 ) -> impl IntoResponse {
     let span = trace_span!("handling");
     let _ = span.enter();
-    tracing::trace!(?state);
+    tracing::trace!(?items);
 
-    let svs = state
-        .0
+    let svs = items
         .iter()
-        .map(|p| {
-            let src = ServeDir::new(&p.path);
-            (p.path.clone(), src)
+        .map(|item| {
+            let src = match &root_path {
+                Some(p) => {
+                    tracing::trace!(
+                        "combining root: `{}` with given path: `{}`",
+                        p.display(),
+                        item.path.display()
+                    );
+                    ServeDir::new(p.join(&item.path))
+                }
+                None => {
+                    tracing::trace!("no root given, using `{}` directly", item.path.display());
+                    ServeDir::new(&item.path)
+                }
+            };
+            (item.path.clone(), src)
         })
         .collect::<Vec<(PathBuf, ServeDir)>>();
 
@@ -123,12 +135,6 @@ pub fn routes_to_stack(state: HandlerStack, route: Route) -> HandlerStack {
 #[test]
 fn test_route_stack() -> anyhow::Result<()> {
     let routes = r#"
-    #- path: /®
-    #  html: 'abc'
-    #- path: /
-    #  html: 'abcdef'
-    #- path: /
-    #  raw: 'lololol'
     - path: /dir1
       dir: 'another'
     - path: /dir1
@@ -137,7 +143,6 @@ fn test_route_stack() -> anyhow::Result<()> {
       proxy: 'example.com'
     "#;
     let routes = serde_yaml::from_str::<Vec<Route>>(&routes)?;
-    dbg!(&routes);
 
     let output = routes
         .into_iter()
@@ -148,7 +153,55 @@ fn test_route_stack() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn create_dir_router(routes: &[Route]) -> Router {
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::server::router::common::to_resp_parts_and_body;
+    use std::env::current_dir;
+    #[tokio::test]
+    async fn test() -> anyhow::Result<()> {
+        let routes_input = r#"
+            - path: /
+              dir: examples/basic/public
+            - path: /
+              dir: examples/kitchen-sink
+        "#;
+
+        {
+            let current = current_dir()?;
+            let parent = current.parent().unwrap().parent().unwrap().to_owned();
+            let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
+            let router = create_dir_router(&routes, Some(parent));
+            let expected_body = include_str!("../../../examples/basic/public/index.html");
+
+            // Define the request
+            let request = Request::get("/index.html").body(Body::empty())?;
+            // Make a one-shot request on the router
+            let response = router.oneshot(request).await?;
+            let (parts, actual_body) = to_resp_parts_and_body(response).await;
+            assert_eq!(actual_body, expected_body);
+        }
+
+        {
+            let current = current_dir()?;
+            let parent = current.parent().unwrap().parent().unwrap().to_owned();
+            let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
+            let router = create_dir_router(&routes, Some(parent));
+            let expected_body = include_str!("../../../examples/kitchen-sink/input.html");
+
+            // Define the request
+            let request = Request::get("/input.html").body(Body::empty())?;
+            // Make a one-shot request on the router
+            let response = router.oneshot(request).await?;
+            let (parts, actual_body) = to_resp_parts_and_body(response).await;
+            assert_eq!(actual_body, expected_body);
+        }
+
+        Ok(())
+    }
+}
+
+pub fn create_dir_router(routes: &[Route], root_path: Option<PathBuf>) -> Router {
     let route_map = routes
         .iter()
         .filter(|r| matches!(&r.kind, RouteKind::Dir(_)))
@@ -163,8 +216,9 @@ pub fn create_dir_router(routes: &[Route]) -> Router {
     for (path, route_list) in route_map {
         tracing::trace!("register {} routes for path {}", route_list.len(), path);
         let serve_dir_items = route_list.iter().filter_map(route_to_serve_dir).collect();
+
         let temp_router = Router::new().layer(middleware::from_fn_with_state(
-            serve_dir_items,
+            (serve_dir_items, root_path.to_owned()),
             try_many_serve_dir,
         ));
         router = router.nest_service(&path, temp_router.into_service());
