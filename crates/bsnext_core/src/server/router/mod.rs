@@ -21,7 +21,6 @@ use tower::ServiceBuilder;
 use tower_http::catch_panic::CatchPanicLayer;
 
 use crate::meta::MetaData;
-use crate::not_found::not_found_service::not_found_loader;
 use crate::raw_loader::raw_loader;
 use crate::server::router::assets::pub_ui_assets;
 use crate::server::router::pub_api::pub_api;
@@ -101,7 +100,7 @@ pub fn dynamic_loaders(state: Arc<ServerState>) -> Router {
                 .layer(from_fn_with_state(state.clone(), tagging_layer))
                 // .layer(from_fn_with_state(state.clone(), maybe_proxy))
                 // todo(alpha): have the order listed here instead: static -> dir -> proxy
-                .layer(from_fn_with_state(state.clone(), not_found_loader))
+                // .layer(from_fn_with_state(state.clone(), not_found_loader))
                 .layer(from_fn_with_state(state.clone(), raw_loader)),
         )
         .layer(CatchPanicLayer::custom(handle_panic))

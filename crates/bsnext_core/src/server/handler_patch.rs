@@ -1,4 +1,4 @@
-use crate::raw_loader::create_raw_router;
+use crate::handler_stack::RouteMap;
 use crate::server::actor::ServerActor;
 use actix::ResponseFuture;
 use bsnext_input::route_manifest::{RouteChangeSet, RoutesManifest};
@@ -34,7 +34,8 @@ impl actix::Handler<Patch> for ServerActor {
         Box::pin(async move {
             let mut mut_raw_router = app_state_clone.raw_router.write().await;
             let mut mut_routes = app_state_clone.routes.write().await;
-            *mut_raw_router = create_raw_router(&routes);
+            let router = RouteMap::new_from_routes(&routes).into_router();
+            *mut_raw_router = router;
             *mut_routes = routes;
 
             Ok(changeset)

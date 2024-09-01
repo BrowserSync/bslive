@@ -50,7 +50,6 @@ pub async fn response_modifications_layer(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let span = span!(parent: None, Level::TRACE, "resp-mod", uri=req.uri().path());
     let _guard = span.enter();
-    let req_headers = req.headers().clone();
 
     // bail when there are no accepting modifications
     let req_accepted: Vec<InjectionItem> = inject
@@ -58,10 +57,12 @@ pub async fn response_modifications_layer(
         .into_iter()
         .filter(|item| item.accept_req(&req))
         .collect();
+
     if req_accepted.is_empty() {
         return Ok(next.run(req).await.into_response());
     }
 
+    let req_headers = req.headers().clone();
     let mut res = next.run(req).await;
 
     // also bail if no responses are accepted

@@ -1,11 +1,9 @@
-use std::collections::HashMap;
 use std::convert::Infallible;
 
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response, Sse};
-use axum::routing::any_service;
-use axum::{middleware, Json, Router};
+use axum::{middleware, Json};
 use http::header::CONTENT_TYPE;
 
 use crate::meta::MetaData;
@@ -13,7 +11,7 @@ use crate::server::state::ServerState;
 use axum::body::Body;
 use axum::handler::Handler;
 use axum::response::sse::Event;
-use bsnext_input::route::{RawRoute, Route, RouteKind};
+use bsnext_input::route::{RawRoute, Route};
 use bytes::Bytes;
 use http::{StatusCode, Uri};
 use http_body_util::BodyExt;
@@ -23,8 +21,6 @@ use tokio_stream::StreamExt;
 use tower::ServiceExt;
 
 use tracing::{span, Level};
-
-// use futures_util::stream::{self, Stream};
 
 pub async fn raw_loader(
     State(app): State<Arc<ServerState>>,
@@ -44,80 +40,40 @@ pub async fn raw_loader(
         .into_response()
 }
 
-pub fn create_raw_router(routes: &[Route]) -> Router {
-    let route_map = routes
-        .iter()
-        .filter(|r| match &r.kind {
-            RouteKind::Raw(raw) => match raw {
-                RawRoute::Html { .. } => true,
-                RawRoute::Json { .. } => true,
-                RawRoute::Raw { .. } => true,
-                RawRoute::Sse { .. } => true,
-            },
-            RouteKind::Proxy(_) => false,
-            RouteKind::Dir(_) => false,
-        })
-        .fold(HashMap::<String, Vec<Route>>::new(), |mut acc, route| {
-            acc.entry(route.path.clone())
-                .and_modify(|acc| acc.push(route.clone()))
-                .or_insert(vec![route.clone()]);
-            acc
-        });
-
-    async fn serve_raw(uri: Uri, state: State<Vec<Route>>, req: Request) -> Response {
-        tracing::trace!("serve_raw {}", req.uri().to_string());
-        if state.len() > 1 {
-            tracing::error!(
-                "more than 1 matching route for {}, only the last will take effect",
-                uri
-            )
-        }
-        match state.last() {
-            None => StatusCode::NOT_FOUND.into_response(),
-            Some(route) => raw_resp_for(uri, route).await.into_response(),
-        }
-    }
-
-    let mut router = Router::new();
-    for (path, route_list) in route_map {
-        // todo(alpha): support more use-cases here?
-        router = router.route_service(&path, any_service(serve_raw.with_state(route_list)));
-    }
-    router
+pub async fn serve_raw_one(uri: Uri, state: State<RawRoute>, req: Request) -> Response {
+    tracing::trace!("serve_raw_one {}", req.uri().to_string());
+    raw_resp_for(uri, &state.0).await.into_response()
 }
 
-async fn raw_resp_for(uri: Uri, route: &Route) -> impl IntoResponse {
-    match &route.kind {
-        RouteKind::Raw(raw) => match raw {
-            RawRoute::Html { html } => Html(html.clone()).into_response(),
-            RawRoute::Json { json } => Json(&json.0).into_response(),
-            RawRoute::Raw { raw } => text_asset_response(uri.path(), raw).into_response(),
-            RawRoute::Sse { sse } => {
-                let l = sse
-                    .lines()
-                    .map(|l| l.to_owned())
-                    .map(|l| l.strip_prefix("data:").unwrap_or(&l).to_owned())
-                    .filter(|l| !l.trim().is_empty())
-                    .collect::<Vec<_>>();
+async fn raw_resp_for(uri: Uri, route: &RawRoute) -> impl IntoResponse {
+    match route {
+        RawRoute::Html { html } => Html(html.clone()).into_response(),
+        RawRoute::Json { json } => Json(&json.0).into_response(),
+        RawRoute::Raw { raw } => text_asset_response(uri.path(), raw).into_response(),
+        RawRoute::Sse { sse } => {
+            let l = sse
+                .lines()
+                .map(|l| l.to_owned())
+                .map(|l| l.strip_prefix("data:").unwrap_or(&l).to_owned())
+                .filter(|l| !l.trim().is_empty())
+                .collect::<Vec<_>>();
 
-                tracing::trace!(lines.count = l.len(), "sending EventStream");
+            tracing::trace!(lines.count = l.len(), "sending EventStream");
 
-                let stream = tokio_stream::iter(l)
-                    .throttle(Duration::from_millis(10))
-                    .map(|chu| Event::default().data(chu))
-                    .map(Ok::<_, Infallible>);
+            let stream = tokio_stream::iter(l)
+                .throttle(Duration::from_millis(10))
+                .map(|chu| Event::default().data(chu))
+                .map(Ok::<_, Infallible>);
 
-                Sse::new(stream).into_response()
-            }
-        },
-        RouteKind::Proxy(_) => todo!("not cupported yet"),
-        RouteKind::Dir(_) => todo!("not cupported yet"),
+            Sse::new(stream).into_response()
+        }
     }
 }
 
 #[cfg(test)]
 mod raw_test {
     use super::*;
+    use crate::handler_stack::RouteMap;
     use crate::server::router::common::to_resp_parts_and_body;
 
     #[tokio::test]
@@ -139,7 +95,7 @@ mod raw_test {
 
         {
             let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
-            let router = create_raw_router(&routes);
+            let router = RouteMap::new_from_routes(&routes).into_router();
             // Define the request
             let request = Request::get("/route1").body(Body::empty())?;
             // Make a one-shot request on the router
@@ -150,7 +106,7 @@ mod raw_test {
 
         {
             let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
-            let router = create_raw_router(&routes);
+            let router = RouteMap::new_from_routes(&routes).into_router();
             // Define the request
             let request = Request::get("/raw1").body(Body::empty())?;
             // Make a one-shot request on the router
@@ -161,7 +117,7 @@ mod raw_test {
 
         {
             let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
-            let router = create_raw_router(&routes);
+            let router = RouteMap::new_from_routes(&routes).into_router();
             // Define the request
             let request = Request::get("/json").body(Body::empty())?;
             // Make a one-shot request on the router
@@ -172,7 +128,7 @@ mod raw_test {
 
         {
             let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
-            let router = create_raw_router(&routes);
+            let router = RouteMap::new_from_routes(&routes).into_router();
             // Define the request
             let request = Request::get("/sse").body(Body::empty())?;
             // Make a one-shot request on the router

@@ -2,26 +2,16 @@ use axum::extract::Request;
 use axum::middleware::Next;
 use axum::{middleware, Extension, Router};
 use http::{HeaderName, HeaderValue};
-use std::cmp::PartialEq;
 use std::convert::Infallible;
 use std::time::Duration;
 
 use bsnext_input::route::{CorsOpts, DelayKind, DelayOpts, Route};
-use bsnext_resp::injector_guard::InjectorGuard;
 use bsnext_resp::{response_modifications_layer, InjectHandling};
 use tokio::time::sleep;
 use tower_http::cors::CorsLayer;
-use tower_http::decompression::DecompressionLayer;
 use tower_http::set_header;
 
-#[derive(Debug, PartialEq)]
-pub enum Handling {
-    Proxy,
-    Raw,
-    Dir,
-}
-
-pub fn add_route_layers(app: Router, handling: Handling, route: &Route, req: &Request) -> Router {
+pub fn add_route_layers(app: Router, route: &Route) -> Router {
     let mut app = app;
 
     if route
@@ -67,20 +57,9 @@ pub fn add_route_layers(app: Router, handling: Handling, route: &Route, req: &Re
     }
 
     let injections = route.inject_opts.injections();
-    let might_inject = injections.iter().any(|inj| inj.accept_req(req));
-
-    if might_inject {
-        if handling == Handling::Proxy {
-            app = app.layer(DecompressionLayer::new())
-        }
-        app = app
-            .layer(middleware::from_fn(response_modifications_layer))
-            .layer(Extension(InjectHandling { items: injections }));
-    }
-
-    // if route.opts.as_ref().is_some_and(|v| v.buff) {
-    // app = app.layer(middleware::from_fn(print_request_response));
-    // }
+    app = app
+        .layer(middleware::from_fn(response_modifications_layer))
+        .layer(Extension(InjectHandling { items: injections }));
 
     app
 }

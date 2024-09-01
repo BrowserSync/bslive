@@ -2,7 +2,7 @@ servers:
   - name: "raw"
     routes:
       - path: /styles.css
-        raw: 'another'
+        raw: 'body { background: red }'
   - name: "2dirs"
     routes:
       - path: /

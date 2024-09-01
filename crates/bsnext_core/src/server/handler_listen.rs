@@ -1,18 +1,16 @@
-use crate::raw_loader::create_raw_router;
+use crate::handler_stack::RouteMap;
 use crate::server::actor::ServerActor;
 use crate::server::router::make_router;
 use crate::server::state::ServerState;
 use crate::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
 use actix::{Recipient, ResponseFuture};
 use actix_rt::Arbiter;
-use axum::handler::HandlerWithoutStateExt;
 use bsnext_dto::internal::ServerError;
 use bsnext_input::server_config::ServerIdentity;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
-use tower::ServiceExt;
 
 #[derive(actix::Message)]
 #[rtype(result = "Result<SocketAddr, ServerError>")]
@@ -32,28 +30,12 @@ impl actix::Handler<Listen> for ServerActor {
         let h1 = handle.clone();
         let h2 = handle.clone();
 
-        // let p = Router::new()
-        //     .nest_service("/", any(proxy_handler))
-        //     .layer(Extension(ProxyConfig {
-        //         target: "https://shaneddg.ngrok.io".to_string(),
-        //         path: "/".to_string(),
-        //     }));
-
-        // async fn try_proxy(s: State<Router>, r: Request, n: Next) -> impl IntoResponse {
-        //     let (p, b) = r.into_parts();
-        //     let res = n.run(Request::from_parts(p.clone(), Body::empty())).await;
-        //     if res.status() == StatusCode::NOT_FOUND {
-        //         tracing::info!("will try proxy");
-        //         s.0.oneshot(Request::from_parts(p, b)).await.into_response()
-        //     } else {
-        //         res.into_response()
-        //     }
-        // }
+        let router = RouteMap::new_from_routes(&self.config.routes).into_router();
 
         let app_state = Arc::new(ServerState {
             // parent: ,
             routes: Arc::new(RwLock::new(self.config.routes.clone())),
-            raw_router: Arc::new(RwLock::new(create_raw_router(&self.config.routes))),
+            raw_router: Arc::new(RwLock::new(router)),
             id: self.config.identity.as_id(),
             parent: Some(msg.parent.clone()),
             evt_receiver: Some(msg.evt_receiver.clone()),

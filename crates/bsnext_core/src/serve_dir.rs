@@ -1,15 +1,9 @@
-use crate::handler_stack;
-use crate::handler_stack::HandlerStack;
 use axum::body::Body;
 use axum::extract::{Request, State};
-use axum::handler::Handler;
 use axum::middleware::Next;
 use axum::response::IntoResponse;
-use axum::{middleware, Router};
-use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
+use bsnext_input::route::{Route, RouteKind};
 use http::{StatusCode, Uri};
-use http_body_util::BodyExt;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
@@ -21,35 +15,13 @@ pub struct ServeDirItem {
 }
 
 pub async fn try_many_serve_dir(
-    State((items, root_path)): State<(Vec<ServeDirItem>, Option<PathBuf>)>,
+    State(svs): State<Vec<(PathBuf, ServeDir)>>,
     uri: Uri,
     r: Request,
     next: Next,
 ) -> impl IntoResponse {
     let span = trace_span!("handling");
     let _ = span.enter();
-    tracing::trace!(?items);
-
-    let svs = items
-        .iter()
-        .map(|item| {
-            let src = match &root_path {
-                Some(p) => {
-                    tracing::trace!(
-                        "combining root: `{}` with given path: `{}`",
-                        p.display(),
-                        item.path.display()
-                    );
-                    ServeDir::new(p.join(&item.path))
-                }
-                None => {
-                    tracing::trace!("no root given, using `{}` directly", item.path.display());
-                    ServeDir::new(&item.path)
-                }
-            };
-            (item.path.clone(), src)
-        })
-        .collect::<Vec<(PathBuf, ServeDir)>>();
 
     tracing::trace!(?uri, "{} services", svs.len());
 
@@ -92,8 +64,10 @@ pub async fn try_many_serve_dir(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::handler_stack::RouteMap;
     use crate::server::router::common::to_resp_parts_and_body;
     use std::env::current_dir;
+
     #[tokio::test]
     async fn test() -> anyhow::Result<()> {
         let routes_input = r#"
@@ -107,14 +81,14 @@ mod test {
             let current = current_dir()?;
             let parent = current.parent().unwrap().parent().unwrap().to_owned();
             let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
-            let router = create_dir_router(&routes, Some(parent));
+            let router = RouteMap::new_from_routes(&routes).into_router();
             let expected_body = include_str!("../../../examples/basic/public/index.html");
 
             // Define the request
             let request = Request::get("/index.html").body(Body::empty())?;
             // Make a one-shot request on the router
             let response = router.oneshot(request).await?;
-            let (parts, actual_body) = to_resp_parts_and_body(response).await;
+            let (_parts, actual_body) = to_resp_parts_and_body(response).await;
             assert_eq!(actual_body, expected_body);
         }
 
@@ -122,44 +96,19 @@ mod test {
             let current = current_dir()?;
             let parent = current.parent().unwrap().parent().unwrap().to_owned();
             let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
-            let router = create_dir_router(&routes, Some(parent));
+            let router = RouteMap::new_from_routes(&routes).into_router();
             let expected_body = include_str!("../../../examples/kitchen-sink/input.html");
 
             // Define the request
             let request = Request::get("/input.html").body(Body::empty())?;
             // Make a one-shot request on the router
             let response = router.oneshot(request).await?;
-            let (parts, actual_body) = to_resp_parts_and_body(response).await;
+            let (_parts, actual_body) = to_resp_parts_and_body(response).await;
             assert_eq!(actual_body, expected_body);
         }
 
         Ok(())
     }
-}
-
-pub fn create_dir_router(routes: &[Route], root_path: Option<PathBuf>) -> Router {
-    let route_map = routes
-        .iter()
-        .filter(|r| matches!(&r.kind, RouteKind::Dir(_)))
-        .fold(HashMap::<String, Vec<Route>>::new(), |mut acc, route| {
-            acc.entry(route.path.clone())
-                .and_modify(|acc| acc.push(route.clone()))
-                .or_insert(vec![route.clone()]);
-            acc
-        });
-
-    let mut router = Router::new();
-    for (path, route_list) in route_map {
-        tracing::trace!("register {} routes for path {}", route_list.len(), path);
-        let serve_dir_items = route_list.iter().filter_map(route_to_serve_dir).collect();
-
-        let temp_router = Router::new().layer(middleware::from_fn_with_state(
-            (serve_dir_items, root_path.to_owned()),
-            try_many_serve_dir,
-        ));
-        router = router.nest_service(&path, temp_router.into_service());
-    }
-    router
 }
 
 fn route_to_serve_dir(r: &Route) -> Option<ServeDirItem> {
