@@ -2,7 +2,6 @@ use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::IntoResponse;
-use bsnext_input::route::{Route, RouteKind};
 use http::{StatusCode, Uri};
 use std::path::PathBuf;
 use tower::ServiceExt;
@@ -66,6 +65,7 @@ mod test {
     use super::*;
     use crate::handler_stack::RouteMap;
     use crate::server::router::common::to_resp_parts_and_body;
+    use bsnext_input::route::Route;
     use std::env::current_dir;
 
     #[tokio::test]
@@ -108,14 +108,5 @@ mod test {
         }
 
         Ok(())
-    }
-}
-
-fn route_to_serve_dir(r: &Route) -> Option<ServeDirItem> {
-    match &r.kind {
-        RouteKind::Dir(dir) => Some(ServeDirItem {
-            path: PathBuf::from(&dir.dir),
-        }),
-        _ => None,
     }
 }

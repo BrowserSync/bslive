@@ -10,17 +10,21 @@ use bsnext_resp::inject_opts::InjectOpts;
 pub struct Route {
     pub path: String,
     #[serde(flatten)]
-    pub cors_opts: Option<CorsOpts>,
-    #[serde(flatten)]
-    pub delay_opts: Option<DelayOpts>,
-    #[serde(rename = "watch")]
-    #[serde(default)]
-    pub watch_opts: WatchOpts,
-    #[serde(rename = "inject")]
-    #[serde(default)]
-    pub inject_opts: InjectOpts,
-    #[serde(flatten)]
     pub kind: RouteKind,
+    #[serde(flatten)]
+    pub opts: Opts,
+}
+
+#[derive(Debug, Default, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+pub struct Opts {
+    #[serde(flatten)]
+    pub cors: Option<CorsOpts>,
+    #[serde(flatten)]
+    pub delay: Option<DelayOpts>,
+    #[serde(default)]
+    pub watch: WatchOpts,
+    #[serde(default)]
+    pub inject: InjectOpts,
     pub headers: Option<BTreeMap<String, String>>,
 }
 
@@ -29,11 +33,13 @@ impl Default for Route {
         Self {
             path: "/".to_string(),
             kind: RouteKind::new_html("default"),
-            headers: None,
-            cors_opts: None,
-            delay_opts: None,
-            watch_opts: Default::default(),
-            inject_opts: Default::default(),
+            opts: Opts {
+                headers: None,
+                cors: None,
+                delay: None,
+                watch: Default::default(),
+                inject: Default::default(),
+            },
         }
     }
 }

@@ -15,7 +15,8 @@ pub fn add_route_layers(app: Router, route: &Route) -> Router {
     let mut app = app;
 
     if route
-        .cors_opts
+        .opts
+        .cors
         .as_ref()
         .is_some_and(|v| *v == CorsOpts::Cors(true))
     {
@@ -23,7 +24,7 @@ pub fn add_route_layers(app: Router, route: &Route) -> Router {
         app = app.layer(CorsLayer::permissive());
     }
 
-    if let Some(DelayOpts::Delay(DelayKind::Ms(ms))) = route.delay_opts.as_ref() {
+    if let Some(DelayOpts::Delay(DelayKind::Ms(ms))) = route.opts.delay.as_ref() {
         tracing::trace!(to = route.path, ?ms, "adding a delay");
         let ms = *ms;
         app = app.layer(middleware::from_fn(
@@ -35,7 +36,7 @@ pub fn add_route_layers(app: Router, route: &Route) -> Router {
         ));
     }
 
-    if let Some(headers) = route.headers.as_ref() {
+    if let Some(headers) = route.opts.headers.as_ref() {
         for (k, v) in headers {
             let hn = HeaderName::from_bytes(k.as_bytes());
             let hv = HeaderValue::from_bytes(v.as_bytes());
@@ -56,7 +57,7 @@ pub fn add_route_layers(app: Router, route: &Route) -> Router {
         }
     }
 
-    let injections = route.inject_opts.injections();
+    let injections = route.opts.inject.injections();
     app = app
         .layer(middleware::from_fn(response_modifications_layer))
         .layer(Extension(InjectHandling { items: injections }));

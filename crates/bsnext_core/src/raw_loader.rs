@@ -11,7 +11,7 @@ use crate::server::state::ServerState;
 use axum::body::Body;
 use axum::handler::Handler;
 use axum::response::sse::Event;
-use bsnext_input::route::{RawRoute, Route};
+use bsnext_input::route::RawRoute;
 use bytes::Bytes;
 use http::{StatusCode, Uri};
 use http_body_util::BodyExt;
@@ -75,6 +75,7 @@ mod raw_test {
     use super::*;
     use crate::handler_stack::RouteMap;
     use crate::server::router::common::to_resp_parts_and_body;
+    use bsnext_input::route::Route;
 
     #[tokio::test]
     async fn duplicate_path() -> anyhow::Result<()> {

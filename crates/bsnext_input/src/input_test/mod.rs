@@ -36,10 +36,10 @@ fn test_deserialize_2() {
         "#;
     let c: Config = serde_yaml::from_str(input).unwrap();
     let first = c.items.get(0).unwrap().to_owned();
-    let opts = first.cors_opts.unwrap();
+    let opts = first.opts.cors.unwrap();
     assert_eq!(opts, CorsOpts::Cors(true));
 
-    let delay_opts = first.delay_opts.unwrap();
+    let delay_opts = first.opts.delay.unwrap();
     assert_eq!(delay_opts, DelayOpts::Delay(DelayKind::Ms(2000)));
 }
 
@@ -58,7 +58,7 @@ fn test_deserialize_cors_false() {
         "#;
     let c: Config = serde_yaml::from_str(input).unwrap();
     let first = c.items.get(0).unwrap().to_owned();
-    let opts = first.cors_opts.unwrap();
+    let opts = first.opts.cors.unwrap();
     assert_eq!(opts, CorsOpts::Cors(false));
 }
 
@@ -114,14 +114,14 @@ fn test_deserialize_watch() {
     watch: true
         "#;
     let c: Route = serde_yaml::from_str(input).unwrap();
-    assert_eq!(c.watch_opts, WatchOpts::Bool(true));
+    assert_eq!(c.opts.watch, WatchOpts::Bool(true));
     let input = r#"
     path: /hello.js
     dir: "hello"
     watch: false
         "#;
     let c: Route = serde_yaml::from_str(input).unwrap();
-    assert_eq!(c.watch_opts, WatchOpts::Bool(false));
+    assert_eq!(c.opts.watch, WatchOpts::Bool(false));
     let input = r#"
     path: /hello.js
     dir: "hello"
@@ -129,7 +129,7 @@ fn test_deserialize_watch() {
         "#;
     let c: Route = serde_yaml::from_str(input).unwrap();
     assert_eq!(
-        c.watch_opts,
+        c.opts.watch,
         WatchOpts::InlineGlob("public/**/*.css".into())
     );
     let input = r#"
@@ -141,7 +141,7 @@ fn test_deserialize_watch() {
         "#;
     let c: Route = serde_yaml::from_str(input).unwrap();
     assert_eq!(
-        c.watch_opts,
+        c.opts.watch,
         WatchOpts::Spec(Spec {
             opts: Some(SpecOpts {
                 debounce: Some(DebounceDuration::Ms(2000)),

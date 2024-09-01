@@ -2,7 +2,7 @@ use axum::body::Body;
 use axum::extract::Request;
 use bsnext_core::server::router::common::{into_state, to_resp_body};
 use bsnext_core::server::router::make_router;
-use bsnext_input::route::{CorsOpts, Route, RouteKind};
+use bsnext_input::route::{CorsOpts, Opts, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use http::HeaderValue;
 use std::collections::BTreeMap;
@@ -20,8 +20,10 @@ async fn test_handlers() -> Result<(), anyhow::Error> {
         routes: vec![Route {
             path: "/hello".to_string(),
             kind: RouteKind::new_html("🐥"),
-            headers: Some(headers),
-            ..Default::default()
+            opts: Opts {
+                headers: Some(headers),
+                ..Default::default()
+            },
         }],
         ..Default::default()
     };
@@ -79,7 +81,10 @@ async fn test_cors_handlers() -> Result<(), anyhow::Error> {
         routes: vec![
             Route {
                 path: "/".to_string(),
-                cors_opts: Some(CorsOpts::Cors(true)),
+                opts: Opts {
+                    cors: Some(CorsOpts::Cors(true)),
+                    ..Default::default()
+                },
                 kind: RouteKind::new_html("home"),
                 ..Default::default()
             },
@@ -122,7 +127,10 @@ async fn test_not_found_handler() -> Result<(), anyhow::Error> {
         },
         routes: vec![Route {
             path: "/".to_string(),
-            cors_opts: Some(CorsOpts::Cors(true)),
+            opts: Opts {
+                cors: Some(CorsOpts::Cors(true)),
+                ..Default::default()
+            },
             kind: RouteKind::new_html("home"),
             ..Default::default()
         }],
@@ -154,7 +162,10 @@ async fn test_route_list() -> Result<(), anyhow::Error> {
         },
         routes: vec![Route {
             path: "/abc".to_string(),
-            cors_opts: Some(CorsOpts::Cors(true)),
+            opts: Opts {
+                cors: Some(CorsOpts::Cors(true)),
+                ..Default::default()
+            },
             kind: RouteKind::new_html("home"),
             ..Default::default()
         }],

@@ -48,7 +48,7 @@ mod test {
             // Make a one-shot request on the router
             let response = router.oneshot(request).await?;
 
-            let (parts, actual_body) = to_resp_parts_and_body(response).await;
+            let (_parts, actual_body) = to_resp_parts_and_body(response).await;
 
             assert_eq!(actual_body, expected_body);
         }

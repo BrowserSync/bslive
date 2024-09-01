@@ -262,12 +262,12 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
             server_config
                 .routes
                 .iter()
-                .filter(|r| r.watch_opts.is_enabled())
+                .filter(|r| r.opts.watch.is_enabled())
                 .filter_map(|r| match &r.kind {
                     RouteKind::Raw(_) => None,
                     RouteKind::Proxy(_) => None,
                     RouteKind::Dir(DirRoute { dir }) => {
-                        let spec = to_spec(&r.watch_opts);
+                        let spec = to_spec(&r.opts.watch);
                         Some(RouteWatchable {
                             server_identity: server_config.identity.clone(),
                             route_path: r.path.to_string(),
