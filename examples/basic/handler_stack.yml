@@ -1,0 +1,19 @@
+servers:
+  - name: "raw"
+    routes:
+      - path: /styles.css
+        raw: 'another'
+  - name: "2dirs"
+    routes:
+      - path: /
+        dir: 'public'
+      - path: /
+        dir: .
+  - name: "2dirs+proxy"
+    routes:
+      - path: /dir1
+        dir: 'another'
+      - path: /dir1
+        dir: 'another_2'
+      - path: /dir1
+        proxy: 'example.com'

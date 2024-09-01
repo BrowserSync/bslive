@@ -1,3 +1,5 @@
+use crate::handler_stack;
+use crate::handler_stack::HandlerStack;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::Handler;
@@ -85,72 +87,6 @@ pub async fn try_many_serve_dir(
     tracing::trace!(" - REQUEST was NOT HANDLED BY SERVE_DIR (will be sent onwards)");
     let r = Request::from_parts(a.clone(), b);
     next.run(r).await
-}
-
-#[derive(Debug, PartialEq)]
-pub enum HandlerStack {
-    None,
-    // todo: make this a separate thing
-    Raw(RawRoute),
-    Dirs(Vec<DirRoute>),
-    Proxy(ProxyRoute),
-    DirsProxy(Vec<DirRoute>, ProxyRoute),
-}
-
-pub fn routes_to_stack(state: HandlerStack, route: Route) -> HandlerStack {
-    match state {
-        HandlerStack::None => match route.kind {
-            RouteKind::Raw(route) => HandlerStack::Raw(route),
-            RouteKind::Proxy(pr) => HandlerStack::Proxy(pr),
-            RouteKind::Dir(dir) => HandlerStack::Dirs(vec![dir]),
-        },
-        HandlerStack::Raw(..) => match route.kind {
-            // if a second 'raw' is seen, just use it, discarding the previous
-            RouteKind::Raw(route) => HandlerStack::Raw(route),
-            // 'raw' handlers never get updated
-            _ => state,
-        },
-        HandlerStack::Dirs(mut dirs) => match route.kind {
-            RouteKind::Dir(next_dir) => {
-                dirs.push(next_dir);
-                HandlerStack::Dirs(dirs)
-            }
-            RouteKind::Proxy(proxy) => HandlerStack::DirsProxy(dirs, proxy),
-            _ => HandlerStack::Dirs(dirs),
-        },
-        HandlerStack::Proxy(proxy) => match route.kind {
-            RouteKind::Dir(dir) => HandlerStack::DirsProxy(vec![dir], proxy),
-            _ => HandlerStack::Proxy(proxy),
-        },
-        HandlerStack::DirsProxy(mut dirs, proxy) => match route.kind {
-            RouteKind::Dir(dir) => {
-                dirs.push(dir);
-                HandlerStack::DirsProxy(dirs, proxy)
-            }
-            _ => HandlerStack::DirsProxy(dirs, proxy),
-        },
-    }
-}
-
-#[test]
-fn test_route_stack() -> anyhow::Result<()> {
-    let routes = r#"
-    - path: /dir1
-      dir: 'another'
-    - path: /dir1
-      dir: 'another_2'
-    - path: /dir1
-      proxy: 'example.com'
-    "#;
-    let routes = serde_yaml::from_str::<Vec<Route>>(&routes)?;
-
-    let output = routes
-        .into_iter()
-        .fold(HandlerStack::None, |s, route| routes_to_stack(s, route));
-
-    dbg!(&output);
-
-    Ok(())
 }
 
 #[cfg(test)]

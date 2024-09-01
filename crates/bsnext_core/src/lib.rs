@@ -3,6 +3,7 @@ pub mod servers_supervisor;
 
 pub mod common_layers;
 pub mod dir_loader;
+mod handler_stack;
 pub mod handlers;
 pub mod meta;
 pub mod not_found;

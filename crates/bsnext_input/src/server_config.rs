@@ -58,6 +58,14 @@ impl ServerIdentity {
         self.hash(&mut hasher);
         hasher.finish()
     }
+
+    pub fn is_named(&self, pred_name: &str) -> bool {
+        match self {
+            ServerIdentity::Both { name, .. } => name == pred_name,
+            ServerIdentity::Address { .. } => false,
+            ServerIdentity::Named { name } => name == pred_name,
+        }
+    }
 }
 
 #[test]
