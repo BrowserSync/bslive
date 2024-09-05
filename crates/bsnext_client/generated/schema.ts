@@ -37,6 +37,7 @@ export const routeKindDTOSchema = z.union([
     kind: z.literal("Dir"),
     payload: z.object({
       dir: z.string(),
+      base: z.string().optional(),
     }),
   }),
 ]);

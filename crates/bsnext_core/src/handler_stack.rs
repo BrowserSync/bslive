@@ -110,7 +110,7 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
             Router::new().route_service(path, ServiceBuilder::new().service(svc))
         }
         HandlerStack::Dirs(dir_list) => {
-            Router::new().nest_service(path, serve_dir_layer(&dir_list, Router::new(), None))
+            Router::new().nest_service(path, serve_dir_layer(&dir_list, Router::new()))
         }
         HandlerStack::Proxy(proxy) => {
             let proxy_config = ProxyConfig {
@@ -124,24 +124,25 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
         }
         HandlerStack::DirsProxy(dir_list, proxy) => {
             let r2 = stack_to_router(path, HandlerStack::Proxy(proxy));
-            let r1 = serve_dir_layer(&dir_list, Router::new().fallback_service(r2), None);
+            let r1 = serve_dir_layer(&dir_list, Router::new().fallback_service(r2));
             Router::new().nest_service(path, r1)
         }
     }
 }
 
-fn serve_dir_layer(dir_list: &[DirRoute], initial: Router, root_path: Option<PathBuf>) -> Router {
+fn serve_dir_layer(dir_list: &[DirRoute], initial: Router) -> Router {
     let serve_dir_items = dir_list
         .iter()
         .map(|dir_route| ServeDirItem {
             path: PathBuf::from(&dir_route.dir),
+            base: dir_route.base.clone(),
         })
         .collect::<Vec<_>>();
 
     let services = serve_dir_items
         .iter()
         .map(|item| {
-            let src = match &root_path {
+            let src = match &item.base {
                 Some(p) => {
                     tracing::trace!(
                         "combining root: `{}` with given path: `{}`",
@@ -203,9 +204,11 @@ mod test {
                 vec![
                     DirRoute {
                         dir: "another".to_string(),
+                        ..Default::default()
                     },
                     DirRoute {
                         dir: "another_2".to_string(),
+                        ..Default::default()
                     },
                 ],
                 ProxyRoute {
@@ -227,9 +230,11 @@ mod test {
             let expected = Dirs(vec![
                 DirRoute {
                     dir: "public".to_string(),
+                    ..Default::default()
                 },
                 DirRoute {
                     dir: ".".to_string(),
+                    ..Default::default()
                 },
             ]);
 

@@ -51,7 +51,10 @@ pub fn from_paths<T: AsRef<str>>(
                 let str = p.as_ref();
                 Route {
                     path: "/".to_string(),
-                    kind: RouteKind::Dir(DirRoute { dir: str.into() }),
+                    kind: RouteKind::Dir(DirRoute {
+                        dir: str.into(),
+                        base: None,
+                    }),
                     ..Default::default()
                 }
             })

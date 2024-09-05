@@ -20,6 +20,7 @@ export type RouteKindDTO =
 }}
 	| { kind: "Dir", payload: {
 	dir: string;
+	base?: string;
 }};
 
 export interface RouteDTO {

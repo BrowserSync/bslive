@@ -1,10 +1,10 @@
+use crate::watch_opts::WatchOpts;
+use bsnext_resp::inject_opts::InjectOpts;
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
-
-use crate::watch_opts::WatchOpts;
-use bsnext_resp::inject_opts::InjectOpts;
+use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Route {
@@ -107,9 +107,10 @@ impl Hash for JsonWrapper {
     }
 }
 
-#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct DirRoute {
     pub dir: String,
+    pub base: Option<PathBuf>,
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]

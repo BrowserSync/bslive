@@ -25,7 +25,7 @@ use tracing::{span, Level};
 pub async fn raw_loader(
     State(app): State<Arc<ServerState>>,
     req: Request,
-    next: Next,
+    _next: Next,
 ) -> impl IntoResponse {
     let span = span!(parent: None, Level::INFO, "raw_loader", path = req.uri().path());
     let _guard = span.enter();

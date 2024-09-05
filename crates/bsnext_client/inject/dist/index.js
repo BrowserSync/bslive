@@ -6299,7 +6299,8 @@ var routeKindDTOSchema = z.union([
   z.object({
     kind: z.literal("Dir"),
     payload: z.object({
-      dir: z.string()
+      dir: z.string(),
+      base: z.string().optional()
     })
   })
 ]);

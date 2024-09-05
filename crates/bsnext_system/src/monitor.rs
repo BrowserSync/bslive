@@ -266,7 +266,7 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                 .filter_map(|r| match &r.kind {
                     RouteKind::Raw(_) => None,
                     RouteKind::Proxy(_) => None,
-                    RouteKind::Dir(DirRoute { dir }) => {
+                    RouteKind::Dir(DirRoute { dir, .. }) => {
                         let spec = to_spec(&r.opts.watch);
                         Some(RouteWatchable {
                             server_identity: server_config.identity.clone(),

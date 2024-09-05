@@ -11,6 +11,7 @@ use tracing::trace_span;
 #[derive(Debug, Clone)]
 pub struct ServeDirItem {
     pub path: PathBuf,
+    pub base: Option<PathBuf>,
 }
 
 pub async fn try_many_serve_dir(
@@ -65,22 +66,30 @@ mod test {
     use super::*;
     use crate::handler_stack::RouteMap;
     use crate::server::router::common::to_resp_parts_and_body;
+    
     use bsnext_input::route::Route;
     use std::env::current_dir;
 
     #[tokio::test]
     async fn test() -> anyhow::Result<()> {
-        let routes_input = r#"
+        let current = current_dir()?;
+        let parent = current.parent().unwrap().parent().unwrap().to_owned();
+
+        let routes_input = format!(
+            r#"
             - path: /
               dir: examples/basic/public
+              base: {base}
             - path: /
               dir: examples/kitchen-sink
-        "#;
+              base: {base}
+        "#,
+            base = parent.display()
+        );
+
+        let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
 
         {
-            let current = current_dir()?;
-            let parent = current.parent().unwrap().parent().unwrap().to_owned();
-            let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
             let router = RouteMap::new_from_routes(&routes).into_router();
             let expected_body = include_str!("../../../examples/basic/public/index.html");
 
@@ -93,9 +102,6 @@ mod test {
         }
 
         {
-            let current = current_dir()?;
-            let parent = current.parent().unwrap().parent().unwrap().to_owned();
-            let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
             let router = RouteMap::new_from_routes(&routes).into_router();
             let expected_body = include_str!("../../../examples/kitchen-sink/input.html");
 

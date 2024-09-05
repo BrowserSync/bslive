@@ -50,7 +50,7 @@ pub enum RouteKindDTO {
     Raw { raw: String },
     Sse { sse: String },
     Proxy { proxy: String },
-    Dir { dir: String },
+    Dir { dir: String, base: Option<String> },
 }
 
 impl From<RouteKind> for RouteKindDTO {
@@ -65,7 +65,10 @@ impl From<RouteKind> for RouteKindDTO {
                 RawRoute::Sse { sse } => RouteKindDTO::Sse { sse },
             },
             RouteKind::Proxy(ProxyRoute { proxy }) => RouteKindDTO::Proxy { proxy },
-            RouteKind::Dir(DirRoute { dir }) => RouteKindDTO::Dir { dir },
+            RouteKind::Dir(DirRoute { dir, base }) => RouteKindDTO::Dir {
+                dir,
+                base: base.map(|b| b.to_string_lossy().to_string()),
+            },
         }
     }
 }
