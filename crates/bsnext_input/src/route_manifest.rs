@@ -1,4 +1,4 @@
-use crate::route::{Route, RouteKind};
+use crate::route::{RawRoute, Route, RouteKind};
 use std::collections::{HashMap, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -55,8 +55,13 @@ impl From<&Route> for RouteIdentity {
     fn from(value: &Route) -> Self {
         Self {
             path: value.path.clone(),
-            kind_str: match value.kind {
-                RouteKind::Raw(_) => "RouteKind::Raw",
+            kind_str: match &value.kind {
+                RouteKind::Raw(raw) => match raw {
+                    RawRoute::Html { .. } => "RouteKind::Raw::Html",
+                    RawRoute::Json { .. } => "RouteKind::Raw::Json",
+                    RawRoute::Raw { .. } => "RouteKind::Raw::Raw",
+                    RawRoute::Sse { .. } => "RouteKind::Raw::Sse",
+                },
                 RouteKind::Proxy(_) => "RouteKind::Proxy",
                 RouteKind::Dir(_) => "RouteKind::Dir",
             }
@@ -136,7 +141,7 @@ html: hello world
                 added: vec![],
                 removed: vec![RouteIdentity {
                     path: "/api".to_string(),
-                    kind_str: "RouteKind::Html".to_string()
+                    kind_str: "RouteKind::Raw::Html".to_string()
                 }],
                 changed: vec![],
             }
@@ -148,7 +153,7 @@ html: hello world
                 added: vec![],
                 removed: vec![RouteIdentity {
                     path: "/api".to_string(),
-                    kind_str: "RouteKind::Html".to_string()
+                    kind_str: "RouteKind::Raw::Html".to_string()
                 }],
                 changed: vec![],
             }
@@ -171,7 +176,7 @@ html: hello world
                 removed: vec![],
                 changed: vec![RouteIdentity {
                     path: "/api".to_string(),
-                    kind_str: "RouteKind::Html".to_string()
+                    kind_str: "RouteKind::Raw::Html".to_string()
                 }],
             }
         );
