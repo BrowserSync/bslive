@@ -6,27 +6,31 @@ Config {
     items: [
         Route {
             path: "/api",
-            cors_opts: None,
-            delay_opts: None,
-            watch_opts: Bool(
-                true,
-            ),
-            inject_opts: Bool(
-                true,
-            ),
-            kind: Json {
-                json: JsonWrapper(
-                    Array [
-                        Number(1),
-                        Number(2),
-                    ],
-                ),
-            },
-            headers: Some(
-                {
-                    "a": "b",
+            kind: Raw(
+                Json {
+                    json: JsonWrapper(
+                        Array [
+                            Number(1),
+                            Number(2),
+                        ],
+                    ),
                 },
             ),
+            opts: Opts {
+                cors: None,
+                delay: None,
+                watch: Bool(
+                    true,
+                ),
+                inject: Bool(
+                    true,
+                ),
+                headers: Some(
+                    {
+                        "a": "b",
+                    },
+                ),
+            },
         },
     ],
 }
