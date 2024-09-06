@@ -1,13 +1,18 @@
 use anyhow::Context;
 use axum::body::Body;
 use axum::extract::Request;
+use axum::handler::Handler;
 use axum::response::{IntoResponse, Response};
+use axum::routing::any;
 use axum::Extension;
-
+use bsnext_resp::injector_guard::InjectorGuard;
+use bsnext_resp::InjectHandling;
 use http::{HeaderValue, StatusCode, Uri};
 use hyper_tls::HttpsConnector;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
+use tower::ServiceExt;
+use tower_http::decompression::DecompressionLayer;
 
 #[derive(Debug, Clone)]
 pub struct ProxyConfig {
@@ -41,21 +46,12 @@ pub async fn proxy_handler(
     Extension(config): Extension<ProxyConfig>,
     req: Request,
 ) -> Result<Response, AnyAppError> {
-    let client = {
-        req.extensions()
-            .get::<Client<HttpsConnector<HttpConnector>, Body>>()
-            .expect("must have a client, move this to an extractor?")
-    };
-    let client_c = client.clone();
-
     let target = config.target.clone();
 
     tracing::trace!(?config);
-
     let path = req.uri().path();
 
     tracing::trace!(req.uri = %path, config.path = config.path);
-    // tracing::trace!(req.headers = ?req.headers());
 
     let path_query = req
         .uri()
@@ -81,14 +77,34 @@ pub async fn proxy_handler(
 
     *req.uri_mut() = parsed;
 
-    // todo: Which other headers to mod here?
+    // todo(alpha): Which other headers to mod here?
     req.headers_mut().insert("host", host_header_value);
 
-    let res = client_c
+    // decompress requests if needed
+    if let Some(h) = req.extensions().get::<InjectHandling>() {
+        let req_accepted = h.items.iter().any(|item| item.accept_req(&req));
+        tracing::trace!(req.accepted = req_accepted);
+        if req_accepted {
+            let sv2 = any(serve_raw_one.layer(DecompressionLayer::new()));
+            return Ok(sv2.oneshot(req).await.into_response());
+        }
+    }
+
+    let sv2 = any(serve_raw_one);
+    Ok(sv2.oneshot(req).await.into_response())
+}
+
+async fn serve_raw_one(req: Request) -> Response {
+    tracing::trace!("serve_raw_one {}", req.uri().to_string());
+    let client = {
+        req.extensions()
+            .get::<Client<HttpsConnector<HttpConnector>, Body>>()
+            .expect("must have a client, move this to an extractor?")
+    };
+    let client_c = client.clone();
+    client_c
         .request(req)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)
-        .into_response();
-
-    Ok(res)
+        .into_response()
 }

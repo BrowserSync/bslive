@@ -7,7 +7,6 @@ use axum::middleware::from_fn_with_state;
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{Extension, Router};
 use bsnext_input::route::{DirRoute, FallbackRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
-use bsnext_resp::path_matcher::PathMatcher::Def;
 use std::collections::HashMap;
 use tower_http::services::{ServeDir, ServeFile};
 
@@ -171,7 +170,7 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
             let svc = any_service(serve_raw_one.with_state(raw_route));
             add_route_layers(svc, &route.opts)
         }
-        RouteKind::Proxy(new_proxy_route) => {
+        RouteKind::Proxy(_new_proxy_route) => {
             // todo(alpha): make a decision proxy as a fallback
             todo!("add support for RouteKind::Proxy as a fallback?")
         }
@@ -180,7 +179,7 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
             let item = DirRouteOpts::new(dir, route.opts, None);
             let serve_dir_service = item.as_serve_file();
             let service = get_service(serve_dir_service);
-            let mut layered = add_route_layers(service, &item.opts);
+            let layered = add_route_layers(service, &item.opts);
             layered
         }
     }
@@ -207,8 +206,11 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
                 target: proxy.proxy.clone(),
                 path: path.to_string(),
             };
-            let router = any(proxy_handler).layer(Extension(proxy_config.clone()));
-            Router::new().nest_service(path, add_route_layers(router, &opts))
+
+            let proxy_with_decompression = proxy_handler.layer(Extension(proxy_config.clone()));
+            let as_service = any(proxy_with_decompression);
+
+            Router::new().nest_service(path, add_route_layers(as_service, &opts))
         }
         HandlerStack::DirsProxy(dir_list, proxy) => {
             let r2 = stack_to_router(
@@ -224,12 +226,6 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum FallbackStatus {
-    None,
-    Fallback,
-}
-
 fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Router {
     let serve_dir_items = dir_list_with_opts
         .iter()
@@ -237,7 +233,7 @@ fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Rout
             None => {
                 let serve_dir_service = dir_route.as_serve_dir();
                 let service = get_service(serve_dir_service);
-                let mut layered = add_route_layers(service, &dir_route.opts);
+                let layered = add_route_layers(service, &dir_route.opts);
                 layered
             }
             Some(fallback) => {
@@ -247,7 +243,7 @@ fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Rout
                     .fallback(stack)
                     .call_fallback_on_method_not_allowed(true);
                 let service = any_service(serve_dir_service);
-                let mut layered = add_route_layers(service, &dir_route.opts);
+                let layered = add_route_layers(service, &dir_route.opts);
                 layered
             }
         })
@@ -337,6 +333,14 @@ mod test {
             assert_eq!(body, "body { background: red }");
         }
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_handler_stack_04() -> anyhow::Result<()> {
+        let input = include_bytes!("../../../bs.html");
+        let as_str = std::str::from_utf8(input)?;
+        print!("{}", as_str.len());
         Ok(())
     }
 }

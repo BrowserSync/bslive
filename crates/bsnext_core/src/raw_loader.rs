@@ -6,7 +6,6 @@ use axum::response::{Html, IntoResponse, Response, Sse};
 use axum::Json;
 use http::header::CONTENT_TYPE;
 
-use crate::handler_stack::FallbackStatus;
 use axum::body::Body;
 use axum::response::sse::Event;
 use bsnext_input::route::RawRoute;

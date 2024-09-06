@@ -2,8 +2,6 @@ servers:
   - bind_address: 0.0.0.0:3002
     routes:
       - path: /
-        html: "homepage"
-      - path: /api
-        proxy: "example.com"
-      - path: /test
-        html: "hello test"
+        proxy: https://browsersync.io
+      - path: /css
+        dir: examples/proxy-simple/overrides

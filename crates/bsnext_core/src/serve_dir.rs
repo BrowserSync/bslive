@@ -1,8 +1,7 @@
-use crate::handler_stack::FallbackStatus;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
+use axum::response::IntoResponse;
 use axum::routing::MethodRouter;
 use http::{StatusCode, Uri};
 use tower::ServiceExt;
