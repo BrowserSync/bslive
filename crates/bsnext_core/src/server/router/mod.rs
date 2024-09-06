@@ -4,9 +4,9 @@ use crate::panic_handler::handle_panic;
 use axum::extract::{Request, State};
 use axum::http::Uri;
 use axum::middleware::{from_fn_with_state, Next};
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, MethodRouter};
-use axum::{http, Extension, Router};
+use axum::{http, middleware, Extension, Router};
 
 use axum::body::Body;
 use http::header::CONTENT_TYPE;
@@ -17,18 +17,17 @@ use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use mime_guess::mime;
 use std::sync::Arc;
-use tower::ServiceBuilder;
+use tower::{ServiceBuilder, ServiceExt};
 use tower_http::catch_panic::CatchPanicLayer;
 
 use crate::meta::MetaData;
-use crate::raw_loader::raw_loader;
 use crate::server::router::assets::pub_ui_assets;
 use crate::server::router::pub_api::pub_api;
 use crate::server::state::ServerState;
 use crate::ws::ws_handler;
 use bsnext_client::html_with_base;
 use bsnext_dto::{RouteDTO, ServerDesc};
-use tower_http::trace::TraceLayer;
+use tracing::{span, Level};
 
 mod assets;
 mod pub_api;
@@ -43,7 +42,8 @@ pub fn make_router(state: &Arc<ServerState>) -> Router {
         .merge(dynamic_loaders(state.clone()));
 
     router
-        .layer(TraceLayer::new_for_http())
+        // todo(alpha): enable tracing on a per-item basis?
+        // .layer(TraceLayer::new_for_http())
         // todo(alpha): re-enable in the correct place?
         // .layer(TimeoutLayer::new(Duration::from_secs(10)))
         .layer(Extension(client))
@@ -101,7 +101,7 @@ pub fn dynamic_loaders(state: Arc<ServerState>) -> Router {
                 // .layer(from_fn_with_state(state.clone(), maybe_proxy))
                 // todo(alpha): have the order listed here instead: static -> dir -> proxy
                 // .layer(from_fn_with_state(state.clone(), not_found_loader))
-                .layer(from_fn_with_state(state.clone(), raw_loader)),
+                .layer(from_fn_with_state(state.clone(), dynamic_router)),
         )
         .layer(CatchPanicLayer::custom(handle_panic))
         .with_state(state.clone())
@@ -124,4 +124,30 @@ async fn tagging_layer(
 pub enum Encoding {
     Br,
     Zip,
+}
+
+pub async fn dynamic_router(
+    State(app): State<Arc<ServerState>>,
+    req: Request,
+    _next: Next,
+) -> impl IntoResponse {
+    let span = span!(parent: None, Level::INFO, "raw_loader", path = req.uri().path());
+    let _guard = span.enter();
+
+    let raw_router = app.raw_router.read().await;
+
+    raw_router
+        .clone()
+        .layer(middleware::from_fn(tag_dynamic))
+        .oneshot(req)
+        .await
+        .into_response()
+}
+
+async fn tag_dynamic(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let (mut parts, body) = next.run(req).await.into_parts();
+    if parts.status.as_u16() == 200 {
+        parts.extensions.insert(MetaData::ServedRaw);
+    }
+    Ok(Response::from_parts(parts, body))
 }

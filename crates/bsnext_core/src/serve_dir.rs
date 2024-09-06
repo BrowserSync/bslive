@@ -2,37 +2,30 @@ use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::IntoResponse;
+use axum::routing::MethodRouter;
 use http::{StatusCode, Uri};
-use std::path::PathBuf;
 use tower::ServiceExt;
-use tower_http::services::ServeDir;
 use tracing::trace_span;
 
-#[derive(Debug, Clone)]
-pub struct ServeDirItem {
-    pub path: PathBuf,
-    pub base: Option<PathBuf>,
-}
-
-pub async fn try_many_serve_dir(
-    State(svs): State<Vec<(PathBuf, ServeDir)>>,
+pub async fn try_many_services_dir(
+    State((path, router_list)): State<(String, Vec<MethodRouter>)>,
     uri: Uri,
-    r: Request,
+    req: Request,
     next: Next,
 ) -> impl IntoResponse {
-    let span = trace_span!("handling");
+    let span = trace_span!(parent: None, "handling", path);
     let _ = span.enter();
 
-    tracing::trace!(?uri, "{} services", svs.len());
+    tracing::trace!(?uri, "{} services", router_list.len());
 
-    let (a, b) = r.into_parts();
+    let (a, b) = req.into_parts();
 
-    for (index, (path_buf, srv)) in svs.into_iter().enumerate() {
+    for (index, method_router) in router_list.into_iter().enumerate() {
         let span = trace_span!("trying {}", index);
         let _ = span.enter();
-        tracing::trace!(?path_buf);
+        // tracing::trace!(?path_buf);
         let req_clone = Request::from_parts(a.clone(), Body::empty());
-        let result = srv.oneshot(req_clone).await;
+        let result = method_router.oneshot(req_clone).await;
         match result {
             Ok(result) if result.status() == 404 => {
                 tracing::trace!("  ❌ not found at index {}, trying another", index);
@@ -66,7 +59,7 @@ mod test {
     use super::*;
     use crate::handler_stack::RouteMap;
     use crate::server::router::common::to_resp_parts_and_body;
-    
+
     use bsnext_input::route::Route;
     use std::env::current_dir;
 

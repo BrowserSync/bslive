@@ -1,16 +1,13 @@
 use crate::common_layers::add_route_layers;
 use crate::handlers::proxy::{proxy_handler, ProxyConfig};
 use crate::raw_loader::serve_raw_one;
-use crate::serve_dir::{try_many_serve_dir, ServeDirItem};
+use crate::serve_dir::try_many_services_dir;
 use axum::handler::Handler;
-use axum::routing::{any, any_service};
-use axum::{middleware, Extension, Router};
-use bsnext_input::route::{
-    DirRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind,
-};
+use axum::middleware::from_fn_with_state;
+use axum::routing::{any, any_service, get_service, MethodRouter};
+use axum::{Extension, Router};
+use bsnext_input::route::{DirRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
 use std::collections::HashMap;
-use std::path::PathBuf;
-use tower::ServiceBuilder;
 use tower_http::services::ServeDir;
 
 #[derive(Debug, PartialEq)]
@@ -18,9 +15,43 @@ pub enum HandlerStack {
     None,
     // todo: make this a separate thing
     Raw { raw: RawRoute, opts: Opts },
-    Dirs { dirs: Vec<DirRoute>, opts: Opts },
+    Dirs(Vec<DirRouteOpts>),
     Proxy(ProxyRoute),
-    DirsProxy(Vec<DirRoute>, ProxyRoute),
+    DirsProxy(Vec<DirRouteOpts>, ProxyRoute),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DirRouteOpts {
+    dir_route: DirRoute,
+    opts: Opts,
+}
+
+impl DirRouteOpts {
+    pub fn as_serve_dir(&self) -> ServeDir {
+        match &self.dir_route.base {
+            Some(base_dir) => {
+                tracing::trace!(
+                    "combining root: `{}` with given path: `{}`",
+                    base_dir.display(),
+                    self.dir_route.dir
+                );
+                ServeDir::new(base_dir.join(&self.dir_route.dir))
+            }
+            None => {
+                tracing::trace!("no root given, using `{}` directly", self.dir_route.dir);
+                ServeDir::new(&self.dir_route.dir)
+            }
+        }
+    }
+}
+
+impl DirRouteOpts {
+    fn new(p0: DirRoute, p1: Opts) -> DirRouteOpts {
+        Self {
+            dir_route: p0,
+            opts: p1,
+        }
+    }
 }
 
 pub struct RouteMap {
@@ -72,10 +103,7 @@ pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
                 opts: route.opts,
             },
             RouteKind::Proxy(pr) => HandlerStack::Proxy(pr),
-            RouteKind::Dir(dir) => HandlerStack::Dirs {
-                dirs: vec![dir],
-                opts: route.opts,
-            },
+            RouteKind::Dir(dir) => HandlerStack::Dirs(vec![DirRouteOpts::new(dir, route.opts)]),
         },
         HandlerStack::Raw { raw, opts } => match route.kind {
             // if a second 'raw' is seen, just use it, discarding the previous
@@ -86,21 +114,23 @@ pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
             // 'raw' handlers never get updated
             _ => HandlerStack::Raw { raw, opts },
         },
-        HandlerStack::Dirs { mut dirs, opts } => match route.kind {
+        HandlerStack::Dirs(mut dirs) => match route.kind {
             RouteKind::Dir(next_dir) => {
-                dirs.push(next_dir);
-                HandlerStack::Dirs { dirs, opts }
+                dirs.push(DirRouteOpts::new(next_dir, route.opts));
+                HandlerStack::Dirs(dirs)
             }
             RouteKind::Proxy(proxy) => HandlerStack::DirsProxy(dirs, proxy),
-            _ => HandlerStack::Dirs { dirs, opts },
+            _ => HandlerStack::Dirs(dirs),
         },
         HandlerStack::Proxy(proxy) => match route.kind {
-            RouteKind::Dir(dir) => HandlerStack::DirsProxy(vec![dir], proxy),
+            RouteKind::Dir(dir) => {
+                HandlerStack::DirsProxy(vec![DirRouteOpts::new(dir, route.opts)], proxy)
+            }
             _ => HandlerStack::Proxy(proxy),
         },
         HandlerStack::DirsProxy(mut dirs, proxy) => match route.kind {
             RouteKind::Dir(dir) => {
-                dirs.push(dir);
+                dirs.push(DirRouteOpts::new(dir, route.opts));
                 HandlerStack::DirsProxy(dirs, proxy)
             }
             // todo(alpha): how to handle multiple proxies? should it just override for now?
@@ -120,11 +150,10 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
         HandlerStack::None => unreachable!(),
         HandlerStack::Raw { raw, opts } => {
             let svc = any_service(serve_raw_one.with_state(raw));
-            let service = ServiceBuilder::new().service(svc);
-            Router::new().route_service(path, add_route_layers(service, path, &opts))
+            Router::new().route_service(path, add_route_layers(svc, path, &opts))
         }
-        HandlerStack::Dirs { dirs, opts } => {
-            Router::new().nest_service(path, serve_dir_layer(&dirs, Router::new()))
+        HandlerStack::Dirs(dirs) => {
+            Router::new().nest_service(path, serve_dir_layer(path, &dirs, Router::new()))
         }
         HandlerStack::Proxy(proxy) => {
             let proxy_config = ProxyConfig {
@@ -138,43 +167,26 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
         }
         HandlerStack::DirsProxy(dir_list, proxy) => {
             let r2 = stack_to_router(path, HandlerStack::Proxy(proxy));
-            let r1 = serve_dir_layer(&dir_list, Router::new().fallback_service(r2));
+            let r1 = serve_dir_layer(path, &dir_list, Router::new().fallback_service(r2));
             Router::new().nest_service(path, r1)
         }
     }
 }
 
-fn serve_dir_layer(dir_list: &[DirRoute], initial: Router) -> Router {
-    let serve_dir_items = dir_list
+fn serve_dir_layer(path: &str, dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Router {
+    let serve_dir_items = dir_list_with_opts
         .iter()
-        .map(|dir_route| ServeDirItem {
-            path: PathBuf::from(&dir_route.dir),
-            base: dir_route.base.clone(),
+        .map(|dir_route| {
+            let src = dir_route.as_serve_dir();
+            let service = get_service(src);
+            add_route_layers(service, path, &dir_route.opts)
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<MethodRouter>>();
 
-    let services = serve_dir_items
-        .iter()
-        .map(|item| {
-            let src = match &item.base {
-                Some(p) => {
-                    tracing::trace!(
-                        "combining root: `{}` with given path: `{}`",
-                        p.display(),
-                        item.path.display()
-                    );
-                    ServeDir::new(p.join(&item.path))
-                }
-                None => {
-                    tracing::trace!("no root given, using `{}` directly", item.path.display());
-                    ServeDir::new(&item.path)
-                }
-            };
-            (item.path.clone(), src)
-        })
-        .collect::<Vec<(PathBuf, ServeDir)>>();
-
-    initial.layer(middleware::from_fn_with_state(services, try_many_serve_dir))
+    initial.layer(from_fn_with_state(
+        (path.to_string(), serve_dir_items),
+        try_many_services_dir,
+    ))
 }
 
 #[cfg(test)]

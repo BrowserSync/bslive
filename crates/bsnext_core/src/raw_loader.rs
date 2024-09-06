@@ -3,42 +3,17 @@ use std::convert::Infallible;
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response, Sse};
-use axum::{middleware, Json};
+use axum::Json;
 use http::header::CONTENT_TYPE;
 
-use crate::meta::MetaData;
-use crate::server::state::ServerState;
 use axum::body::Body;
-use axum::handler::Handler;
 use axum::response::sse::Event;
 use bsnext_input::route::RawRoute;
 use bytes::Bytes;
 use http::{StatusCode, Uri};
 use http_body_util::BodyExt;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio_stream::StreamExt;
-use tower::ServiceExt;
-
-use tracing::{span, Level};
-
-pub async fn raw_loader(
-    State(app): State<Arc<ServerState>>,
-    req: Request,
-    _next: Next,
-) -> impl IntoResponse {
-    let span = span!(parent: None, Level::INFO, "raw_loader", path = req.uri().path());
-    let _guard = span.enter();
-
-    let raw_router = app.raw_router.read().await;
-
-    raw_router
-        .clone()
-        .layer(middleware::from_fn(tag_raw))
-        .oneshot(req)
-        .await
-        .into_response()
-}
 
 pub async fn serve_raw_one(uri: Uri, state: State<RawRoute>, req: Request) -> Response {
     tracing::trace!("serve_raw_one {}", req.uri().to_string());
@@ -76,6 +51,7 @@ mod raw_test {
     use crate::handler_stack::RouteMap;
     use crate::server::router::common::to_resp_parts_and_body;
     use bsnext_input::route::Route;
+    use tower::ServiceExt;
 
     #[tokio::test]
     async fn duplicate_path() -> anyhow::Result<()> {
@@ -144,14 +120,6 @@ mod raw_test {
 
         Ok(())
     }
-}
-
-async fn tag_raw(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let (mut parts, body) = next.run(req).await.into_parts();
-    if parts.status.as_u16() == 200 {
-        parts.extensions.insert(MetaData::ServedRaw);
-    }
-    Ok(Response::from_parts(parts, body))
 }
 
 #[allow(dead_code)]
