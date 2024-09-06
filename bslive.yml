@@ -4,6 +4,7 @@ servers:
       - path: /
         dir: examples/basic/public
       - path: /
+        cors: true
         dir: examples/kitchen-sink
       - path: /
         proxy: https://shaneddg.ngrok.io
@@ -16,5 +17,5 @@ servers:
         raw: '1234'
       - path: /styles.css
         raw: '/* css */'
-      - path: /styles.css
-        raw: '/* css2 */'
+        delay:
+          ms: 10000

@@ -17,3 +17,8 @@ servers:
         dir: 'another_2'
       - path: /dir1
         proxy: 'example.com'
+  - name: "raw+opts"
+    routes:
+      - path: /script.js
+        raw: 'console.log("hello world!")'
+        cors: true

@@ -1,31 +1,30 @@
 use axum::extract::Request;
 use axum::middleware::Next;
-use axum::{middleware, Extension, Router};
+use axum::routing::MethodRouter;
+use axum::{middleware, Extension};
+use bsnext_input::route::{CorsOpts, DelayKind, DelayOpts, Opts};
+use bsnext_resp::{response_modifications_layer, InjectHandling};
 use http::{HeaderName, HeaderValue};
 use std::convert::Infallible;
 use std::time::Duration;
-
-use bsnext_input::route::{CorsOpts, DelayKind, DelayOpts, Route};
-use bsnext_resp::{response_modifications_layer, InjectHandling};
 use tokio::time::sleep;
 use tower_http::cors::CorsLayer;
 use tower_http::set_header;
 
-pub fn add_route_layers(app: Router, route: &Route) -> Router {
+pub fn add_route_layers(app: MethodRouter, path: &str, opts: &Opts) -> MethodRouter {
     let mut app = app;
 
-    if route
-        .opts
+    if opts
         .cors
         .as_ref()
         .is_some_and(|v| *v == CorsOpts::Cors(true))
     {
-        tracing::trace!(to = route.path, "adding permissive cors");
+        tracing::trace!(to = path, "adding permissive cors");
         app = app.layer(CorsLayer::permissive());
     }
 
-    if let Some(DelayOpts::Delay(DelayKind::Ms(ms))) = route.opts.delay.as_ref() {
-        tracing::trace!(to = route.path, ?ms, "adding a delay");
+    if let Some(DelayOpts::Delay(DelayKind::Ms(ms))) = opts.delay.as_ref() {
+        tracing::trace!(to = path, ?ms, "adding a delay");
         let ms = *ms;
         app = app.layer(middleware::from_fn(
             move |req: Request, next: Next| async move {
@@ -36,7 +35,7 @@ pub fn add_route_layers(app: Router, route: &Route) -> Router {
         ));
     }
 
-    if let Some(headers) = route.opts.headers.as_ref() {
+    if let Some(headers) = opts.headers.as_ref() {
         for (k, v) in headers {
             let hn = HeaderName::from_bytes(k.as_bytes());
             let hv = HeaderValue::from_bytes(v.as_bytes());
@@ -57,9 +56,9 @@ pub fn add_route_layers(app: Router, route: &Route) -> Router {
         }
     }
 
-    let injections = route.opts.inject.injections();
+    let injections = opts.inject.injections();
     app = app
-        .layer(middleware::from_fn(response_modifications_layer))
+        .layer::<_, Infallible>(middleware::from_fn(response_modifications_layer))
         .layer(Extension(InjectHandling { items: injections }));
 
     app

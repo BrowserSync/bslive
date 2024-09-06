@@ -1,10 +1,13 @@
+use crate::common_layers::add_route_layers;
 use crate::handlers::proxy::{proxy_handler, ProxyConfig};
 use crate::raw_loader::serve_raw_one;
 use crate::serve_dir::{try_many_serve_dir, ServeDirItem};
 use axum::handler::Handler;
 use axum::routing::{any, any_service};
 use axum::{middleware, Extension, Router};
-use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
+use bsnext_input::route::{
+    DirRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind,
+};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tower::ServiceBuilder;
@@ -14,8 +17,8 @@ use tower_http::services::ServeDir;
 pub enum HandlerStack {
     None,
     // todo: make this a separate thing
-    Raw(RawRoute),
-    Dirs(Vec<DirRoute>),
+    Raw { raw: RawRoute, opts: Opts },
+    Dirs { dirs: Vec<DirRoute>, opts: Opts },
     Proxy(ProxyRoute),
     DirsProxy(Vec<DirRoute>, ProxyRoute),
 }
@@ -64,23 +67,32 @@ impl RouteMap {
 pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
     match state {
         HandlerStack::None => match route.kind {
-            RouteKind::Raw(route) => HandlerStack::Raw(route),
+            RouteKind::Raw(raw_route) => HandlerStack::Raw {
+                raw: raw_route,
+                opts: route.opts,
+            },
             RouteKind::Proxy(pr) => HandlerStack::Proxy(pr),
-            RouteKind::Dir(dir) => HandlerStack::Dirs(vec![dir]),
+            RouteKind::Dir(dir) => HandlerStack::Dirs {
+                dirs: vec![dir],
+                opts: route.opts,
+            },
         },
-        HandlerStack::Raw(..) => match route.kind {
+        HandlerStack::Raw { raw, opts } => match route.kind {
             // if a second 'raw' is seen, just use it, discarding the previous
-            RouteKind::Raw(route) => HandlerStack::Raw(route),
+            RouteKind::Raw(raw_route) => HandlerStack::Raw {
+                raw: raw_route,
+                opts: route.opts,
+            },
             // 'raw' handlers never get updated
-            _ => state,
+            _ => HandlerStack::Raw { raw, opts },
         },
-        HandlerStack::Dirs(mut dirs) => match route.kind {
+        HandlerStack::Dirs { mut dirs, opts } => match route.kind {
             RouteKind::Dir(next_dir) => {
                 dirs.push(next_dir);
-                HandlerStack::Dirs(dirs)
+                HandlerStack::Dirs { dirs, opts }
             }
             RouteKind::Proxy(proxy) => HandlerStack::DirsProxy(dirs, proxy),
-            _ => HandlerStack::Dirs(dirs),
+            _ => HandlerStack::Dirs { dirs, opts },
         },
         HandlerStack::Proxy(proxy) => match route.kind {
             RouteKind::Dir(dir) => HandlerStack::DirsProxy(vec![dir], proxy),
@@ -91,6 +103,7 @@ pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
                 dirs.push(dir);
                 HandlerStack::DirsProxy(dirs, proxy)
             }
+            // todo(alpha): how to handle multiple proxies? should it just override for now?
             _ => HandlerStack::DirsProxy(dirs, proxy),
         },
     }
@@ -105,12 +118,13 @@ pub fn routes_to_stack(routes: &[Route]) -> HandlerStack {
 pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
     match stack {
         HandlerStack::None => unreachable!(),
-        HandlerStack::Raw(raw) => {
+        HandlerStack::Raw { raw, opts } => {
             let svc = any_service(serve_raw_one.with_state(raw));
-            Router::new().route_service(path, ServiceBuilder::new().service(svc))
+            let service = ServiceBuilder::new().service(svc);
+            Router::new().route_service(path, add_route_layers(service, path, &opts))
         }
-        HandlerStack::Dirs(dir_list) => {
-            Router::new().nest_service(path, serve_dir_layer(&dir_list, Router::new()))
+        HandlerStack::Dirs { dirs, opts } => {
+            Router::new().nest_service(path, serve_dir_layer(&dirs, Router::new()))
         }
         HandlerStack::Proxy(proxy) => {
             let proxy_config = ProxyConfig {
@@ -166,83 +180,57 @@ fn serve_dir_layer(dir_list: &[DirRoute], initial: Router) -> Router {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::handler_stack::HandlerStack::{Dirs, DirsProxy};
+
     use crate::server::router::common::to_resp_parts_and_body;
     use axum::body::Body;
     use bsnext_input::Input;
     use http::Request;
+    use insta::assert_debug_snapshot;
     use tower::ServiceExt;
 
     #[test]
     fn test_handler_stack_01() -> anyhow::Result<()> {
         let yaml = include_str!("../../../examples/basic/handler_stack.yml");
         let input = serde_yaml::from_str::<Input>(&yaml)?;
+        let first = input
+            .servers
+            .iter()
+            .find(|x| x.identity.is_named("raw"))
+            .unwrap();
 
-        {
-            let first = input
-                .servers
-                .iter()
-                .find(|x| x.identity.is_named("raw"))
-                .unwrap();
+        let actual = routes_to_stack(&first.routes);
+        assert_debug_snapshot!(actual);
+        Ok(())
+    }
 
-            let expected = HandlerStack::Raw(RawRoute::Raw {
-                raw: "another".to_string(),
-            });
+    #[test]
+    fn test_handler_stack_02() -> anyhow::Result<()> {
+        let yaml = include_str!("../../../examples/basic/handler_stack.yml");
+        let input = serde_yaml::from_str::<Input>(&yaml)?;
+        let first = input
+            .servers
+            .iter()
+            .find(|x| x.identity.is_named("2dirs+proxy"))
+            .unwrap();
 
-            let actual = routes_to_stack(&first.routes);
+        let actual = routes_to_stack(&first.routes);
 
-            assert_eq!(actual, expected);
-        }
+        assert_debug_snapshot!(actual);
+        Ok(())
+    }
+    #[test]
+    fn test_handler_stack_03() -> anyhow::Result<()> {
+        let yaml = include_str!("../../../examples/basic/handler_stack.yml");
+        let input = serde_yaml::from_str::<Input>(&yaml)?;
+        let first = input
+            .servers
+            .iter()
+            .find(|s| s.identity.is_named("raw+opts"))
+            .unwrap();
 
-        {
-            let first = input
-                .servers
-                .iter()
-                .find(|x| x.identity.is_named("2dirs+proxy"))
-                .unwrap();
-            let expected = DirsProxy(
-                vec![
-                    DirRoute {
-                        dir: "another".to_string(),
-                        ..Default::default()
-                    },
-                    DirRoute {
-                        dir: "another_2".to_string(),
-                        ..Default::default()
-                    },
-                ],
-                ProxyRoute {
-                    proxy: "example.com".to_string(),
-                },
-            );
+        let actual = routes_to_stack(&first.routes);
 
-            let actual = routes_to_stack(&first.routes);
-
-            assert_eq!(actual, expected);
-        }
-
-        {
-            let first = input
-                .servers
-                .iter()
-                .find(|s| s.identity.is_named("2dirs"))
-                .unwrap();
-            let expected = Dirs(vec![
-                DirRoute {
-                    dir: "public".to_string(),
-                    ..Default::default()
-                },
-                DirRoute {
-                    dir: ".".to_string(),
-                    ..Default::default()
-                },
-            ]);
-
-            let actual = routes_to_stack(&first.routes);
-
-            assert_eq!(actual, expected);
-        }
-
+        assert_debug_snapshot!(actual);
         Ok(())
     }
 

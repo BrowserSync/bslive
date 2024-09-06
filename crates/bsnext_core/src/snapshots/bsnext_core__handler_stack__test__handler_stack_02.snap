@@ -1,0 +1,19 @@
+---
+source: crates/bsnext_core/src/handler_stack.rs
+expression: actual
+---
+DirsProxy(
+    [
+        DirRoute {
+            dir: "another",
+            base: None,
+        },
+        DirRoute {
+            dir: "another_2",
+            base: None,
+        },
+    ],
+    ProxyRoute {
+        proxy: "example.com",
+    },
+)
