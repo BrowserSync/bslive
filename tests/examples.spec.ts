@@ -110,3 +110,17 @@ test.describe('examples/basic/live-reload.yml', {
     await requestPromise;
   });
 })
+
+test.describe('examples/react-router/bslive.yaml', {
+  annotation: {
+    type: bstest({
+      input: 'examples/react-router/bslive.yaml'
+    }),
+    description: ''
+  }
+}, () => {
+  test('support client-side routing', async ({page, bs}) => {
+    await page.goto(bs.path('/'), {waitUntil: 'networkidle'})
+    await expect(page.locator('#root')).toContainText('API response from /abc[1,2,3]');
+  });
+})

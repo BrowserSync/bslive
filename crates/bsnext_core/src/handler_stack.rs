@@ -9,7 +9,7 @@ use axum::{Extension, Router};
 use bsnext_input::route::{DirRoute, FallbackRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
 use bsnext_resp::path_matcher::PathMatcher::Def;
 use std::collections::HashMap;
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Debug, PartialEq)]
 pub enum HandlerStack {
@@ -45,6 +45,22 @@ impl DirRouteOpts {
             }
         }
         .append_index_html_on_directories(true)
+    }
+    pub fn as_serve_file(&self) -> ServeFile {
+        match &self.dir_route.base {
+            Some(base_dir) => {
+                tracing::trace!(
+                    "combining root: `{}` with given path: `{}`",
+                    base_dir.display(),
+                    self.dir_route.dir
+                );
+                ServeFile::new(base_dir.join(&self.dir_route.dir))
+            }
+            None => {
+                tracing::trace!("no root given, using `{}` directly", self.dir_route.dir);
+                ServeFile::new(&self.dir_route.dir)
+            }
+        }
     }
 }
 
@@ -159,8 +175,9 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
             todo!("add support for RouteKind::Proxy as a fallback?")
         }
         RouteKind::Dir(dir) => {
+            tracing::trace!("creating fallback for dir {:?}", dir);
             let item = DirRouteOpts::new(dir, route.opts, None);
-            let serve_dir_service = item.as_serve_dir();
+            let serve_dir_service = item.as_serve_file();
             let service = get_service(serve_dir_service);
             let mut layered = add_route_layers(service, &item.opts);
             layered

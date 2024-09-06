@@ -1,0 +1,14 @@
+servers:
+  - name: 'react-router'
+    routes:
+      # This route just serves the folder of assets
+      - path: /
+        dir: examples/react-router/dist
+        fallback:
+          dir: examples/react-router/dist/index.html
+
+      # and this route just shows an example of a route + delay for testing
+      - path: /abc
+        json: [ 1, 2, 3 ]
+        delay:
+          ms: 1000
