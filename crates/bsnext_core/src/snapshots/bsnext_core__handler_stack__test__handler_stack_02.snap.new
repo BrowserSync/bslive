@@ -1,0 +1,46 @@
+---
+source: crates/bsnext_core/src/handler_stack.rs
+assertion_line: 230
+expression: actual
+---
+DirsProxy(
+    [
+        DirRouteOpts {
+            dir_route: DirRoute {
+                dir: "another",
+                base: None,
+            },
+            opts: Opts {
+                cors: None,
+                delay: None,
+                watch: Bool(
+                    true,
+                ),
+                inject: Bool(
+                    true,
+                ),
+                headers: None,
+            },
+        },
+        DirRouteOpts {
+            dir_route: DirRoute {
+                dir: "another_2",
+                base: None,
+            },
+            opts: Opts {
+                cors: None,
+                delay: None,
+                watch: Bool(
+                    true,
+                ),
+                inject: Bool(
+                    true,
+                ),
+                headers: None,
+            },
+        },
+    ],
+    ProxyRoute {
+        proxy: "example.com",
+    },
+)
