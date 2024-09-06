@@ -13,6 +13,15 @@ pub struct Route {
     pub kind: RouteKind,
     #[serde(flatten)]
     pub opts: Opts,
+    pub fallback: Option<FallbackRoute>,
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+pub struct FallbackRoute {
+    #[serde(flatten)]
+    pub kind: RouteKind,
+    #[serde(flatten)]
+    pub opts: Opts,
 }
 
 #[derive(Debug, Default, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -40,6 +49,7 @@ impl Default for Route {
                 watch: Default::default(),
                 inject: Default::default(),
             },
+            fallback: Default::default(),
         }
     }
 }

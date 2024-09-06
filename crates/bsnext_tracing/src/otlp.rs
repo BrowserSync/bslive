@@ -110,6 +110,7 @@ pub fn init_tracing_subscriber(
         (OutputFormat::Normal, WriteOption::None) | (OutputFormat::Tui, WriteOption::None) => {
             tracing_subscriber::fmt::layer()
                 .without_time()
+                .with_ansi(true)
                 .with_file(false)
                 .boxed()
         }

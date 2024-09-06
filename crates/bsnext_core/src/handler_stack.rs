@@ -6,7 +6,7 @@ use axum::handler::Handler;
 use axum::middleware::from_fn_with_state;
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{Extension, Router};
-use bsnext_input::route::{DirRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
+use bsnext_input::route::{DirRoute, FallbackRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
 use bsnext_resp::path_matcher::PathMatcher::Def;
 use std::collections::HashMap;
 use tower_http::services::ServeDir;
@@ -25,6 +25,7 @@ pub enum HandlerStack {
 pub struct DirRouteOpts {
     dir_route: DirRoute,
     opts: Opts,
+    fallback_route: Option<FallbackRoute>,
 }
 
 impl DirRouteOpts {
@@ -43,14 +44,16 @@ impl DirRouteOpts {
                 ServeDir::new(&self.dir_route.dir)
             }
         }
+        .append_index_html_on_directories(true)
     }
 }
 
 impl DirRouteOpts {
-    fn new(p0: DirRoute, p1: Opts) -> DirRouteOpts {
+    fn new(p0: DirRoute, p1: Opts, fallback_route: Option<FallbackRoute>) -> DirRouteOpts {
         Self {
             dir_route: p0,
             opts: p1,
+            fallback_route,
         }
     }
 }
@@ -107,7 +110,9 @@ pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
                 proxy: new_proxy_route,
                 opts: route.opts,
             },
-            RouteKind::Dir(dir) => HandlerStack::Dirs(vec![DirRouteOpts::new(dir, route.opts)]),
+            RouteKind::Dir(dir) => {
+                HandlerStack::Dirs(vec![DirRouteOpts::new(dir, route.opts, route.fallback)])
+            }
         },
         HandlerStack::Raw { raw, opts } => match route.kind {
             // if a second 'raw' is seen, just use it, discarding the previous
@@ -120,26 +125,46 @@ pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
         },
         HandlerStack::Dirs(mut dirs) => match route.kind {
             RouteKind::Dir(next_dir) => {
-                dirs.push(DirRouteOpts::new(next_dir, route.opts));
+                dirs.push(DirRouteOpts::new(next_dir, route.opts, route.fallback));
                 HandlerStack::Dirs(dirs)
             }
             RouteKind::Proxy(proxy) => HandlerStack::DirsProxy(dirs, proxy),
             _ => HandlerStack::Dirs(dirs),
         },
         HandlerStack::Proxy { proxy, opts } => match route.kind {
-            RouteKind::Dir(dir) => {
-                HandlerStack::DirsProxy(vec![DirRouteOpts::new(dir, route.opts)], proxy)
-            }
+            RouteKind::Dir(dir) => HandlerStack::DirsProxy(
+                vec![DirRouteOpts::new(dir, route.opts, route.fallback)],
+                proxy,
+            ),
             _ => HandlerStack::Proxy { proxy, opts },
         },
         HandlerStack::DirsProxy(mut dirs, proxy) => match route.kind {
             RouteKind::Dir(dir) => {
-                dirs.push(DirRouteOpts::new(dir, route.opts));
+                dirs.push(DirRouteOpts::new(dir, route.opts, route.fallback));
                 HandlerStack::DirsProxy(dirs, proxy)
             }
             // todo(alpha): how to handle multiple proxies? should it just override for now?
             _ => HandlerStack::DirsProxy(dirs, proxy),
         },
+    }
+}
+
+pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
+    match route.kind {
+        RouteKind::Raw(raw_route) => {
+            let svc = any_service(serve_raw_one.with_state(raw_route));
+            add_route_layers(svc, &route.opts)
+        }
+        RouteKind::Proxy(new_proxy_route) => {
+            todo!("add support for RouteKind::Proxy as a fallback?")
+        }
+        RouteKind::Dir(dir) => {
+            let item = DirRouteOpts::new(dir, route.opts, None);
+            let serve_dir_service = item.as_serve_dir();
+            let service = get_service(serve_dir_service);
+            let mut layered = add_route_layers(service, &item.opts);
+            layered
+        }
     }
 }
 
@@ -154,10 +179,10 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
         HandlerStack::None => unreachable!(),
         HandlerStack::Raw { raw, opts } => {
             let svc = any_service(serve_raw_one.with_state(raw));
-            Router::new().route_service(path, add_route_layers(svc, path, &opts))
+            Router::new().route_service(path, add_route_layers(svc, &opts))
         }
         HandlerStack::Dirs(dirs) => {
-            Router::new().nest_service(path, serve_dir_layer(path, &dirs, Router::new()))
+            Router::new().nest_service(path, serve_dir_layer(&dirs, Router::new()))
         }
         HandlerStack::Proxy { proxy, opts } => {
             let proxy_config = ProxyConfig {
@@ -165,7 +190,7 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
                 path: path.to_string(),
             };
             let router = any(proxy_handler).layer(Extension(proxy_config.clone()));
-            Router::new().nest_service(path, add_route_layers(router, path, &opts))
+            Router::new().nest_service(path, add_route_layers(router, &opts))
         }
         HandlerStack::DirsProxy(dir_list, proxy) => {
             let r2 = stack_to_router(
@@ -175,26 +200,42 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
                     opts: Default::default(),
                 },
             );
-            let r1 = serve_dir_layer(path, &dir_list, Router::new().fallback_service(r2));
+            let r1 = serve_dir_layer(&dir_list, Router::new().fallback_service(r2));
             Router::new().nest_service(path, r1)
         }
     }
 }
 
-fn serve_dir_layer(path: &str, dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Router {
+#[derive(Debug, Clone)]
+pub enum FallbackStatus {
+    None,
+    Fallback,
+}
+
+fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Router {
     let serve_dir_items = dir_list_with_opts
         .iter()
-        .map(|dir_route| {
-            let src = dir_route.as_serve_dir();
-            let service = get_service(src);
-            add_route_layers(service, path, &dir_route.opts)
+        .map(|dir_route| match &dir_route.fallback_route {
+            None => {
+                let serve_dir_service = dir_route.as_serve_dir();
+                let service = get_service(serve_dir_service);
+                let mut layered = add_route_layers(service, &dir_route.opts);
+                layered
+            }
+            Some(fallback) => {
+                let stack = fallback_to_layered_method_router(fallback.clone());
+                let serve_dir_service = dir_route
+                    .as_serve_dir()
+                    .fallback(stack)
+                    .call_fallback_on_method_not_allowed(true);
+                let service = any_service(serve_dir_service);
+                let mut layered = add_route_layers(service, &dir_route.opts);
+                layered
+            }
         })
         .collect::<Vec<MethodRouter>>();
 
-    initial.layer(from_fn_with_state(
-        (path.to_string(), serve_dir_items),
-        try_many_services_dir,
-    ))
+    initial.layer(from_fn_with_state(serve_dir_items, try_many_services_dir))
 }
 
 #[cfg(test)]

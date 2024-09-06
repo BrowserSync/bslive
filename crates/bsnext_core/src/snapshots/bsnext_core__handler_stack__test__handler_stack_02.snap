@@ -20,6 +20,7 @@ DirsProxy(
                 ),
                 headers: None,
             },
+            fallback_route: None,
         },
         DirRouteOpts {
             dir_route: DirRoute {
@@ -37,6 +38,7 @@ DirsProxy(
                 ),
                 headers: None,
             },
+            fallback_route: None,
         },
     ],
     ProxyRoute {

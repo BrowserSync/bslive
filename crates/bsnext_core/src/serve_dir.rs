@@ -1,19 +1,20 @@
+use crate::handler_stack::FallbackStatus;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::middleware::Next;
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use axum::routing::MethodRouter;
 use http::{StatusCode, Uri};
 use tower::ServiceExt;
 use tracing::trace_span;
 
 pub async fn try_many_services_dir(
-    State((path, router_list)): State<(String, Vec<MethodRouter>)>,
+    State(router_list): State<Vec<MethodRouter>>,
     uri: Uri,
     req: Request,
     next: Next,
 ) -> impl IntoResponse {
-    let span = trace_span!(parent: None, "handling", path);
+    let span = trace_span!(parent: None, "handling");
     let _ = span.enter();
 
     tracing::trace!(?uri, "{} services", router_list.len());
@@ -28,7 +29,7 @@ pub async fn try_many_services_dir(
         let result = method_router.oneshot(req_clone).await;
         match result {
             Ok(result) if result.status() == 404 => {
-                tracing::trace!("  ❌ not found at index {}, trying another", index);
+                tracing::trace!("  ❌ not found at index {}, trying another", index,);
                 continue;
             }
             Ok(result) if result.status() == 405 => {
@@ -52,6 +53,7 @@ pub async fn try_many_services_dir(
     tracing::trace!(" - REQUEST was NOT HANDLED BY SERVE_DIR (will be sent onwards)");
     let r = Request::from_parts(a.clone(), b);
     next.run(r).await
+    // StatusCode::NOT_FOUND.into_response()
 }
 
 #[cfg(test)]

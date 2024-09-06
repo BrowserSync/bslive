@@ -21,4 +21,4 @@ tracing-opentelemetry = { version = "0.24.0" }
 [dependencies.tracing-subscriber]
 version = "0.3.0"
 default-features = false
-features = ["registry", "std", "fmt", "json", "env-filter"]
+features = ["registry", "std", "fmt", "json", "env-filter", "ansi"]

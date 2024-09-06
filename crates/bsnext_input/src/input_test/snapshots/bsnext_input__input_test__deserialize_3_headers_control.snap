@@ -27,6 +27,7 @@ Config {
                 ),
                 headers: None,
             },
+            fallback: None,
         },
     ],
 }

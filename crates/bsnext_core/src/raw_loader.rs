@@ -6,6 +6,7 @@ use axum::response::{Html, IntoResponse, Response, Sse};
 use axum::Json;
 use http::header::CONTENT_TYPE;
 
+use crate::handler_stack::FallbackStatus;
 use axum::body::Body;
 use axum::response::sse::Event;
 use bsnext_input::route::RawRoute;
@@ -22,7 +23,10 @@ pub async fn serve_raw_one(uri: Uri, state: State<RawRoute>, req: Request) -> Re
 
 async fn raw_resp_for(uri: Uri, route: &RawRoute) -> impl IntoResponse {
     match route {
-        RawRoute::Html { html } => Html(html.clone()).into_response(),
+        RawRoute::Html { html } => {
+            tracing::trace!("raw_resp_for will respond with HTML");
+            Html(html.clone()).into_response()
+        }
         RawRoute::Json { json } => Json(&json.0).into_response(),
         RawRoute::Raw { raw } => text_asset_response(uri.path(), raw).into_response(),
         RawRoute::Sse { sse } => {

@@ -11,7 +11,7 @@ use tokio::time::sleep;
 use tower_http::cors::CorsLayer;
 use tower_http::set_header;
 
-pub fn add_route_layers(app: MethodRouter, path: &str, opts: &Opts) -> MethodRouter {
+pub fn add_route_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
     let mut app = app;
 
     if opts
@@ -19,12 +19,10 @@ pub fn add_route_layers(app: MethodRouter, path: &str, opts: &Opts) -> MethodRou
         .as_ref()
         .is_some_and(|v| *v == CorsOpts::Cors(true))
     {
-        tracing::trace!(to = path, "adding permissive cors");
         app = app.layer(CorsLayer::permissive());
     }
 
     if let Some(DelayOpts::Delay(DelayKind::Ms(ms))) = opts.delay.as_ref() {
-        tracing::trace!(to = path, ?ms, "adding a delay");
         let ms = *ms;
         app = app.layer(middleware::from_fn(
             move |req: Request, next: Next| async move {
