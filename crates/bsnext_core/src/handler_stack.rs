@@ -7,6 +7,7 @@ use axum::middleware::from_fn_with_state;
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{Extension, Router};
 use bsnext_input::route::{DirRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
+use bsnext_resp::path_matcher::PathMatcher::Def;
 use std::collections::HashMap;
 use tower_http::services::ServeDir;
 
@@ -16,7 +17,7 @@ pub enum HandlerStack {
     // todo: make this a separate thing
     Raw { raw: RawRoute, opts: Opts },
     Dirs(Vec<DirRouteOpts>),
-    Proxy(ProxyRoute),
+    Proxy { proxy: ProxyRoute, opts: Opts },
     DirsProxy(Vec<DirRouteOpts>, ProxyRoute),
 }
 
@@ -102,7 +103,10 @@ pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
                 raw: raw_route,
                 opts: route.opts,
             },
-            RouteKind::Proxy(pr) => HandlerStack::Proxy(pr),
+            RouteKind::Proxy(new_proxy_route) => HandlerStack::Proxy {
+                proxy: new_proxy_route,
+                opts: route.opts,
+            },
             RouteKind::Dir(dir) => HandlerStack::Dirs(vec![DirRouteOpts::new(dir, route.opts)]),
         },
         HandlerStack::Raw { raw, opts } => match route.kind {
@@ -122,11 +126,11 @@ pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
             RouteKind::Proxy(proxy) => HandlerStack::DirsProxy(dirs, proxy),
             _ => HandlerStack::Dirs(dirs),
         },
-        HandlerStack::Proxy(proxy) => match route.kind {
+        HandlerStack::Proxy { proxy, opts } => match route.kind {
             RouteKind::Dir(dir) => {
                 HandlerStack::DirsProxy(vec![DirRouteOpts::new(dir, route.opts)], proxy)
             }
-            _ => HandlerStack::Proxy(proxy),
+            _ => HandlerStack::Proxy { proxy, opts },
         },
         HandlerStack::DirsProxy(mut dirs, proxy) => match route.kind {
             RouteKind::Dir(dir) => {
@@ -155,18 +159,22 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
         HandlerStack::Dirs(dirs) => {
             Router::new().nest_service(path, serve_dir_layer(path, &dirs, Router::new()))
         }
-        HandlerStack::Proxy(proxy) => {
+        HandlerStack::Proxy { proxy, opts } => {
             let proxy_config = ProxyConfig {
                 target: proxy.proxy.clone(),
                 path: path.to_string(),
             };
-            Router::new().nest_service(
-                path,
-                any(proxy_handler).layer(Extension(proxy_config.clone())),
-            )
+            let router = any(proxy_handler).layer(Extension(proxy_config.clone()));
+            Router::new().nest_service(path, add_route_layers(router, path, &opts))
         }
         HandlerStack::DirsProxy(dir_list, proxy) => {
-            let r2 = stack_to_router(path, HandlerStack::Proxy(proxy));
+            let r2 = stack_to_router(
+                path,
+                HandlerStack::Proxy {
+                    proxy,
+                    opts: Default::default(),
+                },
+            );
             let r1 = serve_dir_layer(path, &dir_list, Router::new().fallback_service(r2));
             Router::new().nest_service(path, r1)
         }
