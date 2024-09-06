@@ -36,8 +36,7 @@ socket
 function changedPath(change: ChangeDTO) {
   switch (change.kind) {
     case "FsMany": {
-      // todo: if this collection of events contains
-      // anything that will cause a refresh, just do it immediately
+      // todo(alpha): if this collection of events contains anything that will cause a refresh, just do it immediately
       for (let changeDTO of change.payload) {
         changedPath(changeDTO);
       }

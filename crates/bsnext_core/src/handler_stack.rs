@@ -172,6 +172,7 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
             add_route_layers(svc, &route.opts)
         }
         RouteKind::Proxy(new_proxy_route) => {
+            // todo(alpha): make a decision proxy as a fallback
             todo!("add support for RouteKind::Proxy as a fallback?")
         }
         RouteKind::Dir(dir) => {
