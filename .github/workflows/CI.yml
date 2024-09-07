@@ -98,8 +98,10 @@ jobs:
 
       - name: Publish to Next
         if: github.event_name == 'workflow_dispatch'
-        #language=shell
         run: |
+          # Fetch all tags in case they are missing in the shallow clone
+          git fetch --tags
+          
           # Fetch all tags and get the latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0)
           echo "Latest tag found: $LATEST_TAG"
