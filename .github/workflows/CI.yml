@@ -1,4 +1,4 @@
-name: CI
+name: Release
 env:
   DEBUG: napi:*
   APP_NAME: bslive
@@ -99,15 +99,13 @@ jobs:
       - name: Publish to Next
         if: github.event_name == 'workflow_dispatch'
         run: |
-          # Fetch all tags in case they are missing in the shallow clone
-          git fetch --tags
-          
-          # Fetch all tags and get the latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0)
-          echo "Latest tag found: $LATEST_TAG"
+          # Extract the branch name from the ref
+          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
+          SHORT_DATE=$(date +%Y%m%d) # Get the current date in YYYYMMDD format
+          SHORT_SHA=${GITHUB_SHA::8} # Get the first 8 characters of the Git SHA
 
-          # Generate a temporary version using the latest tag and short SHA
-          TEMP_VERSION="${LATEST_TAG}-${GITHUB_SHA:0:7}"
+          # Combine branch name, date, and commit hash to create a unique version
+          TEMP_VERSION="${BRANCH_NAME}-${SHORT_DATE}-${SHORT_SHA}"
           echo "Temporary version: $TEMP_VERSION"
 
           # Update npm version without creating a git tag
@@ -120,3 +118,4 @@ jobs:
           npm publish --tag next --access public
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
