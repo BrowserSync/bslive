@@ -3,6 +3,7 @@ use std::io::Write;
 use std::process::Command;
 use std::{env, io};
 
+#[cfg(not(target_os = "windows"))]
 fn main() {
     if env::var("CI").is_ok() {
         return;
@@ -53,3 +54,6 @@ fn main() {
 
     assert!(output.status.success());
 }
+
+#[cfg(target_os = "windows")]
+fn main() {}

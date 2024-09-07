@@ -335,12 +335,4 @@ mod test {
 
         Ok(())
     }
-
-    #[tokio::test]
-    async fn test_handler_stack_04() -> anyhow::Result<()> {
-        let input = include_bytes!("../../../bs.html");
-        let as_str = std::str::from_utf8(input)?;
-        print!("{}", as_str.len());
-        Ok(())
-    }
 }

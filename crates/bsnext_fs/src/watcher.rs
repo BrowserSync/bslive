@@ -109,7 +109,13 @@ pub fn create_watcher(
                         }
                     },
                     EventKind::Modify(modify) => match modify {
-                        ModifyKind::Any => tracing::trace!("EventKind::Modify ModifyKind::Any"),
+                        ModifyKind::Any => {
+                            tracing::trace!("EventKind::Modify ModifyKind::Any");
+                            match sender.send(msg) {
+                                Ok(_) => tracing::trace!("-> EventKind::Modify ModifyKind::Any"),
+                                Err(e) => tracing::error!(?e),
+                            }
+                        }
                         ModifyKind::Data(data) => match data {
                             DataChange::Any => {
                                 tracing::trace!(
@@ -126,7 +132,11 @@ pub fn create_watcher(
                                     "EventKind::Modify ModifyKind::Data DataChange::Content"
                                 );
                                 match sender.send(msg) {
-                                    Ok(_) => {}
+                                    Ok(_) => {
+                                        tracing::trace!(
+                                            "-> EventKind::Modify ModifyKind::Data DataChange::Content"
+                                        );
+                                    }
                                     Err(e) => tracing::error!(?e),
                                 };
                             }
@@ -143,7 +153,11 @@ pub fn create_watcher(
                                         "EventKind::Modify ModifyKind::Metadata MetadataKind::Any"
                                     );
                                     match sender.send(msg) {
-                                        Ok(_) => {}
+                                        Ok(_) => {
+                                            tracing::trace!(
+                                                "-> EventKind::Modify ModifyKind::Metadata MetadataKind::Any"
+                                            );
+                                        }
                                         Err(e) => tracing::error!(?e),
                                     };
                                 }
