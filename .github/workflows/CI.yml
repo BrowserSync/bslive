@@ -97,16 +97,24 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to Next
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+        if: github.event_name == 'workflow_dispatch'
+        #language=shell
         run: |
+          # Fetch all tags and get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0)
+          echo "Latest tag found: $LATEST_TAG"
+
+          # Generate a temporary version using the latest tag and short SHA
+          TEMP_VERSION="${LATEST_TAG}-${GITHUB_SHA:0:7}"
+          echo "Temporary version: $TEMP_VERSION"
+
+          # Update npm version without creating a git tag
+          npm version $TEMP_VERSION --no-git-tag-version
+
+          # Configure npm authentication
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
+
+          # Publish to the 'next' tag on npm
           npm publish --tag next --access public
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Skip Publish
-        if: ${{ !(github.event_name == 'release' && github.event.action == 'published') && !(github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))) }}
-        run: echo "Not a release, skipping publish"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
