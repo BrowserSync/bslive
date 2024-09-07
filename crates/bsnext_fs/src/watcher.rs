@@ -21,19 +21,20 @@ pub fn create_watcher(
                     is_ignored_path_type(&p.as_path())
                         || is_auto_excluded(&cwd_c.as_path(), &p.as_path())
                 }) {
-                    tracing::trace!(?event.paths, "ignored!!!");
+                    tracing::trace!(?event.paths, "[ignored]");
                     return;
                 }
                 let msg = InnerChangeEvent {
                     absolute_path: event.paths.first().unwrap().into(),
                 };
+                tracing::trace!("  └ [accept] {:?}", event);
                 match sender.send(msg) {
                     Ok(_) => {}
                     Err(e) => tracing::error!(?e),
                 }
             }
             Ok(event) => {
-                tracing::trace!(?event, "not accepted!!!")
+                tracing::trace!(?event, "[not-accepted]")
             }
             Err(e) => {
                 tracing::error!("fswadtcher {:?}", e);
@@ -50,17 +51,11 @@ fn platform_accepts(evt: &notify::Event) -> bool {
         EventKind::Create(..) => false,
         EventKind::Modify(modify) => match modify {
             ModifyKind::Data(data) => match data {
-                DataChange::Content => {
-                    tracing::trace!("  └ EventKind::Modify ModifyKind::Data DataChange::Content");
-                    true
-                }
+                DataChange::Content => true,
                 _ => false,
             },
             ModifyKind::Metadata(meta) => match meta {
-                MetadataKind::Any => {
-                    tracing::trace!("  └ EventKind::Modify ModifyKind::Metadata MetadataKind::Any");
-                    true
-                }
+                MetadataKind::Any => true,
                 _ => false,
             },
             ModifyKind::Name(..) => false,
@@ -79,22 +74,13 @@ fn platform_accepts(evt: &notify::Event) -> bool {
         EventKind::Access(..) => false,
         EventKind::Create(..) => false,
         EventKind::Modify(modify) => match modify {
-            ModifyKind::Any => {
-                tracing::trace!("  └ EventKind::Modify ModifyKind::Any");
-                true
-            }
+            ModifyKind::Any => true,
             ModifyKind::Data(data) => match data {
-                DataChange::Content => {
-                    tracing::trace!("  └ EventKind::Modify ModifyKind::Data DataChange::Content");
-                    true
-                }
+                DataChange::Content => true,
                 _ => false,
             },
             ModifyKind::Metadata(meta) => match meta {
-                MetadataKind::Any => {
-                    tracing::trace!("  └ EventKind::Modify ModifyKind::Metadata MetadataKind::Any");
-                    true
-                }
+                MetadataKind::Any => true,
                 _ => false,
             },
             ModifyKind::Name(..) => false,
