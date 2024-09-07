@@ -1,8 +1,5 @@
 use crate::inner_fs_event_handler::InnerChangeEvent;
-use notify::event::{
-    AccessKind, AccessMode, CreateKind, DataChange, MetadataKind, ModifyKind, RemoveKind,
-    RenameMode,
-};
+use notify::event::{DataChange, MetadataKind, ModifyKind};
 use notify::EventKind;
 use std::collections::HashSet;
 use std::ffi::OsStr;
@@ -19,7 +16,7 @@ pub fn create_watcher(
         let span = tracing::span!(tracing::Level::TRACE, "raw");
         let _guard = span.enter();
         match res {
-            Ok(event) => {
+            Ok(event) if platform_accepts(&event) => {
                 if event.paths.iter().any(|p| {
                     is_ignored_path_type(&p.as_path())
                         || is_auto_excluded(&cwd_c.as_path(), &p.as_path())
@@ -27,209 +24,85 @@ pub fn create_watcher(
                     tracing::trace!(?event.paths, "ignored!!!");
                     return;
                 }
-
                 let msg = InnerChangeEvent {
                     absolute_path: event.paths.first().unwrap().into(),
                 };
-                match event.kind {
-                    EventKind::Any => {}
-                    EventKind::Access(ac) => match ac {
-                        AccessKind::Any => tracing::trace!("EventKind::Access AccessKind::Any"),
-                        AccessKind::Read => {
-                            tracing::trace!("EventKind::Access AccessKind::Read")
-                        }
-                        AccessKind::Open(o) => match o {
-                            AccessMode::Any => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Open AccessMode::Any"
-                                )
-                            }
-                            AccessMode::Execute => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Open AccessMode::Execute"
-                                )
-                            }
-                            AccessMode::Read => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Open AccessMode::Read"
-                                )
-                            }
-                            AccessMode::Write => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Open AccessMode::Write"
-                                )
-                            }
-                            AccessMode::Other => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Open AccessMode::Other"
-                                )
-                            }
-                        },
-                        AccessKind::Close(c) => match c {
-                            AccessMode::Any => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Close AccessMode::Any"
-                                )
-                            }
-                            AccessMode::Execute => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Close AccessMode::Execute"
-                                )
-                            }
-                            AccessMode::Read => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Close AccessMode::Read"
-                                )
-                            }
-                            AccessMode::Write => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Close AccessMode::Write"
-                                )
-                            }
-                            AccessMode::Other => {
-                                tracing::trace!(
-                                    "EventKind::Access AccessKind::Close AccessMode::Other"
-                                )
-                            }
-                        },
-                        AccessKind::Other => {
-                            tracing::trace!("EventKind::Access AccessKind::Other")
-                        }
-                    },
-                    EventKind::Create(c) => match c {
-                        CreateKind::Any => tracing::trace!("EventKind::Create CreateKind::Any"),
-                        CreateKind::File => {
-                            tracing::trace!("EventKind::Create CreateKind::File")
-                        }
-                        CreateKind::Folder => {
-                            tracing::trace!("EventKind::Create CreateKind::Folder")
-                        }
-                        CreateKind::Other => {
-                            tracing::trace!("EventKind::Create CreateKind::Other")
-                        }
-                    },
-                    EventKind::Modify(modify) => match modify {
-                        ModifyKind::Any => {
-                            tracing::trace!("EventKind::Modify ModifyKind::Any");
-                            match sender.send(msg) {
-                                Ok(_) => tracing::trace!("-> EventKind::Modify ModifyKind::Any"),
-                                Err(e) => tracing::error!(?e),
-                            }
-                        }
-                        ModifyKind::Data(data) => match data {
-                            DataChange::Any => {
-                                tracing::trace!(
-                                    "EventKind::Modify ModifyKind::Data DataChange::Any"
-                                );
-                            }
-                            DataChange::Size => {
-                                tracing::trace!(
-                                    "EventKind::Modify ModifyKind::Data DataChange::Size"
-                                );
-                            }
-                            DataChange::Content => {
-                                tracing::trace!(
-                                    "EventKind::Modify ModifyKind::Data DataChange::Content"
-                                );
-                                match sender.send(msg) {
-                                    Ok(_) => {
-                                        tracing::trace!(
-                                            "-> EventKind::Modify ModifyKind::Data DataChange::Content"
-                                        );
-                                    }
-                                    Err(e) => tracing::error!(?e),
-                                };
-                            }
-                            DataChange::Other => {
-                                tracing::trace!(
-                                    "EventKind::Modify ModifyKind::Data DataChange::Other"
-                                );
-                            }
-                        },
-                        ModifyKind::Metadata(meta) => {
-                            match meta {
-                                MetadataKind::Any => {
-                                    tracing::trace!(
-                                        "EventKind::Modify ModifyKind::Metadata MetadataKind::Any"
-                                    );
-                                    match sender.send(msg) {
-                                        Ok(_) => {
-                                            tracing::trace!(
-                                                "-> EventKind::Modify ModifyKind::Metadata MetadataKind::Any"
-                                            );
-                                        }
-                                        Err(e) => tracing::error!(?e),
-                                    };
-                                }
-                                MetadataKind::AccessTime => {
-                                    tracing::trace!("EventKind::Modify ModifyKind::Metadata MetadataKind::AccessTime")
-                                }
-                                MetadataKind::WriteTime => {
-                                    tracing::trace!("EventKind::Modify ModifyKind::Metadata MetadataKind::WriteTime")
-                                }
-                                MetadataKind::Permissions => {
-                                    tracing::trace!("EventKind::Modify ModifyKind::Metadata MetadataKind::Permissions")
-                                }
-                                MetadataKind::Ownership => {
-                                    tracing::trace!("EventKind::Modify ModifyKind::Metadata MetadataKind::Ownership")
-                                }
-                                MetadataKind::Extended => {
-                                    tracing::trace!("EventKind::Modify ModifyKind::Metadata MetadataKind::Extended")
-                                }
-                                MetadataKind::Other => {
-                                    tracing::trace!("EventKind::Modify ModifyKind::Metadata MetadataKind::Other")
-                                }
-                            }
-                        }
-                        ModifyKind::Name(mode) => match mode {
-                            RenameMode::Any => {
-                                tracing::trace!(
-                                    "EventKind::Modify ModifyKind::Name RenameMode::Any"
-                                )
-                            }
-                            RenameMode::To => {
-                                tracing::trace!("EventKind::Modify ModifyKind::Name RenameMode::To")
-                            }
-                            RenameMode::From => {
-                                tracing::trace!(
-                                    "EventKind::Modify ModifyKind::Name RenameMode::From"
-                                )
-                            }
-                            RenameMode::Both => {
-                                tracing::trace!(
-                                    "EventKind::Modify ModifyKind::Name RenameMode::Both"
-                                )
-                            }
-                            RenameMode::Other => {
-                                tracing::trace!(
-                                    "EventKind::Modify ModifyKind::Name RenameMode::Other"
-                                )
-                            }
-                        },
-                        ModifyKind::Other => {
-                            tracing::trace!("EventKind::Modify ModifyKind::Other")
-                        }
-                    },
-                    EventKind::Remove(remove) => match remove {
-                        RemoveKind::Any => tracing::trace!("EventKind::Remove RemoveKind::Any"),
-                        RemoveKind::File => {
-                            tracing::trace!("EventKind::Remove RemoveKind::File")
-                        }
-                        RemoveKind::Folder => {
-                            tracing::trace!("EventKind::Remove RemoveKind::Folder")
-                        }
-                        RemoveKind::Other => {
-                            tracing::trace!("EventKind::Remove RemoveKind::Other")
-                        }
-                    },
-                    EventKind::Other => tracing::trace!("EventKind::Other"),
+                match sender.send(msg) {
+                    Ok(_) => {}
+                    Err(e) => tracing::error!(?e),
                 }
+            }
+            Ok(event) => {
+                tracing::trace!(?event, "not accepted!!!")
             }
             Err(e) => {
                 tracing::error!("fswadtcher {:?}", e);
             }
         }
     })
+}
+
+#[cfg(not(target_os = "windows"))]
+fn platform_accepts(evt: &notify::Event) -> bool {
+    match evt.kind {
+        EventKind::Any => false,
+        EventKind::Access(..) => false,
+        EventKind::Create(..) => false,
+        EventKind::Modify(modify) => match modify {
+            ModifyKind::Data(data) => match data {
+                DataChange::Content => {
+                    tracing::trace!("  └ EventKind::Modify ModifyKind::Data DataChange::Content");
+                    true
+                }
+                _ => false,
+            },
+            ModifyKind::Metadata(meta) => match meta {
+                MetadataKind::Any => {
+                    tracing::trace!("  └ EventKind::Modify ModifyKind::Metadata MetadataKind::Any");
+                    true
+                }
+                _ => false,
+            },
+            ModifyKind::Name(..) => false,
+            ModifyKind::Other => false,
+            ModifyKind::Any => false,
+        },
+        EventKind::Remove(..) => false,
+        EventKind::Other => false,
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn platform_accepts(evt: &notify::Event) -> bool {
+    match evt.kind {
+        EventKind::Any => false,
+        EventKind::Access(..) => false,
+        EventKind::Create(..) => false,
+        EventKind::Modify(modify) => match modify {
+            ModifyKind::Any => {
+                tracing::trace!("  └ EventKind::Modify ModifyKind::Any");
+                true
+            }
+            ModifyKind::Data(data) => match data {
+                DataChange::Content => {
+                    tracing::trace!("  └ EventKind::Modify ModifyKind::Data DataChange::Content");
+                    true
+                }
+                _ => false,
+            },
+            ModifyKind::Metadata(meta) => match meta {
+                MetadataKind::Any => {
+                    tracing::trace!("  └ EventKind::Modify ModifyKind::Metadata MetadataKind::Any");
+                    true
+                }
+                _ => false,
+            },
+            ModifyKind::Name(..) => false,
+            ModifyKind::Other => false,
+        },
+        EventKind::Remove(..) => false,
+        EventKind::Other => false,
+    }
 }
 
 #[cfg(test)]

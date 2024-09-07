@@ -8,14 +8,5 @@ servers:
         dir: examples/kitchen-sink
       - path: /
         proxy: https://shaneddg.ngrok.io
-      #      - path: /
-      #        dir: examples/kitchen-sink
-      #      - path: /raw
-      #        raw: '123'
-      #        cors: true
       - path: /raw
         raw: '1234'
-      - path: /styles.css
-        raw: '/* css */'
-        delay:
-          ms: 10000
