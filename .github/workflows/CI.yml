@@ -99,23 +99,22 @@ jobs:
       - name: Publish to Next
         if: github.event_name == 'workflow_dispatch'
         run: |
-          # Extract the branch name from the ref
-          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
-          SHORT_DATE=$(date +%Y%m%d) # Get the current date in YYYYMMDD format
-          SHORT_SHA=${GITHUB_SHA::8} # Get the first 8 characters of the Git SHA
-
-          # Combine branch name, date, and commit hash to create a unique version
-          TEMP_VERSION="${BRANCH_NAME}-${SHORT_DATE}-${SHORT_SHA}"
+          # Extract the branch name and create a valid pre-release identifier
+          SHORT_SHA=$(git rev-parse --short=8 HEAD)
+          
+          # Combine base version with pre-release identifier
+          TEMP_VERSION="0.0.0-${SHORT_SHA}"
           echo "Temporary version: $TEMP_VERSION"
-
+          
           # Update npm version without creating a git tag
           npm version $TEMP_VERSION --no-git-tag-version
-
+          
           # Configure npm authentication
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-
+          
           # Publish to the 'next' tag on npm
           npm publish --tag next --access public
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
 
