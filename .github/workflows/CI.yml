@@ -8,7 +8,7 @@ permissions:
   id-token: write
 on:
   release:
-    types: [ created ]
+    types: [ published ]
   workflow_dispatch:
     inputs:
       branch:
