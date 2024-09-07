@@ -1,4 +1,4 @@
-name: Release
+name: CI
 env:
   DEBUG: napi:*
   APP_NAME: bslive
