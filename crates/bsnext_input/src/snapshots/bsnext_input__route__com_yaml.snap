@@ -1,0 +1,36 @@
+---
+source: crates/bsnext_input/src/route.rs
+expression: v
+---
+[
+    V {
+        compression: Bool(
+            true,
+        ),
+    },
+    V {
+        compression: Bool(
+            false,
+        ),
+    },
+    V {
+        compression: CompType(
+            Br,
+        ),
+    },
+    V {
+        compression: CompType(
+            Gzip,
+        ),
+    },
+    V {
+        compression: CompType(
+            Zstd,
+        ),
+    },
+    V {
+        compression: CompType(
+            Deflate,
+        ),
+    },
+]

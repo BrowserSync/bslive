@@ -44,6 +44,7 @@ export const test = base.extend<{
     servers: { url: string }[],
     child: any;
     path: (path: string) => string;
+    named: (name: string, path: string) => string;
     stdout: string[];
     touch: (path: string) => void;
     // next: (args: NextArgs) => Promise<string[]>;
@@ -117,7 +118,7 @@ export const test = base.extend<{
     })
     const data = await servers_changed_msg;
     const servers = data.servers.map(s => {
-      return {url: 'http://' + s.socket_addr}
+      return {url: 'http://' + s.socket_addr, identity: s.identity}
     });
 
     await use({
@@ -128,6 +129,17 @@ export const test = base.extend<{
       servers,
       path(path: string) {
         const url = new URL(path, servers[0].url);
+        return url.toString()
+      },
+      named(server_name: string, path: string) {
+        const server = servers.find(x => {
+          if (x.identity.kind === "Named") {
+            return x.identity.payload.name === server_name
+          }
+          return false
+        });
+        if (!server) throw new Error('server not found with name: ' + server_name);
+        const url = new URL(path, server.url);
         return url.toString()
       },
       stdout,

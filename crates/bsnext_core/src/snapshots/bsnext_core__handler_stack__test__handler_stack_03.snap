@@ -20,5 +20,6 @@ Raw {
             true,
         ),
         headers: None,
+        compression: None,
     },
 }

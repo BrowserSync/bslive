@@ -123,4 +123,24 @@ test.describe('examples/react-router/bslive.yaml', {
     await page.goto(bs.path('/'), {waitUntil: 'networkidle'})
     await expect(page.locator('#root')).toContainText('API response from /abc[1,2,3]');
   });
+  test('supports compressed responses', async ({page, bs}) => {
+    const load = page.goto(bs.named('react-router-with-compression', '/'), {waitUntil: 'networkidle'})
+    const requestPromise = page.waitForResponse((req) => {
+      const url = new URL(req.url());
+      return url.pathname.includes('assets/index')
+        && url.pathname.endsWith('.js')
+    }, {timeout: 2000});
+    const [_, jsfile] = await Promise.all([load, requestPromise]);
+    expect(jsfile?.headers()['content-encoding']).toBe('zstd')
+  });
+  test('does not compress by default', async ({page, bs}) => {
+    const load = page.goto(bs.named('react-router', '/'), {waitUntil: 'networkidle'})
+    const requestPromise = page.waitForResponse((req) => {
+      const url = new URL(req.url());
+      return url.pathname.includes('assets/index')
+        && url.pathname.endsWith('.js')
+    }, {timeout: 2000});
+    const [_, jsfile] = await Promise.all([load, requestPromise]);
+    expect(jsfile?.headers()['content-encoding']).toBeUndefined()
+  });
 })

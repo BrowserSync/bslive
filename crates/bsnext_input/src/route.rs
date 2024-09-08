@@ -35,6 +35,7 @@ pub struct Opts {
     #[serde(default)]
     pub inject: InjectOpts,
     pub headers: Option<BTreeMap<String, String>>,
+    pub compression: Option<CompressionOpts>,
 }
 
 impl Default for Route {
@@ -48,6 +49,7 @@ impl Default for Route {
                 delay: None,
                 watch: Default::default(),
                 inject: Default::default(),
+                compression: Default::default(),
             },
             fallback: Default::default(),
         }
@@ -141,6 +143,31 @@ pub enum RawRoute {
 pub enum CorsOpts {
     #[serde(rename = "cors")]
     Cors(bool),
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
+pub enum CompressionOpts {
+    Bool(bool),
+    CompType(CompType),
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+pub enum CompType {
+    #[serde(rename = "gzip")]
+    Gzip,
+    #[serde(rename = "br")]
+    Br,
+    #[serde(rename = "deflate")]
+    Deflate,
+    #[serde(rename = "zstd")]
+    Zstd,
+}
+
+impl Default for CompressionOpts {
+    fn default() -> Self {
+        Self::Bool(false)
+    }
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
