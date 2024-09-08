@@ -1,0 +1,18 @@
+[
+  [
+    {
+      "kind": "reload",
+      "args": {
+        "path": "index.html",
+        "opts": {
+          "liveCSS": true,
+          "liveImg": true,
+          "reloadMissingCSS": true,
+          "originalPath": "",
+          "overrideURL": "",
+          "serverURL": ""
+        }
+      }
+    }
+  ]
+]

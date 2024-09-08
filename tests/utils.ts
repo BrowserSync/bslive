@@ -47,6 +47,7 @@ export const test = base.extend<{
     named: (name: string, path: string) => string;
     stdout: string[];
     touch: (path: string) => void;
+    api: (kind: 'events') => string
     // next: (args: NextArgs) => Promise<string[]>;
   };
 }>({
@@ -65,7 +66,12 @@ export const test = base.extend<{
 
     const child = fork(file, [
       '-i', ann.input,
-      '-f', 'json'
+      '-f', 'json',
+
+      // uncomment these 2 lines to debug trace data in a bslive.log file
+      // tip: ensure you only run 1 test at a time
+      // '-l', 'trace',
+      // '--write-log'
     ], {
       cwd,
       stdio: "pipe"
@@ -141,6 +147,13 @@ export const test = base.extend<{
         if (!server) throw new Error('server not found with name: ' + server_name);
         const url = new URL(path, server.url);
         return url.toString()
+      },
+      api(kind: 'events') {
+        switch (kind) {
+          case "events":
+            return this.path('/__bs_api/events')
+        }
+        throw new Error("unreachable")
       },
       stdout,
       touch: (path: string) => {

@@ -6568,14 +6568,25 @@ function changedPath(change) {
     }
     case "Fs": {
       let path = change.payload.path;
-      r.reload(path, {
+      const opts = {
         liveCSS: true,
         liveImg: true,
         reloadMissingCSS: true,
         originalPath: "",
         overrideURL: "",
         serverURL: ``
-      });
+      };
+      if (window.__playwright?.record) {
+        window.__playwright?.record({
+          kind: "reload",
+          args: {
+            path,
+            opts
+          }
+        });
+      } else {
+        r.reload(path, opts);
+      }
     }
   }
 }

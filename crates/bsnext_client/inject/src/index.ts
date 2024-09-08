@@ -44,14 +44,24 @@ function changedPath(change: ChangeDTO) {
     }
     case "Fs": {
       let path = change.payload.path;
-      r.reload(path, {
+      const opts = {
         liveCSS: true,
         liveImg: true,
         reloadMissingCSS: true,
         originalPath: '',
         overrideURL: '',
         serverURL: ``,
-      })
+      }
+      if (window.__playwright?.record) {
+        window.__playwright?.record({
+          kind: 'reload',
+          args: {
+            path, opts
+          }
+        })
+      } else {
+        r.reload(path, opts)
+      }
     }
   }
 }
@@ -70,3 +80,12 @@ consoleSubject.subscribe(evt => {
   }
 })
 
+// todo: share this with tests
+declare global {
+  interface Window {
+    __playwright?: {
+      calls?: any[],
+      record?: (...args: any[]) => void
+    }
+  }
+}

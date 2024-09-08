@@ -47,6 +47,7 @@ async fn post_events(
     State(app): State<Arc<ServerState>>,
     Json(payload): Json<ClientEvent>,
 ) -> impl IntoResponse {
+    tracing::trace!("Got post event: {:?}", payload);
     match &app.evt_receiver {
         None => unreachable!("should be unreachable?"),
         Some(recv) => {
