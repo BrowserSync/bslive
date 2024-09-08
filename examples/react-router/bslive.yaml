@@ -12,3 +12,16 @@ servers:
         json: [ 1, 2, 3 ]
         delay:
           ms: 1000
+
+  ## This server is just like the one above, but it adds `compression: true`
+  - name: 'react-router-with-compression'
+    routes:
+      - path: /
+        dir: examples/react-router/dist
+        compression: true
+        fallback:
+          dir: examples/react-router/dist/index.html
+      - path: /abc
+        json: [ 1, 2, 3 ]
+        delay:
+          ms: 1000
