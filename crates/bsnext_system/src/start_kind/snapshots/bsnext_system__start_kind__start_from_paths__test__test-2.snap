@@ -11,5 +11,6 @@ servers:
         watch: true
         inject: true
         headers: ~
+        compression: ~
         fallback: ~
     watchers: []

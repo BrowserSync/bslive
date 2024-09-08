@@ -1,8 +1,10 @@
 use crate::route::{
-    CorsOpts, DebounceDuration, DelayKind, DelayOpts, FilterKind, Route, Spec, SpecOpts, Watcher,
+    CompressionOpts, CorsOpts, DebounceDuration, DelayKind, DelayOpts, FilterKind, Route, Spec,
+    SpecOpts, Watcher,
 };
 use crate::watch_opts::WatchOpts;
 use crate::Input;
+use insta::assert_debug_snapshot;
 
 #[test]
 fn test_deserialize() {
@@ -60,6 +62,75 @@ fn test_deserialize_cors_false() {
     let first = c.items.get(0).unwrap().to_owned();
     let opts = first.opts.cors.unwrap();
     assert_eq!(opts, CorsOpts::Cors(false));
+}
+
+#[test]
+fn test_deserialize_compressions_absent() {
+    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    struct Config {
+        pub items: Vec<Route>,
+    }
+
+    let input = r#"
+    items:
+      - path: /hello.js
+        raw: "hello"
+        "#;
+    let c: Config = serde_yaml::from_str(input).unwrap();
+    let first = c.items.get(0).unwrap();
+    assert_eq!(first.opts.compression, None);
+}
+
+#[test]
+fn test_deserialize_compressions_true() {
+    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    struct Config {
+        pub items: Vec<Route>,
+    }
+
+    let input = r#"
+    items:
+      - path: /hello.js
+        raw: "hello"
+        compression: true
+        "#;
+    let c: Config = serde_yaml::from_str(input).unwrap();
+    let first = c.items.get(0).unwrap();
+    assert_eq!(first.opts.compression, Some(CompressionOpts::Bool(true)));
+}
+#[test]
+fn test_deserialize_compressions_gzip() {
+    let input = r#"
+      - path: /hello.js
+        raw: "hello"
+        compression: gzip
+      - path: /hello2.js
+        raw: "hello"
+        compression: br
+        "#;
+    let c: Vec<Route> = serde_yaml::from_str(input).unwrap();
+    assert_debug_snapshot!(c.get(0).unwrap().opts.compression);
+    assert_debug_snapshot!(c.get(1).unwrap().opts.compression);
+}
+
+#[test]
+fn test_com_yaml() -> anyhow::Result<()> {
+    #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+    struct V {
+        compression: CompressionOpts,
+    }
+
+    let input = r#"
+    - compression: true
+    - compression: false
+    - compression: br
+    - compression: gzip
+    - compression: zstd
+    - compression: deflate
+    "#;
+    let v: Vec<V> = serde_yaml::from_str(input)?;
+    assert_debug_snapshot!(v);
+    Ok(())
 }
 
 #[test]

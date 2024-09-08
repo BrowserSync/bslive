@@ -27,6 +27,7 @@ Input {
                             true,
                         ),
                         headers: None,
+                        compression: None,
                     },
                     fallback: None,
                 },

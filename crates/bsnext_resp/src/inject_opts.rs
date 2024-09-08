@@ -14,9 +14,14 @@ pub enum InjectOpts {
     Items(Vec<InjectionItem>),
 }
 
+#[derive(Debug, PartialEq)]
+pub struct Injections {
+    pub items: Vec<InjectionItem>,
+}
+
 impl InjectOpts {
-    pub fn injections(&self) -> Vec<InjectionItem> {
-        match self {
+    pub fn as_injections(&self) -> Injections {
+        let items = match self {
             InjectOpts::Bool(true) => {
                 vec![InjectionItem {
                     inner: Injection::BsLive(BuiltinStringDef {
@@ -32,7 +37,8 @@ impl InjectOpts {
             // todo: is this too expensive?
             InjectOpts::Items(items) => items.to_owned(),
             InjectOpts::Item(item) => vec![item.to_owned()],
-        }
+        };
+        Injections { items }
     }
 }
 

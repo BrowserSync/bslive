@@ -1,0 +1,9 @@
+---
+source: crates/bsnext_input/src/input_test/mod.rs
+expression: c.get(0).unwrap().opts.compression
+---
+Some(
+    CompType(
+        Gzip,
+    ),
+)

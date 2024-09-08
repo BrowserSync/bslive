@@ -1,5 +1,5 @@
-use crate::common_layers::add_route_layers;
 use crate::handlers::proxy::{proxy_handler, ProxyConfig};
+use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
 use crate::serve_dir::try_many_services_dir;
 use axum::handler::Handler;
@@ -8,6 +8,7 @@ use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{Extension, Router};
 use bsnext_input::route::{DirRoute, FallbackRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
 use std::collections::HashMap;
+use tower::Layer;
 use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Debug, PartialEq)]
@@ -168,7 +169,7 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
     match route.kind {
         RouteKind::Raw(raw_route) => {
             let svc = any_service(serve_raw_one.with_state(raw_route));
-            add_route_layers(svc, &route.opts)
+            optional_layers(svc, &route.opts)
         }
         RouteKind::Proxy(_new_proxy_route) => {
             // todo(alpha): make a decision proxy as a fallback
@@ -179,7 +180,7 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
             let item = DirRouteOpts::new(dir, route.opts, None);
             let serve_dir_service = item.as_serve_file();
             let service = get_service(serve_dir_service);
-            let layered = add_route_layers(service, &item.opts);
+            let layered = optional_layers(service, &item.opts);
             layered
         }
     }
@@ -196,7 +197,9 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
         HandlerStack::None => unreachable!(),
         HandlerStack::Raw { raw, opts } => {
             let svc = any_service(serve_raw_one.with_state(raw));
-            Router::new().route_service(path, add_route_layers(svc, &opts))
+            let out = optional_layers(svc, &opts);
+
+            Router::new().route_service(path, out)
         }
         HandlerStack::Dirs(dirs) => {
             Router::new().nest_service(path, serve_dir_layer(&dirs, Router::new()))
@@ -210,7 +213,7 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
             let proxy_with_decompression = proxy_handler.layer(Extension(proxy_config.clone()));
             let as_service = any(proxy_with_decompression);
 
-            Router::new().nest_service(path, add_route_layers(as_service, &opts))
+            Router::new().nest_service(path, optional_layers(as_service, &opts))
         }
         HandlerStack::DirsProxy(dir_list, proxy) => {
             let r2 = stack_to_router(
@@ -233,7 +236,7 @@ fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Rout
             None => {
                 let serve_dir_service = dir_route.as_serve_dir();
                 let service = get_service(serve_dir_service);
-                let layered = add_route_layers(service, &dir_route.opts);
+                let layered = optional_layers(service, &dir_route.opts);
                 layered
             }
             Some(fallback) => {
@@ -243,7 +246,7 @@ fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Rout
                     .fallback(stack)
                     .call_fallback_on_method_not_allowed(true);
                 let service = any_service(serve_dir_service);
-                let layered = add_route_layers(service, &dir_route.opts);
+                let layered = optional_layers(service, &dir_route.opts);
                 layered
             }
         })

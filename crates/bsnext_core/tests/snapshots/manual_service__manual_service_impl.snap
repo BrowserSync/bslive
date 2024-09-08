@@ -1,0 +1,15 @@
+---
+source: crates/bsnext_core/tests/manual_service.rs
+expression: s
+---
+Response {
+    status: 404,
+    version: HTTP/1.1,
+    headers: {
+        "content-length": "0",
+        "a": "b",
+    },
+    body: Body(
+        UnsyncBoxBody,
+    ),
+}
