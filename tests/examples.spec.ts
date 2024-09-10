@@ -127,24 +127,15 @@ test.describe('examples/basic/live-reload.yml', {
         }
       }
     };
-    await page.evaluate(() => {
-      window.__playwright = {
-        calls: [],
-        record: (...args) => {
-          window.__playwright?.calls?.push(args)
-        }
-      }
-    });
+    await page.evaluate(installMockHandler);
     await request.post(bs.api('events'), {data: change});
     await page.waitForFunction(() => {
       return window.__playwright?.calls?.length === 1
     })
-    const calls = await page.evaluate(() => {
-      return window.__playwright?.calls
-    })
+    const calls = await page.evaluate(readCalls)
     expect(JSON.stringify(calls, null, 2)).toMatchSnapshot();
   });
-  test.only('no css reloads with HTML + CSS change', async ({page, bs, request}) => {
+  test('no css reloads with HTML + CSS change', async ({page, bs, request}) => {
     page.on('console', (evt) => {
       console.log("PAGE LOG: ", evt.type(), evt.text())
     })

@@ -3,5 +3,21 @@
     {
       "kind": "reloadPage"
     }
+  ],
+  [
+    {
+      "kind": "reload",
+      "args": {
+        "path": "/Users/shaneosbourne/WebstormProjects/bslive/examples/basic/public/styles.css",
+        "opts": {
+          "liveCSS": true,
+          "liveImg": true,
+          "reloadMissingCSS": true,
+          "originalPath": "",
+          "overrideURL": "",
+          "serverURL": ""
+        }
+      }
+    }
   ]
 ]
