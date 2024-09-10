@@ -101,7 +101,7 @@ var require_reloader = __commonJS({
     var DEFAULT_OPTIONS = {
       stylesheetReloadTimeout: 15e3
     };
-    var IMAGES_REGEX = /\.(jpe?g|png|gif|svg)$/i;
+    var IMAGES_REGEX2 = /\.(jpe?g|png|gif|svg)$/i;
     var Reloader2 = class {
       constructor(window2, console2, Timer2) {
         this.window = window2;
@@ -135,7 +135,7 @@ var require_reloader = __commonJS({
             return;
           }
         }
-        if (options.liveImg && path.match(IMAGES_REGEX)) {
+        if (options.liveImg && path.match(IMAGES_REGEX2)) {
           this.reloadImages(path);
           return;
         }
@@ -155,7 +155,7 @@ var require_reloader = __commonJS({
             }
           }
           if (pluginId === "img") {
-            if (options.liveImg && path.match(IMAGES_REGEX)) {
+            if (options.liveImg && path.match(IMAGES_REGEX2)) {
               this.reloadImages(path);
               return true;
             }
@@ -6558,9 +6558,33 @@ socket.pipe(retry({ delay: 5e3 })).subscribe((m) => {
     }
   }
 });
+var IMAGES_REGEX = /\.(jpe?g|png|gif|svg)$/i;
 function changedPath(change) {
   switch (change.kind) {
     case "FsMany": {
+      const hasNoneInjectable = change.payload.some((changeDTO) => {
+        switch (changeDTO.kind) {
+          case "Fs":
+            if (changeDTO.payload.path.match(/\.css(?:\.map)?$/i)) {
+              return false;
+            }
+            if (changeDTO.payload.path.match(IMAGES_REGEX)) {
+              return false;
+            }
+            return true;
+          case "FsMany":
+            throw new Error("unreachable");
+        }
+      });
+      if (hasNoneInjectable) {
+        if (window.__playwright?.record) {
+          return window.__playwright?.record({
+            kind: "reloadPage"
+          });
+        } else {
+          return r.reloadPage();
+        }
+      }
       for (let changeDTO of change.payload) {
         changedPath(changeDTO);
       }
@@ -6568,14 +6592,25 @@ function changedPath(change) {
     }
     case "Fs": {
       let path = change.payload.path;
-      r.reload(path, {
+      const opts = {
         liveCSS: true,
         liveImg: true,
         reloadMissingCSS: true,
         originalPath: "",
         overrideURL: "",
         serverURL: ``
-      });
+      };
+      if (window.__playwright?.record) {
+        window.__playwright?.record({
+          kind: "reload",
+          args: {
+            path,
+            opts
+          }
+        });
+      } else {
+        r.reload(path, opts);
+      }
     }
   }
 }

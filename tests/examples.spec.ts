@@ -1,5 +1,8 @@
 import {bstest, test} from './utils';
 import {expect} from "@playwright/test";
+import {ChangeKind} from 'bsnext_client/generated/dto';
+import {clientEventSchema} from "bsnext_client/generated/schema";
+import {z} from "zod";
 
 test.describe('examples/basic/headers.yml', {
   annotation: {
@@ -109,6 +112,75 @@ test.describe('examples/basic/live-reload.yml', {
     bs.touch('examples/basic/public/styles.css')
     await requestPromise;
   });
+  test('reloads with HTML change', async ({page, bs, request}) => {
+    page.on('console', (evt) => {
+      console.log("PAGE LOG: ", evt.type(), evt.text())
+    })
+    await page.goto(bs.path('/'), {waitUntil: 'networkidle'})
+    const change: z.infer<typeof clientEventSchema> = {
+      "kind": "Change",
+      "payload": {
+        "kind": "Fs",
+        "payload": {
+          "path": "index.html",
+          "change_kind": ChangeKind.Changed
+        }
+      }
+    };
+    await page.evaluate(installMockHandler);
+    await request.post(bs.api('events'), {data: change});
+    await page.waitForFunction(() => {
+      return window.__playwright?.calls?.length === 1
+    })
+    const calls = await page.evaluate(readCalls)
+    expect(calls).toStrictEqual([
+      [
+        {
+          "kind": "reloadPage"
+        }
+      ]
+    ]);
+  });
+  test('no css reloads with HTML + CSS change', async ({page, bs, request}) => {
+    page.on('console', (evt) => {
+      console.log("PAGE LOG: ", evt.type(), evt.text())
+    })
+    await page.goto(bs.path('/'), {waitUntil: 'networkidle'})
+
+    const change: z.infer<typeof clientEventSchema> = {
+      "kind": "Change",
+      "payload": {
+        "kind": "FsMany",
+        "payload": [
+          {
+            "kind": "Fs",
+            "payload": {
+              "path": "reset.css",
+              "change_kind": ChangeKind.Changed
+            }
+          },
+          {
+            "kind": "Fs",
+            "payload": {
+              "path": "index.html",
+              "change_kind": ChangeKind.Changed
+            }
+          }
+        ]
+      }
+    };
+    await page.evaluate(installMockHandler);
+    await request.post(bs.api('events'), {data: change});
+    await page.waitForTimeout(500);
+    const calls = await page.evaluate(readCalls)
+    expect(calls).toStrictEqual([
+      [
+        {
+          "kind": "reloadPage"
+        }
+      ]
+    ])
+  });
 })
 
 test.describe('examples/react-router/bslive.yaml', {
@@ -144,3 +216,25 @@ test.describe('examples/react-router/bslive.yaml', {
     expect(jsfile?.headers()['content-encoding']).toBeUndefined()
   });
 })
+
+declare global {
+  interface Window {
+    __playwright?: {
+      calls?: any[],
+      record?: (...args: any[]) => void
+    }
+  }
+}
+
+function installMockHandler() {
+  window.__playwright = {
+    calls: [],
+    record: (...args) => {
+      window.__playwright?.calls?.push(args)
+    }
+  }
+}
+
+function readCalls() {
+  return window.__playwright?.calls
+}
