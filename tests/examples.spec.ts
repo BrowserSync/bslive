@@ -133,7 +133,13 @@ test.describe('examples/basic/live-reload.yml', {
       return window.__playwright?.calls?.length === 1
     })
     const calls = await page.evaluate(readCalls)
-    expect(JSON.stringify(calls, null, 2)).toMatchSnapshot();
+    expect(calls).toStrictEqual([
+      [
+        {
+          "kind": "reloadPage"
+        }
+      ]
+    ]);
   });
   test('no css reloads with HTML + CSS change', async ({page, bs, request}) => {
     page.on('console', (evt) => {
@@ -167,7 +173,13 @@ test.describe('examples/basic/live-reload.yml', {
     await request.post(bs.api('events'), {data: change});
     await page.waitForTimeout(500);
     const calls = await page.evaluate(readCalls)
-    expect(JSON.stringify(calls, null, 2)).toMatchSnapshot()
+    expect(calls).toStrictEqual([
+      [
+        {
+          "kind": "reloadPage"
+        }
+      ]
+    ])
   });
 })
 
