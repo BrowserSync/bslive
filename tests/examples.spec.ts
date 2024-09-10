@@ -172,20 +172,11 @@ test.describe('examples/basic/live-reload.yml', {
         ]
       }
     };
-    await page.evaluate(() => {
-      window.__playwright = {
-        calls: [],
-        record: (...args) => {
-          window.__playwright?.calls?.push(args)
-        }
-      }
-    });
+    await page.evaluate(installMockHandler);
     await request.post(bs.api('events'), {data: change});
     await page.waitForTimeout(500);
-    const calls = await page.evaluate(() => {
-      return window.__playwright?.calls
-    })
-    expect(calls).toHaveLength(1);
+    const calls = await page.evaluate(readCalls)
+    expect(JSON.stringify(calls, null, 2)).toMatchSnapshot()
   });
 })
 
@@ -230,4 +221,17 @@ declare global {
       record?: (...args: any[]) => void
     }
   }
+}
+
+function installMockHandler() {
+  window.__playwright = {
+    calls: [],
+    record: (...args) => {
+      window.__playwright?.calls?.push(args)
+    }
+  }
+}
+
+function readCalls() {
+  return window.__playwright?.calls
 }

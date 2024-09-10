@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm"
+    "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm",
+    "build:client:debug": "npm run build:client -- --sourcemap=inline"
   },
   "keywords": [],
   "author": "",

@@ -1,5 +1,5 @@
 // @ts-ignore
-import {Reloader} from "livereload-js/src/reloader.js";
+import {Reloader,} from "livereload-js/src/reloader.js";
 // @ts-ignore
 import {Timer} from "livereload-js/src/timer.js";
 
@@ -33,10 +33,42 @@ socket
     }
   })
 
+// todo: the checks are lifted directly from live reload, we should not use them, but are a good starting point
+const IMAGES_REGEX = /\.(jpe?g|png|gif|svg)$/i;
+
 function changedPath(change: ChangeDTO) {
   switch (change.kind) {
     case "FsMany": {
-      // todo(alpha): if this collection of events contains anything that will cause a refresh, just do it immediately
+
+      const hasNoneInjectable = change.payload.some(changeDTO => {
+        switch (changeDTO.kind) {
+          case "Fs":
+            if (changeDTO.payload.path.match(/\.css(?:\.map)?$/i)) {
+              return false
+            }
+            if (changeDTO.payload.path.match(IMAGES_REGEX)) {
+              return false
+            }
+
+            // if we get here, we're not going to live inject anything
+            return true
+          case "FsMany":
+            throw new Error("unreachable")
+        }
+      });
+
+      // if any path will cause a reload anyway, don't both hot-reloading anything.
+      if (hasNoneInjectable) {
+        if (window.__playwright?.record) {
+          return window.__playwright?.record({
+            kind: 'reloadPage',
+          })
+        } else {
+          return r.reloadPage()
+        }
+      }
+
+      // if we get here, every path given was injectable, so try to inject them all
       for (let changeDTO of change.payload) {
         changedPath(changeDTO);
       }
