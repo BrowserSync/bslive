@@ -103,6 +103,10 @@ test.describe('examples/basic/live-reload.yml', {
   }
 }, () => {
   test('live-reloading css', async ({page, bs}) => {
+    const messages: [type: string, text: string][] = [];
+    page.on('console', (msg) => {
+      messages.push([msg.type(), msg.text()])
+    })
     await page.goto(bs.path('/'), {waitUntil: 'networkidle'})
     const requestPromise = page.waitForRequest((req) => {
       const url = new URL(req.url());
@@ -111,6 +115,8 @@ test.describe('examples/basic/live-reload.yml', {
     }, {timeout: 2000});
     bs.touch('examples/basic/public/styles.css')
     await requestPromise;
+    const log = messages.filter(([, text]) => text === "[debug] found 1 LINKed stylesheets, 1 @imported stylesheets")
+    expect(log).toHaveLength(1);
   });
   test('reloads with HTML change', async ({page, bs, request}) => {
     page.on('console', (evt) => {

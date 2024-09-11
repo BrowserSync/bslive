@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm",
+    "dev": "npm run build:client -- --sourcemap=inline --watch",
     "build:client:debug": "npm run build:client -- --sourcemap=inline"
   },
   "keywords": [],

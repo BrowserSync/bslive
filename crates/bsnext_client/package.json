@@ -16,7 +16,6 @@
   "type": "module",
   "dependencies": {
     "esbuild": "^0.20.2",
-    "livereload-js": "^4.0.2",
     "rxjs": "^7.8.1",
     "typescript": "^5.4.5",
     "@types/node": "18.19.25",

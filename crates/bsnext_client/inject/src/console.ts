@@ -1,4 +1,4 @@
-import {Observable, Subject} from "rxjs";
+import {Subject} from "rxjs";
 
 export enum Level {
   Trace = "Trace",
@@ -12,12 +12,30 @@ export interface ConsoleEvent {
   text: string
 }
 
-export function createLRConsoleObserver(): [Subject<ConsoleEvent>, Pick<typeof console, "log">] {
+export function createLRConsoleObserver(): [Subject<ConsoleEvent>, Pick<typeof console, "trace" | "debug" | "info" | "error">] {
   const subject = new Subject<ConsoleEvent>;
   return [subject, {
-    log: function (...data: any[]): void {
+    debug: function (...data: any[]): void {
       subject.next({
         level: Level.Debug,
+        text: data.join('\n')
+      });
+    },
+    info: function (...data: any[]): void {
+      subject.next({
+        level: Level.Info,
+        text: data.join('\n')
+      });
+    },
+    trace: function (...data: any[]): void {
+      subject.next({
+        level: Level.Trace,
+        text: data.join('\n')
+      });
+    },
+    error: function (...data: any[]): void {
+      subject.next({
+        level: Level.Error,
         text: data.join('\n')
       });
     },
