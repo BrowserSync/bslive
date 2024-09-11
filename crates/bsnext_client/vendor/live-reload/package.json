@@ -1,0 +1,6 @@
+{
+  "name": "livereload-js-vendored",
+  "version": "4.0.2",
+  "description": "LiveReload JS client - auto reload browser on changes",
+  "module": "src/startup.js"
+}

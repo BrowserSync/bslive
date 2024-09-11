@@ -1,7 +1,5 @@
-// @ts-ignore
-import {Reloader,} from "livereload-js/src/reloader.js";
-// @ts-ignore
-import {Timer} from "livereload-js/src/timer.js";
+import {Reloader} from "../../vendor/live-reload/src/reloader";
+import {Timer} from "../../vendor/live-reload/src/timer";
 
 import {webSocket} from "rxjs/webSocket";
 import {retry} from "rxjs";
@@ -20,7 +18,7 @@ const socket = webSocket<ClientEvent>(url.origin + url.pathname);
 socket
   .pipe(retry({delay: 5000}))
   .subscribe(m => {
-    console.log(JSON.stringify(m, null, 2))
+    consoleApi.trace("incoming message", JSON.stringify(m, null, 2))
     const parsed = clientEventSchema.parse(m);
     switch (parsed.kind) {
       case "Change": {
@@ -92,6 +90,7 @@ function changedPath(change: ChangeDTO) {
           }
         })
       } else {
+        consoleApi.trace("will reload a file with path ", path)
         r.reload(path, opts)
       }
     }
@@ -101,6 +100,7 @@ function changedPath(change: ChangeDTO) {
 consoleSubject.subscribe(evt => {
   switch (evt.level) {
     case Level.Trace:
+      console.log('[trace]', evt.text)
       break;
     case Level.Debug:
       console.log('[debug]', evt.text)
@@ -108,6 +108,7 @@ consoleSubject.subscribe(evt => {
     case Level.Info:
       break;
     case Level.Error:
+      console.error('[error]', evt.text)
       break;
   }
 })
