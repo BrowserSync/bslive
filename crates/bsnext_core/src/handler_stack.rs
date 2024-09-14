@@ -14,10 +14,20 @@ use tower_http::services::{ServeDir, ServeFile};
 pub enum HandlerStack {
     None,
     // todo: make this a separate thing
-    Raw { raw: RawRoute, opts: Opts },
+    Raw {
+        raw: RawRoute,
+        opts: Opts,
+    },
     Dirs(Vec<DirRouteOpts>),
-    Proxy { proxy: ProxyRoute, opts: Opts },
-    DirsProxy(Vec<DirRouteOpts>, ProxyRoute),
+    Proxy {
+        proxy: ProxyRoute,
+        opts: Opts,
+    },
+    DirsProxy {
+        dirs: Vec<DirRouteOpts>,
+        proxy: ProxyRoute,
+        opts: Opts,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -143,23 +153,32 @@ pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
                 dirs.push(DirRouteOpts::new(next_dir, route.opts, route.fallback));
                 HandlerStack::Dirs(dirs)
             }
-            RouteKind::Proxy(proxy) => HandlerStack::DirsProxy(dirs, proxy),
+            RouteKind::Proxy(proxy) => HandlerStack::DirsProxy {
+                dirs,
+                proxy,
+                opts: route.opts,
+            },
             _ => HandlerStack::Dirs(dirs),
         },
         HandlerStack::Proxy { proxy, opts } => match route.kind {
-            RouteKind::Dir(dir) => HandlerStack::DirsProxy(
-                vec![DirRouteOpts::new(dir, route.opts, route.fallback)],
+            RouteKind::Dir(dir) => HandlerStack::DirsProxy {
+                dirs: vec![DirRouteOpts::new(dir, route.opts, route.fallback)],
                 proxy,
-            ),
+                opts,
+            },
             _ => HandlerStack::Proxy { proxy, opts },
         },
-        HandlerStack::DirsProxy(mut dirs, proxy) => match route.kind {
+        HandlerStack::DirsProxy {
+            mut dirs,
+            proxy,
+            opts,
+        } => match route.kind {
             RouteKind::Dir(dir) => {
                 dirs.push(DirRouteOpts::new(dir, route.opts, route.fallback));
-                HandlerStack::DirsProxy(dirs, proxy)
+                HandlerStack::DirsProxy { dirs, proxy, opts }
             }
             // todo(alpha): how to handle multiple proxies? should it just override for now?
-            _ => HandlerStack::DirsProxy(dirs, proxy),
+            _ => HandlerStack::DirsProxy { dirs, proxy, opts },
         },
     }
 }
@@ -213,15 +232,9 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
 
             Router::new().nest_service(path, optional_layers(as_service, &opts))
         }
-        HandlerStack::DirsProxy(dir_list, proxy) => {
-            let proxy_router = stack_to_router(
-                path,
-                HandlerStack::Proxy {
-                    proxy,
-                    opts: Default::default(),
-                },
-            );
-            let r1 = serve_dir_layer(&dir_list, Router::new().fallback_service(proxy_router));
+        HandlerStack::DirsProxy { dirs, proxy, opts } => {
+            let proxy_router = stack_to_router(path, HandlerStack::Proxy { proxy, opts });
+            let r1 = serve_dir_layer(&dirs, Router::new().fallback_service(proxy_router));
             Router::new().nest_service(path, r1)
         }
     }
