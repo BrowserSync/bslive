@@ -1,5 +1,7 @@
 servers:
   - name: 'live-reload'
+    clients:
+      log: debug
     routes:
       - path: /
         html: |

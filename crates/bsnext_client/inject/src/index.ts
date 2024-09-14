@@ -2,10 +2,10 @@ import {Reloader} from "../../vendor/live-reload/src/reloader";
 import {Timer} from "../../vendor/live-reload/src/timer";
 
 import {webSocket} from "rxjs/webSocket";
-import {retry} from "rxjs";
+import {filter, map, retry, withLatestFrom} from "rxjs";
 import {clientEventSchema} from "../../generated/schema.js";
-import {ChangeDTO, ClientEvent} from "../../generated/dto";
-import {createLRConsoleObserver, Level} from "./console";
+import {ChangeDTO, ClientConfigDTO, ClientEvent, LogLevelDTO} from "../../generated/dto";
+import {createLRConsoleObserver} from "./console";
 
 const [consoleSubject, consoleApi] = createLRConsoleObserver();
 
@@ -15,21 +15,23 @@ url.protocol = url.protocol === 'http:' ? 'ws' : 'wss';
 url.pathname = '/__bs_ws'
 const socket = webSocket<ClientEvent>(url.origin + url.pathname);
 
-socket
-  .pipe(retry({delay: 5000}))
-  .subscribe(m => {
-    consoleApi.trace("incoming message", JSON.stringify(m, null, 2))
-    const parsed = clientEventSchema.parse(m);
-    switch (parsed.kind) {
-      case "Change": {
-        changedPath(parsed.payload);
-        break;
-      }
-      default: {
-        console.warn("unhandled client event")
-      }
+const sub$ = socket.pipe(retry({delay: 5000}));
+const change$ = sub$.pipe(filter(x => x.kind === "Change"));
+const config$ = sub$.pipe(filter(x => x.kind === "Config"), map(x => x.payload));
+
+change$.pipe(withLatestFrom(config$)).subscribe(([change, config]) => {
+  consoleApi.trace("incoming message", JSON.stringify({change, config}, null, 2))
+  const parsed = clientEventSchema.parse(change);
+  switch (parsed.kind) {
+    case "Change": {
+      changedPath(parsed.payload);
+      break;
     }
-  })
+    default: {
+      console.warn("unhandled client event")
+    }
+  }
+});
 
 // todo: the checks are lifted directly from live reload, we should not use them, but are a good starting point
 const IMAGES_REGEX = /\.(jpe?g|png|gif|svg)$/i;
@@ -97,21 +99,19 @@ function changedPath(change: ChangeDTO) {
   }
 }
 
-consoleSubject.subscribe(evt => {
-  switch (evt.level) {
-    case Level.Trace:
-      console.log('[trace]', evt.text)
-      break;
-    case Level.Debug:
-      console.log('[debug]', evt.text)
-      break;
-    case Level.Info:
-      break;
-    case Level.Error:
-      console.error('[error]', evt.text)
-      break;
+consoleSubject.pipe(withLatestFrom(config$)).subscribe(([evt, config]) => {
+  const levelOrder = [LogLevelDTO.Trace, LogLevelDTO.Debug, LogLevelDTO.Info, LogLevelDTO.Error];
+  const currentLevelIndex = levelOrder.indexOf(evt.level);
+  const configLevelIndex = levelOrder.indexOf(config.log_level);
+
+  if (currentLevelIndex >= configLevelIndex) {
+    console.log(`[${evt.level}] ${evt.text}`);
   }
 })
+
+export function logMessage(message: string, level: LogLevelDTO, config: ClientConfigDTO): void {
+
+}
 
 // todo: share this with tests
 declare global {

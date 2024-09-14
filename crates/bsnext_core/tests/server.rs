@@ -118,7 +118,7 @@ impl ServerParent {
         let server_config = ServerConfig {
             identity: ServerIdentity::named(),
             routes,
-            watchers: vec![],
+            ..Default::default()
         };
 
         Self {

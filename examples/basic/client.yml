@@ -1,0 +1,15 @@
+servers:
+  - bind_address: 0.0.0.0:3000
+    clients:
+      log: info
+    routes:
+      - path: /style.css
+        raw: |
+          body { font-family: orange }
+      - path: /
+        html: |
+          <body>
+          <link rel="stylesheet" href="/style.css">
+          <h1>hello?</h1>
+          </body>
+            

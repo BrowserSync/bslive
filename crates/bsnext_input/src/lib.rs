@@ -9,6 +9,7 @@ use std::net::AddrParseError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+pub mod client_config;
 #[cfg(test)]
 pub mod input_test;
 pub mod md;

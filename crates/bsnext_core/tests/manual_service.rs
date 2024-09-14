@@ -26,6 +26,7 @@ async fn test_manual_service_impl() -> anyhow::Result<()> {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 struct MyLayer {
     headers: BTreeMap<String, String>,
 }

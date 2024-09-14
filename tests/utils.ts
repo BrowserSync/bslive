@@ -11,6 +11,15 @@ import {existsSync} from "node:fs";
 
 const either = z.union([internalEventsDTOSchema, externalEventsSchema]);
 
+declare global {
+  interface Window {
+    __playwright?: {
+      calls?: any[],
+      record?: (...args: any[]) => void
+    }
+  }
+}
+
 const messageSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("ready"),
@@ -169,4 +178,17 @@ export const test = base.extend<{
 
 function touchFile(filePath: string) {
   execSync(`touch ${filePath}`);
+}
+
+export function installMockHandler() {
+  window.__playwright = {
+    calls: [],
+    record: (...args) => {
+      window.__playwright?.calls?.push(args)
+    }
+  }
+}
+
+export function readCalls() {
+  return window.__playwright?.calls
 }

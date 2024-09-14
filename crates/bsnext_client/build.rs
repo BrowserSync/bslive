@@ -9,7 +9,9 @@ fn main() {
         return;
     }
     println!("cargo::rerun-if-changed=src/lib.rs");
+    println!("cargo::rerun-if-changed=inject");
     println!("cargo::rerun-if-changed=../bsnext_dto");
+    println!("cargo::rerun-if-changed=../bsnext_input");
     let curr = current_dir().expect("current dir");
     let root = curr
         .parent()

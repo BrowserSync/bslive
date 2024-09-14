@@ -8,7 +8,6 @@ use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{Extension, Router};
 use bsnext_input::route::{DirRoute, FallbackRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
 use std::collections::HashMap;
-use tower::Layer;
 use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Debug, PartialEq)]
@@ -180,8 +179,7 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
             let item = DirRouteOpts::new(dir, route.opts, None);
             let serve_dir_service = item.as_serve_file();
             let service = get_service(serve_dir_service);
-            let layered = optional_layers(service, &item.opts);
-            layered
+            optional_layers(service, &item.opts)
         }
     }
 }
@@ -236,8 +234,7 @@ fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Rout
             None => {
                 let serve_dir_service = dir_route.as_serve_dir();
                 let service = get_service(serve_dir_service);
-                let layered = optional_layers(service, &dir_route.opts);
-                layered
+                optional_layers(service, &dir_route.opts)
             }
             Some(fallback) => {
                 let stack = fallback_to_layered_method_router(fallback.clone());
@@ -246,8 +243,7 @@ fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Rout
                     .fallback(stack)
                     .call_fallback_on_method_not_allowed(true);
                 let service = any_service(serve_dir_service);
-                let layered = optional_layers(service, &dir_route.opts);
-                layered
+                optional_layers(service, &dir_route.opts)
             }
         })
         .collect::<Vec<MethodRouter>>();

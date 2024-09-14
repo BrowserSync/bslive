@@ -5,9 +5,12 @@ use std::fmt::{Display, Formatter};
 use std::path::Path;
 
 use bsnext_fs::Debounce;
+use bsnext_input::client_config::ClientConfig;
 use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
 use bsnext_input::startup::StartupError;
+use bsnext_tracing::LogLevel;
 use typeshare::typeshare;
+
 pub mod internal;
 
 #[typeshare]
@@ -334,6 +337,50 @@ impl From<InputError> for InputErrorDTO {
 #[serde(tag = "kind", content = "payload")]
 pub enum ClientEvent {
     Change(ChangeDTO),
+    Config(ClientConfigDTO),
+}
+
+#[typeshare::typeshare]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ClientConfigDTO {
+    pub log_level: LogLevelDTO,
+}
+
+impl From<ClientConfig> for ClientConfigDTO {
+    fn from(value: ClientConfig) -> Self {
+        Self {
+            log_level: value.log.into(),
+        }
+    }
+}
+
+impl From<&ClientConfig> for ClientConfigDTO {
+    fn from(value: &ClientConfig) -> Self {
+        Self {
+            log_level: value.log.into(),
+        }
+    }
+}
+
+#[typeshare::typeshare]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevelDTO {
+    Info,
+    Debug,
+    Trace,
+    Error,
+}
+
+impl From<LogLevel> for LogLevelDTO {
+    fn from(value: LogLevel) -> Self {
+        match value {
+            LogLevel::Info => LogLevelDTO::Info,
+            LogLevel::Debug => LogLevelDTO::Debug,
+            LogLevel::Trace => LogLevelDTO::Trace,
+            LogLevel::Error => LogLevelDTO::Error,
+        }
+    }
 }
 
 #[typeshare::typeshare]

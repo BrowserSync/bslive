@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bsnext_input = { path = "../bsnext_input" }
 bsnext_fs = { path = "../bsnext_fs" }
+bsnext_tracing = { path = "../bsnext_tracing" }
 
 serde = { workspace = true }
 thiserror = { workspace = true }

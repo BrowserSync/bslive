@@ -254,3 +254,14 @@ servers:
         ]
     )
 }
+#[test]
+fn test_deserialize_server_clients_config() {
+    let input = r#"
+servers:
+- bind_address: 0.0.0.0:4000
+  clients:
+    log: debug
+"#;
+    let c: Input = serde_yaml::from_str(input).unwrap();
+    dbg!(&c);
+}

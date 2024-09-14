@@ -6,11 +6,13 @@ use futures_util::{SinkExt, StreamExt};
 
 use crate::server::state::ServerState;
 use bsnext_dto::ClientEvent;
+use bsnext_input::client_config::ClientConfig;
 use std::net::SocketAddr;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::Sender;
+use tokio::sync::RwLock;
 
 /// The handler for the HTTP request (this gets called when the HTTP GET lands at the start
 /// of websocket negotiation). After this completes, the actual switching from HTTP to
@@ -24,7 +26,14 @@ pub async fn ws_handler(
 ) -> impl IntoResponse {
     // finalize the upgrade process by returning upgrade callback.
     // we can customize the callback by sending additional info such as address.
-    ws.on_upgrade(move |socket| handle_socket(socket, addr, state.client_sender.clone()))
+    ws.on_upgrade(move |socket| {
+        handle_socket(
+            socket,
+            addr,
+            state.client_sender.clone(),
+            state.client_config.clone(),
+        )
+    })
 }
 
 /// Actual websocket statemachine (one will be spawned per connection)
@@ -32,6 +41,7 @@ async fn handle_socket(
     mut socket: WebSocket,
     who: SocketAddr,
     client_sender: Arc<Sender<ClientEvent>>,
+    initial_config: Arc<RwLock<ClientConfig>>,
 ) {
     //send a ping (unsupported by some browsers) just to kick things off and get a response
     if socket.send(Message::Ping(vec![1, 2, 3])).await.is_ok() {
@@ -64,6 +74,16 @@ async fn handle_socket(
 
     // Spawn a task that will push several messages to the client (does not matter what client does)
     let mut send_task = tokio::spawn(async move {
+        // send client config first
+        let v = initial_config.read().await;
+        let as_client_event = ClientEvent::Config(v.clone().into());
+        let as_str = serde_json::to_string(&as_client_event).unwrap();
+        drop(v);
+
+        if sender.send(Message::Text(as_str)).await.is_err() {
+            tracing::error!("could not send initial message?");
+        }
+
         let mut count = 0;
         let mut client_receiver = client_sender.subscribe();
         loop {
@@ -85,7 +105,7 @@ async fn handle_socket(
                     tracing::debug!("closed!");
                 }
                 Err(RecvError::Lagged(num)) => {
-                    tracing::error!(?num, "loagged!");
+                    tracing::error!(?num, "lagged!");
                 }
             }
         }

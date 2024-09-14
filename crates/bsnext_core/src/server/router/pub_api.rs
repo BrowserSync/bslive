@@ -62,6 +62,9 @@ async fn post_events(
                         ChangeDTO::FsMany(..) => todo!("recursion..."),
                     })
                     .collect::<Vec<_>>(),
+                ClientEvent::Config(_) => {
+                    todo!("handle ClientEvent::Config  in incoming event handler...")
+                }
             };
             match recv
                 .send(IncomingEvents::FilesChanged(FilesChanged {

@@ -50,10 +50,12 @@ fn platform_accepts(evt: &notify::Event) -> bool {
         EventKind::Access(..) => false,
         EventKind::Create(..) => false,
         EventKind::Modify(modify) => match modify {
+            #[allow(clippy::match_like_matches_macro)]
             ModifyKind::Data(data) => match data {
                 DataChange::Content => true,
                 _ => false,
             },
+            #[allow(clippy::match_like_matches_macro)]
             ModifyKind::Metadata(meta) => match meta {
                 MetadataKind::Any => true,
                 _ => false,

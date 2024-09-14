@@ -36,6 +36,7 @@ impl actix::Handler<Listen> for ServerActor {
             // parent: ,
             routes: Arc::new(RwLock::new(self.config.routes.clone())),
             raw_router: Arc::new(RwLock::new(router)),
+            client_config: Arc::new(RwLock::new(self.config.clients.clone())),
             id: self.config.identity.as_id(),
             parent: Some(msg.parent.clone()),
             evt_receiver: Some(msg.evt_receiver.clone()),

@@ -1,14 +1,8 @@
 import {Subject} from "rxjs";
-
-export enum Level {
-  Trace = "Trace",
-  Debug = "Debug",
-  Info = "Info",
-  Error = "Error",
-}
+import {LogLevelDTO} from "../../generated/dto";
 
 export interface ConsoleEvent {
-  level: Level,
+  level: LogLevelDTO,
   text: string
 }
 
@@ -17,25 +11,25 @@ export function createLRConsoleObserver(): [Subject<ConsoleEvent>, Pick<typeof c
   return [subject, {
     debug: function (...data: any[]): void {
       subject.next({
-        level: Level.Debug,
+        level: LogLevelDTO.Debug,
         text: data.join('\n')
       });
     },
     info: function (...data: any[]): void {
       subject.next({
-        level: Level.Info,
+        level: LogLevelDTO.Info,
         text: data.join('\n')
       });
     },
     trace: function (...data: any[]): void {
       subject.next({
-        level: Level.Trace,
+        level: LogLevelDTO.Trace,
         text: data.join('\n')
       });
     },
     error: function (...data: any[]): void {
       subject.next({
-        level: Level.Error,
+        level: LogLevelDTO.Error,
         text: data.join('\n')
       });
     },

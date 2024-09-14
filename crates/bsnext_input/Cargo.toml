@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bsnext_resp = { path = "../bsnext_resp" }
+bsnext_tracing = { path = "../bsnext_tracing" }
 
 markdown = { version = "1.0.0-alpha.16" }
 

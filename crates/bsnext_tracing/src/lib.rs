@@ -4,7 +4,19 @@ use std::fmt::{Display, Formatter};
 
 pub use crate::otlp::{init_tracing_subscriber, OtelGuard};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    clap::ValueEnum,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     Info,
     Debug,
