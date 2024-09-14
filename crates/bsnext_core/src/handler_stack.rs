@@ -1,4 +1,5 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig};
+use crate::not_found::not_found_service::not_found_srv;
 use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
 use crate::serve_dir::try_many_services_dir;
@@ -215,11 +216,15 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
         HandlerStack::Raw { raw, opts } => {
             let svc = any_service(serve_raw_one.with_state(raw));
             let out = optional_layers(svc, &opts);
-
-            Router::new().route_service(path, out)
+            Router::new()
+                .route_service(path, out)
+                .fallback_service(any(not_found_srv))
         }
         HandlerStack::Dirs(dirs) => {
-            Router::new().nest_service(path, serve_dir_layer(&dirs, Router::new()))
+            let fallback = Router::new().fallback_service(any(not_found_srv));
+            let service = serve_dir_layer(&dirs, fallback);
+
+            Router::new().nest_service(path, service)
         }
         HandlerStack::Proxy { proxy, opts } => {
             let proxy_config = ProxyConfig {
