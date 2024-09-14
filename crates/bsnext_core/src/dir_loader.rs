@@ -18,6 +18,7 @@ use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio_stream::StreamExt;
 
+#[allow(dead_code)]
 async fn tag_file(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {
     let (mut parts, body) = next.run(req).await.into_parts();
     if parts.status.as_u16() == 200 {
@@ -26,6 +27,7 @@ async fn tag_file(req: Request, next: Next) -> Result<impl IntoResponse, (Status
     Ok(Response::from_parts(parts, body))
 }
 
+#[allow(dead_code)]
 async fn tag_proxy(req: Request, next: Next) -> Result<impl IntoResponse, (StatusCode, String)> {
     let (mut parts, body) = next.run(req).await.into_parts();
     if parts.status.as_u16() == 200 {

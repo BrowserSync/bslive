@@ -6,6 +6,13 @@ var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
   EventLevel2["External"] = "BSLIVE_EXTERNAL";
   return EventLevel2;
 })(EventLevel || {});
+var LogLevelDTO = /* @__PURE__ */ ((LogLevelDTO2) => {
+  LogLevelDTO2["Info"] = "info";
+  LogLevelDTO2["Debug"] = "debug";
+  LogLevelDTO2["Trace"] = "trace";
+  LogLevelDTO2["Error"] = "error";
+  return LogLevelDTO2;
+})(LogLevelDTO || {});
 var ChangeKind = /* @__PURE__ */ ((ChangeKind2) => {
   ChangeKind2["Changed"] = "Changed";
   ChangeKind2["Added"] = "Added";
@@ -197,6 +204,10 @@ var serverChangeSetItemSchema = z.object({
 var serverChangeSetSchema = z.object({
   items: z.array(serverChangeSetItemSchema)
 });
+var logLevelDTOSchema = z.nativeEnum(LogLevelDTO);
+var clientConfigDTOSchema = z.object({
+  log_level: logLevelDTOSchema
+});
 var internalEventsDTOSchema = z.object({
   kind: z.literal("ServersChanged"),
   payload: getServersMessageResponseSchema
@@ -269,13 +280,20 @@ var startupEventSchema = z.union([
     payload: startupErrorDTOSchema
   })
 ]);
-var clientEventSchema = z.object({
-  kind: z.literal("Change"),
-  payload: changeDTOSchema
-});
+var clientEventSchema = z.union([
+  z.object({
+    kind: z.literal("Change"),
+    payload: changeDTOSchema
+  }),
+  z.object({
+    kind: z.literal("Config"),
+    payload: clientConfigDTOSchema
+  })
+]);
 export {
   changeDTOSchema,
   changeKindSchema,
+  clientConfigDTOSchema,
   clientEventSchema,
   debounceDTOSchema,
   eventLevelSchema,
@@ -287,6 +305,7 @@ export {
   inputAcceptedSchema,
   inputErrorDTOSchema,
   internalEventsDTOSchema,
+  logLevelDTOSchema,
   routeDTOSchema,
   routeKindDTOSchema,
   serverChangeSchema,

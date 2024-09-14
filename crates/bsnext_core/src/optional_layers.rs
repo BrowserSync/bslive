@@ -1,5 +1,4 @@
 use axum::extract::{Request, State};
-use axum::handler::Handler;
 use axum::middleware::{map_response_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::MethodRouter;
@@ -12,7 +11,7 @@ use std::collections::BTreeMap;
 use std::convert::Infallible;
 use std::time::Duration;
 use tokio::time::sleep;
-use tower::{Layer, ServiceBuilder};
+use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 
@@ -91,7 +90,7 @@ async fn set_resp_headers<B>(
             (Ok(n), Err(_e)) => {
                 tracing::error!("invalid header value: `{}` for name: `{}`", v, n)
             }
-            (Err(_e), Ok(v)) => {
+            (Err(_e), Ok(..)) => {
                 tracing::error!("invalid header name `{}`", k)
             }
             (Err(_e), Err(_e2)) => {

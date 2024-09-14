@@ -143,18 +143,19 @@ impl ServersSupervisor {
                     Err(e) => unreachable!("{}", e),
                 });
 
-                let fts = patch_jobs.into_iter().map(|(child, server_config)| {
+                let patch_futures = patch_jobs.into_iter().map(|(child, server_config)| {
                     child
                         .actor_address
                         .send(Patch { server_config })
                         .map(|r| (r, child))
                 });
-                let results = join_all(fts).await;
+                let results = join_all(patch_futures).await;
                 let patch_child_results = results.into_iter().map(|(r, child_handler)| match r {
-                    Ok(Ok(route_change_set)) => {
+                    Ok(Ok((route_change_set, client_config_change_set))) => {
                         let evt = ChildResult::Patched(ChildPatched {
                             server_handler: child_handler.minimal(),
                             route_change_set,
+                            client_config_change_set,
                         });
                         (Some(child_handler.actor_address), evt)
                     }

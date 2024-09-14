@@ -14,3 +14,5 @@ servers:
         compression: ~
         fallback: ~
     watchers: []
+    clients:
+      log: info

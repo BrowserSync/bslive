@@ -26,6 +26,7 @@ pub fn into_state(val: ServerConfig) -> ServerState {
     ServerState {
         routes: Arc::new(RwLock::new(val.routes.clone())),
         raw_router: Arc::new(RwLock::new(router)),
+        client_config: Arc::new(RwLock::new(val.clients.clone())),
         id: val.identity.as_id(),
         parent: None,
         evt_receiver: None,

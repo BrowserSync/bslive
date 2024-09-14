@@ -19,6 +19,7 @@ use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_fs::actor::FsWatcher;
 
 use crate::monitor_any_watchables::MonitorAnyWatchables;
+use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
@@ -169,8 +170,11 @@ impl BsSystem {
                         ChildResult::Patched(p) if maybe_addr.is_some() => {
                             let inner = debug_span!("patching...");
                             let _g = inner.enter();
-                            if let Some(addr) = maybe_addr {
-                                addr.do_send(RoutesUpdated {
+                            if let Some(child_actor) = maybe_addr {
+                                child_actor.do_send(ClientConfigChange {
+                                    change_set: p.client_config_change_set.clone(),
+                                });
+                                child_actor.do_send(RoutesUpdated {
                                     change_set: p.route_change_set.clone(),
                                     span: Arc::new(inner.clone()),
                                 })

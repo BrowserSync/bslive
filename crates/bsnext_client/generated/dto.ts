@@ -123,6 +123,17 @@ export interface ServerChangeSet {
 	items: ServerChangeSetItem[];
 }
 
+export enum LogLevelDTO {
+	Info = "info",
+	Debug = "debug",
+	Trace = "trace",
+	Error = "error",
+}
+
+export interface ClientConfigDTO {
+	log_level: LogLevelDTO;
+}
+
 /**
  * public version of internal events
  * todo(alpha): clean this up
@@ -153,7 +164,8 @@ export type InputErrorDTO =
 	| { kind: "EmptyInput", payload: string };
 
 export type ClientEvent = 
-	| { kind: "Change", payload: ChangeDTO };
+	| { kind: "Change", payload: ChangeDTO }
+	| { kind: "Config", payload: ClientConfigDTO };
 
 export type ChangeDTO = 
 	| { kind: "Fs", payload: {

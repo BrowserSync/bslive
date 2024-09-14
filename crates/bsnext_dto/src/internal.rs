@@ -41,6 +41,7 @@ pub struct ChildCreated {
 pub struct ChildPatched {
     pub server_handler: ChildHandlerMinimal,
     pub route_change_set: bsnext_input::route_manifest::RouteChangeSet,
+    pub client_config_change_set: bsnext_input::client_config::ClientConfigChangeSet,
 }
 
 #[derive(Debug, actix::Message)]

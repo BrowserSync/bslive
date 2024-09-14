@@ -24,7 +24,7 @@ impl LitExample {
                     ..Default::default()
                 },
             ],
-            watchers: vec![],
+            ..Default::default()
         };
         Input {
             servers: vec![server],

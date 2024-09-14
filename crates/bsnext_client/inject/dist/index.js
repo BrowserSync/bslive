@@ -1480,11 +1480,11 @@ var ReplaySubject = function(_super) {
     _bufferSize < Infinity && adjustedBufferSize < _buffer.length && _buffer.splice(0, _buffer.length - adjustedBufferSize);
     if (!_infiniteTimeWindow) {
       var now = _timestampProvider.now();
-      var last = 0;
+      var last2 = 0;
       for (var i = 1; i < _buffer.length && _buffer[i] <= now; i += 2) {
-        last = i;
+        last2 = i;
       }
-      last && _buffer.splice(0, last + 1);
+      last2 && _buffer.splice(0, last2 + 1);
     }
   };
   return ReplaySubject2;
@@ -1963,6 +1963,14 @@ function isScheduler(value) {
   return value && isFunction(value.schedule);
 }
 
+// ../../../node_modules/rxjs/dist/esm5/internal/util/args.js
+function last(arr) {
+  return arr[arr.length - 1];
+}
+function popResultSelector(args) {
+  return isFunction(last(args)) ? args.pop() : void 0;
+}
+
 // ../../../node_modules/rxjs/dist/esm5/internal/util/isArrayLike.js
 var isArrayLike = function(x) {
   return x && typeof x.length === "number" && typeof x !== "function";
@@ -2197,6 +2205,16 @@ function isValidDate(value) {
   return value instanceof Date && !isNaN(value);
 }
 
+// ../../../node_modules/rxjs/dist/esm5/internal/operators/map.js
+function map(project, thisArg) {
+  return operate(function(source, subscriber) {
+    var index = 0;
+    source.subscribe(createOperatorSubscriber(subscriber, function(value) {
+      subscriber.next(project.call(thisArg, value, index++));
+    }));
+  });
+}
+
 // ../../../node_modules/rxjs/dist/esm5/internal/observable/timer.js
 function timer(dueTime, intervalOrScheduler, scheduler) {
   if (dueTime === void 0) {
@@ -2229,6 +2247,16 @@ function timer(dueTime, intervalOrScheduler, scheduler) {
         }
       }
     }, due);
+  });
+}
+
+// ../../../node_modules/rxjs/dist/esm5/internal/operators/filter.js
+function filter(predicate, thisArg) {
+  return operate(function(source, subscriber) {
+    var index = 0;
+    source.subscribe(createOperatorSubscriber(subscriber, function(value) {
+      return predicate.call(thisArg, value, index++) && subscriber.next(value);
+    }));
   });
 }
 
@@ -2290,6 +2318,41 @@ function retry(configOrCount) {
       }
     };
     subscribeForRetry();
+  });
+}
+
+// ../../../node_modules/rxjs/dist/esm5/internal/operators/withLatestFrom.js
+function withLatestFrom() {
+  var inputs = [];
+  for (var _i = 0; _i < arguments.length; _i++) {
+    inputs[_i] = arguments[_i];
+  }
+  var project = popResultSelector(inputs);
+  return operate(function(source, subscriber) {
+    var len = inputs.length;
+    var otherValues = new Array(len);
+    var hasValue = inputs.map(function() {
+      return false;
+    });
+    var ready = false;
+    var _loop_1 = function(i2) {
+      innerFrom(inputs[i2]).subscribe(createOperatorSubscriber(subscriber, function(value) {
+        otherValues[i2] = value;
+        if (!ready && !hasValue[i2]) {
+          hasValue[i2] = true;
+          (ready = hasValue.every(identity)) && (hasValue = null);
+        }
+      }, noop));
+    };
+    for (var i = 0; i < len; i++) {
+      _loop_1(i);
+    }
+    source.subscribe(createOperatorSubscriber(subscriber, function(value) {
+      if (ready) {
+        var values = __spreadArray([value], __read(otherValues));
+        subscriber.next(project ? project.apply(void 0, __spreadArray([], __read(values))) : values);
+      }
+    }));
   });
 }
 
@@ -2639,8 +2702,8 @@ var errorMap = (issue, _ctx) => {
   return { message };
 };
 var overrideErrorMap = errorMap;
-function setErrorMap(map) {
-  overrideErrorMap = map;
+function setErrorMap(map2) {
+  overrideErrorMap = map2;
 }
 function getErrorMap() {
   return overrideErrorMap;
@@ -2661,8 +2724,8 @@ var makeIssue = (params) => {
   }
   let errorMessage = "";
   const maps = errorMaps.filter((m) => !!m).slice().reverse();
-  for (const map of maps) {
-    errorMessage = map(fullIssue, { data, defaultError: errorMessage }).message;
+  for (const map2 of maps) {
+    errorMessage = map2(fullIssue, { data, defaultError: errorMessage }).message;
   }
   return {
     ...issueData,
@@ -6218,6 +6281,13 @@ var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
   EventLevel2["External"] = "BSLIVE_EXTERNAL";
   return EventLevel2;
 })(EventLevel || {});
+var LogLevelDTO = /* @__PURE__ */ ((LogLevelDTO22) => {
+  LogLevelDTO22["Info"] = "info";
+  LogLevelDTO22["Debug"] = "debug";
+  LogLevelDTO22["Trace"] = "trace";
+  LogLevelDTO22["Error"] = "error";
+  return LogLevelDTO22;
+})(LogLevelDTO || {});
 var ChangeKind = /* @__PURE__ */ ((ChangeKind2) => {
   ChangeKind2["Changed"] = "Changed";
   ChangeKind2["Added"] = "Added";
@@ -6407,6 +6477,10 @@ var serverChangeSetItemSchema = z.object({
 var serverChangeSetSchema = z.object({
   items: z.array(serverChangeSetItemSchema)
 });
+var logLevelDTOSchema = z.nativeEnum(LogLevelDTO);
+var clientConfigDTOSchema = z.object({
+  log_level: logLevelDTOSchema
+});
 var internalEventsDTOSchema = z.object({
   kind: z.literal("ServersChanged"),
   payload: getServersMessageResponseSchema
@@ -6479,10 +6553,16 @@ var startupEventSchema = z.union([
     payload: startupErrorDTOSchema
   })
 ]);
-var clientEventSchema = z.object({
-  kind: z.literal("Change"),
-  payload: changeDTOSchema
-});
+var clientEventSchema = z.union([
+  z.object({
+    kind: z.literal("Change"),
+    payload: changeDTOSchema
+  }),
+  z.object({
+    kind: z.literal("Config"),
+    payload: clientConfigDTOSchema
+  })
+]);
 
 // src/console.ts
 function createLRConsoleObserver() {
@@ -6490,25 +6570,25 @@ function createLRConsoleObserver() {
   return [subject, {
     debug: function(...data) {
       subject.next({
-        level: "Debug" /* Debug */,
+        level: "debug" /* Debug */,
         text: data.join("\n")
       });
     },
     info: function(...data) {
       subject.next({
-        level: "Info" /* Info */,
+        level: "info" /* Info */,
         text: data.join("\n")
       });
     },
     trace: function(...data) {
       subject.next({
-        level: "Trace" /* Trace */,
+        level: "trace" /* Trace */,
         text: data.join("\n")
       });
     },
     error: function(...data) {
       subject.next({
-        level: "Error" /* Error */,
+        level: "error" /* Error */,
         text: data.join("\n")
       });
     }
@@ -6522,9 +6602,12 @@ var url = new URL(window.location.href);
 url.protocol = url.protocol === "http:" ? "ws" : "wss";
 url.pathname = "/__bs_ws";
 var socket = webSocket(url.origin + url.pathname);
-socket.pipe(retry({ delay: 5e3 })).subscribe((m) => {
-  consoleApi.trace("incoming message", JSON.stringify(m, null, 2));
-  const parsed = clientEventSchema.parse(m);
+var sub$ = socket.pipe(retry({ delay: 5e3 }));
+var change$ = sub$.pipe(filter((x) => x.kind === "Change"));
+var config$ = sub$.pipe(filter((x) => x.kind === "Config"), map((x) => x.payload));
+change$.pipe(withLatestFrom(config$)).subscribe(([change, config2]) => {
+  consoleApi.trace("incoming message", JSON.stringify({ change, config: config2 }, null, 2));
+  const parsed = clientEventSchema.parse(change);
   switch (parsed.kind) {
     case "Change": {
       changedPath(parsed.payload);
@@ -6592,18 +6675,16 @@ function changedPath(change) {
     }
   }
 }
-consoleSubject.subscribe((evt) => {
-  switch (evt.level) {
-    case "Trace" /* Trace */:
-      console.log("[trace]", evt.text);
-      break;
-    case "Debug" /* Debug */:
-      console.log("[debug]", evt.text);
-      break;
-    case "Info" /* Info */:
-      break;
-    case "Error" /* Error */:
-      console.error("[error]", evt.text);
-      break;
+consoleSubject.pipe(withLatestFrom(config$)).subscribe(([evt, config2]) => {
+  const levelOrder = ["trace" /* Trace */, "debug" /* Debug */, "info" /* Info */, "error" /* Error */];
+  const currentLevelIndex = levelOrder.indexOf(evt.level);
+  const configLevelIndex = levelOrder.indexOf(config2.log_level);
+  if (currentLevelIndex >= configLevelIndex) {
+    console.log(`[${evt.level}] ${evt.text}`);
   }
 });
+function logMessage(message, level, config2) {
+}
+export {
+  logMessage
+};

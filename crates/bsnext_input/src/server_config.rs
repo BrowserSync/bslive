@@ -1,3 +1,4 @@
+use crate::client_config::ClientConfig;
 use crate::route::{Route, Watcher};
 use crate::{rand_word, PortError};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -12,6 +13,8 @@ pub struct ServerConfig {
     pub routes: Vec<Route>,
     #[serde(default)]
     pub watchers: Vec<Watcher>,
+    #[serde(default)]
+    pub clients: ClientConfig,
 }
 
 #[derive(
