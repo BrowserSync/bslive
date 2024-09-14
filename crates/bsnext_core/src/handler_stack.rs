@@ -214,14 +214,14 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
             Router::new().nest_service(path, optional_layers(as_service, &opts))
         }
         HandlerStack::DirsProxy(dir_list, proxy) => {
-            let r2 = stack_to_router(
+            let proxy_router = stack_to_router(
                 path,
                 HandlerStack::Proxy {
                     proxy,
                     opts: Default::default(),
                 },
             );
-            let r1 = serve_dir_layer(&dir_list, Router::new().fallback_service(r2));
+            let r1 = serve_dir_layer(&dir_list, Router::new().fallback_service(proxy_router));
             Router::new().nest_service(path, r1)
         }
     }

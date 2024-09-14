@@ -5,7 +5,7 @@ use axum::extract::{Request, State};
 use axum::http::Uri;
 use axum::middleware::{from_fn_with_state, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, MethodRouter};
+use axum::routing::{any, get, MethodRouter};
 use axum::{http, middleware, Extension, Router};
 
 use axum::body::Body;
@@ -21,6 +21,7 @@ use tower::{ServiceBuilder, ServiceExt};
 use tower_http::catch_panic::CatchPanicLayer;
 
 use crate::meta::MetaData;
+use crate::not_found::not_found_service::not_found_loader;
 use crate::server::router::assets::pub_ui_assets;
 use crate::server::router::pub_api::pub_api;
 use crate::server::state::ServerState;

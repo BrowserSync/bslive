@@ -96,17 +96,17 @@ pub async fn proxy_handler(
             "will accept request + decompress"
         );
         if req_accepted {
-            let sv2 = any(serve_raw_one.layer(DecompressionLayer::new()));
+            let sv2 = any(serve_one_proxy_req.layer(DecompressionLayer::new()));
             return Ok(sv2.oneshot(req).await.into_response());
         }
     }
 
-    let sv2 = any(serve_raw_one);
+    let sv2 = any(serve_one_proxy_req);
     Ok(sv2.oneshot(req).await.into_response())
 }
 
-async fn serve_raw_one(req: Request) -> Response {
-    tracing::trace!("serve_raw_one {}", req.uri().to_string());
+async fn serve_one_proxy_req(req: Request) -> Response {
+    tracing::trace!("serve_one_proxy_req {}", req.uri().to_string());
     let client = {
         req.extensions()
             .get::<Client<HttpsConnector<HttpConnector>, Body>>()
