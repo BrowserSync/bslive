@@ -1,5 +1,4 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig};
-use crate::not_found::not_found_service::not_found_srv;
 use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
 use crate::serve_dir::try_many_services_dir;
@@ -216,14 +215,10 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
         HandlerStack::Raw { raw, opts } => {
             let svc = any_service(serve_raw_one.with_state(raw));
             let out = optional_layers(svc, &opts);
-            Router::new()
-                .route_service(path, out)
-                .fallback_service(any(not_found_srv))
+            Router::new().route_service(path, out)
         }
         HandlerStack::Dirs(dirs) => {
-            let fallback = Router::new().fallback_service(any(not_found_srv));
-            let service = serve_dir_layer(&dirs, fallback);
-
+            let service = serve_dir_layer(&dirs, Router::new());
             Router::new().nest_service(path, service)
         }
         HandlerStack::Proxy { proxy, opts } => {
@@ -272,13 +267,40 @@ fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Rout
 #[cfg(test)]
 mod test {
     use super::*;
-
     use crate::server::router::common::to_resp_parts_and_body;
     use axum::body::Body;
+    use bsnext_input::route::{PathDef, PathDefError};
     use bsnext_input::Input;
     use http::Request;
     use insta::assert_debug_snapshot;
+    use matchit::InsertError;
+    
+    
     use tower::ServiceExt;
+
+    #[test]
+    fn test_verify() -> anyhow::Result<()> {
+        let input = "/abc/one/*rest";
+        let actual = PathDef::try_new(input).unwrap_err();
+        assert_eq!(actual, PathDefError::ContainsStar);
+
+        let input = "abc/one";
+        let actual = PathDef::try_new(input).unwrap_err();
+        assert_eq!(actual, PathDefError::StartsWithSlash);
+
+        let input = "/:";
+        let actual = PathDef::try_new(input).unwrap_err();
+        assert_eq!(actual, PathDefError::InsertError(InsertError::UnnamedParam));
+
+        let input = "/:abc:abc";
+        let actual = PathDef::try_new(input).unwrap_err();
+        assert_eq!(
+            actual,
+            PathDefError::InsertError(InsertError::TooManyParams)
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn test_handler_stack_01() -> anyhow::Result<()> {

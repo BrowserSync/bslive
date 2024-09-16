@@ -12,6 +12,7 @@ bsnext_tracing = { path = "../bsnext_tracing" }
 markdown = { version = "1.0.0-alpha.16" }
 
 random_word = { workspace = true }
+matchit = { workspace = true }
 mime_guess = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }

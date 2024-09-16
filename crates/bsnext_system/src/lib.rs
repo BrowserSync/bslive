@@ -148,7 +148,8 @@ impl BsSystem {
                 let results = addr.send(InputChanged { input }).await;
 
                 let Ok(result_set) = results else {
-                    unreachable!("?1")
+                    let e = results.unwrap_err();
+                    unreachable!("?1 {:?}", e);
                 };
 
                 for (maybe_addr, x) in &result_set {
