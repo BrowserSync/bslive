@@ -1,3 +1,4 @@
+use crate::path_def::PathDef;
 use crate::watch_opts::WatchOpts;
 use bsnext_resp::inject_opts::InjectOpts;
 use matchit::InsertError;
@@ -5,21 +6,18 @@ use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
-use std::path::{Component, Path, PathBuf};
+use std::path::PathBuf;
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Route {
-    pub path: String,
+    #[serde(with = "crate::path_def")]
+    pub path: PathDef,
     #[serde(flatten)]
     pub kind: RouteKind,
     #[serde(flatten)]
     pub opts: Opts,
     pub fallback: Option<FallbackRoute>,
-}
-
-#[derive(Debug)]
-pub struct PathDef {
-    inner: String,
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
@@ -30,37 +28,6 @@ pub enum PathDefError {
     ContainsStar,
     #[error("matchit error {0}")]
     InsertError(#[from] InsertError),
-}
-
-impl PathDef {
-    pub fn as_pb(&self) -> PathBuf {
-        PathBuf::from(&self.inner)
-    }
-    pub fn try_new<A: AsRef<str>>(input: A) -> Result<Self, PathDefError> {
-        let str = input.as_ref();
-        let is_path = str.starts_with("/");
-        let p = Path::new(str);
-        let has_star = p.components().any(|c| match c {
-            Component::Prefix(_) => false,
-            Component::RootDir => false,
-            Component::CurDir => false,
-            Component::ParentDir => false,
-            Component::Normal(n) => n.to_str().is_some_and(|str| str.contains("*")),
-        });
-        let route = match (is_path, has_star) {
-            (true, false) => Ok(Self {
-                inner: str.to_string(),
-            }),
-            (true, true) => Err(PathDefError::ContainsStar),
-            (false, _) => Err(PathDefError::StartsWithSlash),
-        }?;
-
-        let mut r = matchit::Router::new();
-        match r.insert(&route.inner, true) {
-            Ok(_) => Ok(route),
-            Err(e) => Err(PathDefError::InsertError(e)),
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -88,7 +55,7 @@ pub struct Opts {
 impl Default for Route {
     fn default() -> Self {
         Self {
-            path: "/".to_string(),
+            path: PathDef::from_str("/").unwrap(),
             kind: RouteKind::new_html("default"),
             opts: Opts {
                 headers: None,

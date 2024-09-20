@@ -54,7 +54,7 @@ pub struct RouteIdentity {
 impl From<&Route> for RouteIdentity {
     fn from(value: &Route) -> Self {
         Self {
-            path: value.path.clone(),
+            path: value.path.as_str().to_string(),
             kind_str: match &value.kind {
                 RouteKind::Raw(raw) => match raw {
                     RawRoute::Html { .. } => "RouteKind::Raw::Html",
@@ -80,11 +80,14 @@ pub struct RouteChangeSet {
 mod test {
     use super::*;
 
+    use crate::path_def::PathDef;
     use std::hash::DefaultHasher;
+    use std::str::FromStr;
+
     #[test]
     fn test_route_hash() -> anyhow::Result<()> {
         let r1 = Route {
-            path: "/".to_string(),
+            path: PathDef::from_str("/")?,
             kind: RouteKind::new_html("hello world!"),
             ..Default::default()
         };

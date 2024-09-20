@@ -93,7 +93,7 @@ impl RouteMap {
             mapping: routes
                 .iter()
                 .fold(HashMap::<String, Vec<Route>>::new(), |mut acc, route| {
-                    acc.entry(route.path.clone())
+                    acc.entry(route.path.as_str().to_string())
                         .and_modify(|acc| acc.push(route.clone()))
                         .or_insert(vec![route.clone()]);
                     acc
@@ -269,38 +269,14 @@ mod test {
     use super::*;
     use crate::server::router::common::to_resp_parts_and_body;
     use axum::body::Body;
-    use bsnext_input::route::{PathDef, PathDefError};
+    
     use bsnext_input::Input;
     use http::Request;
     use insta::assert_debug_snapshot;
-    use matchit::InsertError;
     
+
     
     use tower::ServiceExt;
-
-    #[test]
-    fn test_verify() -> anyhow::Result<()> {
-        let input = "/abc/one/*rest";
-        let actual = PathDef::try_new(input).unwrap_err();
-        assert_eq!(actual, PathDefError::ContainsStar);
-
-        let input = "abc/one";
-        let actual = PathDef::try_new(input).unwrap_err();
-        assert_eq!(actual, PathDefError::StartsWithSlash);
-
-        let input = "/:";
-        let actual = PathDef::try_new(input).unwrap_err();
-        assert_eq!(actual, PathDefError::InsertError(InsertError::UnnamedParam));
-
-        let input = "/:abc:abc";
-        let actual = PathDef::try_new(input).unwrap_err();
-        assert_eq!(
-            actual,
-            PathDefError::InsertError(InsertError::TooManyParams)
-        );
-
-        Ok(())
-    }
 
     #[test]
     fn test_handler_stack_01() -> anyhow::Result<()> {

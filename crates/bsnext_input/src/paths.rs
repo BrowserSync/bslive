@@ -50,7 +50,7 @@ pub fn from_paths<T: AsRef<str>>(
             .map(|p| -> Route {
                 let str = p.as_ref();
                 Route {
-                    path: "/".to_string(),
+                    path: "/".to_string().parse().unwrap(),
                     kind: RouteKind::Dir(DirRoute {
                         dir: str.into(),
                         base: None,

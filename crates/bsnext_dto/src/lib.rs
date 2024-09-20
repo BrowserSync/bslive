@@ -30,7 +30,7 @@ pub struct RouteDTO {
 impl From<Route> for RouteDTO {
     fn from(value: Route) -> Self {
         Self {
-            path: value.path.to_owned(),
+            path: value.path.as_str().to_owned(),
             kind: RouteKindDTO::from(value.kind),
         }
     }
@@ -38,7 +38,7 @@ impl From<Route> for RouteDTO {
 impl From<&Route> for RouteDTO {
     fn from(value: &Route) -> Self {
         Self {
-            path: value.path.to_owned(),
+            path: value.path.as_str().to_owned(),
             kind: RouteKindDTO::from(value.kind.clone()),
         }
     }

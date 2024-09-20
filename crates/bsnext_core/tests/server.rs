@@ -16,13 +16,13 @@ mod tests;
 
 async fn system_test_01() {
     let route1 = Route {
-        path: "/".to_string(),
+        path: "/".parse().unwrap(),
         kind: RouteKind::new_html("hello world!"),
         ..Default::default()
     };
     let value: Value = serde_json::from_str("[]").expect("json");
     let route2 = Route {
-        path: "/j".to_string(),
+        path: "/j".parse().unwrap(),
         kind: RouteKind::new_json(JsonWrapper(value)),
         ..Default::default()
     };
@@ -60,7 +60,7 @@ async fn system_test_01() {
 
 async fn system_test_02() {
     let route1 = Route {
-        path: "/".to_string(),
+        path: "/".parse().unwrap(),
         kind: RouteKind::new_html("hello world!"),
         ..Default::default()
     };

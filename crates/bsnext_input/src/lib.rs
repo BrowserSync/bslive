@@ -13,6 +13,7 @@ pub mod client_config;
 #[cfg(test)]
 pub mod input_test;
 pub mod md;
+pub mod path_def;
 pub mod paths;
 pub mod route;
 pub mod route_manifest;

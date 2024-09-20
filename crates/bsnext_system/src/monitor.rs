@@ -270,7 +270,7 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                         let spec = to_spec(&r.opts.watch);
                         Some(RouteWatchable {
                             server_identity: server_config.identity.clone(),
-                            route_path: r.path.to_string(),
+                            route_path: r.path.as_str().to_owned(),
                             dir: PathBuf::from(dir),
                             spec,
                         })
