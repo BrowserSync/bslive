@@ -49,7 +49,7 @@ impl StartKind {
 }
 
 impl SystemStart for StartKind {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
+    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         match self {
             StartKind::FromInputPaths(from_inputs) => from_inputs.input(ctx),
             StartKind::FromExample(from_example) => from_example.input(ctx),

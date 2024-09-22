@@ -10,7 +10,9 @@ Input {
             },
             routes: [
                 Route {
-                    path: "/",
+                    path: PathDef {
+                        inner: "/",
+                    },
                     kind: Dir(
                         DirRoute {
                             dir: ".",

@@ -1,17 +1,17 @@
 use crate::servers_supervisor::actor::ServersSupervisor;
 use crate::servers_supervisor::file_changed_handler::FilesChanged;
 use actix::AsyncContext;
-use bsnext_dto::{GetServersMessageResponse, ServerDTO};
+use bsnext_dto::{GetServersMessageResponseDTO, ServerDTO};
 
 #[derive(actix::Message)]
-#[rtype(result = "GetServersMessageResponse")]
+#[rtype(result = "GetServersMessageResponseDTO")]
 pub struct GetServersMessage;
 
 impl actix::Handler<GetServersMessage> for ServersSupervisor {
-    type Result = GetServersMessageResponse;
+    type Result = GetServersMessageResponseDTO;
 
     fn handle(&mut self, _msg: GetServersMessage, _ctx: &mut Self::Context) -> Self::Result {
-        GetServersMessageResponse {
+        GetServersMessageResponseDTO {
             servers: self
                 .handlers
                 .iter()

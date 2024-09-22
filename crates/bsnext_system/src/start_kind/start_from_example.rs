@@ -16,8 +16,9 @@ pub struct StartFromExample {
 }
 
 impl SystemStart for StartFromExample {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
-        let identity = ServerIdentity::from_port_or_named(self.port)?;
+    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+        let identity =
+            ServerIdentity::from_port_or_named(self.port).map_err(|e| Box::new(e.into()))?;
         let input = self.example.into_input(identity);
         let name = self.name.clone();
         let dir = if self.temp {
@@ -34,12 +35,15 @@ impl SystemStart for StartFromExample {
                         path: next_dir.clone(),
                     })
                 })
-                .map(|_| next_dir.clone())?
+                .map(|_| next_dir.clone())
+                .map_err(|e| Box::new(e.into()))?
         } else {
             ctx.cwd.to_path_buf()
         };
         if self.write_input {
-            let path = fs_write_input(&dir, &input, self.target_kind.clone())?;
+            let path = fs_write_input(&dir, &input, self.target_kind.clone())
+                .map_err(|e| Box::new(e.into()))?;
+
             Ok(SystemStartArgs::PathWithInput { path, input })
         } else {
             Ok(SystemStartArgs::InputOnly { input })

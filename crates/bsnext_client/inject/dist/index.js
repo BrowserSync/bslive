@@ -6277,10 +6277,6 @@ var z = /* @__PURE__ */ Object.freeze({
 });
 
 // ../generated/schema.js
-var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
-  EventLevel2["External"] = "BSLIVE_EXTERNAL";
-  return EventLevel2;
-})(EventLevel || {});
 var LogLevelDTO = /* @__PURE__ */ ((LogLevelDTO22) => {
   LogLevelDTO22["Info"] = "info";
   LogLevelDTO22["Debug"] = "debug";
@@ -6288,6 +6284,10 @@ var LogLevelDTO = /* @__PURE__ */ ((LogLevelDTO22) => {
   LogLevelDTO22["Error"] = "error";
   return LogLevelDTO22;
 })(LogLevelDTO || {});
+var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
+  EventLevel2["External"] = "BSLIVE_EXTERNAL";
+  return EventLevel2;
+})(EventLevel || {});
 var ChangeKind = /* @__PURE__ */ ((ChangeKind2) => {
   ChangeKind2["Changed"] = "Changed";
   ChangeKind2["Added"] = "Added";
@@ -6367,25 +6367,110 @@ var serverDTOSchema = z.object({
   identity: serverIdentityDTOSchema,
   socket_addr: z.string()
 });
-var getServersMessageResponseSchema = z.object({
+var getServersMessageResponseDTOSchema = z.object({
   servers: z.array(serverDTOSchema)
 });
-var serversChangedSchema = z.object({
-  servers_resp: getServersMessageResponseSchema
+var serversChangedDTOSchema = z.object({
+  servers_resp: getServersMessageResponseDTOSchema
 });
-var eventLevelSchema = z.nativeEnum(EventLevel);
-var stoppedWatchingSchema = z.object({
-  paths: z.array(z.string())
+var inputAcceptedDTOSchema = z.object({
+  path: z.string()
 });
-var fileChangedSchema = z.object({
+var fileChangedDTOSchema = z.object({
   path: z.string()
 });
 var filesChangedDTOSchema = z.object({
   paths: z.array(z.string())
 });
-var inputAcceptedSchema = z.object({
-  path: z.string()
+var debounceDTOSchema = z.object({
+  kind: z.string(),
+  ms: z.string()
 });
+var watchingDTOSchema = z.object({
+  paths: z.array(z.string()),
+  debounce: debounceDTOSchema
+});
+var stoppedWatchingDTOSchema = z.object({
+  paths: z.array(z.string())
+});
+var serverChangeSchema = z.union([
+  z.object({
+    kind: z.literal("Stopped"),
+    payload: z.object({
+      bind_address: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Started"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Patched"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Errored"),
+    payload: z.object({
+      error: z.string()
+    })
+  })
+]);
+var serverChangeSetItemSchema = z.object({
+  identity: serverIdentityDTOSchema,
+  change: serverChangeSchema
+});
+var serverChangeSetSchema = z.object({
+  items: z.array(serverChangeSetItemSchema)
+});
+var logLevelDTOSchema = z.nativeEnum(LogLevelDTO);
+var clientConfigDTOSchema = z.object({
+  log_level: logLevelDTOSchema
+});
+var internalEventsDTOSchema = z.object({
+  kind: z.literal("ServersChanged"),
+  payload: getServersMessageResponseDTOSchema
+});
+var eventLevelSchema = z.nativeEnum(EventLevel);
+var externalEventsDTOSchema = z.union([
+  z.object({
+    kind: z.literal("ServersChanged"),
+    payload: serversChangedDTOSchema
+  }),
+  z.object({
+    kind: z.literal("Watching"),
+    payload: watchingDTOSchema
+  }),
+  z.object({
+    kind: z.literal("WatchingStopped"),
+    payload: stoppedWatchingDTOSchema
+  }),
+  z.object({
+    kind: z.literal("FileChanged"),
+    payload: fileChangedDTOSchema
+  }),
+  z.object({
+    kind: z.literal("FilesChanged"),
+    payload: filesChangedDTOSchema
+  }),
+  z.object({
+    kind: z.literal("InputFileChanged"),
+    payload: fileChangedDTOSchema
+  }),
+  z.object({
+    kind: z.literal("InputAccepted"),
+    payload: inputAcceptedDTOSchema
+  })
+]);
+var startupEventDTOSchema = z.union([
+  z.object({
+    kind: z.literal("Started"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("FailedStartup"),
+    payload: z.string()
+  })
+]);
 var inputErrorDTOSchema = z.union([
   z.object({
     kind: z.literal("MissingInputs"),
@@ -6438,57 +6523,12 @@ var inputErrorDTOSchema = z.union([
   z.object({
     kind: z.literal("EmptyInput"),
     payload: z.string()
+  }),
+  z.object({
+    kind: z.literal("BsLiveRules"),
+    payload: z.string()
   })
 ]);
-var debounceDTOSchema = z.object({
-  kind: z.string(),
-  ms: z.string()
-});
-var watchingSchema = z.object({
-  paths: z.array(z.string()),
-  debounce: debounceDTOSchema
-});
-var serverChangeSchema = z.union([
-  z.object({
-    kind: z.literal("Stopped"),
-    payload: z.object({
-      bind_address: z.string()
-    })
-  }),
-  z.object({
-    kind: z.literal("Started"),
-    payload: z.undefined().optional()
-  }),
-  z.object({
-    kind: z.literal("Patched"),
-    payload: z.undefined().optional()
-  }),
-  z.object({
-    kind: z.literal("Errored"),
-    payload: z.object({
-      error: z.string()
-    })
-  })
-]);
-var serverChangeSetItemSchema = z.object({
-  identity: serverIdentityDTOSchema,
-  change: serverChangeSchema
-});
-var serverChangeSetSchema = z.object({
-  items: z.array(serverChangeSetItemSchema)
-});
-var logLevelDTOSchema = z.nativeEnum(LogLevelDTO);
-var clientConfigDTOSchema = z.object({
-  log_level: logLevelDTOSchema
-});
-var internalEventsDTOSchema = z.object({
-  kind: z.literal("ServersChanged"),
-  payload: getServersMessageResponseSchema
-});
-var startupErrorDTOSchema = z.object({
-  kind: z.literal("InputError"),
-  payload: inputErrorDTOSchema
-});
 var changeKindSchema = z.nativeEnum(ChangeKind);
 var changeDTOSchema = z.lazy(
   () => z.union([
@@ -6505,54 +6545,6 @@ var changeDTOSchema = z.lazy(
     })
   ])
 );
-var externalEventsSchema = z.union([
-  z.object({
-    kind: z.literal("ServersChanged"),
-    payload: serversChangedSchema
-  }),
-  z.object({
-    kind: z.literal("Watching"),
-    payload: watchingSchema
-  }),
-  z.object({
-    kind: z.literal("WatchingStopped"),
-    payload: stoppedWatchingSchema
-  }),
-  z.object({
-    kind: z.literal("FileChanged"),
-    payload: fileChangedSchema
-  }),
-  z.object({
-    kind: z.literal("FilesChanged"),
-    payload: filesChangedDTOSchema
-  }),
-  z.object({
-    kind: z.literal("InputFileChanged"),
-    payload: fileChangedSchema
-  }),
-  z.object({
-    kind: z.literal("InputAccepted"),
-    payload: inputAcceptedSchema
-  }),
-  z.object({
-    kind: z.literal("InputError"),
-    payload: inputErrorDTOSchema
-  })
-]);
-var externalEventSchema = z.object({
-  level: eventLevelSchema,
-  fields: externalEventsSchema
-});
-var startupEventSchema = z.union([
-  z.object({
-    kind: z.literal("Started"),
-    payload: z.undefined().optional()
-  }),
-  z.object({
-    kind: z.literal("FailedStartup"),
-    payload: startupErrorDTOSchema
-  })
-]);
 var clientEventSchema = z.union([
   z.object({
     kind: z.literal("Change"),

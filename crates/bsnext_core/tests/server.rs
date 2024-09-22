@@ -3,7 +3,7 @@ use bsnext_core::server::actor::ServerActor;
 use bsnext_core::server::handler_listen::Listen;
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_core::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
-use bsnext_dto::GetServersMessageResponse;
+use bsnext_dto::GetServersMessageResponseDTO;
 use bsnext_input::route::{JsonWrapper, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use http::header::ACCEPT;
@@ -16,13 +16,13 @@ mod tests;
 
 async fn system_test_01() {
     let route1 = Route {
-        path: "/".to_string(),
+        path: "/".parse().unwrap(),
         kind: RouteKind::new_html("hello world!"),
         ..Default::default()
     };
     let value: Value = serde_json::from_str("[]").expect("json");
     let route2 = Route {
-        path: "/j".to_string(),
+        path: "/j".parse().unwrap(),
         kind: RouteKind::new_json(JsonWrapper(value)),
         ..Default::default()
     };
@@ -60,7 +60,7 @@ async fn system_test_01() {
 
 async fn system_test_02() {
     let route1 = Route {
-        path: "/".to_string(),
+        path: "/".parse().unwrap(),
         kind: RouteKind::new_html("hello world!"),
         ..Default::default()
     };
@@ -133,7 +133,7 @@ impl actix::Actor for ServerParent {
 }
 
 impl actix::Handler<GetServersMessage> for ServerParent {
-    type Result = GetServersMessageResponse;
+    type Result = GetServersMessageResponseDTO;
 
     fn handle(&mut self, _msg: GetServersMessage, _ctx: &mut Self::Context) -> Self::Result {
         todo!("woop!")

@@ -1,8 +1,9 @@
 use crate::pretty::PrettyPrint;
 use crate::OutputWriter;
+use bsnext_dto::internal::StartupEvent;
 use bsnext_dto::{
-    ExternalEvents, GetServersMessageResponse, ServerDTO, ServerIdentityDTO, ServersChanged,
-    StartupEvent,
+    ExternalEventsDTO, GetServersMessageResponseDTO, ServerDTO, ServerIdentityDTO,
+    ServersChangedDTO,
 };
 use std::io::BufWriter;
 
@@ -31,7 +32,7 @@ fn server_2() -> ServerDTO {
     }
 }
 
-fn exec(evt: &ExternalEvents) -> anyhow::Result<String> {
+fn exec(evt: &ExternalEventsDTO) -> anyhow::Result<String> {
     let mut writer = BufWriter::new(Vec::new());
     PrettyPrint.handle_external_event(&mut writer, &evt)?;
     Ok(String::from_utf8(writer.into_inner()?).unwrap())
@@ -48,8 +49,8 @@ fn exec_startup(evt: &StartupEvent) -> anyhow::Result<(String, String)> {
 
 #[test]
 fn test_servers_started() -> anyhow::Result<()> {
-    let evt = ExternalEvents::ServersChanged(ServersChanged {
-        servers_resp: GetServersMessageResponse {
+    let evt = ExternalEventsDTO::ServersChanged(ServersChangedDTO {
+        servers_resp: GetServersMessageResponseDTO {
             servers: vec![server_1(), server_2()],
         },
     });

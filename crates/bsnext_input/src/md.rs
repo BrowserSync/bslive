@@ -2,6 +2,7 @@ use crate::route::{RawRoute, Route, RouteKind};
 use crate::server_config::ServerConfig;
 use crate::Input;
 
+use crate::path_def::PathDef;
 use markdown::mdast::Node;
 use markdown::{Constructs, ParseOptions};
 use mime_guess::get_mime_extensions_str;
@@ -12,6 +13,7 @@ use nom::sequence::separated_pair;
 use nom::{error::ParseError, IResult};
 use serde_json::json;
 use std::cmp::PartialEq;
+use std::str::FromStr;
 
 fn parser_for(k: BsLiveKinds) -> impl Fn(&[Node]) -> IResult<&[Node], &Node> {
     move |input: &[Node]| {
@@ -99,7 +101,7 @@ impl TryInto<Route> for (&Node, &Node) {
                     let r: PathOnly = serde_yaml::from_str(&code.value)?;
                     let route_kind = route_kind_from_body_node(self.1)?;
                     let route = Route {
-                        path: r.path,
+                        path: PathDef::from_str(&r.path)?,
                         kind: route_kind,
                         ..Default::default()
                     };
@@ -312,7 +314,7 @@ body {
         assert_eq!(
             server_1.routes[0],
             Route {
-                path: "/app.css".into(),
+                path: "/app.css".parse()?,
                 kind: RouteKind::new_raw("body {\n    background: blue\n}"),
                 ..Default::default()
             }
@@ -352,7 +354,7 @@ body {
         assert_eq!(
             server_1.routes[0],
             Route {
-                path: "/app.css".into(),
+                path: PathDef::from_str("/app.css")?,
                 kind: RouteKind::new_raw("body {\n    background: blue\n}"),
                 ..Default::default()
             }
@@ -360,7 +362,7 @@ body {
         assert_eq!(
             server_1.routes[1],
             Route {
-                path: "/app2.css".into(),
+                path: PathDef::from_str("/app2.css")?,
                 kind: RouteKind::new_raw("body {\n    background: blue\n}"),
                 ..Default::default()
             }
@@ -410,7 +412,7 @@ path: /abc
         assert_eq!(
             server_1.routes[0],
             Route {
-                path: "/health".into(),
+                path: PathDef::from_str("/health")?,
                 kind: RouteKind::new_raw("OK"),
                 ..Default::default()
             }
@@ -418,7 +420,7 @@ path: /abc
         assert_eq!(
             server_1.routes[1],
             Route {
-                path: "/".into(),
+                path: PathDef::from_str("/")?,
                 kind: RouteKind::new_html("<p>hello world</p>"),
                 ..Default::default()
             }
@@ -426,7 +428,7 @@ path: /abc
         assert_eq!(
             server_1.routes[2],
             Route {
-                path: "/abc".into(),
+                path: PathDef::from_str("/abc")?,
                 kind: RouteKind::new_html("<p>hello world 2</p>"),
                 ..Default::default()
             }
@@ -480,10 +482,10 @@ pub fn input_to_str(input: &Input) -> String {
         chunks.push(fenced_input(&yml));
 
         for route in &server_config.routes {
-            let path_only = json!({"path": route.path});
+            let path_only = json!({"path": route.path.as_str()});
             let route_yaml = serde_yaml::to_string(&path_only).expect("never fail here on route?");
             chunks.push(fenced_route(&route_yaml));
-            chunks.push(route_to_markdown(&route.kind, &route.path));
+            chunks.push(route_to_markdown(&route.kind, route.path.as_str()));
         }
     }
     for _x in input.servers.iter().skip(1) {

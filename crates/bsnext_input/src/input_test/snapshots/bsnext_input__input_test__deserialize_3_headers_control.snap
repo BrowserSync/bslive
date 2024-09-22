@@ -5,7 +5,9 @@ expression: c
 Config {
     items: [
         Route {
-            path: "/api",
+            path: PathDef {
+                inner: "/api",
+            },
             kind: Raw(
                 Json {
                     json: JsonWrapper(

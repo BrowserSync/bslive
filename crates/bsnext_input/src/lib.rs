@@ -2,6 +2,7 @@ use crate::target::TargetKind;
 
 use crate::md::MarkdownError;
 use crate::yml::YamlError;
+use miette::{JSONReportHandler, NamedSource};
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::fs::read_to_string;
@@ -13,6 +14,7 @@ pub mod client_config;
 #[cfg(test)]
 pub mod input_test;
 pub mod md;
+pub mod path_def;
 pub mod paths;
 pub mod route;
 pub mod route_manifest;
@@ -53,50 +55,54 @@ impl FromStr for Input {
 }
 
 impl Input {
-    pub fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
+    pub fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<InputError>> {
         match path.as_ref().extension().and_then(|x| x.to_str()) {
-            None => Err(InputError::MissingExtension(path.as_ref().to_owned())),
+            None => Err(Box::new(InputError::MissingExtension(
+                path.as_ref().to_owned(),
+            ))),
             Some("yml") | Some("yaml") => Input::from_yaml_path(path),
             Some("md") | Some("markdown") => Input::from_md_path(path),
-            Some(other) => Err(InputError::UnsupportedExtension(other.to_string())),
+            Some(other) => Err(Box::new(InputError::UnsupportedExtension(
+                other.to_string(),
+            ))),
         }
     }
-    fn from_yaml_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
-        let str = read_to_string(&path)?;
+    fn from_yaml_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<InputError>> {
+        let str = read_to_string(&path).map_err(|e| Box::new(e.into()))?;
         if str.trim().is_empty() {
-            return Err(InputError::YamlError(YamlError::EmptyError {
+            return Err(Box::new(InputError::YamlError(YamlError::EmptyError {
                 path: path.as_ref().to_string_lossy().to_string(),
-            }));
+            })));
         }
-        let output = serde_yaml::from_str::<Self>(str.as_str()).map_err(move |e| {
-            if let Some(location) = e.location() {
-                YamlError::ParseErrorWithLocation {
-                    serde_error: e,
-                    input: str,
-                    path: path.as_ref().to_string_lossy().to_string(),
-                    line: location.line(),
-                    column: location.column(),
+        let output = serde_yaml::from_str::<Self>(str.as_str())
+            .map_err(move |e| {
+                if let Some(loc) = e.location() {
+                    BsLiveRulesError {
+                        err_span: (loc.index()..loc.index() + 1).into(),
+                        src: NamedSource::new(
+                            "/Users/shaneosbourne/WebstormProjects/bslive/bslive.yml",
+                            str,
+                        ),
+                        message: e.to_string(),
+                        summary: None,
+                    }
+                } else {
+                    unreachable!("handle later")
                 }
-            } else {
-                YamlError::ParseError {
-                    serde_error: e,
-                    input: str,
-                    path: path.as_ref().to_string_lossy().to_string(),
-                }
-            }
-        })?;
+            })
+            .map_err(|e| Box::new(e.into()))?;
         // todo: don't allow duplicates?.
         Ok(output)
     }
-    fn from_md_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
-        let str = read_to_string(path)?;
-        let input = md::md_to_input(&str)?;
+    fn from_md_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<InputError>> {
+        let str = read_to_string(path).map_err(|e| Box::new(e.into()))?;
+        let input = md::md_to_input(&str).map_err(|e| Box::new(e.into()))?;
         // todo: don't allow duplicates.
         Ok(input)
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, miette::Diagnostic, thiserror::Error)]
 pub enum InputError {
     #[error("no suitable inputs could be found")]
     MissingInputs,
@@ -124,6 +130,9 @@ pub enum InputError {
     MarkdownError(#[from] MarkdownError),
     #[error("{0}")]
     YamlError(#[from] YamlError),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    BsLiveRules(#[from] BsLiveRulesError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -160,6 +169,37 @@ pub enum DirError {
     CannotCreate { path: PathBuf },
     #[error("could not change the process CWD to: {path}")]
     CannotMove { path: PathBuf },
+}
+
+#[derive(miette::Diagnostic, Debug, thiserror::Error)]
+#[error("bslive rules violated")]
+#[diagnostic()]
+pub struct BsLiveRulesError {
+    // Note: label but no source code
+    #[label = "{message}"]
+    err_span: miette::SourceSpan,
+    #[source_code]
+    src: miette::NamedSource<String>,
+    message: String,
+    #[help]
+    summary: Option<String>,
+}
+
+impl BsLiveRulesError {
+    pub fn as_string(&self) -> String {
+        let n = miette::GraphicalReportHandler::new();
+        let mut inner = String::new();
+        n.render_report(&mut inner, self).expect("write?");
+        inner
+    }
+
+    pub fn as_json(&self) -> String {
+        let mut out = String::new();
+        JSONReportHandler::new()
+            .render_report(&mut out, self)
+            .unwrap();
+        out
+    }
 }
 
 #[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize)]

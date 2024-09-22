@@ -73,6 +73,8 @@ servers:
                         dbg!(server_resp);
                     }
                     AnyEvent::External(_) => {}
+                    AnyEvent::Internal(InternalEvents::InputError(_)) => {}
+                    AnyEvent::Internal(InternalEvents::StartupError(_)) => {}
                 }
             }
         }
