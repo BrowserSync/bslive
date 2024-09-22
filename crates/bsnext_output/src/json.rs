@@ -1,6 +1,6 @@
 use crate::OutputWriter;
-use bsnext_dto::internal::{InternalEvents, InternalEventsDTO};
-use bsnext_dto::{ExternalEvents, StartupEvent};
+use bsnext_dto::internal::{InternalEvents, InternalEventsDTO, StartupEvent};
+use bsnext_dto::{ExternalEventsDTO, StartupEventDTO};
 use std::io::Write;
 
 pub struct JsonPrint;
@@ -9,7 +9,7 @@ impl OutputWriter for JsonPrint {
     fn handle_external_event<W: Write>(
         &self,
         sink: &mut W,
-        evt: &ExternalEvents,
+        evt: &ExternalEventsDTO,
     ) -> anyhow::Result<()> {
         writeln!(sink, "{}", serde_json::to_string(&evt)?)
             .map_err(|e| anyhow::anyhow!(e.to_string()))
@@ -26,6 +26,8 @@ impl OutputWriter for JsonPrint {
                 writeln!(sink, "{}", serde_json::to_string(&output)?)
                     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             }
+            InternalEvents::InputError(_) => {}
+            InternalEvents::StartupError(_) => {}
         }
         Ok(())
     }
@@ -35,7 +37,8 @@ impl OutputWriter for JsonPrint {
         sink: &mut W,
         evt: &StartupEvent,
     ) -> anyhow::Result<()> {
-        writeln!(sink, "{}", serde_json::to_string(&evt)?)
+        let as_dto = StartupEventDTO::from(evt);
+        writeln!(sink, "{}", serde_json::to_string(&as_dto)?)
             .map_err(|e| anyhow::anyhow!(e.to_string()))
     }
 }

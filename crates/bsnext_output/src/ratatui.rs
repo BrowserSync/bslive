@@ -1,6 +1,6 @@
 use self::common::{init_terminal, install_hooks, restore_terminal, Tui};
 use crate::OutputWriter;
-use bsnext_dto::{ExternalEvents, GetServersMessageResponse, StartupEvent};
+use bsnext_dto::{ExternalEventsDTO, GetServersMessageResponseDTO};
 use std::io::{BufWriter, Write};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
@@ -12,7 +12,7 @@ use std::{
 };
 
 use crate::pretty::{print_server_updates, server_display, PrettyPrint};
-use bsnext_dto::internal::{AnyEvent, InternalEvents};
+use bsnext_dto::internal::{AnyEvent, InternalEvents, StartupEvent};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{self, Event},
@@ -30,7 +30,7 @@ impl OutputWriter for RatatuiSender {
     fn handle_external_event<W: Write>(
         &self,
         _sink: &mut W,
-        evt: &ExternalEvents,
+        evt: &ExternalEventsDTO,
     ) -> anyhow::Result<()> {
         match self
             .0
@@ -134,7 +134,7 @@ struct App {
     scroll: u16,
     last_tick: Instant,
     events: FixedSizeQueue,
-    server_status: Option<GetServersMessageResponse>,
+    server_status: Option<GetServersMessageResponseDTO>,
 }
 
 enum RatatuiEvent {
@@ -193,6 +193,12 @@ impl App {
                     match &evt {
                         InternalEvents::ServersChanged { server_resp, .. } => {
                             self.server_status = Some(server_resp.clone());
+                        }
+                        InternalEvents::InputError(_) => {
+                            todo!("InternalEvents::InputError")
+                        }
+                        InternalEvents::StartupError(_) => {
+                            todo!("InternalEvents::StartupError")
                         }
                     }
                     self.events.add(RecordedEvent::new(AnyEvent::Internal(evt)));
@@ -257,6 +263,12 @@ impl App {
                 AnyEvent::Internal(int) => match int {
                     InternalEvents::ServersChanged { child_results, .. } => {
                         (evt.now, print_server_updates(child_results))
+                    }
+                    InternalEvents::InputError(input_error) => {
+                        todo!("InternalEvents::InputError")
+                    }
+                    InternalEvents::StartupError(_) => {
+                        todo!("InternalEvents::StartupError")
                     }
                 },
                 AnyEvent::External(ext) => {

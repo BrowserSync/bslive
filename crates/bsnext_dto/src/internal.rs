@@ -1,19 +1,29 @@
-use crate::{ExternalEvents, GetServersMessageResponse};
+use crate::{ExternalEventsDTO, GetServersMessageResponseDTO};
 use bsnext_input::server_config::ServerIdentity;
+use bsnext_input::startup::StartupError;
+use bsnext_input::InputError;
 use std::net::SocketAddr;
 use typeshare::typeshare;
 
 #[derive(Debug)]
 pub enum AnyEvent {
     Internal(InternalEvents),
-    External(ExternalEvents),
+    External(ExternalEventsDTO),
 }
 #[derive(Debug)]
 pub enum InternalEvents {
     ServersChanged {
-        server_resp: GetServersMessageResponse,
+        server_resp: GetServersMessageResponseDTO,
         child_results: Vec<ChildResult>,
     },
+    InputError(InputError),
+    StartupError(StartupError),
+}
+
+#[derive(Debug)]
+pub enum StartupEvent {
+    Started,
+    FailedStartup(StartupError),
 }
 
 /// public version of internal events
@@ -22,7 +32,7 @@ pub enum InternalEvents {
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
 pub enum InternalEventsDTO {
-    ServersChanged(GetServersMessageResponse),
+    ServersChanged(GetServersMessageResponseDTO),
 }
 
 #[derive(Debug, Clone)]

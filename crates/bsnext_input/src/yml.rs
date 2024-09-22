@@ -7,7 +7,7 @@ could not parse yaml file:
 
 input content was: (error at line: {line}, column: {column})
 
-{input}
+{src}
 
 original error:
 
@@ -16,7 +16,7 @@ original error:
     )]
     ParseErrorWithLocation {
         path: String,
-        input: String,
+        src: String,
         serde_error: serde_yaml::Error,
         line: usize,
         column: usize,

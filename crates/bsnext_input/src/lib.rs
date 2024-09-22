@@ -2,6 +2,7 @@ use crate::target::TargetKind;
 
 use crate::md::MarkdownError;
 use crate::yml::YamlError;
+use miette::{JSONReportHandler, NamedSource};
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::fs::read_to_string;
@@ -70,20 +71,18 @@ impl Input {
             }));
         }
         let output = serde_yaml::from_str::<Self>(str.as_str()).map_err(move |e| {
-            if let Some(location) = e.location() {
-                YamlError::ParseErrorWithLocation {
-                    serde_error: e,
-                    input: str,
-                    path: path.as_ref().to_string_lossy().to_string(),
-                    line: location.line(),
-                    column: location.column(),
+            if let Some(loc) = e.location() {
+                BsLiveRulesError {
+                    err_span: (loc.index()..loc.index() + 1).into(),
+                    src: NamedSource::new(
+                        "/Users/shaneosbourne/WebstormProjects/bslive/bslive.yml",
+                        str,
+                    ),
+                    message: e.to_string(),
+                    summary: None,
                 }
             } else {
-                YamlError::ParseError {
-                    serde_error: e,
-                    input: str,
-                    path: path.as_ref().to_string_lossy().to_string(),
-                }
+                unreachable!("handle later")
             }
         })?;
         // todo: don't allow duplicates?.
@@ -97,7 +96,7 @@ impl Input {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, miette::Diagnostic, thiserror::Error)]
 pub enum InputError {
     #[error("no suitable inputs could be found")]
     MissingInputs,
@@ -125,6 +124,9 @@ pub enum InputError {
     MarkdownError(#[from] MarkdownError),
     #[error("{0}")]
     YamlError(#[from] YamlError),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    BsLiveRules(#[from] BsLiveRulesError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -161,6 +163,37 @@ pub enum DirError {
     CannotCreate { path: PathBuf },
     #[error("could not change the process CWD to: {path}")]
     CannotMove { path: PathBuf },
+}
+
+#[derive(miette::Diagnostic, Debug, thiserror::Error)]
+#[error("bslive rules violated")]
+#[diagnostic()]
+pub struct BsLiveRulesError {
+    // Note: label but no source code
+    #[label = "{message}"]
+    err_span: miette::SourceSpan,
+    #[source_code]
+    src: miette::NamedSource<String>,
+    message: String,
+    #[help]
+    summary: Option<String>,
+}
+
+impl BsLiveRulesError {
+    pub fn as_string(&self) -> String {
+        let n = miette::GraphicalReportHandler::new();
+        let mut inner = String::new();
+        n.render_report(&mut inner, self).expect("write?");
+        inner
+    }
+
+    pub fn as_json(&self) -> String {
+        let mut out = String::new();
+        JSONReportHandler::new()
+            .render_report(&mut out, self)
+            .unwrap();
+        out
+    }
 }
 
 #[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize)]

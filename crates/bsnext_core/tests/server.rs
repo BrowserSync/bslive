@@ -3,7 +3,7 @@ use bsnext_core::server::actor::ServerActor;
 use bsnext_core::server::handler_listen::Listen;
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_core::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
-use bsnext_dto::GetServersMessageResponse;
+use bsnext_dto::GetServersMessageResponseDTO;
 use bsnext_input::route::{JsonWrapper, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use http::header::ACCEPT;
@@ -133,7 +133,7 @@ impl actix::Actor for ServerParent {
 }
 
 impl actix::Handler<GetServersMessage> for ServerParent {
-    type Result = GetServersMessageResponse;
+    type Result = GetServersMessageResponseDTO;
 
     fn handle(&mut self, _msg: GetServersMessage, _ctx: &mut Self::Context) -> Self::Result {
         todo!("woop!")

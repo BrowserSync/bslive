@@ -7,7 +7,7 @@ use bsnext_input::Input;
 use std::collections::HashMap;
 
 use actix_rt::Arbiter;
-use bsnext_dto::ExternalEvents;
+use bsnext_dto::ExternalEventsDTO;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -41,7 +41,7 @@ pub mod start_kind;
 pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
-    external_event_sender: Option<Sender<AnyEvent>>,
+    any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Vec<Addr<FsWatcher>>,
     any_monitors: HashMap<AnyWatchable, Monitor>,
     cwd: Option<PathBuf>,
@@ -49,7 +49,7 @@ pub struct BsSystem {
 
 #[derive(Debug)]
 pub struct EventWithSpan {
-    pub evt: ExternalEvents,
+    pub evt: ExternalEventsDTO,
 }
 
 impl Default for BsSystem {
@@ -71,7 +71,7 @@ impl BsSystem {
         BsSystem {
             self_addr: None,
             servers_addr: None,
-            external_event_sender: None,
+            any_event_sender: None,
             input_monitors: vec![],
             any_monitors: Default::default(),
             cwd: None,
@@ -140,7 +140,7 @@ impl BsSystem {
         };
         Arbiter::current().spawn({
             let addr = servers_addr.clone();
-            let external_event_sender = self.external_event_sender.as_ref().unwrap().clone();
+            let external_event_sender = self.any_event_sender.as_ref().unwrap().clone();
             let inner = debug_span!("inform_servers");
             let _g = inner.enter();
 
@@ -217,16 +217,14 @@ impl BsSystem {
     }
 
     #[tracing::instrument(skip(self))]
-    fn publish_external_event(&mut self, evt: ExternalEvents) {
-        match evt {
-            ExternalEvents::InputError(_) => tracing::error!(?evt),
-            _ => tracing::debug!(?evt),
-        }
-        if let Some(external_event_sender) = &self.external_event_sender {
+    fn publish_any_event(&mut self, evt: AnyEvent) {
+        tracing::debug!(?evt);
+
+        if let Some(any_event_sender) = &self.any_event_sender {
             Arbiter::current().spawn({
-                let events_sender = external_event_sender.clone();
+                let events_sender = any_event_sender.clone();
                 async move {
-                    match events_sender.send(AnyEvent::External(evt)).await {
+                    match events_sender.send(evt).await {
                         Ok(_) => {}
                         Err(_) => tracing::error!("could not send"),
                     }
@@ -254,7 +252,7 @@ impl Actor for BsSystem {
         tracing::trace!(actor.name = "BsSystem", actor.lifecyle = "stopped");
         self.self_addr = None;
         self.servers_addr = None;
-        self.external_event_sender = None;
+        self.any_event_sender = None;
     }
 }
 
@@ -275,7 +273,7 @@ impl Handler<Start> for BsSystem {
     type Result = StartupResult;
 
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
-        self.external_event_sender = Some(msg.events_sender.clone());
+        self.any_event_sender = Some(msg.events_sender.clone());
         self.cwd = msg.cwd;
 
         let Some(cwd) = &self.cwd else {
@@ -312,7 +310,7 @@ impl Handler<Start> for BsSystem {
                     path: path.clone(),
                     cwd: cwd.clone(),
                 });
-                self.publish_external_event(ExternalEvents::InputError(input_error.into()));
+                self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
                 Ok(DidStart::Started)
             }
             Err(e) => {

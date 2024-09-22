@@ -3,7 +3,7 @@ use actix::{Actor, Addr, AsyncContext};
 use std::hash::Hash;
 
 use bsnext_core::servers_supervisor::file_changed_handler::{FileChanged, FilesChanged};
-use bsnext_dto::{ExternalEvents, StoppedWatching, Watching};
+use bsnext_dto::{ExternalEventsDTO, StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, Debounce, FsEvent, FsEventKind, PathAddedEvent, PathEvent,
@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use bsnext_fs::actor::FsWatcher;
 
+use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_input::watch_opts::WatchOpts;
 use tracing::trace_span;
 
@@ -63,11 +64,7 @@ impl actix::Handler<MonitorInput> for BsSystem {
 
 impl BsSystem {
     #[tracing::instrument(skip(self))]
-    fn handle_buffered(
-        &mut self,
-        msg: &FsEvent,
-        buf: &BufferedChangeEvent,
-    ) -> Option<ExternalEvents> {
+    fn handle_buffered(&mut self, msg: &FsEvent, buf: &BufferedChangeEvent) -> Option<AnyEvent> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?msg.ctx, ?buf);
         let paths = buf
             .events
@@ -85,11 +82,11 @@ impl BsSystem {
             })
         }
         // todo(alpha): need to exclude changes to the input file if this event has captured it
-        Some(ExternalEvents::FilesChanged(bsnext_dto::FilesChangedDTO {
-            paths: as_strings,
-        }))
+        Some(AnyEvent::External(ExternalEventsDTO::FilesChanged(
+            bsnext_dto::FilesChangedDTO { paths: as_strings },
+        )))
     }
-    fn handle_change(&mut self, msg: &FsEvent, inner: &ChangeEvent) -> Option<ExternalEvents> {
+    fn handle_change(&mut self, msg: &FsEvent, inner: &ChangeEvent) -> Option<AnyEvent> {
         let span = trace_span!("handle_change", ?inner.absolute_path);
         let _guard = span.enter();
         match msg.ctx.id() {
@@ -99,15 +96,15 @@ impl BsSystem {
 
                 let Ok(input) = input else {
                     let err = input.unwrap_err();
-                    return Some(ExternalEvents::InputError(err.into()));
+                    return Some(AnyEvent::Internal(InternalEvents::InputError(err)));
                 };
 
                 self.accept_watchables(&input);
                 self.resolve_servers(input);
 
-                Some(ExternalEvents::InputFileChanged(
-                    bsnext_dto::FileChanged::from_path_buf(&inner.path),
-                ))
+                Some(AnyEvent::External(ExternalEventsDTO::InputFileChanged(
+                    bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
+                )))
             }
             _id => {
                 tracing::trace!(?inner, "Other file changed");
@@ -118,29 +115,28 @@ impl BsSystem {
                         ctx: msg.ctx.clone(),
                     })
                 }
-                Some(ExternalEvents::FileChanged(
-                    bsnext_dto::FileChanged::from_path_buf(&inner.path),
-                ))
+                Some(AnyEvent::External(ExternalEventsDTO::FileChanged(
+                    bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
+                )))
             }
         }
     }
     #[tracing::instrument(skip(self))]
-    fn handle_path_added(&mut self, path: &PathAddedEvent) -> Option<ExternalEvents> {
-        Some(ExternalEvents::Watching(Watching::from_path_buf(
-            &path.path,
-            path.debounce,
+    fn handle_path_added(&mut self, path: &PathAddedEvent) -> Option<AnyEvent> {
+        Some(AnyEvent::External(ExternalEventsDTO::Watching(
+            WatchingDTO::from_path_buf(&path.path, path.debounce),
         )))
     }
 
     #[tracing::instrument(skip(self))]
-    fn handle_path_removed(&mut self, path: &PathEvent) -> Option<ExternalEvents> {
-        Some(ExternalEvents::WatchingStopped(
-            StoppedWatching::from_path_buf(&path.path),
-        ))
+    fn handle_path_removed(&mut self, path: &PathEvent) -> Option<AnyEvent> {
+        Some(AnyEvent::External(ExternalEventsDTO::WatchingStopped(
+            StoppedWatchingDTO::from_path_buf(&path.path),
+        )))
     }
 
     #[tracing::instrument(skip(self))]
-    fn handle_path_not_found(&mut self, pdo: &PathEvent) -> Option<ExternalEvents> {
+    fn handle_path_not_found(&mut self, pdo: &PathEvent) -> Option<AnyEvent> {
         let as_str = pdo.path.to_string_lossy().to_string();
         let cwd = self.cwd.clone().unwrap();
         let abs = cwd.join(&as_str);
@@ -152,7 +148,7 @@ impl BsSystem {
         let e = InputError::PathError(PathError::MissingPaths {
             paths: PathDefs(vec![def]),
         });
-        Some(ExternalEvents::InputError(e.into()))
+        Some(AnyEvent::Internal(InternalEvents::InputError(e)))
     }
 }
 
@@ -183,7 +179,7 @@ impl actix::Handler<FsEvent> for BsSystem {
             FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),
         };
         if let Some(ext) = next {
-            self.publish_external_event(ext)
+            self.publish_any_event(ext)
         }
     }
 }
