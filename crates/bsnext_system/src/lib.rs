@@ -315,7 +315,7 @@ impl Handler<Start> for BsSystem {
             }
             Err(e) => {
                 tracing::error!(%e);
-                Err(StartupError::InputError(e))
+                Err(StartupError::InputError(*e))
             }
         }
     }

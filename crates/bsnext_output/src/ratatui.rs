@@ -264,7 +264,7 @@ impl App {
                     InternalEvents::ServersChanged { child_results, .. } => {
                         (evt.now, print_server_updates(child_results))
                     }
-                    InternalEvents::InputError(input_error) => {
+                    InternalEvents::InputError(_) => {
                         todo!("InternalEvents::InputError")
                     }
                     InternalEvents::StartupError(_) => {

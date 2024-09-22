@@ -96,7 +96,7 @@ impl BsSystem {
 
                 let Ok(input) = input else {
                     let err = input.unwrap_err();
-                    return Some(AnyEvent::Internal(InternalEvents::InputError(err)));
+                    return Some(AnyEvent::Internal(InternalEvents::InputError(*err)));
                 };
 
                 self.accept_watchables(&input);

@@ -55,42 +55,48 @@ impl FromStr for Input {
 }
 
 impl Input {
-    pub fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
+    pub fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<InputError>> {
         match path.as_ref().extension().and_then(|x| x.to_str()) {
-            None => Err(InputError::MissingExtension(path.as_ref().to_owned())),
+            None => Err(Box::new(InputError::MissingExtension(
+                path.as_ref().to_owned(),
+            ))),
             Some("yml") | Some("yaml") => Input::from_yaml_path(path),
             Some("md") | Some("markdown") => Input::from_md_path(path),
-            Some(other) => Err(InputError::UnsupportedExtension(other.to_string())),
+            Some(other) => Err(Box::new(InputError::UnsupportedExtension(
+                other.to_string(),
+            ))),
         }
     }
-    fn from_yaml_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
-        let str = read_to_string(&path)?;
+    fn from_yaml_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<InputError>> {
+        let str = read_to_string(&path).map_err(|e| Box::new(e.into()))?;
         if str.trim().is_empty() {
-            return Err(InputError::YamlError(YamlError::EmptyError {
+            return Err(Box::new(InputError::YamlError(YamlError::EmptyError {
                 path: path.as_ref().to_string_lossy().to_string(),
-            }));
+            })));
         }
-        let output = serde_yaml::from_str::<Self>(str.as_str()).map_err(move |e| {
-            if let Some(loc) = e.location() {
-                BsLiveRulesError {
-                    err_span: (loc.index()..loc.index() + 1).into(),
-                    src: NamedSource::new(
-                        "/Users/shaneosbourne/WebstormProjects/bslive/bslive.yml",
-                        str,
-                    ),
-                    message: e.to_string(),
-                    summary: None,
+        let output = serde_yaml::from_str::<Self>(str.as_str())
+            .map_err(move |e| {
+                if let Some(loc) = e.location() {
+                    BsLiveRulesError {
+                        err_span: (loc.index()..loc.index() + 1).into(),
+                        src: NamedSource::new(
+                            "/Users/shaneosbourne/WebstormProjects/bslive/bslive.yml",
+                            str,
+                        ),
+                        message: e.to_string(),
+                        summary: None,
+                    }
+                } else {
+                    unreachable!("handle later")
                 }
-            } else {
-                unreachable!("handle later")
-            }
-        })?;
+            })
+            .map_err(|e| Box::new(e.into()))?;
         // todo: don't allow duplicates?.
         Ok(output)
     }
-    fn from_md_path<P: AsRef<Path>>(path: P) -> Result<Self, InputError> {
-        let str = read_to_string(path)?;
-        let input = md::md_to_input(&str)?;
+    fn from_md_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<InputError>> {
+        let str = read_to_string(path).map_err(|e| Box::new(e.into()))?;
+        let input = md::md_to_input(&str).map_err(|e| Box::new(e.into()))?;
         // todo: don't allow duplicates.
         Ok(input)
     }

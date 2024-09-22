@@ -1,7 +1,6 @@
 use bsnext_input::route::Route;
 use miette::{JSONReportHandler, NamedSource};
 use serde_yaml::Value;
-use std::io::Write;
 
 fn main() -> miette::Result<()> {
     use miette::{Diagnostic, SourceSpan};

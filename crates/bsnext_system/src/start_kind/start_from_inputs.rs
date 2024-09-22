@@ -9,7 +9,7 @@ pub struct StartFromInputPaths {
 }
 
 impl SystemStart for StartFromInputPaths {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
+    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         from_yml_paths(&ctx.cwd, &self.input_paths)
     }
 }
@@ -20,14 +20,17 @@ pub struct StartFromInput {
 }
 
 impl SystemStart for StartFromInput {
-    fn input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
+    fn input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         Ok(SystemStartArgs::InputOnly {
             input: self.input.clone(),
         })
     }
 }
 
-fn from_yml_paths<T: AsRef<str>>(cwd: &Path, inputs: &[T]) -> Result<SystemStartArgs, InputError> {
+fn from_yml_paths<T: AsRef<str>>(
+    cwd: &Path,
+    inputs: &[T],
+) -> Result<SystemStartArgs, Box<InputError>> {
     let input_candidates = inputs
         .iter()
         .map(|path| cwd.join(path.as_ref()))
@@ -57,16 +60,16 @@ fn from_yml_paths<T: AsRef<str>>(cwd: &Path, inputs: &[T]) -> Result<SystemStart
         for path in &missing {
             tracing::error!(?path, "input file not found");
         }
-        return Err(InputError::NotFound(
+        return Err(Box::new(InputError::NotFound(
             missing.first().expect("guarded").to_path_buf(),
-        ));
+        )));
     }
 
     let first_user = exists.first();
     let first_auto = auto_candidates.first();
 
     let Some(input_path) = first_user.or(first_auto) else {
-        return Err(InputError::MissingInputs);
+        return Err(Box::new(InputError::MissingInputs));
     };
 
     tracing::info!(?input_path);
@@ -77,13 +80,15 @@ fn from_yml_paths<T: AsRef<str>>(cwd: &Path, inputs: &[T]) -> Result<SystemStart
             path: input_path.to_path_buf(),
             input,
         }),
-        Err(InputError::YamlError(yaml_error)) => Ok(SystemStartArgs::PathWithInvalidInput {
-            path: input_path.to_path_buf(),
-            input_error: InputError::YamlError(yaml_error),
-        }),
-        Err(e) => {
-            tracing::error!("cannot continue");
-            Err(e)
-        }
+        Err(e) => match *e {
+            InputError::YamlError(yaml_error) => Ok(SystemStartArgs::PathWithInvalidInput {
+                path: input_path.to_path_buf(),
+                input_error: InputError::YamlError(yaml_error),
+            }),
+            _ => {
+                tracing::error!("cannot continue");
+                Err(e)
+            }
+        },
     }
 }
