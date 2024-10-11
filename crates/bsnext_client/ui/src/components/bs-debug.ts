@@ -1,10 +1,10 @@
 import {css, html, LitElement} from "lit";
 import {property} from "lit/decorators.js";
-import {GetServersMessageResponse, ServerDesc, ServerDTO} from "../../../generated/dto";
+import {GetServersMessageResponseDTO, ServerDesc, ServerDTO} from "../../../generated/dto";
 
 class BsDebug extends LitElement {
   @property({type: Object})
-  servers: GetServersMessageResponse = {servers: []};
+  servers: GetServersMessageResponseDTO = {servers: []};
 
   @property({type: Object})
   me: ServerDesc = {routes: [], id: ''}

@@ -883,7 +883,8 @@ customElements.define("bs-icon", BsIcon);
 var all = fetch("/__bs_api/servers").then((x2) => x2.json());
 var me = fetch("/__bs_api/me").then((x2) => x2.json());
 Promise.all([all, me]).then(([servers, me2]) => {
-  let next = ke`<bs-debug .servers=${servers} .me=${me2}></bs-debug>`;
+  let next = ke`
+        <bs-debug .servers=${servers} .me=${me2}></bs-debug>`;
   let app = document.querySelector("#app");
   if (!app)
     throw new Error("cannot...");
