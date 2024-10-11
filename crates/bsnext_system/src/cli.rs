@@ -3,7 +3,7 @@ use crate::start_kind::StartKind;
 use crate::{AnyEvent, BsSystem, Start};
 use actix::Actor;
 
-use bsnext_dto::StartupEvent;
+use bsnext_dto::internal::StartupEvent;
 use bsnext_input::startup::DidStart;
 use bsnext_output::ratatui::Ratatui;
 use bsnext_output::{OutputWriter, Writers};
@@ -77,7 +77,7 @@ where
             };
         }
         Err(e) => {
-            let evt = StartupEvent::FailedStartup((&e).into());
+            let evt = StartupEvent::FailedStartup(e);
             match start_printer.handle_startup_event(stdout, &evt) {
                 Ok(_) => {}
                 Err(e) => tracing::error!(?e),
@@ -86,7 +86,7 @@ where
                 Ok(_) => {}
                 Err(e) => tracing::error!("could not flush {e}"),
             };
-            return Err(e.into());
+            return Err(anyhow::anyhow!("could not flush"));
         }
     };
 

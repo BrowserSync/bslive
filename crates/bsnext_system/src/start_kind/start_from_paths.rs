@@ -12,11 +12,13 @@ pub struct StartFromPaths {
 }
 
 impl SystemStart for StartFromPaths {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError> {
-        let identity = ServerIdentity::from_port_or_named(self.port)?;
-        let input = from_paths(&ctx.cwd, &self.paths, identity)?;
+    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+        let identity =
+            ServerIdentity::from_port_or_named(self.port).map_err(|e| Box::new(e.into()))?;
+        let input = from_paths(&ctx.cwd, &self.paths, identity).map_err(|e| Box::new(e.into()))?;
         if self.write_input {
-            let path = fs_write_input(&ctx.cwd, &input, TargetKind::Yaml)?;
+            let path = fs_write_input(&ctx.cwd, &input, TargetKind::Yaml)
+                .map_err(|e| Box::new(e.into()))?;
             Ok(SystemStartArgs::PathWithInput { input, path })
         } else {
             Ok(SystemStartArgs::InputOnly { input })

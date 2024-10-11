@@ -2,8 +2,8 @@
 source: crates/bsnext_core/src/handler_stack.rs
 expression: actual
 ---
-DirsProxy(
-    [
+DirsProxy {
+    dirs: [
         DirRouteOpts {
             dir_route: DirRoute {
                 dir: "another",
@@ -43,7 +43,19 @@ DirsProxy(
             fallback_route: None,
         },
     ],
-    ProxyRoute {
+    proxy: ProxyRoute {
         proxy: "example.com",
     },
-)
+    opts: Opts {
+        cors: None,
+        delay: None,
+        watch: Bool(
+            true,
+        ),
+        inject: Bool(
+            true,
+        ),
+        headers: None,
+        compression: None,
+    },
+}

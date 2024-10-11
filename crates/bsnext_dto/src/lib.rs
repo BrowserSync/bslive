@@ -4,6 +4,7 @@ use bsnext_input::InputError;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 
+use crate::internal::StartupEvent;
 use bsnext_fs::Debounce;
 use bsnext_input::client_config::ClientConfig;
 use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
@@ -30,7 +31,7 @@ pub struct RouteDTO {
 impl From<Route> for RouteDTO {
     fn from(value: Route) -> Self {
         Self {
-            path: value.path.to_owned(),
+            path: value.path.as_str().to_owned(),
             kind: RouteKindDTO::from(value.kind),
         }
     }
@@ -38,7 +39,7 @@ impl From<Route> for RouteDTO {
 impl From<&Route> for RouteDTO {
     fn from(value: &Route) -> Self {
         Self {
-            path: value.path.to_owned(),
+            path: value.path.as_str().to_owned(),
             kind: RouteKindDTO::from(value.kind.clone()),
         }
     }
@@ -78,8 +79,8 @@ impl From<RouteKind> for RouteKindDTO {
 
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct ServersChanged {
-    pub servers_resp: GetServersMessageResponse,
+pub struct ServersChangedDTO {
+    pub servers_resp: GetServersMessageResponseDTO,
 }
 
 #[typeshare]
@@ -90,58 +91,46 @@ pub enum EventLevel {
 }
 
 #[typeshare]
-#[derive(Debug, serde::Serialize)]
-pub struct ExternalEvent {
-    pub level: EventLevel,
-    pub fields: ExternalEvents,
-}
-
-#[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
-pub enum ExternalEvents {
-    ServersChanged(ServersChanged),
-    Watching(Watching),
-    WatchingStopped(StoppedWatching),
-    FileChanged(FileChanged),
+pub enum ExternalEventsDTO {
+    ServersChanged(ServersChangedDTO),
+    Watching(WatchingDTO),
+    WatchingStopped(StoppedWatchingDTO),
+    FileChanged(FileChangedDTO),
     FilesChanged(FilesChangedDTO),
-    InputFileChanged(FileChanged),
-    InputAccepted(InputAccepted),
-    InputError(InputErrorDTO),
+    InputFileChanged(FileChangedDTO),
+    InputAccepted(InputAcceptedDTO),
 }
 
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
-pub enum StartupEvent {
+pub enum StartupEventDTO {
     Started,
-    FailedStartup(StartupErrorDTO),
+    FailedStartup(String),
 }
 
-#[typeshare]
-#[derive(Debug, PartialEq, Hash, Eq, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(tag = "kind", content = "payload")]
-pub enum StartupErrorDTO {
-    InputError(InputErrorDTO),
-}
-
-impl From<&StartupError> for StartupErrorDTO {
-    fn from(value: &StartupError) -> Self {
+impl From<&StartupEvent> for StartupEventDTO {
+    fn from(value: &StartupEvent) -> Self {
         match value {
-            StartupError::InputError(e) => StartupErrorDTO::InputError(e.into()),
+            StartupEvent::Started => StartupEventDTO::Started,
+            StartupEvent::FailedStartup(StartupError::InputError(err)) => {
+                StartupEventDTO::FailedStartup(err.to_string())
+            }
         }
     }
 }
 
 #[typeshare]
 #[derive(Debug, serde::Serialize, Clone)]
-pub struct InputAccepted {
+pub struct InputAcceptedDTO {
     pub path: String,
 }
 
 #[typeshare]
 #[derive(Debug, serde::Serialize, Clone)]
-pub struct FileChanged {
+pub struct FileChangedDTO {
     pub path: String,
 }
 
@@ -153,18 +142,18 @@ pub struct FilesChangedDTO {
 
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct Watching {
+pub struct WatchingDTO {
     pub paths: Vec<String>,
     pub debounce: DebounceDTO,
 }
 
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct StoppedWatching {
+pub struct StoppedWatchingDTO {
     pub paths: Vec<String>,
 }
 
-impl StoppedWatching {
+impl StoppedWatchingDTO {
     pub fn from_path_buf(p: &Path) -> Self {
         Self {
             paths: vec![p.to_string_lossy().to_string()],
@@ -172,7 +161,7 @@ impl StoppedWatching {
     }
 }
 
-impl Display for Watching {
+impl Display for WatchingDTO {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "yo")
     }
@@ -206,7 +195,7 @@ impl From<Debounce> for DebounceDTO {
     }
 }
 
-impl FileChanged {
+impl FileChangedDTO {
     pub fn from_path_buf(p: &Path) -> Self {
         Self {
             path: p.to_string_lossy().to_string(),
@@ -214,7 +203,7 @@ impl FileChanged {
     }
 }
 
-impl Watching {
+impl WatchingDTO {
     pub fn from_path_buf(p: &Path, debounce: Debounce) -> Self {
         Self {
             paths: vec![p.to_string_lossy().to_string()],
@@ -247,7 +236,7 @@ pub struct ServerChangeSet {
 
 #[typeshare::typeshare]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, MessageResponse)]
-pub struct GetServersMessageResponse {
+pub struct GetServersMessageResponseDTO {
     pub servers: Vec<ServerDTO>,
 }
 
@@ -302,6 +291,7 @@ pub enum InputErrorDTO {
     UnsupportedExtension(String),
     MissingExtension(String),
     EmptyInput(String),
+    BsLiveRules(String),
 }
 
 impl From<&InputError> for InputErrorDTO {
@@ -322,6 +312,7 @@ impl From<&InputError> for InputErrorDTO {
             }
             e @ InputError::MissingExtension(_) => InputErrorDTO::MissingExtension(e.to_string()),
             e @ InputError::EmptyInput => InputErrorDTO::EmptyInput(e.to_string()),
+            e @ InputError::BsLiveRules(..) => InputErrorDTO::BsLiveRules(e.to_string()),
         }
     }
 }

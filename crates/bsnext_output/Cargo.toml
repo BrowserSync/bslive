@@ -8,9 +8,7 @@ edition = "2021"
 [dependencies]
 bsnext_core = { path = "../bsnext_core" }
 bsnext_dto = { path = "../bsnext_dto" }
-
-ansi_term = { version = "0.12.1" }
-indent = { version = "0.1.1" }
+bsnext_input = { path = "../bsnext_input" }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
@@ -18,6 +16,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 insta = { workspace = true }
 tracing = { workspace = true }
+miette = { workspace = true }
+
+ansi_term = { version = "0.12.1" }
+indent = { version = "0.1.1" }
 ratatui = { version = "0.27.0" }
 crossterm = { version = "0.27.0" }
 color-eyre = { version = "0.6.3" }

@@ -14,12 +14,12 @@ impl LitExample {
             identity: identity.unwrap_or_else(ServerIdentity::named),
             routes: vec![
                 Route {
-                    path: "/".to_string(),
+                    path: "/".to_string().parse().unwrap(),
                     kind: RouteKind::new_html(include_str!("../../../examples/lit/index.html")),
                     ..Default::default()
                 },
                 Route {
-                    path: "/lit.js".to_string(),
+                    path: "/lit.js".to_string().parse().unwrap(),
                     kind: RouteKind::new_raw(include_str!("../../../examples/lit/lit.js")),
                     ..Default::default()
                 },

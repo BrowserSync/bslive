@@ -51,38 +51,19 @@ export interface ServerDTO {
 	socket_addr: string;
 }
 
-export interface GetServersMessageResponse {
+export interface GetServersMessageResponseDTO {
 	servers: ServerDTO[];
 }
 
-export interface ServersChanged {
-	servers_resp: GetServersMessageResponse;
+export interface ServersChangedDTO {
+	servers_resp: GetServersMessageResponseDTO;
 }
 
-export enum EventLevel {
-	External = "BSLIVE_EXTERNAL",
-}
-
-export type ExternalEvents = 
-	| { kind: "ServersChanged", payload: ServersChanged }
-	| { kind: "Watching", payload: Watching }
-	| { kind: "WatchingStopped", payload: StoppedWatching }
-	| { kind: "FileChanged", payload: FileChanged }
-	| { kind: "FilesChanged", payload: FilesChangedDTO }
-	| { kind: "InputFileChanged", payload: FileChanged }
-	| { kind: "InputAccepted", payload: InputAccepted }
-	| { kind: "InputError", payload: InputErrorDTO };
-
-export interface ExternalEvent {
-	level: EventLevel;
-	fields: ExternalEvents;
-}
-
-export interface InputAccepted {
+export interface InputAcceptedDTO {
 	path: string;
 }
 
-export interface FileChanged {
+export interface FileChangedDTO {
 	path: string;
 }
 
@@ -95,12 +76,12 @@ export interface DebounceDTO {
 	ms: string;
 }
 
-export interface Watching {
+export interface WatchingDTO {
 	paths: string[];
 	debounce: DebounceDTO;
 }
 
-export interface StoppedWatching {
+export interface StoppedWatchingDTO {
 	paths: string[];
 }
 
@@ -139,14 +120,24 @@ export interface ClientConfigDTO {
  * todo(alpha): clean this up
  */
 export type InternalEventsDTO = 
-	| { kind: "ServersChanged", payload: GetServersMessageResponse };
+	| { kind: "ServersChanged", payload: GetServersMessageResponseDTO };
 
-export type StartupEvent = 
+export enum EventLevel {
+	External = "BSLIVE_EXTERNAL",
+}
+
+export type ExternalEventsDTO = 
+	| { kind: "ServersChanged", payload: ServersChangedDTO }
+	| { kind: "Watching", payload: WatchingDTO }
+	| { kind: "WatchingStopped", payload: StoppedWatchingDTO }
+	| { kind: "FileChanged", payload: FileChangedDTO }
+	| { kind: "FilesChanged", payload: FilesChangedDTO }
+	| { kind: "InputFileChanged", payload: FileChangedDTO }
+	| { kind: "InputAccepted", payload: InputAcceptedDTO };
+
+export type StartupEventDTO = 
 	| { kind: "Started", payload?: undefined }
-	| { kind: "FailedStartup", payload: StartupErrorDTO };
-
-export type StartupErrorDTO = 
-	| { kind: "InputError", payload: InputErrorDTO };
+	| { kind: "FailedStartup", payload: string };
 
 export type InputErrorDTO = 
 	| { kind: "MissingInputs", payload: string }
@@ -161,7 +152,8 @@ export type InputErrorDTO =
 	| { kind: "Io", payload: string }
 	| { kind: "UnsupportedExtension", payload: string }
 	| { kind: "MissingExtension", payload: string }
-	| { kind: "EmptyInput", payload: string };
+	| { kind: "EmptyInput", payload: string }
+	| { kind: "BsLiveRules", payload: string };
 
 export type ClientEvent = 
 	| { kind: "Change", payload: ChangeDTO }

@@ -44,7 +44,7 @@ pub enum SystemStartArgs {
 }
 
 pub trait SystemStart {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, InputError>;
+    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>>;
 }
 
 impl Default for StartupContext {

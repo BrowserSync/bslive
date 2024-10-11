@@ -1,19 +1,33 @@
+use crate::path_def::PathDef;
 use crate::watch_opts::WatchOpts;
 use bsnext_resp::inject_opts::InjectOpts;
+use matchit::InsertError;
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Route {
-    pub path: String,
+    #[serde(with = "crate::path_def")]
+    pub path: PathDef,
     #[serde(flatten)]
     pub kind: RouteKind,
     #[serde(flatten)]
     pub opts: Opts,
     pub fallback: Option<FallbackRoute>,
+}
+
+#[derive(Debug, PartialEq, thiserror::Error)]
+pub enum PathDefError {
+    #[error("Paths must start with a slash")]
+    StartsWithSlash,
+    #[error("Paths cannot contain a `*`")]
+    ContainsStar,
+    #[error("matchit error {0}")]
+    InsertError(#[from] InsertError),
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -41,7 +55,7 @@ pub struct Opts {
 impl Default for Route {
     fn default() -> Self {
         Self {
-            path: "/".to_string(),
+            path: PathDef::from_str("/").unwrap(),
             kind: RouteKind::new_html("default"),
             opts: Opts {
                 headers: None,
