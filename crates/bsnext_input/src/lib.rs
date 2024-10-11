@@ -79,10 +79,7 @@ impl Input {
                 if let Some(loc) = e.location() {
                     BsLiveRulesError {
                         err_span: (loc.index()..loc.index() + 1).into(),
-                        src: NamedSource::new(
-                            "/Users/shaneosbourne/WebstormProjects/bslive/bslive.yml",
-                            str,
-                        ),
+                        src: NamedSource::new(path.as_ref().to_string_lossy().to_string(), str),
                         message: e.to_string(),
                         summary: None,
                     }
