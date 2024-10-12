@@ -7,14 +7,14 @@ workspace.resolver = "2"
 
 [workspace.dependencies]
 clap = { version = "4.5.3", features = ["derive"] }
-axum = { version = "0.7.5", features = ["ws"] }
+axum = { version = "0.7.7", features = ["ws"] }
 matchit = { version = "0.7.3" }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.15", features = ["sync"] }
 futures = "0.3.30"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
-tower = { version = "0.4.13", features = ['steer'] }
-tower-http = { version = "0.5.0", features = ['trace', 'fs', 'compression-full', 'decompression-full', 'catch-panic', 'cors', 'timeout', 'set-header', ] }
+tower = { version = "0.4", features = ['steer'] }
+tower-http = { version = "0.6.0", features = ['trace', 'fs', 'compression-full', 'decompression-full', 'catch-panic', 'cors', 'timeout', 'set-header', ] }
 tracing = { version = "0.1.35", default-features = false, features = ["std", "attributes"] }
 actix = "0.13.1"
 actix-rt = "2.9.0"
