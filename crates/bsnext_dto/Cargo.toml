@@ -13,6 +13,5 @@ bsnext_tracing = { path = "../bsnext_tracing" }
 serde = { workspace = true }
 thiserror = { workspace = true }
 serde_json = { workspace = true }
-anyhow = { workspace = true }
 actix = { workspace = true }
 typeshare = { workspace = true }

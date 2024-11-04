@@ -9,14 +9,11 @@ edition = "2021"
 clap = { workspace = true }
 opentelemetry = { version = "0.23.0", features = ["trace", "metrics"] }
 opentelemetry_sdk = { version = "0.23.0", default-features = false, features = ["trace", "rt-tokio"] }
-opentelemetry-jaeger = "0.22.0"
 opentelemetry-stdout = { version = "0.4.0", features = ["trace", "metrics"] }
 opentelemetry-otlp = { version = "0.16.0", features = ["metrics"] }
 opentelemetry-semantic-conventions = "0.15.0"
 
 serde = { workspace = true }
-tracing = { workspace = true }
-tracing-error = "0.2.0"
 tracing-opentelemetry = { version = "0.24.0" }
 
 [dependencies.tracing-subscriber]
