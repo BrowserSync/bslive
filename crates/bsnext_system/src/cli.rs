@@ -7,7 +7,7 @@ use bsnext_dto::internal::StartupEvent;
 use bsnext_input::startup::DidStart;
 use bsnext_output::ratatui::Ratatui;
 use bsnext_output::{OutputWriter, Writers};
-use bsnext_tracing::{init_tracing, OtelOption, OutputFormat, WriteOption};
+use bsnext_tracing::{init_tracing, OutputFormat, WriteOption};
 use clap::Parser;
 use std::env::current_dir;
 use std::ffi::OsString;
@@ -32,12 +32,8 @@ where
         WriteOption::None
     };
 
-    let otel = if args.otel {
-        OtelOption::On
-    } else {
-        OtelOption::Off
-    };
-    let _g = init_tracing(args.log_level, args.format, write_opt, otel);
+    init_tracing(args.log_level, args.format, write_opt);
+
     tracing::debug!("{:#?}", args);
 
     let (tx, rx) = oneshot::channel();

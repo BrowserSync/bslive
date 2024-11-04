@@ -1,4 +1,4 @@
-mod raw_tracing;
+mod otlp;
 
 use std::fmt::{Display, Formatter};
 
@@ -69,14 +69,13 @@ pub enum OtelOption {
     Off,
 }
 
-pub fn init_tracing(
+pub fn init_otel_tracing(
     log_level: Option<LogLevel>,
     format: OutputFormat,
     write_option: WriteOption,
-) -> Option<()> {
+) -> otlp::OtelGuard {
     let level = level(log_level);
-    raw_tracing::init_tracing_subscriber(&level, format, write_option);
-    None::<()>
+    otlp::init_tracing_subscriber(&level, format, write_option)
 }
 
 pub fn level(log_level: Option<LogLevel>) -> String {
