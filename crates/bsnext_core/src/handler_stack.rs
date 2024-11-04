@@ -269,13 +269,11 @@ mod test {
     use super::*;
     use crate::server::router::common::to_resp_parts_and_body;
     use axum::body::Body;
-    
+
     use bsnext_input::Input;
     use http::Request;
     use insta::assert_debug_snapshot;
-    
 
-    
     use tower::ServiceExt;
 
     #[test]

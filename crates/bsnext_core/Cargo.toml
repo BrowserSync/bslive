@@ -17,16 +17,12 @@ bsnext_dto = { path = "../bsnext_dto" }
 
 axum-server = { version = "0.6.0", features = ["tls-rustls"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
-hyper = { version = "1.0.0", features = ["full"] }
 hyper-tls = { version = "0.6.0" }
 hyper-util = { version = "0.1.1", features = ["client-legacy"] }
-matchit = { workspace = true }
-htmlescape = { version = "0.3.1" }
 
 mime_guess = { workspace = true }
 insta = { workspace = true }
 axum = { workspace = true }
-clap = { workspace = true }
 http-body-util = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
@@ -40,7 +36,6 @@ futures = { workspace = true }
 futures-util = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
-thiserror = { workspace = true }
 serde_json = { workspace = true }
 bytes = { workspace = true }
 http = { workspace = true }

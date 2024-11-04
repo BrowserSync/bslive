@@ -14,7 +14,7 @@ use opentelemetry_semantic_conventions::{
 };
 use std::fs::File;
 
-use crate::{OtelOption, OutputFormat, WriteOption};
+use crate::{OutputFormat, WriteOption};
 use tracing_opentelemetry::{MetricsLayer, OpenTelemetryLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
@@ -87,7 +87,6 @@ pub fn init_tracing_subscriber(
     debug_str: &str,
     format: OutputFormat,
     write_option: WriteOption,
-    otel: OtelOption,
 ) -> OtelGuard {
     let filter =
         tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| debug_str.into());
@@ -123,44 +122,25 @@ pub fn init_tracing_subscriber(
         }
     };
 
-    if otel == OtelOption::On {
-        let meter_provider = init_meter_provider();
-        tracing_subscriber::registry()
-            .with(filter)
-            .with(fmt_layer)
-            .with(MetricsLayer::new(meter_provider.clone()))
-            .with(OpenTelemetryLayer::new(init_tracer()))
-            .init();
-        OtelGuard {
-            meter_provider: Some(meter_provider),
-        }
-    } else {
-        tracing_subscriber::registry()
-            .with(filter)
-            .with(fmt_layer)
-            .init();
-        OtelGuard {
-            meter_provider: None,
-        }
-    }
+    let meter_provider = init_meter_provider();
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt_layer)
+        .with(MetricsLayer::new(meter_provider.clone()))
+        .with(OpenTelemetryLayer::new(init_tracer()))
+        .init();
+    OtelGuard { meter_provider }
 }
 
 pub struct OtelGuard {
-    pub meter_provider: Option<SdkMeterProvider>,
+    pub meter_provider: SdkMeterProvider,
 }
 
 impl Drop for OtelGuard {
     fn drop(&mut self) {
-        match &self.meter_provider {
-            None => {
-                // nothing to do here
-            }
-            Some(provider) => {
-                if let Err(err) = provider.shutdown() {
-                    eprintln!("{err:?}");
-                }
-                opentelemetry::global::shutdown_tracer_provider();
-            }
+        if let Err(err) = self.meter_provider.shutdown() {
+            eprintln!("{err:?}");
         }
+        opentelemetry::global::shutdown_tracer_provider();
     }
 }

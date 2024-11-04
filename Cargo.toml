@@ -1,9 +1,12 @@
 workspace.members = [
     "bslive",
     "bsnext",
-    "crates/*"
+    "crates/*",
 ]
 workspace.resolver = "2"
+workspace.exclude = [
+    "crates/bsnext_otel"
+]
 
 [workspace.dependencies]
 clap = { version = "4.5.3", features = ["derive"] }

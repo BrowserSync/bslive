@@ -16,15 +16,11 @@ bsnext_output = { path = "../bsnext_output" }
 rand = "0.8.5"
 
 anyhow = { workspace = true }
-thiserror = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
-serde = { workspace = true }
-serde_yaml = { workspace = true }
 actix = { workspace = true }
 actix-rt = { workspace = true }
 tracing = { workspace = true }
-random_word = { workspace = true }
 tempfile = { workspace = true }
 
 [dev-dependencies]
