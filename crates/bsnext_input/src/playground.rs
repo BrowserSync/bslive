@@ -5,7 +5,7 @@ use bsnext_resp::inject_addition::{AdditionPosition, InjectAddition};
 use bsnext_resp::inject_opts::{InjectOpts, Injection, InjectionItem, MatcherList};
 use bsnext_resp::path_matcher::PathMatcher;
 
-#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, Default, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Playground {
     pub html: String,
     pub js: Option<String>,

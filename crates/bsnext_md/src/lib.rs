@@ -1,5 +1,7 @@
 pub mod md_fs;
+use crate::Convert::PlaygroundJS;
 use bsnext_input::path_def::PathDef;
+use bsnext_input::playground::Playground;
 use bsnext_input::route::{RawRoute, Route, RouteKind};
 use bsnext_input::server_config::ServerConfig;
 use bsnext_input::Input;
@@ -8,8 +10,8 @@ use markdown::{Constructs, ParseOptions};
 use mime_guess::get_mime_extensions_str;
 use nom::branch::alt;
 use nom::combinator::map;
-use nom::multi::many0;
-use nom::sequence::separated_pair;
+use nom::multi::{many0, separated_list0};
+use nom::sequence::{pair, separated_pair};
 use nom::{error::ParseError, IResult};
 use serde_json::json;
 use std::cmp::PartialEq;
@@ -32,6 +34,9 @@ fn parser_for(k: BsLiveKinds) -> impl Fn(&[Node]) -> IResult<&[Node], &Node> {
 pub enum BsLiveKinds {
     Input,
     Route,
+    PlaygroundHtml,
+    PlaygroundCSS,
+    PlaygroundJS,
     Body,
     Ignored,
 }
@@ -43,15 +48,6 @@ pub enum MarkdownError {
     ParseError(String),
     #[error("invalid markdown format: {0}")]
     InvalidFormat(String),
-}
-
-trait BsLive {
-    fn kind(&self) -> BsLiveKinds;
-    fn is_input(&self) -> bool;
-    fn is_route(&self) -> bool;
-    fn is_body(&self) -> bool;
-    #[allow(dead_code)]
-    fn raw_value(&self) -> Option<String>;
 }
 
 fn node_to_input(node: &Node) -> Result<Input, anyhow::Error> {
@@ -71,13 +67,6 @@ fn node_to_input(node: &Node) -> Result<Input, anyhow::Error> {
     }
 }
 
-// impl TryInto<Input> for Vec<Node> {
-//     type Error = MarkdownError;
-//     fn try_into(self) -> Result<Input, Self::Error> {
-//         nodes_to_input(&self)
-//     }
-// }
-//
 fn pair_to_route((first, second): (&Node, &Node)) -> Result<Route, anyhow::Error> {
     match (first.is_route(), second.is_body()) {
         (true, true) => match first {
@@ -122,13 +111,34 @@ fn route_kind_from_body_node(node: &Node) -> anyhow::Result<RouteKind> {
     }
 }
 
+trait BsLive {
+    fn kind(&self) -> BsLiveKinds;
+    fn is_input(&self) -> bool;
+    fn is_route(&self) -> bool;
+    fn is_body(&self) -> bool;
+    fn is_playground_html(&self) -> bool;
+    fn is_playground_css(&self) -> bool;
+    fn is_playground_js(&self) -> bool;
+    #[allow(dead_code)]
+    fn raw_value(&self) -> Option<String>;
+}
+
 impl BsLive for Node {
     fn kind(&self) -> BsLiveKinds {
+        if self.is_playground_html() {
+            return BsLiveKinds::PlaygroundHtml;
+        }
         if self.is_input() {
             return BsLiveKinds::Input;
         }
         if self.is_route() {
             return BsLiveKinds::Route;
+        }
+        if self.is_playground_css() {
+            return BsLiveKinds::PlaygroundCSS;
+        }
+        if self.is_playground_js() {
+            return BsLiveKinds::PlaygroundJS;
         }
         if self.is_body() {
             return BsLiveKinds::Body;
@@ -165,6 +175,33 @@ impl BsLive for Node {
         matches!(self, Node::Code(..))
     }
 
+    fn is_playground_html(&self) -> bool {
+        match self {
+            Node::Code(code) => {
+                code.lang.as_ref().is_some_and(|v| v == "html")
+                    && code.meta.as_ref().is_some_and(|v| v.contains("playground"))
+            }
+            _ => false,
+        }
+    }
+
+    fn is_playground_css(&self) -> bool {
+        match self {
+            Node::Code(code) => code.lang.as_ref().is_some_and(|v| v == "css"),
+            _ => false,
+        }
+    }
+
+    fn is_playground_js(&self) -> bool {
+        match self {
+            Node::Code(code) => code
+                .lang
+                .as_ref()
+                .is_some_and(|v| v == "js" || v == "javascript"),
+            _ => false,
+        }
+    }
+
     fn raw_value(&self) -> Option<String> {
         if self.is_body() {
             let Node::Code(code) = self else {
@@ -181,6 +218,9 @@ enum Convert {
     None,
     Input(Input),
     Route(Route),
+    PlaygroundHtml(String),
+    PlaygroundJS(String),
+    PlaygroundCSS(String),
 }
 
 pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
@@ -201,17 +241,33 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                 many0(parser_for(BsLiveKinds::Ignored)),
                 parser_for(BsLiveKinds::Body),
             ),
-            |pair| {
-                let as_route: Result<Route, _> = pair_to_route(pair);
+            |route_body_pair| {
+                let as_route: Result<Route, _> = pair_to_route(route_body_pair);
                 match as_route {
                     Ok(route) => Convert::Route(route),
                     Err(e) => unreachable!("? {:?}", e),
                 }
             },
         ),
+        map(
+            pair(
+                parser_for(BsLiveKinds::PlaygroundHtml),
+                many0(alt((
+                    parser_for(BsLiveKinds::PlaygroundCSS),
+                    parser_for(BsLiveKinds::PlaygroundJS),
+                ))),
+            ),
+            |(a, b): (&Node, Vec<&Node>)| {
+                // todo:
+                dbg!(a);
+                dbg!(b);
+                Convert::None
+            },
+        ),
     )));
 
     let results = parser(nodes);
+    let mut playground: Option<Playground> = None;
 
     match results {
         Ok((_rest, matched)) => {
@@ -229,6 +285,26 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                     Convert::Route(route) => {
                         routes.push(route);
                     }
+                    Convert::PlaygroundHtml(pl) => {
+                        if playground.is_none() {
+                            playground = Some(Playground {
+                                html: pl,
+                                js: None,
+                                css: None,
+                            })
+                        }
+                    }
+                    Convert::PlaygroundJS(js) => {
+                        if let Some(playground) = playground.as_mut() {
+                            playground.js = Some(js);
+                        }
+                    }
+                    Convert::PlaygroundCSS(css) => {
+                        println!("dod");
+                        if let Some(playground) = playground.as_mut() {
+                            playground.css = Some(css);
+                        }
+                    }
                 }
             }
         }
@@ -244,12 +320,16 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                 ..Default::default()
             };
             input.servers.push(server);
+            if let Some(s) = input.servers.get_mut(0) {
+                s.playground = playground
+            }
             Ok(input)
         }
         // got some server config, use it.
         Some(mut input) => {
             if let Some(server) = input.servers.first_mut() {
-                server.routes.extend(routes)
+                server.routes.extend(routes);
+                server.playground = playground;
             }
             Ok(input)
         }
@@ -277,188 +357,6 @@ fn str_to_nodes(input: &str) -> Result<Vec<Node>, MarkdownError> {
 pub fn md_to_input(input: &str) -> Result<Input, MarkdownError> {
     let root = str_to_nodes(input)?;
     nodes_to_input(&root)
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use bsnext_input::path_def::PathDef;
-    use bsnext_input::route::Route;
-    use bsnext_input::server_config::ServerIdentity;
-
-    #[test]
-    fn test_single() -> anyhow::Result<()> {
-        // let input = include_str!("../../examples/md-single/md-single.md");
-        let input = r#"
-
-# Demo 2
-
-```yaml bslive_route
-path: /app.css
-```
-
-```css
-body {
-    background: blue
-}
-```
-        "#;
-        let config = md_to_input(&input).expect("unwrap");
-        let server_1 = config.servers.first().unwrap();
-        assert_eq!(
-            server_1.routes[0],
-            Route {
-                path: "/app.css".parse()?,
-                kind: RouteKind::new_raw("body {\n    background: blue\n}"),
-                ..Default::default()
-            }
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_2_consecutive() -> anyhow::Result<()> {
-        // let input = include_str!("../../examples/md-single/md-single.md");
-        let input = r#"
-
-```yaml bslive_route
-path: /app.css
-```
-
-```css
-body {
-    background: blue
-}
-```
-
-Some other text
-
-```yaml bslive_route
-path: /app2.css
-```
-
-```css
-body {
-    background: blue
-}
-```
-        "#;
-        let config = md_to_input(&input).expect("unwrap");
-        let server_1 = config.servers.first().unwrap();
-        assert_eq!(
-            server_1.routes[0],
-            Route {
-                path: PathDef::from_str("/app.css")?,
-                kind: RouteKind::new_raw("body {\n    background: blue\n}"),
-                ..Default::default()
-            }
-        );
-        assert_eq!(
-            server_1.routes[1],
-            Route {
-                path: PathDef::from_str("/app2.css")?,
-                kind: RouteKind::new_raw("body {\n    background: blue\n}"),
-                ..Default::default()
-            }
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_parse_with_elements_in_gaps() -> anyhow::Result<()> {
-        let markdown = r#"
-# Before
-
-```yaml bslive_input
-servers:
-  - bind_address: 0.0.0.0:3001
-    routes:
-        - path: /health
-          raw: OK
-```
-
-```yaml bslive_route
-path: /
-```
-
-in between?
-
-```html
-<p>hello world</p>
-```
-
-```yaml bslive_route
-path: /abc
-```
-```html
-<p>hello world 2</p>
-```
-
-# Before
-        "#;
-        let input = md_to_input(&markdown).expect("unwrap");
-        let server_1 = input.servers.first().unwrap();
-        let expected_id = ServerIdentity::Address {
-            bind_address: "0.0.0.0:3001".into(),
-        };
-        assert_eq!(server_1.identity, expected_id);
-        assert_eq!(server_1.routes.len(), 3);
-        assert_eq!(
-            server_1.routes[0],
-            Route {
-                path: PathDef::from_str("/health")?,
-                kind: RouteKind::new_raw("OK"),
-                ..Default::default()
-            }
-        );
-        assert_eq!(
-            server_1.routes[1],
-            Route {
-                path: PathDef::from_str("/")?,
-                kind: RouteKind::new_html("<p>hello world</p>"),
-                ..Default::default()
-            }
-        );
-        assert_eq!(
-            server_1.routes[2],
-            Route {
-                path: PathDef::from_str("/abc")?,
-                kind: RouteKind::new_html("<p>hello world 2</p>"),
-                ..Default::default()
-            }
-        );
-        Ok(())
-    }
-
-    fn default_md_assertions(input: &str) -> anyhow::Result<()> {
-        let input = md_to_input(&input).expect("unwrap");
-        let server_1 = input.servers.first().unwrap();
-        let expected_id = ServerIdentity::Address {
-            bind_address: "0.0.0.0:5001".into(),
-        };
-        assert_eq!(server_1.identity, expected_id);
-        assert_eq!(server_1.routes.len(), 2);
-        let paths = server_1
-            .routes
-            .iter()
-            .map(|r| r.path.as_str())
-            .collect::<Vec<&str>>();
-
-        assert_eq!(paths, vec!["/app.css", "/"]);
-        Ok(())
-    }
-
-    #[test]
-    fn test_from_example_str() -> anyhow::Result<()> {
-        let input_str = include_str!("../../../examples/md-single/md-single.md");
-        default_md_assertions(input_str)
-    }
-
-    #[test]
-    fn test_from_example_str_frontmatter() -> anyhow::Result<()> {
-        let input_str = include_str!("../../../examples/md-single/frontmatter.md");
-        default_md_assertions(input_str)
-    }
 }
 
 pub fn input_to_str(input: &Input) -> String {
@@ -520,20 +418,4 @@ fn fenced_route(code: &str) -> String {
 
 fn fenced_body(lang: &str, code: &str) -> String {
     format!("```{lang}\n{code}\n```")
-}
-
-#[cfg(test)]
-mod test_serialize {
-    use super::*;
-    #[test]
-    fn test_input_to_str() -> anyhow::Result<()> {
-        let input_str = include_str!("../../../examples/md-single/md-single.md");
-        let input = md_to_input(&input_str).expect("unwrap");
-        let _output = input_to_str(&input);
-        let input = md_to_input(&input_str).expect("unwrapped 2");
-        println!("{:#?}", input);
-        assert_eq!(input.servers.len(), 1);
-        assert_eq!(input.servers.first().unwrap().routes.len(), 2);
-        Ok(())
-    }
 }

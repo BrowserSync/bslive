@@ -1,3 +1,8 @@
+---
+servers:
+  - name: playground
+---
+
 ```html playground
 
 <div class="main">
@@ -6,11 +11,18 @@
 ```
 
 ```css
-@import url("/reset.css");
+@import url("reset.css");
 
 :root {
-    border: 50px solid pink;
-    height: 100vh;
-    overflow: hidden;
+    border: 1px dotted red;
+}
+
+* {
+    font-family: system-ui
 }
 ```
+
+```js
+console.dir('did run?')
+```
+
