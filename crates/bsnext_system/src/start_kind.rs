@@ -3,8 +3,11 @@ use crate::start_kind::start_from_example::StartFromExample;
 use crate::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
 use crate::start_kind::start_from_paths::StartFromPaths;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
+use std::fs;
+use std::path::{Path, PathBuf};
 
-use bsnext_input::{Input, InputError};
+use bsnext_input::target::TargetKind;
+use bsnext_input::{Input, InputError, InputWriteError};
 
 pub mod start_from_example;
 pub mod start_from_inputs;
@@ -57,4 +60,25 @@ impl SystemStart for StartKind {
             StartKind::FromInput(from_inputs) => from_inputs.input(ctx),
         }
     }
+}
+
+pub fn fs_write_input(
+    cwd: &Path,
+    input: &Input,
+    target_kind: TargetKind,
+) -> Result<PathBuf, InputWriteError> {
+    let string = match target_kind {
+        TargetKind::Yaml => bsnext_yaml::input_to_str(input),
+        TargetKind::Toml => todo!("toml missing"),
+        TargetKind::Md => bsnext_md::input_to_str(input),
+    };
+    let name = match target_kind {
+        TargetKind::Yaml => "bslive.yml",
+        TargetKind::Toml => todo!("toml missing"),
+        TargetKind::Md => "bslive.md",
+    };
+    let next_path = cwd.join(name);
+    fs::write(&next_path, string)
+        .map(|()| next_path.clone())
+        .map_err(|_e| InputWriteError::FailedWrite { path: next_path })
 }

@@ -88,7 +88,7 @@ fn playground_wrap() -> InjectOpts {
   </body>
 </html>
 "#;
-    let inject = InjectOpts::Items(vec![
+    InjectOpts::Items(vec![
         InjectionItem {
             inner: Injection::Addition(InjectAddition {
                 addition_position: AdditionPosition::Prepend(prepend.to_string()),
@@ -107,7 +107,5 @@ fn playground_wrap() -> InjectOpts {
             }),
             only: Some(MatcherList::Item(PathMatcher::Str("/".to_string()))),
         },
-    ]);
-
-    inject
+    ])
 }

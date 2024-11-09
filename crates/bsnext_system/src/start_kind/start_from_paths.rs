@@ -1,8 +1,9 @@
+use crate::start_kind::fs_write_input;
 use bsnext_input::paths::from_paths;
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::target::TargetKind;
-use bsnext_input::{fs_write_input, InputError};
+use bsnext_input::InputError;
 
 #[derive(Debug)]
 pub struct StartFromPaths {

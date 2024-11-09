@@ -1,8 +1,8 @@
-use crate::route::{RawRoute, Route, RouteKind};
-use crate::server_config::ServerConfig;
-use crate::Input;
-
-use crate::path_def::PathDef;
+pub mod md_fs;
+use bsnext_input::path_def::PathDef;
+use bsnext_input::route::{RawRoute, Route, RouteKind};
+use bsnext_input::server_config::ServerConfig;
+use bsnext_input::Input;
 use markdown::mdast::Node;
 use markdown::{Constructs, ParseOptions};
 use mime_guess::get_mime_extensions_str;
@@ -54,63 +54,55 @@ trait BsLive {
     fn raw_value(&self) -> Option<String>;
 }
 
-impl TryInto<Input> for &Node {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<Input, Self::Error> {
-        if !self.is_input() {
-            return Err(anyhow::anyhow!("not an input type"));
+fn node_to_input(node: &Node) -> Result<Input, anyhow::Error> {
+    if !node.is_input() {
+        return Err(anyhow::anyhow!("not an input type"));
+    }
+    match node {
+        Node::Code(code) => {
+            let config: Input = serde_yaml::from_str(&code.value)?;
+            Ok(config)
         }
-        match self {
-            Node::Code(code) => {
-                let config: Input = serde_yaml::from_str(&code.value)?;
-                Ok(config)
-            }
-            Node::Yaml(yaml) => {
-                let config: Input = serde_yaml::from_str(&yaml.value)?;
-                Ok(config)
-            }
-            _ => Err(anyhow::anyhow!("unreachable")),
+        Node::Yaml(yaml) => {
+            let config: Input = serde_yaml::from_str(&yaml.value)?;
+            Ok(config)
         }
+        _ => Err(anyhow::anyhow!("unreachable")),
     }
 }
 
-impl TryInto<Input> for Vec<Node> {
-    type Error = MarkdownError;
-    fn try_into(self) -> Result<Input, Self::Error> {
-        nodes_to_input(&self)
-    }
-}
-
-impl TryInto<Route> for (&Node, &Node) {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<Route, Self::Error> {
-        match (self.0.is_route(), self.1.is_body()) {
-            (true, true) => match self.0 {
-                Node::Code(code)
-                    if code
-                        .lang
-                        .as_ref()
-                        .is_some_and(|l| l == "yaml" || l == "yml") =>
-                {
-                    #[derive(serde::Deserialize)]
-                    struct PathOnly {
-                        path: String,
-                    }
-                    let r: PathOnly = serde_yaml::from_str(&code.value)?;
-                    let route_kind = route_kind_from_body_node(self.1)?;
-                    let route = Route {
-                        path: PathDef::from_str(&r.path)?,
-                        kind: route_kind,
-                        ..Default::default()
-                    };
-                    Ok(route)
+// impl TryInto<Input> for Vec<Node> {
+//     type Error = MarkdownError;
+//     fn try_into(self) -> Result<Input, Self::Error> {
+//         nodes_to_input(&self)
+//     }
+// }
+//
+fn pair_to_route((first, second): (&Node, &Node)) -> Result<Route, anyhow::Error> {
+    match (first.is_route(), second.is_body()) {
+        (true, true) => match first {
+            Node::Code(code)
+                if code
+                    .lang
+                    .as_ref()
+                    .is_some_and(|l| l == "yaml" || l == "yml") =>
+            {
+                #[derive(serde::Deserialize)]
+                struct PathOnly {
+                    path: String,
                 }
-                _ => Err(anyhow::anyhow!("unreachlable")),
-            },
-            _ => Err(anyhow::anyhow!("cannot create")),
-        }
+                let r: PathOnly = serde_yaml::from_str(&code.value)?;
+                let route_kind = route_kind_from_body_node(second)?;
+                let route = Route {
+                    path: PathDef::from_str(&r.path)?,
+                    kind: route_kind,
+                    ..Default::default()
+                };
+                Ok(route)
+            }
+            _ => Err(anyhow::anyhow!("unreachlable")),
+        },
+        _ => Err(anyhow::anyhow!("cannot create")),
     }
 }
 
@@ -193,11 +185,11 @@ enum Convert {
 
 pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
     let mut routes = vec![];
-    let mut server_config: Option<Input> = None;
+    let mut input: Option<Input> = None;
     let mut parser = many0(alt((
         map(parser_for(BsLiveKinds::Ignored), |_v| Convert::None),
         map(parser_for(BsLiveKinds::Input), |v: &Node| {
-            let as_config: Result<Input, _> = v.try_into();
+            let as_config: Result<Input, _> = node_to_input(v);
             match as_config {
                 Ok(config) => Convert::Input(config),
                 Err(e) => unreachable!("? creating server config {:?}", e),
@@ -210,7 +202,7 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                 parser_for(BsLiveKinds::Body),
             ),
             |pair| {
-                let as_route: Result<Route, _> = pair.try_into();
+                let as_route: Result<Route, _> = pair_to_route(pair);
                 match as_route {
                     Ok(route) => Convert::Route(route),
                     Err(e) => unreachable!("? {:?}", e),
@@ -228,8 +220,8 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                     Convert::None => {}
                     Convert::Input(input_from_md) => {
                         // todo: handle server config
-                        if server_config.is_none() {
-                            server_config = Some(input_from_md)
+                        if input.is_none() {
+                            input = Some(input_from_md)
                         } else {
                             unreachable!("todo: support multiple 'input' blocks")
                         }
@@ -243,7 +235,7 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
         Err(e) => return Err(MarkdownError::InvalidFormat(e.to_string())),
     }
 
-    match server_config.take() {
+    match input.take() {
         // config was not set, use default
         None => {
             let mut input = Input::default();
@@ -290,7 +282,9 @@ pub fn md_to_input(input: &str) -> Result<Input, MarkdownError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::server_config::ServerIdentity;
+    use bsnext_input::path_def::PathDef;
+    use bsnext_input::route::Route;
+    use bsnext_input::server_config::ServerIdentity;
 
     #[test]
     fn test_single() -> anyhow::Result<()> {
@@ -372,7 +366,7 @@ body {
 
     #[test]
     fn test_parse_with_elements_in_gaps() -> anyhow::Result<()> {
-        let input = r#"
+        let markdown = r#"
 # Before
 
 ```yaml bslive_input
@@ -402,8 +396,8 @@ path: /abc
 
 # Before
         "#;
-        let config = md_to_input(&input).expect("unwrap");
-        let server_1 = config.servers.first().unwrap();
+        let input = md_to_input(&markdown).expect("unwrap");
+        let server_1 = input.servers.first().unwrap();
         let expected_id = ServerIdentity::Address {
             bind_address: "0.0.0.0:3001".into(),
         };
@@ -537,6 +531,7 @@ mod test_serialize {
         let input = md_to_input(&input_str).expect("unwrap");
         let _output = input_to_str(&input);
         let input = md_to_input(&input_str).expect("unwrapped 2");
+        println!("{:#?}", input);
         assert_eq!(input.servers.len(), 1);
         assert_eq!(input.servers.first().unwrap().routes.len(), 2);
         Ok(())

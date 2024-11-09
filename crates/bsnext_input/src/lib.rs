@@ -1,11 +1,6 @@
-use crate::target::TargetKind;
-
-use crate::md::MarkdownError;
 use crate::yml::YamlError;
-use miette::{JSONReportHandler, NamedSource};
+use miette::JSONReportHandler;
 use std::fmt::{Display, Formatter};
-use std::fs;
-use std::fs::read_to_string;
 use std::net::AddrParseError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -13,7 +8,6 @@ use std::str::FromStr;
 pub mod client_config;
 #[cfg(test)]
 pub mod input_test;
-pub mod md;
 pub mod path_def;
 pub mod paths;
 pub mod playground;
@@ -55,49 +49,8 @@ impl FromStr for Input {
     }
 }
 
-impl Input {
-    pub fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<InputError>> {
-        match path.as_ref().extension().and_then(|x| x.to_str()) {
-            None => Err(Box::new(InputError::MissingExtension(
-                path.as_ref().to_owned(),
-            ))),
-            Some("yml") | Some("yaml") => Input::from_yaml_path(path),
-            Some("md") | Some("markdown") => Input::from_md_path(path),
-            Some(other) => Err(Box::new(InputError::UnsupportedExtension(
-                other.to_string(),
-            ))),
-        }
-    }
-    fn from_yaml_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<InputError>> {
-        let str = read_to_string(&path).map_err(|e| Box::new(e.into()))?;
-        if str.trim().is_empty() {
-            return Err(Box::new(InputError::YamlError(YamlError::EmptyError {
-                path: path.as_ref().to_string_lossy().to_string(),
-            })));
-        }
-        let output = serde_yaml::from_str::<Self>(str.as_str())
-            .map_err(move |e| {
-                if let Some(loc) = e.location() {
-                    BsLiveRulesError {
-                        err_span: (loc.index()..loc.index() + 1).into(),
-                        src: NamedSource::new(path.as_ref().to_string_lossy().to_string(), str),
-                        message: e.to_string(),
-                        summary: None,
-                    }
-                } else {
-                    unreachable!("handle later")
-                }
-            })
-            .map_err(|e| Box::new(e.into()))?;
-        // todo: don't allow duplicates?.
-        Ok(output)
-    }
-    fn from_md_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<InputError>> {
-        let str = read_to_string(path).map_err(|e| Box::new(e.into()))?;
-        let input = md::md_to_input(&str).map_err(|e| Box::new(e.into()))?;
-        // todo: don't allow duplicates.
-        Ok(input)
-    }
+pub trait InputCreation {
+    fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Input, Box<InputError>>;
 }
 
 #[derive(Debug, miette::Diagnostic, thiserror::Error)]
@@ -125,7 +78,7 @@ pub enum InputError {
     #[error("{0}")]
     DirError(#[from] DirError),
     #[error("Markdown error: {0}")]
-    MarkdownError(#[from] MarkdownError),
+    MarkdownError(String),
     #[error("{0}")]
     YamlError(#[from] YamlError),
     #[error(transparent)]
@@ -175,12 +128,12 @@ pub enum DirError {
 pub struct BsLiveRulesError {
     // Note: label but no source code
     #[label = "{message}"]
-    err_span: miette::SourceSpan,
+    pub err_span: miette::SourceSpan,
     #[source_code]
-    src: miette::NamedSource<String>,
-    message: String,
+    pub src: miette::NamedSource<String>,
+    pub message: String,
     #[help]
-    summary: Option<String>,
+    pub summary: Option<String>,
 }
 
 impl BsLiveRulesError {
@@ -227,25 +180,4 @@ impl Display for PathDefinition {
 
 pub fn rand_word() -> String {
     random_word::gen(random_word::Lang::En).to_string()
-}
-
-pub fn fs_write_input(
-    cwd: &Path,
-    input: &Input,
-    target_kind: TargetKind,
-) -> Result<PathBuf, InputWriteError> {
-    let string = match target_kind {
-        TargetKind::Yaml => serde_yaml::to_string(&input).expect("create yaml?"),
-        TargetKind::Toml => toml::to_string_pretty(&input).expect("create toml?"),
-        TargetKind::Md => md::input_to_str(input),
-    };
-    let name = match target_kind {
-        TargetKind::Yaml => "bslive.yml",
-        TargetKind::Toml => "bslive.toml",
-        TargetKind::Md => "bslive.md",
-    };
-    let next_path = cwd.join(name);
-    fs::write(&next_path, string)
-        .map(|()| next_path.clone())
-        .map_err(|_e| InputWriteError::FailedWrite { path: next_path })
 }

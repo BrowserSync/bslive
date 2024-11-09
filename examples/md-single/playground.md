@@ -1,16 +1,11 @@
-```yaml bslive_input
-servers:
-  - name: playground
-```
-
-```html bslive_playground
+```html playground
 
 <div class="main">
     Hello world!
 </div>
 ```
 
-```css bslive_playground
+```css
 @import url("/reset.css");
 
 :root {

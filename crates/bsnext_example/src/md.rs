@@ -1,5 +1,6 @@
 use bsnext_input::server_config::ServerIdentity;
-use bsnext_input::{md, Input};
+use bsnext_input::Input;
+use bsnext_md::md_to_input;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MdExample;
@@ -7,7 +8,7 @@ pub struct MdExample;
 impl MdExample {
     pub fn into_input(self, identity: Option<ServerIdentity>) -> Input {
         let input_str = include_str!("../../../examples/md-single/md-single.md");
-        let mut input = md::md_to_input(input_str).expect("example cannot fail?");
+        let mut input = md_to_input(input_str).expect("example cannot fail?");
         let server = input
             .servers
             .first_mut()

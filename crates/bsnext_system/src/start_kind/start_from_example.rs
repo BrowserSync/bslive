@@ -1,8 +1,9 @@
+use crate::start_kind::fs_write_input;
 use bsnext_example::Example;
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::target::TargetKind;
-use bsnext_input::{fs_write_input, rand_word, DirError, InputError};
+use bsnext_input::{rand_word, DirError, InputError};
 use std::fs;
 
 #[derive(Debug)]
