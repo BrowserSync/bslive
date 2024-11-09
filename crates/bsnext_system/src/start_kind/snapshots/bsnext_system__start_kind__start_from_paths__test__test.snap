@@ -35,6 +35,7 @@ Input {
                 },
             ],
             watchers: [],
+            playground: None,
             clients: ClientConfig {
                 log: Info,
             },

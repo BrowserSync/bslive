@@ -29,7 +29,7 @@ impl actix::Handler<Patch> for ServerActor {
         let app_state_clone = app_state.clone();
 
         // Process routes and manifests
-        let routes = msg.server_config.routes.clone();
+        let routes = msg.server_config.as_routes();
         let next_manifest = RoutesManifest::new(&routes);
         let changeset = self.routes_manifest.changeset_for(&next_manifest);
         self.routes_manifest = RoutesManifest::new(&routes);

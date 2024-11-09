@@ -1,4 +1,5 @@
 use crate::client_config::ClientConfig;
+use crate::playground::Playground;
 use crate::route::{Route, Watcher};
 use crate::{rand_word, PortError};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -14,7 +15,19 @@ pub struct ServerConfig {
     #[serde(default)]
     pub watchers: Vec<Watcher>,
     #[serde(default)]
+    pub playground: Option<Playground>,
+    #[serde(default)]
     pub clients: ClientConfig,
+}
+
+impl ServerConfig {
+    pub fn as_routes(&self) -> Vec<Route> {
+        let mut routes = self.routes.clone();
+        if let Some(playground) = &self.playground {
+            routes.extend(playground.as_routes())
+        }
+        routes
+    }
 }
 
 #[derive(

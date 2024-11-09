@@ -30,11 +30,11 @@ impl actix::Handler<Listen> for ServerActor {
         let h1 = handle.clone();
         let h2 = handle.clone();
 
-        let router = RouteMap::new_from_routes(&self.config.routes).into_router();
+        let router = RouteMap::new_from_routes(&self.config.as_routes()).into_router();
 
         let app_state = Arc::new(ServerState {
             // parent: ,
-            routes: Arc::new(RwLock::new(self.config.routes.clone())),
+            routes: Arc::new(RwLock::new(self.config.as_routes())),
             raw_router: Arc::new(RwLock::new(router)),
             client_config: Arc::new(RwLock::new(self.config.clients.clone())),
             id: self.config.identity.as_id(),

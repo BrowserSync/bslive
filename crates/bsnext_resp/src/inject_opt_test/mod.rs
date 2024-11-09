@@ -68,12 +68,21 @@ fn test_inject_builtin() {
     let input = r#"
     inject:
       - name: bslive:connector
+      - append: 'other'
     "#;
     let expected = A {
-        inject: InjectOpts::Items(vec![InjectionItem {
-            inner: Injection::BsLive(BuiltinStringDef { name: Connector }),
-            only: None,
-        }]),
+        inject: InjectOpts::Items(vec![
+            InjectionItem {
+                inner: Injection::BsLive(BuiltinStringDef { name: Connector }),
+                only: None,
+            },
+            InjectionItem {
+                inner: Injection::Addition(InjectAddition {
+                    addition_position: AdditionPosition::Append(String::from("other")),
+                }),
+                only: None,
+            },
+        ]),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
     assert_eq!(actual.unwrap().inject, expected.inject);

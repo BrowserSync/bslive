@@ -481,7 +481,7 @@ pub fn input_to_str(input: &Input) -> String {
 
         chunks.push(fenced_input(&yml));
 
-        for route in &server_config.routes {
+        for route in &server_config.as_routes() {
             let path_only = json!({"path": route.path.as_str()});
             let route_yaml = serde_yaml::to_string(&path_only).expect("never fail here on route?");
             chunks.push(fenced_route(&route_yaml));
