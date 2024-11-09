@@ -99,7 +99,7 @@ expression: routes
         },
         kind: Raw(
             Raw {
-                raw: "// playground js is absent",
+                raw: "console.log(\"hello world\")",
             },
         ),
         opts: Opts {

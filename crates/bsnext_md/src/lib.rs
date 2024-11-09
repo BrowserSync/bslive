@@ -1,5 +1,4 @@
 pub mod md_fs;
-use crate::Convert::PlaygroundJS;
 use bsnext_input::path_def::PathDef;
 use bsnext_input::playground::Playground;
 use bsnext_input::route::{RawRoute, Route, RouteKind};
@@ -218,9 +217,7 @@ enum Convert {
     None,
     Input(Input),
     Route(Route),
-    PlaygroundHtml(String),
-    PlaygroundJS(String),
-    PlaygroundCSS(String),
+    Playground(Playground),
 }
 
 pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
@@ -239,7 +236,11 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
             separated_pair(
                 parser_for(BsLiveKinds::Route),
                 many0(parser_for(BsLiveKinds::Ignored)),
-                parser_for(BsLiveKinds::Body),
+                alt((
+                    parser_for(BsLiveKinds::Body),
+                    parser_for(BsLiveKinds::PlaygroundCSS),
+                    parser_for(BsLiveKinds::PlaygroundJS),
+                )),
             ),
             |route_body_pair| {
                 let as_route: Result<Route, _> = pair_to_route(route_body_pair);
@@ -257,11 +258,40 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                     parser_for(BsLiveKinds::PlaygroundJS),
                 ))),
             ),
-            |(a, b): (&Node, Vec<&Node>)| {
-                // todo:
-                dbg!(a);
-                dbg!(b);
-                Convert::None
+            |(a, nodes): (&Node, Vec<&Node>)| {
+                let mut pl = Playground {
+                    html: code_val(a).to_string(),
+                    js: None,
+                    css: None,
+                };
+
+                for node in nodes {
+                    match &node {
+                        Node::Code(code) => match code.lang.as_ref() {
+                            None => {}
+                            Some(lang) if lang == "js" => {
+                                if let Some(js) = pl.js.as_mut() {
+                                    *js = code.value.clone();
+                                } else {
+                                    pl.js = Some(code.value.clone());
+                                }
+                            }
+                            Some(lang) if lang == "css" => {
+                                if let Some(css) = pl.css.as_mut() {
+                                    *css = code.value.clone();
+                                } else {
+                                    pl.css = Some(code.value.clone());
+                                }
+                            }
+                            Some(_) => {
+                                unreachable!("unsupposted");
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+
+                Convert::Playground(pl)
             },
         ),
     )));
@@ -285,24 +315,9 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                     Convert::Route(route) => {
                         routes.push(route);
                     }
-                    Convert::PlaygroundHtml(pl) => {
+                    Convert::Playground(pl) => {
                         if playground.is_none() {
-                            playground = Some(Playground {
-                                html: pl,
-                                js: None,
-                                css: None,
-                            })
-                        }
-                    }
-                    Convert::PlaygroundJS(js) => {
-                        if let Some(playground) = playground.as_mut() {
-                            playground.js = Some(js);
-                        }
-                    }
-                    Convert::PlaygroundCSS(css) => {
-                        println!("dod");
-                        if let Some(playground) = playground.as_mut() {
-                            playground.css = Some(css);
+                            playground = Some(pl)
                         }
                     }
                 }
@@ -333,6 +348,13 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
             }
             Ok(input)
         }
+    }
+}
+
+fn code_val(n: &Node) -> &str {
+    match n {
+        Node::Code(code) => code.value.as_str(),
+        _ => "",
     }
 }
 
