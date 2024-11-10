@@ -19,7 +19,7 @@ impl InputCreation for YamlFs {
                 if let Some(loc) = e.location() {
                     BsLiveRulesError {
                         err_span: (loc.index()..loc.index() + 1).into(),
-                        src: NamedSource::new(path.as_ref().to_string_lossy().to_string(), str),
+                        src: NamedSource::new(path.as_ref().to_string_lossy(), str),
                         message: e.to_string(),
                         summary: None,
                     }

@@ -25,6 +25,10 @@ pub struct Args {
     #[arg(long)]
     pub write: bool,
 
+    /// Force write over directories or files (dangerous)
+    #[arg(long, requires = "write")]
+    pub force: bool,
+
     /// Write input to disk
     #[arg(long, requires = "write")]
     pub target: Option<TargetKind>,
@@ -36,8 +40,12 @@ pub struct Args {
     #[arg(long, requires = "example")]
     pub temp: bool,
 
+    /// Override output folder (not compatible with 'temp')
+    #[arg(long, requires = "example", conflicts_with = "temp")]
+    pub dir: Option<String>,
+
     /// create a temp folder for examples instead of using the current dir
-    #[arg(long, requires = "example")]
+    #[arg(long, requires = "example", conflicts_with = "dir")]
     pub name: Option<String>,
 
     /// Only works with `--example` - specify a port instead of a random one    

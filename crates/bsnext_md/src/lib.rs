@@ -266,8 +266,8 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                 };
 
                 for node in nodes {
-                    match &node {
-                        Node::Code(code) => match code.lang.as_ref() {
+                    if let Node::Code(code) = &node {
+                        match code.lang.as_ref() {
                             None => {}
                             Some(lang) if lang == "js" => {
                                 if let Some(js) = pl.js.as_mut() {
@@ -286,8 +286,7 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                             Some(_) => {
                                 unreachable!("unsupposted");
                             }
-                        },
-                        _ => {}
+                        }
                     }
                 }
 

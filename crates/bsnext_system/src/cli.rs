@@ -44,6 +44,8 @@ where
 
     let start_kind = StartKind::from_args(args);
 
+    tracing::debug!(?start_kind);
+
     let start = Start {
         kind: start_kind,
         cwd: Some(cwd),
