@@ -22,7 +22,7 @@ pub struct ServerActor {
 
 impl ServerActor {
     pub fn new_from_config(config: ServerConfig) -> Self {
-        let routes_manifest = RoutesManifest::new(&config.as_routes());
+        let routes_manifest = RoutesManifest::new(&config.combined_routes());
         Self {
             config,
             signals: None,

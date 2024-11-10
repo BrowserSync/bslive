@@ -31,4 +31,8 @@ impl InputCreation for YamlFs {
         // todo: don't allow duplicates?.
         Ok(output)
     }
+
+    fn from_input_str<P: AsRef<str>>(_content: P) -> Result<Input, Box<InputError>> {
+        todo!()
+    }
 }

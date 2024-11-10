@@ -1,18 +1,18 @@
 pub mod md_fs;
+pub mod md_writer;
+
 use bsnext_input::path_def::PathDef;
 use bsnext_input::playground::Playground;
-use bsnext_input::route::{RawRoute, Route, RouteKind};
+use bsnext_input::route::{Route, RouteKind};
 use bsnext_input::server_config::ServerConfig;
 use bsnext_input::Input;
 use markdown::mdast::Node;
 use markdown::{Constructs, ParseOptions};
-use mime_guess::get_mime_extensions_str;
 use nom::branch::alt;
 use nom::combinator::map;
 use nom::multi::many0;
 use nom::sequence::{pair, separated_pair};
 use nom::{error::ParseError, IResult};
-use serde_json::json;
 use std::cmp::PartialEq;
 use std::str::FromStr;
 
@@ -246,7 +246,10 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
                 let as_route: Result<Route, _> = pair_to_route(route_body_pair);
                 match as_route {
                     Ok(route) => Convert::Route(route),
-                    Err(e) => unreachable!("? {:?}", e),
+                    Err(_e) => {
+                        // todo: add error handling here?
+                        Convert::None
+                    }
                 }
             },
         ),
@@ -378,65 +381,4 @@ fn str_to_nodes(input: &str) -> Result<Vec<Node>, MarkdownError> {
 pub fn md_to_input(input: &str) -> Result<Input, MarkdownError> {
     let root = str_to_nodes(input)?;
     nodes_to_input(&root)
-}
-
-pub fn input_to_str(input: &Input) -> String {
-    let mut chunks = vec![];
-    if let Some(server_config) = input.servers.first() {
-        let without_routes = Input {
-            servers: vec![ServerConfig {
-                identity: server_config.identity.clone(),
-                routes: vec![],
-                ..Default::default()
-            }],
-        };
-        let yml = serde_yaml::to_string(&without_routes).expect("never fail here");
-
-        chunks.push(fenced_input(&yml));
-
-        for route in &server_config.as_routes() {
-            let path_only = json!({"path": route.path.as_str()});
-            let route_yaml = serde_yaml::to_string(&path_only).expect("never fail here on route?");
-            chunks.push(fenced_route(&route_yaml));
-            chunks.push(route_to_markdown(&route.kind, route.path.as_str()));
-        }
-    }
-    for _x in input.servers.iter().skip(1) {
-        todo!("not supported yet!")
-    }
-    chunks.join("\n")
-}
-
-fn route_to_markdown(kind: &RouteKind, path: &str) -> String {
-    match kind {
-        RouteKind::Raw(raw) => match raw {
-            RawRoute::Html { html } => fenced_body("html", html),
-            RawRoute::Json { .. } => todo!("unsupported json"),
-            RawRoute::Raw { raw } => {
-                let mime = mime_guess::from_path(path);
-                let as_str = mime.first_or_text_plain();
-                let as_str = get_mime_extensions_str(as_str.as_ref());
-                if let Some(v) = as_str.and_then(|x| x.first()) {
-                    fenced_body(v, raw)
-                } else {
-                    fenced_body("", raw)
-                }
-            }
-            RawRoute::Sse { .. } => todo!("unsupported"),
-        },
-        RouteKind::Proxy(_) => todo!("unsupported"),
-        RouteKind::Dir(_) => todo!("unsupported"),
-    }
-}
-
-fn fenced_input(code: &str) -> String {
-    format!("```yaml bslive_input\n{}```", code)
-}
-
-fn fenced_route(code: &str) -> String {
-    format!("```yaml bslive_route\n{}```", code)
-}
-
-fn fenced_body(lang: &str, code: &str) -> String {
-    format!("```{lang}\n{code}\n```")
 }

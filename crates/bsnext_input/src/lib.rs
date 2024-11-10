@@ -1,3 +1,4 @@
+use crate::server_config::ServerIdentity;
 use crate::yml::YamlError;
 use miette::JSONReportHandler;
 use std::fmt::{Display, Formatter};
@@ -49,8 +50,50 @@ impl FromStr for Input {
     }
 }
 
+#[derive(Debug)]
+pub struct InputSourceFile {
+    path: PathBuf,
+    content: String,
+}
+
+impl InputSourceFile {
+    pub fn new(path: impl Into<PathBuf>, content: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            content: content.into(),
+        }
+    }
+
+    pub fn path(&self) -> &'_ Path {
+        &self.path
+    }
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+}
+
+#[derive(Debug)]
+pub enum InputSourceKind {
+    Type(Input),
+    File {
+        src_file: InputSourceFile,
+        input: Input,
+    },
+}
+
+pub trait InputSource {
+    fn into_input(&self, _identity: Option<ServerIdentity>) -> InputSourceKind {
+        InputSourceKind::Type(Default::default())
+    }
+}
+
 pub trait InputCreation {
     fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Input, Box<InputError>>;
+    fn from_input_str<P: AsRef<str>>(content: P) -> Result<Input, Box<InputError>>;
+}
+
+pub trait InputWriter {
+    fn input_to_str(&self, input: &Input) -> String;
 }
 
 #[derive(Debug, miette::Diagnostic, thiserror::Error)]

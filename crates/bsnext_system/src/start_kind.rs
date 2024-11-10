@@ -84,7 +84,7 @@ pub mod start_fs {
         let string = match target_kind {
             TargetKind::Yaml => bsnext_yaml::input_to_str(input),
             TargetKind::Toml => todo!("toml missing"),
-            TargetKind::Md => bsnext_md::input_to_str(input),
+            TargetKind::Md => bsnext_md::md_writer::_input_to_str(input),
         };
         let name = match target_kind {
             TargetKind::Yaml => "bslive.yml",
@@ -92,6 +92,31 @@ pub mod start_fs {
             TargetKind::Md => "bslive.md",
         };
         let next_path = cwd.join(name);
+        tracing::info!(
+            "✏️ writing {} bytes to {}",
+            string.len(),
+            next_path.display()
+        );
+
+        let exists = fs::exists(&next_path).map_err(|_e| InputWriteError::CannotQueryStatus {
+            path: next_path.clone(),
+        })?;
+
+        if exists && *write_mode == WriteMode::Safe {
+            return Err(InputWriteError::Exists { path: next_path });
+        }
+
+        fs::write(&next_path, string)
+            .map(|()| next_path.clone())
+            .map_err(|_e| InputWriteError::FailedWrite { path: next_path })
+    }
+    pub fn fs_write_input_src(
+        cwd: &Path,
+        path: &Path,
+        string: &str,
+        write_mode: &WriteMode,
+    ) -> Result<PathBuf, InputWriteError> {
+        let next_path = cwd.join(path);
         tracing::info!(
             "✏️ writing {} bytes to {}",
             string.len(),

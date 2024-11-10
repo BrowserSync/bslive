@@ -21,12 +21,18 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
-    pub fn as_routes(&self) -> Vec<Route> {
+    ///
+    /// All regular routes, plus dynamically added ones (for example, through a playground)
+    ///
+    pub fn combined_routes(&self) -> Vec<Route> {
         let mut routes = self.routes.clone();
         if let Some(playground) = &self.playground {
             routes.extend(playground.as_routes())
         }
         routes
+    }
+    pub fn routes(&self) -> &[Route] {
+        &self.routes
     }
 }
 

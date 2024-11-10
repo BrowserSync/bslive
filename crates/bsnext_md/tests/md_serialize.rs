@@ -1,10 +1,12 @@
-use bsnext_md::{input_to_str, md_to_input};
+use bsnext_input::InputWriter;
+use bsnext_md::md_to_input;
+use bsnext_md::md_writer::MdWriter;
 
 #[test]
 fn test_input_to_str() -> anyhow::Result<()> {
     let input_str = include_str!("../../../examples/markdown/single.md");
     let input = md_to_input(&input_str).expect("unwrap");
-    let output = input_to_str(&input);
+    let output = MdWriter.input_to_str(&input);
     println!("{}", output);
     let input = md_to_input(&output).expect("unwrapped 2");
     println!("{:#?}", input);

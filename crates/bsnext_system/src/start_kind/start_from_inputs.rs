@@ -37,7 +37,7 @@ fn from_yml_paths<T: AsRef<str>>(
         .map(|path| cwd.join(path.as_ref()))
         .collect::<Vec<PathBuf>>();
 
-    let lookups = ["bslive.yml", "bslive.yaml"]
+    let lookups = ["bslive.yml", "bslive.yaml", "bslive.md"]
         .iter()
         .map(|path| cwd.join(path))
         .collect::<Vec<PathBuf>>();

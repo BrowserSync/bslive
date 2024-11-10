@@ -12,4 +12,9 @@ impl InputCreation for MdFs {
             md_to_input(&str).map_err(|e| Box::new(InputError::MarkdownError(e.to_string())))?;
         Ok(input)
     }
+    fn from_input_str<P: AsRef<str>>(content: P) -> Result<Input, Box<InputError>> {
+        let input = md_to_input(&content.as_ref())
+            .map_err(|e| Box::new(InputError::MarkdownError(e.to_string())))?;
+        Ok(input)
+    }
 }
