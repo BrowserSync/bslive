@@ -1,9 +1,8 @@
-use bsnext_input::route::{Route, RouteKind};
 use bsnext_md::md_to_input;
 
 #[test]
 fn test_md_playground() -> anyhow::Result<()> {
-    // let input = include_str!("../../examples/md-single/md-single.md");
+    // let input = include_str!("../../examples/markdown/markdown.md");
     let input = r#"
 
 ```html playground

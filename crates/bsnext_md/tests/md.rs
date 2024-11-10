@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 #[test]
 fn test_single() -> anyhow::Result<()> {
-    // let input = include_str!("../../examples/md-single/md-single.md");
+    // let input = include_str!("../../examples/markdown/markdown.md");
     let input = r#"
 
 # Demo 2
@@ -36,7 +36,7 @@ body {
 
 #[test]
 fn test_2_consecutive() -> anyhow::Result<()> {
-    // let input = include_str!("../../examples/md-single/md-single.md");
+    // let input = include_str!("../../examples/markdown/markdown.md");
     let input = r#"
 
 ```yaml bslive_route
@@ -168,12 +168,12 @@ fn default_md_assertions(input: &str) -> anyhow::Result<()> {
 
 #[test]
 fn test_from_example_str() -> anyhow::Result<()> {
-    let input_str = include_str!("../../../examples/md-single/md-single.md");
+    let input_str = include_str!("../../../examples/markdown/single.md");
     default_md_assertions(input_str)
 }
 
 #[test]
 fn test_from_example_str_frontmatter() -> anyhow::Result<()> {
-    let input_str = include_str!("../../../examples/md-single/frontmatter.md");
+    let input_str = include_str!("../../../examples/markdown/frontmatter.md");
     default_md_assertions(input_str)
 }

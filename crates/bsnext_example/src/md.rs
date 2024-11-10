@@ -7,7 +7,7 @@ pub struct MdExample;
 
 impl MdExample {
     pub fn into_input(self, identity: Option<ServerIdentity>) -> Input {
-        let input_str = include_str!("../../../examples/md-single/md-single.md");
+        let input_str = include_str!("../../../examples/markdown/single.md");
         let mut input = md_to_input(input_str).expect("example cannot fail?");
         let server = input
             .servers

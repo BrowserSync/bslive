@@ -10,7 +10,7 @@ servers:
 </div>
 ```
 
-```css
+```css 
 @import url("reset.css");
 
 :root {
@@ -23,6 +23,6 @@ servers:
 ```
 
 ```js
-console.dir('did run?')
+console.log('Hello from playground.md')
 ```
 

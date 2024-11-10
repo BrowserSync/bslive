@@ -9,7 +9,7 @@ use markdown::{Constructs, ParseOptions};
 use mime_guess::get_mime_extensions_str;
 use nom::branch::alt;
 use nom::combinator::map;
-use nom::multi::{many0, separated_list0};
+use nom::multi::many0;
 use nom::sequence::{pair, separated_pair};
 use nom::{error::ParseError, IResult};
 use serde_json::json;
