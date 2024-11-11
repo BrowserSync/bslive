@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use bsnext_fs::actor::FsWatcher;
 
+use crate::input_fs::from_input_path;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_input::watch_opts::WatchOpts;
 use tracing::trace_span;
@@ -92,7 +93,7 @@ impl BsSystem {
         match msg.ctx.id() {
             0 => {
                 tracing::info!(?inner, "InputFile file changed");
-                let input = Input::from_input_path(&inner.absolute_path);
+                let input = from_input_path(&inner.absolute_path);
 
                 let Ok(input) = input else {
                     let err = input.unwrap_err();

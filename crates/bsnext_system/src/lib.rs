@@ -34,6 +34,7 @@ use tracing::{debug_span, Instrument};
 
 pub mod args;
 pub mod cli;
+pub mod input_fs;
 pub mod monitor;
 mod monitor_any_watchables;
 pub mod start_kind;
@@ -280,11 +281,15 @@ impl Handler<Start> for BsSystem {
             unreachable!("?")
         };
 
+        tracing::debug!("{:?}", self.cwd);
+
         let servers = ServersSupervisor::new(msg.ack);
         // store the servers addr for later
         self.servers_addr = Some(servers.start());
 
         let start_context = StartupContext::from_cwd(self.cwd.as_ref());
+
+        tracing::debug!(?start_context);
 
         match msg.kind.input(&start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
@@ -313,10 +318,7 @@ impl Handler<Start> for BsSystem {
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
                 Ok(DidStart::Started)
             }
-            Err(e) => {
-                tracing::error!(%e);
-                Err(StartupError::InputError(*e))
-            }
+            Err(e) => Err(StartupError::InputError(*e)),
         }
     }
 }

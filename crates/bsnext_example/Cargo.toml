@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 bsnext_input = { path = "../bsnext_input" }
+bsnext_md = { path = "../bsnext_md" }
 clap = { workspace = true }

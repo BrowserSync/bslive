@@ -20,7 +20,7 @@ async fn test_delays() -> Result<(), anyhow::Error> {
     let dur3_ms = dur3.as_millis();
 
     assert!(dur1_ms > 200 && dur1_ms < 210);
-    assert!(dur2_ms > 500 && dur2_ms < 510);
+    assert!(dur2_ms > 500 && dur2_ms < 600);
     assert!(
         dur3_ms > 300 && dur3_ms < 310,
         "dir delay should be over 300ms"

@@ -1,6 +1,8 @@
 ```yaml bslive_input
 servers:
   - bind_address: 0.0.0.0:5001
+    clients:
+      log: trace
 ```
 
 CSS path:

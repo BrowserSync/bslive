@@ -1,0 +1,10 @@
+[package]
+name = "bsnext_yaml"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+bsnext_input = { path = "../bsnext_input" }
+miette = { workspace = true }

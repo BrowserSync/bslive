@@ -33,7 +33,6 @@ test.describe('examples/basic/live-reload.yml', {
     // Trigger the live-reload by touching the CSS file
     bs.touch('examples/basic/public/styles.css');
     await requestPromise;
-    await page.pause();
 
     // Filter the log messages for specific content and assert
     const log = messages.filter(([, text]) => text === "[debug] found 1 LINKed stylesheets, 1 @imported stylesheets");

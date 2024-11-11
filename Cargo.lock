@@ -526,6 +526,7 @@ name = "bsnext_example"
 version = "0.1.0"
 dependencies = [
  "bsnext_input",
+ "bsnext_md",
  "clap",
 ]
 
@@ -556,17 +557,31 @@ dependencies = [
  "bsnext_tracing",
  "clap",
  "insta",
- "markdown",
  "matchit",
  "miette",
  "mime_guess",
- "nom",
  "random_word",
  "serde",
  "serde_json",
  "serde_yaml",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "bsnext_md"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bsnext_input",
+ "insta",
+ "markdown",
+ "mime_guess",
+ "nom",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror",
 ]
 
 [[package]]
@@ -618,8 +633,10 @@ dependencies = [
  "bsnext_example",
  "bsnext_fs",
  "bsnext_input",
+ "bsnext_md",
  "bsnext_output",
  "bsnext_tracing",
+ "bsnext_yaml",
  "clap",
  "insta",
  "rand",
@@ -648,6 +665,16 @@ dependencies = [
  "http-body-util",
  "hyper-tls",
  "hyper-util",
+]
+
+[[package]]
+name = "bsnext_yaml"
+version = "0.1.0"
+dependencies = [
+ "bsnext_input",
+ "miette",
+ "serde",
+ "serde_yaml",
 ]
 
 [[package]]

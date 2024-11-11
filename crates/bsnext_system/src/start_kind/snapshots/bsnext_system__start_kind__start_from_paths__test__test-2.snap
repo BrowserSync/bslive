@@ -14,5 +14,6 @@ servers:
         compression: ~
         fallback: ~
     watchers: []
+    playground: ~
     clients:
       log: info

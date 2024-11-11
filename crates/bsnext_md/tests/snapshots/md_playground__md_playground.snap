@@ -1,0 +1,165 @@
+---
+source: crates/bsnext_md/tests/md_playground.rs
+expression: routes
+---
+[
+    Route {
+        path: PathDef {
+            inner: "/",
+        },
+        kind: Raw(
+            Html {
+                html: "\n<div class=\"main\">\n    Hello world!\n</div>",
+            },
+        ),
+        opts: Opts {
+            cors: None,
+            delay: None,
+            watch: Bool(
+                true,
+            ),
+            inject: Items(
+                [
+                    InjectionItem {
+                        inner: Addition(
+                            InjectAddition {
+                                addition_position: Prepend(
+                                    "\n<!doctype html>\n  <html lang=\"en\">\n  <head>\n      <meta charset=\"UTF-8\">\n      <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n      <title>Document</title>\n      <link rel=\"stylesheet\" href=\"/__bslive_playground.css\">\n  </head>\n  <body>\n",
+                                ),
+                            },
+                        ),
+                        only: Some(
+                            Item(
+                                Str(
+                                    "/",
+                                ),
+                            ),
+                        ),
+                    },
+                    InjectionItem {
+                        inner: Addition(
+                            InjectAddition {
+                                addition_position: Append(
+                                    "\n  <script src=\"/__bslive_playground.js\"></script>\n  </body>\n</html>\n",
+                                ),
+                            },
+                        ),
+                        only: Some(
+                            Item(
+                                Str(
+                                    "/",
+                                ),
+                            ),
+                        ),
+                    },
+                    InjectionItem {
+                        inner: BsLive(
+                            BuiltinStringDef {
+                                name: Connector,
+                            },
+                        ),
+                        only: Some(
+                            Item(
+                                Str(
+                                    "/",
+                                ),
+                            ),
+                        ),
+                    },
+                ],
+            ),
+            headers: None,
+            compression: None,
+        },
+        fallback: Some(
+            FallbackRoute {
+                kind: Raw(
+                    Html {
+                        html: "This is a BSLIVE playground",
+                    },
+                ),
+                opts: Opts {
+                    cors: None,
+                    delay: None,
+                    watch: Bool(
+                        true,
+                    ),
+                    inject: Bool(
+                        true,
+                    ),
+                    headers: None,
+                    compression: None,
+                },
+            },
+        ),
+    },
+    Route {
+        path: PathDef {
+            inner: "/__bslive_playground.js",
+        },
+        kind: Raw(
+            Raw {
+                raw: "console.log(\"hello world\")",
+            },
+        ),
+        opts: Opts {
+            cors: None,
+            delay: None,
+            watch: Bool(
+                true,
+            ),
+            inject: Bool(
+                true,
+            ),
+            headers: None,
+            compression: None,
+        },
+        fallback: None,
+    },
+    Route {
+        path: PathDef {
+            inner: "/__bslive_playground.css",
+        },
+        kind: Raw(
+            Raw {
+                raw: "@import url(\"/reset.css\");\n\n:root {\n    border: 50px solid pink;\n    height: 100vh;\n    overflow: hidden;\n}",
+            },
+        ),
+        opts: Opts {
+            cors: None,
+            delay: None,
+            watch: Bool(
+                true,
+            ),
+            inject: Bool(
+                true,
+            ),
+            headers: None,
+            compression: None,
+        },
+        fallback: None,
+    },
+    Route {
+        path: PathDef {
+            inner: "/reset.css",
+        },
+        kind: Raw(
+            Raw {
+                raw: "/*\n  1. Use a more-intuitive box-sizing model.\n*/\n*, *::before, *::after {\n    box-sizing: border-box;\n}\n\n/*\n  2. Remove default margin\n*/\n* {\n    margin: 0;\n}\n\n/*\n  Typographic tweaks!\n  3. Add accessible line-height\n  4. Improve text rendering\n*/\nbody {\n    line-height: 1.5;\n    -webkit-font-smoothing: antialiased;\n}\n\n/*\n  5. Improve media defaults\n*/\nimg, picture, video, canvas, svg {\n    display: block;\n    max-width: 100%;\n}\n\n/*\n  6. Remove built-in form typography styles\n*/\ninput, button, textarea, select {\n    font: inherit;\n}\n\n/*\n  7. Avoid text overflows\n*/\np, h1, h2, h3, h4, h5, h6 {\n    overflow-wrap: break-word;\n}\n\n/*\n  8. Create a root stacking context\n*/\n#root, #__next {\n    isolation: isolate;\n}",
+            },
+        ),
+        opts: Opts {
+            cors: None,
+            delay: None,
+            watch: Bool(
+                true,
+            ),
+            inject: Bool(
+                true,
+            ),
+            headers: None,
+            compression: None,
+        },
+        fallback: None,
+    },
+]

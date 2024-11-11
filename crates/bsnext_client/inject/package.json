@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm",
+    "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm --minify --metafile=dist/meta.json",
     "dev": "npm run build:client -- --sourcemap=inline --watch",
     "build:client:debug": "npm run build:client -- --sourcemap=inline"
   },

@@ -22,9 +22,9 @@ use tower::ServiceExt;
 
 pub fn into_state(val: ServerConfig) -> ServerState {
     let (sender, _) = tokio::sync::broadcast::channel::<ClientEvent>(10);
-    let router = RouteMap::new_from_routes(&val.routes).into_router();
+    let router = RouteMap::new_from_routes(&val.combined_routes()).into_router();
     ServerState {
-        routes: Arc::new(RwLock::new(val.routes.clone())),
+        routes: Arc::new(RwLock::new(val.combined_routes())),
         raw_router: Arc::new(RwLock::new(router)),
         client_config: Arc::new(RwLock::new(val.clients.clone())),
         id: val.identity.as_id(),
