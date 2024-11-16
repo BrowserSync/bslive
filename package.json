@@ -38,7 +38,8 @@
     "universal": "napi universal",
     "version": "napi version",
     "tsc": "tsc",
-    "tsc:watch": "tsc --watch"
+    "tsc:watch": "tsc --watch",
+    "lint": "deno fmt tests"
   },
   "napi": {
     "name": "bslive",

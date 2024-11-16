@@ -1,31 +1,31 @@
-import {bstest, test} from "./utils";
-import {expect} from "@playwright/test";
+import { bstest, test } from "./utils";
+import { expect } from "@playwright/test";
 
-test.describe('examples/basic/inject.yml', {
+test.describe("examples/basic/inject.yml", {
   annotation: {
     type: bstest({
-      input: 'examples/basic/inject.yml'
+      input: "examples/basic/inject.yml",
     }),
-    description: ''
-  }
+    description: "",
+  },
 }, () => {
-  test('inject bslive:connector', async ({request, bs}) => {
-    const response = await request.get(bs.path('/'), {
+  test("inject bslive:connector", async ({ request, bs }) => {
+    const response = await request.get(bs.path("/"), {
       headers: {
-        accept: 'text/html'
-      }
+        accept: "text/html",
+      },
     });
     const body = await response.body();
     expect(body.toString()).toMatchSnapshot();
 
     {
-      const response = await request.get(bs.path('/form.html'), {
+      const response = await request.get(bs.path("/form.html"), {
         headers: {
-          accept: 'text/html'
-        }
+          accept: "text/html",
+        },
       });
       const body = await response.body();
       expect(body.toString()).toMatchSnapshot();
     }
   });
-})
+});

@@ -1,0 +1,5 @@
+servers:
+  - name: "fallback"
+    routes:
+      - path: /
+        dir: examples/basic/empty
