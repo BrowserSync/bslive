@@ -5,7 +5,9 @@ use axum::routing::MethodRouter;
 use axum::{middleware, Extension};
 use axum_extra::middleware::option_layer;
 use bsnext_input::route::{CompType, CompressionOpts, CorsOpts, DelayKind, DelayOpts, Opts};
+use bsnext_resp::cache_opts::CacheOpts;
 use bsnext_resp::{response_modifications_layer, InjectHandling};
+use http::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
 use http::{HeaderName, HeaderValue};
 use std::collections::BTreeMap;
 use std::convert::Infallible;
@@ -38,10 +40,25 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
     let set_response_headers_layer = opts
         .headers
         .as_ref()
-        .map(|headers| map_response_with_state(headers.clone(), set_resp_headers));
+        .map(|headers| map_response_with_state(headers.clone(), set_resp_headers_from_strs));
+
+    let prevent_cache_headers_layer = matches!(opts.cache, CacheOpts::Prevent).then(|| {
+        let mut headers: Vec<(HeaderName, HeaderValue)> = vec![];
+        headers.push((
+            HeaderName::from(CACHE_CONTROL),
+            HeaderValue::from_static("no-store, no-cache, must-revalidate"),
+        ));
+        headers.push((
+            HeaderName::from(PRAGMA),
+            HeaderValue::from_static("no-cache"),
+        ));
+        headers.push((HeaderName::from(EXPIRES), HeaderValue::from_static("0")));
+        map_response_with_state(headers, set_resp_headers)
+    });
 
     let optional_stack = ServiceBuilder::new()
         .layer(option_layer(inject_layer))
+        .layer(option_layer(prevent_cache_headers_layer))
         .layer(option_layer(set_response_headers_layer))
         .layer(option_layer(cors_enabled_layer))
         .layer(option_layer(delay_enabled_layer));
@@ -74,7 +91,7 @@ async fn delay_mw(
     }
 }
 
-async fn set_resp_headers<B>(
+async fn set_resp_headers_from_strs<B>(
     State(header_map): State<BTreeMap<String, String>>,
     mut response: Response<B>,
 ) -> Response<B> {
@@ -99,6 +116,17 @@ async fn set_resp_headers<B>(
         }
     }
 
+    response
+}
+
+async fn set_resp_headers<B>(
+    State(header_map): State<Vec<(HeaderName, HeaderValue)>>,
+    mut response: Response<B>,
+) -> Response<B> {
+    let headers = response.headers_mut();
+    for (k, v) in header_map {
+        headers.insert(k, v);
+    }
     response
 }
 

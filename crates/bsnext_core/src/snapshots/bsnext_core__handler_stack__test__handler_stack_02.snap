@@ -19,6 +19,7 @@ DirsProxy {
                     true,
                 ),
                 headers: None,
+                cache: Prevent,
                 compression: None,
             },
             fallback_route: None,
@@ -38,6 +39,7 @@ DirsProxy {
                     true,
                 ),
                 headers: None,
+                cache: Prevent,
                 compression: None,
             },
             fallback_route: None,
@@ -56,6 +58,7 @@ DirsProxy {
             true,
         ),
         headers: None,
+        cache: Prevent,
         compression: None,
     },
 }

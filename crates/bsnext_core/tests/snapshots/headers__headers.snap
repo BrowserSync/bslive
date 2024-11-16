@@ -6,6 +6,9 @@ expression: "(parts1.headers, body1)"
     {
         "content-type": "application/json",
         "content-length": "8",
+        "cache-control": "no-store, no-cache, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
     },
     "[ 1, 2 ]",
 )

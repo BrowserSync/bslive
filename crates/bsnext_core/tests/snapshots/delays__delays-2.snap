@@ -6,6 +6,9 @@ expression: "(parts2.headers, body2)"
     {
         "content-type": "text/html; charset=utf-8",
         "content-length": "20",
+        "cache-control": "no-store, no-cache, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
     },
     "second - 500ms delay",
 )

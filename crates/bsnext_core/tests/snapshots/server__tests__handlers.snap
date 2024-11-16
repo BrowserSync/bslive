@@ -1,9 +1,12 @@
 ---
 source: crates/bsnext_core/tests/tests.rs
-expression: res.headers()
+expression: parts.headers
 ---
 {
     "content-type": "text/html; charset=utf-8",
     "content-length": "4",
     "a": "b",
+    "cache-control": "no-store, no-cache, must-revalidate",
+    "pragma": "no-cache",
+    "expires": "0",
 }

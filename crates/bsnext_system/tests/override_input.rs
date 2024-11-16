@@ -13,7 +13,8 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
 
-async fn test() -> anyhow::Result<()> {
+#[actix_rt::test]
+pub async fn main() -> Result<(), anyhow::Error> {
     let input = r#"
 servers:
     - name: api
@@ -82,9 +83,4 @@ servers:
         }
     };
     Ok(())
-}
-
-#[actix_rt::test]
-pub async fn main() -> Result<(), anyhow::Error> {
-    test().await
 }

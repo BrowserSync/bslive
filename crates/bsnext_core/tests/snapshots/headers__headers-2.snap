@@ -10,6 +10,9 @@ expression: "(parts2.headers, body2)"
         "access-control-allow-origin": "localhost",
         "access-control-expose-headers": "*",
         "abc": "def",
+        "cache-control": "no-store, no-cache, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
     },
     "other route",
 )

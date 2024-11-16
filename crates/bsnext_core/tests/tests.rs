@@ -1,4 +1,5 @@
 use bsnext_core::server::router::common::{from_yaml, uri_to_res_parts};
+use http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use http::HeaderValue;
 
 #[tokio::test]
@@ -92,5 +93,43 @@ async fn test_route_list() -> Result<(), anyhow::Error> {
     assert!(body.contains("<title>Browsersync LIVE</title>"));
     assert!(body.contains("<base href=\"/__bs_assets/ui/\" />"));
     assert_eq!(status, 200);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_cache_prevent() -> Result<(), anyhow::Error> {
+    let input = r#"
+    servers:
+      - bind_address: 0.0.0.0:3000
+        routes:
+          - path: /
+            html: home
+    "#;
+    let state = from_yaml(input)?;
+    let (parts, ..) = uri_to_res_parts(state, "/").await;
+    assert_eq!(
+        parts.headers.get(CONTENT_TYPE).unwrap(),
+        "text/html; charset=utf-8"
+    );
+    assert_eq!(
+        parts.headers.get(CACHE_CONTROL).unwrap(),
+        "no-store, no-cache, must-revalidate"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_cache_default() -> Result<(), anyhow::Error> {
+    let input = r#"
+    servers:
+      - bind_address: 0.0.0.0:3000
+        routes:
+          - path: /
+            html: home
+            cache: 'default'
+    "#;
+    let state = from_yaml(input)?;
+    let (parts, ..) = uri_to_res_parts(state, "/").await;
+    assert_eq!(parts.headers.get(CACHE_CONTROL), None);
     Ok(())
 }
