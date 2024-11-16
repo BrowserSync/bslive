@@ -1,14 +1,13 @@
 import {bstest, test} from "./utils";
-import {expect} from "@playwright/test";
 
-test.describe('examples/basic/client.yml', {
+test.describe("examples/basic/client.yml", {
   annotation: {
     type: bstest({
-      input: 'examples/basic/client.yml'
+      input: "examples/basic/client.yml",
     }),
-    description: ''
-  }
+    description: "",
+  },
 }, () => {
-  test('configures log level', async ({request, bs}) => {
+  test("configures log level", async ({request, bs}) => {
   });
-})
+});

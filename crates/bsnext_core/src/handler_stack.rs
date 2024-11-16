@@ -1,9 +1,10 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig};
+use crate::not_found::not_found_service::{not_found_loader, not_found_srv};
 use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
 use crate::serve_dir::try_many_services_dir;
 use axum::handler::Handler;
-use axum::middleware::from_fn_with_state;
+use axum::middleware::{from_fn, from_fn_with_state};
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{Extension, Router};
 use bsnext_input::route::{DirRoute, FallbackRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
@@ -219,7 +220,9 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
         }
         HandlerStack::Dirs(dirs) => {
             let service = serve_dir_layer(&dirs, Router::new());
-            Router::new().nest_service(path, service)
+            Router::new()
+                .nest_service(path, service)
+                .layer(from_fn(not_found_loader))
         }
         HandlerStack::Proxy { proxy, opts } => {
             let proxy_config = ProxyConfig {
