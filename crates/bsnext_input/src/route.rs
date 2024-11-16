@@ -1,5 +1,6 @@
 use crate::path_def::PathDef;
 use crate::watch_opts::WatchOpts;
+use bsnext_resp::cache_opts::CacheOpts;
 use bsnext_resp::inject_opts::InjectOpts;
 use matchit::InsertError;
 use std::collections::BTreeMap;
@@ -49,6 +50,8 @@ pub struct Opts {
     #[serde(default)]
     pub inject: InjectOpts,
     pub headers: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    pub cache: CacheOpts,
     pub compression: Option<CompressionOpts>,
 }
 
@@ -58,12 +61,7 @@ impl Default for Route {
             path: PathDef::from_str("/").unwrap(),
             kind: RouteKind::new_html("default"),
             opts: Opts {
-                headers: None,
-                cors: None,
-                delay: None,
-                watch: Default::default(),
-                inject: Default::default(),
-                compression: Default::default(),
+                ..Default::default()
             },
             fallback: Default::default(),
         }

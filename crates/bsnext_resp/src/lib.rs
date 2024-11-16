@@ -1,4 +1,5 @@
 pub mod builtin_strings;
+pub mod cache_opts;
 pub mod connector;
 pub mod debug;
 pub mod inject_addition;

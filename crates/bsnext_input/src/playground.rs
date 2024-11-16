@@ -37,6 +37,7 @@ impl Playground {
                 inject: playground_wrap(),
                 headers: None,
                 compression: None,
+                ..Default::default()
             },
             fallback: Some(FallbackRoute {
                 kind: RouteKind::new_html(FALLBACK_HTML),
