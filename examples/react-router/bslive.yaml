@@ -10,8 +10,6 @@ servers:
       # and this route just shows an example of a route + delay for testing
       - path: /abc
         json: [ 1, 2, 3 ]
-        delay:
-          ms: 1000
 
   ## This server is just like the one above, but it adds `compression: true`
   - name: 'react-router-with-compression'
@@ -23,5 +21,3 @@ servers:
           dir: examples/react-router/dist/index.html
       - path: /abc
         json: [ 1, 2, 3 ]
-        delay:
-          ms: 1000
