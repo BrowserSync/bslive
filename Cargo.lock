@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "bslive"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "actix-rt",
  "bsnext_system",
@@ -461,7 +461,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "actix-rt",
  "anyhow",
@@ -470,11 +470,11 @@ dependencies = [
 
 [[package]]
 name = "bsnext_client"
-version = "0.2.1"
+version = "0.2.2"
 
 [[package]]
 name = "bsnext_core"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "actix",
  "actix-rt",
@@ -509,7 +509,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_dto"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "actix",
  "bsnext_fs",
@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_example"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "bsnext_input",
  "bsnext_md",
@@ -532,7 +532,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_fs"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "actix",
  "actix-rt",
@@ -550,7 +550,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_input"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "bsnext_resp",
@@ -570,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_md"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "bsnext_input",
@@ -586,7 +586,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_output"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -606,7 +606,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_resp"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "axum",
@@ -623,7 +623,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_system"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "actix",
  "actix-rt",
@@ -648,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_tracing"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "clap",
  "serde",
@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_utils"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "axum",
@@ -669,7 +669,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_yaml"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "bsnext_input",
  "miette",
