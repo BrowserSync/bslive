@@ -107,7 +107,6 @@ impl OutputWriter for PrettyPrint {
 
 trait LineState {}
 struct Line<T: LineState = Orig> {
-    indent: Indent,
     _state: PhantomData<T>,
 }
 struct Orig;
@@ -115,12 +114,9 @@ impl LineState for Orig {}
 struct Prefixed;
 impl LineState for Prefixed {}
 
-struct Unprefixed;
-impl LineState for Unprefixed {}
 impl Line<Orig> {
     pub fn prefixed() -> Line<Prefixed> {
         Line {
-            indent: Indent::None,
             _state: PhantomData,
         }
     }
@@ -137,18 +133,6 @@ impl Line<Prefixed> {
     pub fn info(self, str: &str) -> String {
         format!("[bslive] {}", ansi_term::Color::Cyan.paint(str))
     }
-}
-impl Line<Unprefixed> {
-    // pub fn indent(self, size: Indent) -> Self {
-    //     Self {
-    //         indent: size,
-    //         _state: PhantomData,
-    //     }
-    // }
-    // pub fn error(self, str: &str) -> String {
-    //     let coloured = ansi_term::Color::Red.paint(str);
-    //     indent::indent_all_by(self.indent.indent_size(), coloured.to_string())
-    // }
 }
 
 pub fn print_file_changed<W: Write>(w: &mut W, evt: &FileChangedDTO) -> anyhow::Result<()> {
@@ -202,20 +186,6 @@ pub fn print_watching<W: Write>(w: &mut W, evt: &WatchingDTO) -> anyhow::Result<
         writeln!(w, "[watching {}] {}", evt.debounce, x)?;
     }
     Ok(())
-}
-
-enum Indent {
-    None,
-    // Some(usize),
-}
-
-impl Indent {
-    // pub fn indent_size(&self) -> usize {
-    //     match self {
-    //         Indent::None => 0,
-    //         Indent::Some(size) => *size,
-    //     }
-    // }
 }
 
 pub fn print_stopped_watching<W: Write>(w: &mut W, evt: &StoppedWatchingDTO) -> anyhow::Result<()> {

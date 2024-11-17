@@ -82,7 +82,10 @@ pub enum InputSourceKind {
 }
 
 pub trait InputSource {
-    fn into_input(&self, _identity: Option<ServerIdentity>) -> InputSourceKind {
+    fn into_input(self, _identity: Option<ServerIdentity>) -> InputSourceKind
+    where
+        Self: Sized,
+    {
         InputSourceKind::Type(Default::default())
     }
 }

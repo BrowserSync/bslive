@@ -70,8 +70,8 @@ impl SystemStart for StartFromExample {
             InputSourceKind::File { src_file, input } => {
                 let path = start_fs::fs_write_input_src(
                     &target_dir,
-                    &src_file.path(),
-                    &src_file.content(),
+                    src_file.path(),
+                    src_file.content(),
                     &write_mode,
                 )
                 .map_err(|e| Box::new(e.into()))?;

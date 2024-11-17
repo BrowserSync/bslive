@@ -20,7 +20,7 @@ pub enum Example {
 }
 
 impl InputSource for Example {
-    fn into_input(&self, identity: Option<ServerIdentity>) -> InputSourceKind {
+    fn into_input(self, identity: Option<ServerIdentity>) -> InputSourceKind {
         match self {
             Example::Basic => BasicExample.into_input(identity),
             Example::Lit => LitExample.into_input(identity),

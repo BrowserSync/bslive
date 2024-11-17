@@ -36,10 +36,10 @@ pub fn _input_to_str(input: &Input) -> String {
         if let Some(playground) = &server_config.playground {
             chunks.push(fenced_playground(&playground.html));
             if let Some(css) = &playground.css {
-                chunks.push(fenced_body("css", &css));
+                chunks.push(fenced_body("css", css));
             }
             if let Some(js) = &playground.js {
-                chunks.push(fenced_body("js", &js));
+                chunks.push(fenced_body("js", js));
             }
         }
 

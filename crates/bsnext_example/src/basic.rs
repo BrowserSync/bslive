@@ -9,7 +9,7 @@ use bsnext_input::{
 pub struct BasicExample;
 
 impl InputSource for BasicExample {
-    fn into_input(&self, identity: Option<ServerIdentity>) -> InputSourceKind {
+    fn into_input(self, identity: Option<ServerIdentity>) -> InputSourceKind {
         let server = server_config::ServerConfig {
             identity: identity.unwrap_or_else(ServerIdentity::named),
             routes: vec![

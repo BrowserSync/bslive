@@ -1,5 +1,5 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig};
-use crate::not_found::not_found_service::{not_found_loader, not_found_srv};
+use crate::not_found::not_found_service::not_found_loader;
 use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
 use crate::serve_dir::try_many_services_dir;

@@ -6,7 +6,7 @@ use bsnext_md::md_fs::MdFs;
 pub struct PlaygroundExample;
 
 impl InputSource for PlaygroundExample {
-    fn into_input(&self, identity: Option<ServerIdentity>) -> InputSourceKind {
+    fn into_input(self, identity: Option<ServerIdentity>) -> InputSourceKind {
         let input_str = include_str!("../../../examples/markdown/playground.md");
         let mut input = MdFs::from_input_str(input_str).unwrap();
 

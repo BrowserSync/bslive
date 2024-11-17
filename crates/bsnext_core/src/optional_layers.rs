@@ -43,16 +43,14 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
         .map(|headers| map_response_with_state(headers.clone(), set_resp_headers_from_strs));
 
     let prevent_cache_headers_layer = matches!(opts.cache, CacheOpts::Prevent).then(|| {
-        let mut headers: Vec<(HeaderName, HeaderValue)> = vec![];
-        headers.push((
-            HeaderName::from(CACHE_CONTROL),
-            HeaderValue::from_static("no-store, no-cache, must-revalidate"),
-        ));
-        headers.push((
-            HeaderName::from(PRAGMA),
-            HeaderValue::from_static("no-cache"),
-        ));
-        headers.push((HeaderName::from(EXPIRES), HeaderValue::from_static("0")));
+        let headers: Vec<(HeaderName, HeaderValue)> = vec![
+            (
+                CACHE_CONTROL,
+                HeaderValue::from_static("no-store, no-cache, must-revalidate"),
+            ),
+            (PRAGMA, HeaderValue::from_static("no-cache")),
+            (EXPIRES, HeaderValue::from_static("0")),
+        ];
         map_response_with_state(headers, set_resp_headers)
     });
 

@@ -6,7 +6,7 @@ use bsnext_md::md_to_input;
 pub struct MdExample;
 
 impl InputSource for MdExample {
-    fn into_input(&self, identity: Option<ServerIdentity>) -> InputSourceKind {
+    fn into_input(self, identity: Option<ServerIdentity>) -> InputSourceKind {
         let input_str = include_str!("../../../examples/markdown/single.md");
         let mut input = md_to_input(input_str).expect("example cannot fail?");
         let server = input
