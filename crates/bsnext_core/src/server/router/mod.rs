@@ -19,14 +19,7 @@ use mime_guess::mime;
 use std::sync::Arc;
 use tower::{ServiceBuilder, ServiceExt};
 use tower_http::catch_panic::CatchPanicLayer;
-
-use crate::meta::MetaData;
-use crate::server::router::assets::pub_ui_assets;
-use crate::server::router::pub_api::pub_api;
-use crate::server::state::ServerState;
-use crate::ws::ws_handler;
-use bsnext_client::html_with_base;
-use bsnext_dto::{RouteDTO, ServerDesc};
+use tower_http::services::ServeFile;
 use tracing::{span, Level};
 
 mod assets;

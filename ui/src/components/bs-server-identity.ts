@@ -1,11 +1,11 @@
-import {html, LitElement} from "lit";
-import {property} from "lit/decorators.js";
-import {ServerIdentityDTO} from "@browsersync/generated/dto";
-import {base} from "../../styles/base.css";
+import { html, LitElement } from "lit";
+import { property } from "lit/decorators.js";
+import { ServerIdentityDTO } from "@browsersync/generated/dto";
+import { base } from "../../styles/base.css";
 
 class BsServerIdentity extends LitElement {
-  @property({type: Object})
-  identity!: ServerIdentityDTO
+  @property({ type: Object })
+  identity!: ServerIdentityDTO;
 
   static styles = [base];
 
@@ -13,12 +13,14 @@ class BsServerIdentity extends LitElement {
     switch (this.identity.kind) {
       case "Named":
       case "Both": {
-        return html`<p><strong>[named] ${this.identity.payload.name}</strong></p>`
+        return html`<p>
+          <strong>[named] ${this.identity.payload.name}</strong>
+        </p>`;
       }
       default:
-        return html`<p><strong>[unnamed]</strong></p>`
+        return html`<p><strong>[unnamed]</strong></p>`;
     }
   }
 }
 
-customElements.define('bs-server-identity', BsServerIdentity)
+customElements.define("bs-server-identity", BsServerIdentity);

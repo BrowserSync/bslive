@@ -278,6 +278,10 @@ var clientEventSchema = z.union([
     payload: changeDTOSchema
   }),
   z.object({
+    kind: z.literal("WsConnection"),
+    payload: clientConfigDTOSchema
+  }),
+  z.object({
     kind: z.literal("Config"),
     payload: clientConfigDTOSchema
   })

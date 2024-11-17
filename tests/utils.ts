@@ -1,13 +1,13 @@
-import {test as base} from "@playwright/test";
-import {execSync, fork} from "node:child_process";
-import {join, sep} from "node:path";
+import { test as base } from "@playwright/test";
+import { execSync, fork } from "node:child_process";
+import { join, sep } from "node:path";
 import * as z from "zod";
 import {
   externalEventsSchema,
   getServersMessageResponseSchema,
   internalEventsDTOSchema,
 } from "../generated/schema.mjs";
-import {existsSync} from "node:fs";
+import { existsSync } from "node:fs";
 
 const either = z.union([internalEventsDTOSchema, externalEventsSchema]);
 
@@ -73,19 +73,23 @@ export const test = base.extend<{
       throw new Error("example input not found");
     }
 
-    const child = fork(file, [
-      "-i",
-      ann.input,
-      "-f",
-      "json",
-      // uncomment these 2 lines to debug trace data in a bslive.log file
-      // tip: ensure you only run 1 test at a time
-      // '-l', 'trace',
-      // '--write-log'
-    ], {
-      cwd,
-      stdio: "pipe",
-    });
+    const child = fork(
+      file,
+      [
+        "-i",
+        ann.input,
+        "-f",
+        "json",
+        // uncomment these 2 lines to debug trace data in a bslive.log file
+        // tip: ensure you only run 1 test at a time
+        // '-l', 'trace',
+        // '--write-log'
+      ],
+      {
+        cwd,
+        stdio: "pipe",
+      },
+    );
 
     const lines: string[] = [];
     const servers_changed_msg: Promise<TServersResp> = new Promise(
@@ -124,11 +128,11 @@ export const test = base.extend<{
             return rej(err);
           }
         }
-        console.log("did close cleanly", {signal});
+        console.log("did close cleanly", { signal });
         res(signal);
       });
       child.on("exit", (err, signal) => {
-        console.log("did exit", {err, signal});
+        console.log("did exit", { err, signal });
       });
       child.on("error", (err) => {
         console.error("did error", err);
@@ -136,7 +140,7 @@ export const test = base.extend<{
     });
     const data = await servers_changed_msg;
     const servers = data.servers.map((s) => {
-      return {url: "http://" + s.socket_addr, identity: s.identity};
+      return { url: "http://" + s.socket_addr, identity: s.identity };
     });
 
     await use({

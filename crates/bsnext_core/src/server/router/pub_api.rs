@@ -65,6 +65,9 @@ async fn post_events(
                 ClientEvent::Config(_) => {
                     todo!("handle ClientEvent::Config  in incoming event handler...")
                 }
+                ClientEvent::WsConnection(_) => {
+                    todo!("handle ClientEvent::WsConnection  in incoming event handler?")
+                }
             };
             match recv
                 .send(IncomingEvents::FilesChanged(FilesChanged {

@@ -76,7 +76,7 @@ async fn handle_socket(
     let mut send_task = tokio::spawn(async move {
         // send client config first
         let v = initial_config.read().await;
-        let as_client_event = ClientEvent::Config(v.clone().into());
+        let as_client_event = ClientEvent::WsConnection(v.clone().into());
         let as_str = serde_json::to_string(&as_client_event).unwrap();
         drop(v);
 

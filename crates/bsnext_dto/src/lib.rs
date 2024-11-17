@@ -328,6 +328,7 @@ impl From<InputError> for InputErrorDTO {
 #[serde(tag = "kind", content = "payload")]
 pub enum ClientEvent {
     Change(ChangeDTO),
+    WsConnection(ClientConfigDTO),
     Config(ClientConfigDTO),
 }
 
