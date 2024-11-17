@@ -8,5 +8,6 @@
   },
   "dependencies": {
     "ts-to-zod": "^3.11.0"
-  }
+  },
+  "version": "0.2.1"
 }
