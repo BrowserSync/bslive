@@ -1,17 +1,17 @@
-import {css} from "lit";
+import { css } from "lit";
 
 export const base = css`
-  pre {
-      margin: 0
-  }
-  a {
-    color: var(--theme-txt-color);
-    &:hover {
-        text-decoration: none;
+    pre {
+        margin: 0;
     }
-  }
-  p {
-    margin: 0;
-    padding: 0;
-  }
-`
+    a {
+        color: var(--theme-txt-color);
+        &:hover {
+            text-decoration: none;
+        }
+    }
+    p {
+        margin: 0;
+        padding: 0;
+    }
+`;

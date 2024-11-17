@@ -157,6 +157,7 @@ export type InputErrorDTO =
 
 export type ClientEvent = 
 	| { kind: "Change", payload: ChangeDTO }
+	| { kind: "WsConnection", payload: ClientConfigDTO }
 	| { kind: "Config", payload: ClientConfigDTO };
 
 export type ChangeDTO = 

@@ -18,13 +18,16 @@
     "typescript": "^5.6.3",
     "zod": "^3.23.8",
     "esbuild": "^0.24.0",
-    "@types/node": "20.17.6"
+    "@types/node": "20.17.6",
+    "prettier": "^3.3.3"
+  },
+  "prettier": {
+    "tabWidth": 4
   },
   "workspaces": [
     "ui",
     "inject",
     "generated",
-    "./crates/bsnext_client",
     "./examples/openai",
     "./examples/react-router"
   ],
@@ -40,9 +43,10 @@
     "test:build": "ava",
     "universal": "napi universal",
     "version": "napi version",
+    "schema": "npm run schema --workspace=generated",
     "tsc": "tsc",
     "tsc:watch": "tsc --watch",
-    "lint": "deno fmt tests"
+    "fmt": "prettier tests inject ui --write"
   },
   "napi": {
     "name": "bslive",

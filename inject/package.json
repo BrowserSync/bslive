@@ -1,18 +1,18 @@
 {
-  "name": "@browsersync/bslive-inject",
-  "version": "0.2.1",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm --minify --metafile=dist/meta.json",
-    "dev": "npm run build:client -- --sourcemap=inline --watch",
-    "build:debug": "npm run build:client -- --sourcemap=inline"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "rxjs": "^7.8.1",
-    "zod": "^3.22.4"
-  }
+    "name": "@browsersync/bslive-inject",
+    "version": "0.2.1",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm --minify --metafile=dist/meta.json",
+        "dev": "npm run build:client -- --sourcemap=inline --watch",
+        "build:debug": "npm run build:client -- --sourcemap=inline"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "rxjs": "^7.8.1",
+        "zod": "^3.22.4"
+    }
 }

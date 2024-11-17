@@ -41,10 +41,10 @@ h6 {
 
 /* styles/style.css */
 :root {
-  --brand-blue: #0F2634;
-  --brand-grey: #6D6D6D;
-  --brand-red: #F24747;
-  --brand-white: #FFFFFF;
+  --brand-blue: #0f2634;
+  --brand-grey: #6d6d6d;
+  --brand-red: #f24747;
+  --brand-white: #ffffff;
   --theme-txt-color: var(--brand-blue);
   --theme-page-color: var(--brand-white);
 }

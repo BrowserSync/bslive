@@ -3,288 +3,292 @@ import { z } from "zod";
 import { LogLevelDTO, EventLevel, ChangeKind, ChangeDTO } from "./dto";
 
 export const routeKindDTOSchema = z.union([
-  z.object({
-    kind: z.literal("Html"),
-    payload: z.object({
-      html: z.string(),
+    z.object({
+        kind: z.literal("Html"),
+        payload: z.object({
+            html: z.string(),
+        }),
     }),
-  }),
-  z.object({
-    kind: z.literal("Json"),
-    payload: z.object({
-      json_str: z.string(),
+    z.object({
+        kind: z.literal("Json"),
+        payload: z.object({
+            json_str: z.string(),
+        }),
     }),
-  }),
-  z.object({
-    kind: z.literal("Raw"),
-    payload: z.object({
-      raw: z.string(),
+    z.object({
+        kind: z.literal("Raw"),
+        payload: z.object({
+            raw: z.string(),
+        }),
     }),
-  }),
-  z.object({
-    kind: z.literal("Sse"),
-    payload: z.object({
-      sse: z.string(),
+    z.object({
+        kind: z.literal("Sse"),
+        payload: z.object({
+            sse: z.string(),
+        }),
     }),
-  }),
-  z.object({
-    kind: z.literal("Proxy"),
-    payload: z.object({
-      proxy: z.string(),
+    z.object({
+        kind: z.literal("Proxy"),
+        payload: z.object({
+            proxy: z.string(),
+        }),
     }),
-  }),
-  z.object({
-    kind: z.literal("Dir"),
-    payload: z.object({
-      dir: z.string(),
-      base: z.string().optional(),
+    z.object({
+        kind: z.literal("Dir"),
+        payload: z.object({
+            dir: z.string(),
+            base: z.string().optional(),
+        }),
     }),
-  }),
 ]);
 
 export const routeDTOSchema = z.object({
-  path: z.string(),
-  kind: routeKindDTOSchema,
+    path: z.string(),
+    kind: routeKindDTOSchema,
 });
 
 export const serverDescSchema = z.object({
-  routes: z.array(routeDTOSchema),
-  id: z.string(),
+    routes: z.array(routeDTOSchema),
+    id: z.string(),
 });
 
 export const serverIdentityDTOSchema = z.union([
-  z.object({
-    kind: z.literal("Both"),
-    payload: z.object({
-      name: z.string(),
-      bind_address: z.string(),
+    z.object({
+        kind: z.literal("Both"),
+        payload: z.object({
+            name: z.string(),
+            bind_address: z.string(),
+        }),
     }),
-  }),
-  z.object({
-    kind: z.literal("Address"),
-    payload: z.object({
-      bind_address: z.string(),
+    z.object({
+        kind: z.literal("Address"),
+        payload: z.object({
+            bind_address: z.string(),
+        }),
     }),
-  }),
-  z.object({
-    kind: z.literal("Named"),
-    payload: z.object({
-      name: z.string(),
+    z.object({
+        kind: z.literal("Named"),
+        payload: z.object({
+            name: z.string(),
+        }),
     }),
-  }),
 ]);
 
 export const serverDTOSchema = z.object({
-  id: z.string(),
-  identity: serverIdentityDTOSchema,
-  socket_addr: z.string(),
+    id: z.string(),
+    identity: serverIdentityDTOSchema,
+    socket_addr: z.string(),
 });
 
 export const getServersMessageResponseDTOSchema = z.object({
-  servers: z.array(serverDTOSchema),
+    servers: z.array(serverDTOSchema),
 });
 
 export const serversChangedDTOSchema = z.object({
-  servers_resp: getServersMessageResponseDTOSchema,
+    servers_resp: getServersMessageResponseDTOSchema,
 });
 
 export const inputAcceptedDTOSchema = z.object({
-  path: z.string(),
+    path: z.string(),
 });
 
 export const fileChangedDTOSchema = z.object({
-  path: z.string(),
+    path: z.string(),
 });
 
 export const filesChangedDTOSchema = z.object({
-  paths: z.array(z.string()),
+    paths: z.array(z.string()),
 });
 
 export const debounceDTOSchema = z.object({
-  kind: z.string(),
-  ms: z.string(),
+    kind: z.string(),
+    ms: z.string(),
 });
 
 export const watchingDTOSchema = z.object({
-  paths: z.array(z.string()),
-  debounce: debounceDTOSchema,
+    paths: z.array(z.string()),
+    debounce: debounceDTOSchema,
 });
 
 export const stoppedWatchingDTOSchema = z.object({
-  paths: z.array(z.string()),
+    paths: z.array(z.string()),
 });
 
 export const serverChangeSchema = z.union([
-  z.object({
-    kind: z.literal("Stopped"),
-    payload: z.object({
-      bind_address: z.string(),
+    z.object({
+        kind: z.literal("Stopped"),
+        payload: z.object({
+            bind_address: z.string(),
+        }),
     }),
-  }),
-  z.object({
-    kind: z.literal("Started"),
-    payload: z.undefined().optional(),
-  }),
-  z.object({
-    kind: z.literal("Patched"),
-    payload: z.undefined().optional(),
-  }),
-  z.object({
-    kind: z.literal("Errored"),
-    payload: z.object({
-      error: z.string(),
+    z.object({
+        kind: z.literal("Started"),
+        payload: z.undefined().optional(),
     }),
-  }),
+    z.object({
+        kind: z.literal("Patched"),
+        payload: z.undefined().optional(),
+    }),
+    z.object({
+        kind: z.literal("Errored"),
+        payload: z.object({
+            error: z.string(),
+        }),
+    }),
 ]);
 
 export const serverChangeSetItemSchema = z.object({
-  identity: serverIdentityDTOSchema,
-  change: serverChangeSchema,
+    identity: serverIdentityDTOSchema,
+    change: serverChangeSchema,
 });
 
 export const serverChangeSetSchema = z.object({
-  items: z.array(serverChangeSetItemSchema),
+    items: z.array(serverChangeSetItemSchema),
 });
 
 export const logLevelDTOSchema = z.nativeEnum(LogLevelDTO);
 
 export const clientConfigDTOSchema = z.object({
-  log_level: logLevelDTOSchema,
+    log_level: logLevelDTOSchema,
 });
 
 export const internalEventsDTOSchema = z.object({
-  kind: z.literal("ServersChanged"),
-  payload: getServersMessageResponseDTOSchema,
+    kind: z.literal("ServersChanged"),
+    payload: getServersMessageResponseDTOSchema,
 });
 
 export const eventLevelSchema = z.nativeEnum(EventLevel);
 
 export const externalEventsDTOSchema = z.union([
-  z.object({
-    kind: z.literal("ServersChanged"),
-    payload: serversChangedDTOSchema,
-  }),
-  z.object({
-    kind: z.literal("Watching"),
-    payload: watchingDTOSchema,
-  }),
-  z.object({
-    kind: z.literal("WatchingStopped"),
-    payload: stoppedWatchingDTOSchema,
-  }),
-  z.object({
-    kind: z.literal("FileChanged"),
-    payload: fileChangedDTOSchema,
-  }),
-  z.object({
-    kind: z.literal("FilesChanged"),
-    payload: filesChangedDTOSchema,
-  }),
-  z.object({
-    kind: z.literal("InputFileChanged"),
-    payload: fileChangedDTOSchema,
-  }),
-  z.object({
-    kind: z.literal("InputAccepted"),
-    payload: inputAcceptedDTOSchema,
-  }),
+    z.object({
+        kind: z.literal("ServersChanged"),
+        payload: serversChangedDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("Watching"),
+        payload: watchingDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("WatchingStopped"),
+        payload: stoppedWatchingDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("FileChanged"),
+        payload: fileChangedDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("FilesChanged"),
+        payload: filesChangedDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("InputFileChanged"),
+        payload: fileChangedDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("InputAccepted"),
+        payload: inputAcceptedDTOSchema,
+    }),
 ]);
 
 export const startupEventDTOSchema = z.union([
-  z.object({
-    kind: z.literal("Started"),
-    payload: z.undefined().optional(),
-  }),
-  z.object({
-    kind: z.literal("FailedStartup"),
-    payload: z.string(),
-  }),
+    z.object({
+        kind: z.literal("Started"),
+        payload: z.undefined().optional(),
+    }),
+    z.object({
+        kind: z.literal("FailedStartup"),
+        payload: z.string(),
+    }),
 ]);
 
 export const inputErrorDTOSchema = z.union([
-  z.object({
-    kind: z.literal("MissingInputs"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("InvalidInput"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("NotFound"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("InputWriteError"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("PathError"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("PortError"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("DirError"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("YamlError"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("MarkdownError"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("Io"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("UnsupportedExtension"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("MissingExtension"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("EmptyInput"),
-    payload: z.string(),
-  }),
-  z.object({
-    kind: z.literal("BsLiveRules"),
-    payload: z.string(),
-  }),
+    z.object({
+        kind: z.literal("MissingInputs"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("InvalidInput"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("NotFound"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("InputWriteError"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("PathError"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("PortError"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("DirError"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("YamlError"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("MarkdownError"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("Io"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("UnsupportedExtension"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("MissingExtension"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("EmptyInput"),
+        payload: z.string(),
+    }),
+    z.object({
+        kind: z.literal("BsLiveRules"),
+        payload: z.string(),
+    }),
 ]);
 
 export const changeKindSchema = z.nativeEnum(ChangeKind);
 
 export const changeDTOSchema: z.ZodSchema<ChangeDTO> = z.lazy(() =>
-  z.union([
-    z.object({
-      kind: z.literal("Fs"),
-      payload: z.object({
-        path: z.string(),
-        change_kind: changeKindSchema,
-      }),
-    }),
-    z.object({
-      kind: z.literal("FsMany"),
-      payload: z.array(changeDTOSchema),
-    }),
-  ]),
+    z.union([
+        z.object({
+            kind: z.literal("Fs"),
+            payload: z.object({
+                path: z.string(),
+                change_kind: changeKindSchema,
+            }),
+        }),
+        z.object({
+            kind: z.literal("FsMany"),
+            payload: z.array(changeDTOSchema),
+        }),
+    ]),
 );
 
 export const clientEventSchema = z.union([
-  z.object({
-    kind: z.literal("Change"),
-    payload: changeDTOSchema,
-  }),
-  z.object({
-    kind: z.literal("Config"),
-    payload: clientConfigDTOSchema,
-  }),
+    z.object({
+        kind: z.literal("Change"),
+        payload: changeDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("WsConnection"),
+        payload: clientConfigDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("Config"),
+        payload: clientConfigDTOSchema,
+    }),
 ]);

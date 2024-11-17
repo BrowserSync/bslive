@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"no test specified\"",
     "start": "node --env-file .env build.mjs",
-    "build:client": "node build.mjs"
+    "build:example": "node build.mjs"
   },
   "keywords": [],
   "author": "",
