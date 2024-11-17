@@ -1,13 +1,13 @@
-import { test as base } from "@playwright/test";
-import { execSync, fork } from "node:child_process";
-import { join, sep } from "node:path";
+import {test as base} from "@playwright/test";
+import {execSync, fork} from "node:child_process";
+import {join, sep} from "node:path";
 import * as z from "zod";
 import {
   externalEventsSchema,
   getServersMessageResponseSchema,
   internalEventsDTOSchema,
-} from "../crates/bsnext_client/generated/schema.mjs";
-import { existsSync } from "node:fs";
+} from "../generated/schema.mjs";
+import {existsSync} from "node:fs";
 
 const either = z.union([internalEventsDTOSchema, externalEventsSchema]);
 
@@ -124,11 +124,11 @@ export const test = base.extend<{
             return rej(err);
           }
         }
-        console.log("did close cleanly", { signal });
+        console.log("did close cleanly", {signal});
         res(signal);
       });
       child.on("exit", (err, signal) => {
-        console.log("did exit", { err, signal });
+        console.log("did exit", {err, signal});
       });
       child.on("error", (err) => {
         console.error("did error", err);
@@ -136,7 +136,7 @@ export const test = base.extend<{
     });
     const data = await servers_changed_msg;
     const servers = data.servers.map((s) => {
-      return { url: "http://" + s.socket_addr, identity: s.identity };
+      return {url: "http://" + s.socket_addr, identity: s.identity};
     });
 
     await use({

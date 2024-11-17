@@ -1,6 +1,6 @@
 import {css, html, LitElement} from "lit";
 import {property} from "lit/decorators.js";
-import {GetServersMessageResponseDTO, ServerDesc, ServerDTO} from "../../../generated/dto";
+import {GetServersMessageResponseDTO, ServerDesc, ServerDTO} from "@browsersync/generated/dto";
 
 class BsDebug extends LitElement {
   @property({type: Object})

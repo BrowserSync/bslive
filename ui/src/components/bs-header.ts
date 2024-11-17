@@ -1,7 +1,7 @@
 import {css, html, LitElement} from "lit";
 import {property} from "lit/decorators.js";
-import {ServerDTO} from "../../../generated/dto";
-import { base } from "../../styles/base.css";
+import {ServerDTO} from "@browsersync/generated/dto";
+import {base} from "../../styles/base.css";
 
 class BsHeader extends LitElement {
   @property({type: Object})
@@ -10,14 +10,15 @@ class BsHeader extends LitElement {
   static styles = [
     base,
     css`
-    .logo {
-        position: relative;
-        color: var(--theme-txt-color);  
-    }   
-    .logo bs-icon::part(svg) {
-        height: 30px;
-        width: 140px;
-    }
+        .logo {
+            position: relative;
+            color: var(--theme-txt-color);
+        }
+
+        .logo bs-icon::part(svg) {
+            height: 30px;
+            width: 140px;
+        }
     `
   ]
 

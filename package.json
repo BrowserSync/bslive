@@ -14,15 +14,17 @@
   "devDependencies": {
     "@napi-rs/cli": "^2.18.3",
     "@playwright/test": "^1.46.1",
-    "@types/node": "20.14.8",
     "ava": "^6.0.1",
-    "typescript": "^5.5.4",
-    "zod": "^3.23.8"
+    "typescript": "^5.6.3",
+    "zod": "^3.23.8",
+    "esbuild": "^0.24.0",
+    "@types/node": "20.17.6"
   },
   "workspaces": [
+    "ui",
+    "inject",
+    "generated",
     "./crates/bsnext_client",
-    "./crates/bsnext_client/ui",
-    "./crates/bsnext_client/inject",
     "./examples/openai",
     "./examples/react-router"
   ],
@@ -31,6 +33,7 @@
     "build": "napi build --cargo-name bslive --platform --release",
     "build:debug": "napi build --cargo-name bslive --platform",
     "build:client": "npm run build:client --workspaces --if-present",
+    "build:example": "npm run build:example --workspaces --if-present",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "npm run tsc",
     "posttest": "npm run test --workspaces --if-present",

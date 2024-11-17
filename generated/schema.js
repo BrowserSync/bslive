@@ -1,7 +1,7 @@
-// generated/schema.ts
+// schema.ts
 import { z } from "zod";
 
-// generated/dto.ts
+// dto.ts
 var LogLevelDTO = /* @__PURE__ */ ((LogLevelDTO2) => {
   LogLevelDTO2["Info"] = "info";
   LogLevelDTO2["Debug"] = "debug";
@@ -20,7 +20,7 @@ var ChangeKind = /* @__PURE__ */ ((ChangeKind2) => {
   return ChangeKind2;
 })(ChangeKind || {});
 
-// generated/schema.ts
+// schema.ts
 var routeKindDTOSchema = z.union([
   z.object({
     kind: z.literal("Html"),

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* global CSSRule */
 const IMAGE_STYLES = [
     {selector: 'background', styleNames: ['backgroundImage']},

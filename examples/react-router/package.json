@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:client": "tsc && vite build",
+    "build:example": "tsc && vite build",
     "serve": "vite preview"
   },
   "dependencies": {

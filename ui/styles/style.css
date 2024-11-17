@@ -1,4 +1,5 @@
-@import url("./reset.css");
+@import url("reset.css");
+
 :root {
     --brand-blue: #0F2634;
     --brand-grey: #6D6D6D;
@@ -14,13 +15,16 @@ body {
     color: var(--theme-txt-color);
     background: var(--theme-page-color);
 }
+
 svg:not(:root) {
     overflow: hidden;
 }
+
 .main {
     padding-left: 1em;
     padding-right: 1em;
 }
+
 @media (prefers-color-scheme: dark) {
     :root {
         --theme-txt-color: var(--brand-white);

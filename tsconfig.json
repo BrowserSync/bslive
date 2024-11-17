@@ -19,12 +19,19 @@
     "strict": true,
     /* Enable all strict type-checking options. */
     "skipLibCheck": true
-    /* Skip type checking all .d.ts files. */
+    /* Skip type checking all .d.ts files. */,
+    "experimentalDecorators": true
   },
   "exclude": [
-    "crates"
+    "crates",
+    "inject/dist",
+    "ui/dist",
+    "inject/vendor"
   ],
   "include": [
-    "tests"
+    "tests",
+    "ui",
+    "generated",
+    "inject"
   ]
 }

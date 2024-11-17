@@ -1,3 +1,4 @@
+// @ts-nocheck
 class Timer {
     constructor(func) {
         this.func = func;

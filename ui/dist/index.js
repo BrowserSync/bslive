@@ -5,20 +5,18 @@ var __decorateClass = (decorators, target, key, kind) => {
   for (var i3 = decorators.length - 1, decorator; i3 >= 0; i3--)
     if (decorator = decorators[i3])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result)
-    __defProp(target, key, result);
+  if (kind && result) __defProp(target, key, result);
   return result;
 };
 
-// ../../../node_modules/@lit/reactive-element/css-tag.js
+// ../node_modules/@lit/reactive-element/css-tag.js
 var t = globalThis;
 var e = t.ShadowRoot && (void 0 === t.ShadyCSS || t.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype;
 var s = Symbol();
 var o = /* @__PURE__ */ new WeakMap();
 var n = class {
   constructor(t2, e4, o4) {
-    if (this._$cssResult$ = true, o4 !== s)
-      throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
+    if (this._$cssResult$ = true, o4 !== s) throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
     this.cssText = t2, this.t = e4;
   }
   get styleSheet() {
@@ -37,31 +35,26 @@ var n = class {
 var r = (t2) => new n("string" == typeof t2 ? t2 : t2 + "", void 0, s);
 var i = (t2, ...e4) => {
   const o4 = 1 === t2.length ? t2[0] : e4.reduce((e5, s2, o5) => e5 + ((t3) => {
-    if (true === t3._$cssResult$)
-      return t3.cssText;
-    if ("number" == typeof t3)
-      return t3;
+    if (true === t3._$cssResult$) return t3.cssText;
+    if ("number" == typeof t3) return t3;
     throw Error("Value passed to 'css' function must be a 'css' function result: " + t3 + ". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.");
   })(s2) + t2[o5 + 1], t2[0]);
   return new n(o4, t2, s);
 };
 var S = (s2, o4) => {
-  if (e)
-    s2.adoptedStyleSheets = o4.map((t2) => t2 instanceof CSSStyleSheet ? t2 : t2.styleSheet);
-  else
-    for (const e4 of o4) {
-      const o5 = document.createElement("style"), n5 = t.litNonce;
-      void 0 !== n5 && o5.setAttribute("nonce", n5), o5.textContent = e4.cssText, s2.appendChild(o5);
-    }
+  if (e) s2.adoptedStyleSheets = o4.map((t2) => t2 instanceof CSSStyleSheet ? t2 : t2.styleSheet);
+  else for (const e4 of o4) {
+    const o5 = document.createElement("style"), n5 = t.litNonce;
+    void 0 !== n5 && o5.setAttribute("nonce", n5), o5.textContent = e4.cssText, s2.appendChild(o5);
+  }
 };
 var c = e ? (t2) => t2 : (t2) => t2 instanceof CSSStyleSheet ? ((t3) => {
   let e4 = "";
-  for (const s2 of t3.cssRules)
-    e4 += s2.cssText;
+  for (const s2 of t3.cssRules) e4 += s2.cssText;
   return r(e4);
 })(t2) : t2;
 
-// ../../../node_modules/@lit/reactive-element/reactive-element.js
+// ../node_modules/@lit/reactive-element/reactive-element.js
 var { is: i2, defineProperty: e2, getOwnPropertyDescriptor: r2, getOwnPropertyNames: h, getOwnPropertySymbols: o2, getPrototypeOf: n2 } = Object;
 var a = globalThis;
 var c2 = a.trustedTypes;
@@ -130,25 +123,20 @@ var b = class extends HTMLElement {
     return this.elementProperties.get(t2) ?? y;
   }
   static _$Ei() {
-    if (this.hasOwnProperty(d("elementProperties")))
-      return;
+    if (this.hasOwnProperty(d("elementProperties"))) return;
     const t2 = n2(this);
     t2.finalize(), void 0 !== t2.l && (this.l = [...t2.l]), this.elementProperties = new Map(t2.elementProperties);
   }
   static finalize() {
-    if (this.hasOwnProperty(d("finalized")))
-      return;
+    if (this.hasOwnProperty(d("finalized"))) return;
     if (this.finalized = true, this._$Ei(), this.hasOwnProperty(d("properties"))) {
       const t3 = this.properties, s2 = [...h(t3), ...o2(t3)];
-      for (const i3 of s2)
-        this.createProperty(i3, t3[i3]);
+      for (const i3 of s2) this.createProperty(i3, t3[i3]);
     }
     const t2 = this[Symbol.metadata];
     if (null !== t2) {
       const s2 = litPropertyMetadata.get(t2);
-      if (void 0 !== s2)
-        for (const [t3, i3] of s2)
-          this.elementProperties.set(t3, i3);
+      if (void 0 !== s2) for (const [t3, i3] of s2) this.elementProperties.set(t3, i3);
     }
     this._$Eh = /* @__PURE__ */ new Map();
     for (const [t3, s2] of this.elementProperties) {
@@ -161,10 +149,8 @@ var b = class extends HTMLElement {
     const i3 = [];
     if (Array.isArray(s2)) {
       const e4 = new Set(s2.flat(1 / 0).reverse());
-      for (const s3 of e4)
-        i3.unshift(c(s3));
-    } else
-      void 0 !== s2 && i3.push(c(s2));
+      for (const s3 of e4) i3.unshift(c(s3));
+    } else void 0 !== s2 && i3.push(c(s2));
     return i3;
   }
   static _$Eu(t2, s2) {
@@ -185,8 +171,7 @@ var b = class extends HTMLElement {
   }
   _$E_() {
     const t2 = /* @__PURE__ */ new Map(), s2 = this.constructor.elementProperties;
-    for (const i3 of s2.keys())
-      this.hasOwnProperty(i3) && (t2.set(i3, this[i3]), delete this[i3]);
+    for (const i3 of s2.keys()) this.hasOwnProperty(i3) && (t2.set(i3, this[i3]), delete this[i3]);
     t2.size > 0 && (this._$Ep = t2);
   }
   createRenderRoot() {
@@ -220,8 +205,7 @@ var b = class extends HTMLElement {
   }
   requestUpdate(t2, s2, i3) {
     if (void 0 !== t2) {
-      if (i3 ??= this.constructor.getPropertyOptions(t2), !(i3.hasChanged ?? f)(this[t2], s2))
-        return;
+      if (i3 ??= this.constructor.getPropertyOptions(t2), !(i3.hasChanged ?? f)(this[t2], s2)) return;
       this.P(t2, s2, i3);
     }
     false === this.isUpdatePending && (this._$ES = this._$ET());
@@ -243,18 +227,14 @@ var b = class extends HTMLElement {
     return this.performUpdate();
   }
   performUpdate() {
-    if (!this.isUpdatePending)
-      return;
+    if (!this.isUpdatePending) return;
     if (!this.hasUpdated) {
       if (this.renderRoot ??= this.createRenderRoot(), this._$Ep) {
-        for (const [t4, s3] of this._$Ep)
-          this[t4] = s3;
+        for (const [t4, s3] of this._$Ep) this[t4] = s3;
         this._$Ep = void 0;
       }
       const t3 = this.constructor.elementProperties;
-      if (t3.size > 0)
-        for (const [s3, i3] of t3)
-          true !== i3.wrapped || this._$AL.has(s3) || void 0 === this[s3] || this.P(s3, this[s3], i3);
+      if (t3.size > 0) for (const [s3, i3] of t3) true !== i3.wrapped || this._$AL.has(s3) || void 0 === this[s3] || this.P(s3, this[s3], i3);
     }
     let t2 = false;
     const s2 = this._$AL;
@@ -292,7 +272,7 @@ var b = class extends HTMLElement {
 };
 b.elementStyles = [], b.shadowRootOptions = { mode: "open" }, b[d("elementProperties")] = /* @__PURE__ */ new Map(), b[d("finalized")] = /* @__PURE__ */ new Map(), p?.({ ReactiveElement: b }), (a.reactiveElementVersions ??= []).push("2.0.4");
 
-// ../../../node_modules/lit-html/lit-html.js
+// ../node_modules/lit-html/lit-html.js
 var n3 = globalThis;
 var c3 = n3.trustedTypes;
 var h2 = c3 ? c3.createPolicy("lit-html", { createHTML: (t2) => t2 }) : void 0;
@@ -323,8 +303,7 @@ var D = Symbol.for("lit-nothing");
 var V = /* @__PURE__ */ new WeakMap();
 var I = w.createTreeWalker(w, 129);
 function N(t2, i3) {
-  if (!g(t2) || !t2.hasOwnProperty("raw"))
-    throw Error("invalid template strings array");
+  if (!g(t2) || !t2.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return void 0 !== h2 ? h2.createHTML(i3) : i3;
 }
 var U = (t2, i3) => {
@@ -333,8 +312,7 @@ var U = (t2, i3) => {
   for (let i4 = 0; i4 < s2; i4++) {
     const s3 = t2[i4];
     let r4, l2, c4 = -1, a2 = 0;
-    for (; a2 < s3.length && (n5.lastIndex = a2, l2 = n5.exec(s3), null !== l2); )
-      a2 = n5.lastIndex, n5 === T ? "!--" === l2[1] ? n5 = E : void 0 !== l2[1] ? n5 = k : void 0 !== l2[2] ? (M.test(l2[2]) && (h4 = RegExp("</" + l2[2], "g")), n5 = O) : void 0 !== l2[3] && (n5 = O) : n5 === O ? ">" === l2[0] ? (n5 = h4 ?? T, c4 = -1) : void 0 === l2[1] ? c4 = -2 : (c4 = n5.lastIndex - l2[2].length, r4 = l2[1], n5 = void 0 === l2[3] ? O : '"' === l2[3] ? j : S2) : n5 === j || n5 === S2 ? n5 = O : n5 === E || n5 === k ? n5 = T : (n5 = O, h4 = void 0);
+    for (; a2 < s3.length && (n5.lastIndex = a2, l2 = n5.exec(s3), null !== l2); ) a2 = n5.lastIndex, n5 === T ? "!--" === l2[1] ? n5 = E : void 0 !== l2[1] ? n5 = k : void 0 !== l2[2] ? (M.test(l2[2]) && (h4 = RegExp("</" + l2[2], "g")), n5 = O) : void 0 !== l2[3] && (n5 = O) : n5 === O ? ">" === l2[0] ? (n5 = h4 ?? T, c4 = -1) : void 0 === l2[1] ? c4 = -2 : (c4 = n5.lastIndex - l2[2].length, r4 = l2[1], n5 = void 0 === l2[3] ? O : '"' === l2[3] ? j : S2) : n5 === j || n5 === S2 ? n5 = O : n5 === E || n5 === k ? n5 = T : (n5 = O, h4 = void 0);
     const u2 = n5 === O && t2[i4 + 1].startsWith("/>") ? " " : "";
     o4 += n5 === T ? s3 + _ : c4 >= 0 ? (e4.push(r4), s3.slice(0, c4) + f2 + s3.slice(c4) + v + u2) : s3 + v + (-2 === c4 ? i4 : u2);
   }
@@ -352,30 +330,23 @@ var B = class _B {
     }
     for (; null !== (e4 = I.nextNode()) && r4.length < n5; ) {
       if (1 === e4.nodeType) {
-        if (e4.hasAttributes())
-          for (const t3 of e4.getAttributeNames())
-            if (t3.endsWith(f2)) {
-              const i4 = a2[o4++], s3 = e4.getAttribute(t3).split(v), n6 = /([.?@])?(.*)/.exec(i4);
-              r4.push({ type: 1, index: h4, name: n6[2], strings: s3, ctor: "." === n6[1] ? Y : "?" === n6[1] ? Z : "@" === n6[1] ? q : G }), e4.removeAttribute(t3);
-            } else
-              t3.startsWith(v) && (r4.push({ type: 6, index: h4 }), e4.removeAttribute(t3));
+        if (e4.hasAttributes()) for (const t3 of e4.getAttributeNames()) if (t3.endsWith(f2)) {
+          const i4 = a2[o4++], s3 = e4.getAttribute(t3).split(v), n6 = /([.?@])?(.*)/.exec(i4);
+          r4.push({ type: 1, index: h4, name: n6[2], strings: s3, ctor: "." === n6[1] ? Y : "?" === n6[1] ? Z : "@" === n6[1] ? q : G }), e4.removeAttribute(t3);
+        } else t3.startsWith(v) && (r4.push({ type: 6, index: h4 }), e4.removeAttribute(t3));
         if (M.test(e4.tagName)) {
           const t3 = e4.textContent.split(v), i4 = t3.length - 1;
           if (i4 > 0) {
             e4.textContent = c3 ? c3.emptyScript : "";
-            for (let s3 = 0; s3 < i4; s3++)
-              e4.append(t3[s3], lt()), I.nextNode(), r4.push({ type: 2, index: ++h4 });
+            for (let s3 = 0; s3 < i4; s3++) e4.append(t3[s3], lt()), I.nextNode(), r4.push({ type: 2, index: ++h4 });
             e4.append(t3[i4], lt());
           }
         }
-      } else if (8 === e4.nodeType)
-        if (e4.data === m)
-          r4.push({ type: 2, index: h4 });
-        else {
-          let t3 = -1;
-          for (; -1 !== (t3 = e4.data.indexOf(v, t3 + 1)); )
-            r4.push({ type: 7, index: h4 }), t3 += v.length - 1;
-        }
+      } else if (8 === e4.nodeType) if (e4.data === m) r4.push({ type: 2, index: h4 });
+      else {
+        let t3 = -1;
+        for (; -1 !== (t3 = e4.data.indexOf(v, t3 + 1)); ) r4.push({ type: 7, index: h4 }), t3 += v.length - 1;
+      }
       h4++;
     }
   }
@@ -385,8 +356,7 @@ var B = class _B {
   }
 };
 function z(t2, i3, s2 = t2, e4) {
-  if (i3 === R)
-    return i3;
+  if (i3 === R) return i3;
   let h4 = void 0 !== e4 ? s2.o?.[e4] : s2.l;
   const o4 = st(i3) ? void 0 : i3._$litDirective$;
   return h4?.constructor !== o4 && (h4?._$AO?.(false), void 0 === o4 ? h4 = void 0 : (h4 = new o4(t2), h4._$AT(t2, s2, e4)), void 0 !== e4 ? (s2.o ??= [])[e4] = h4 : s2.l = h4), void 0 !== h4 && (i3 = z(t2, h4._$AS(t2, i3.values), h4, e4)), i3;
@@ -416,8 +386,7 @@ var F = class {
   }
   p(t2) {
     let i3 = 0;
-    for (const s2 of this._$AV)
-      void 0 !== s2 && (void 0 !== s2.strings ? (s2._$AI(t2, s2, i3), i3 += s2.strings.length - 2) : s2._$AI(t2[i3])), i3++;
+    for (const s2 of this._$AV) void 0 !== s2 && (void 0 !== s2.strings ? (s2._$AI(t2, s2, i3), i3 += s2.strings.length - 2) : s2._$AI(t2[i3])), i3++;
   }
 };
 var et = class _et {
@@ -452,8 +421,7 @@ var et = class _et {
   }
   $(t2) {
     const { values: i3, _$litType$: s2 } = t2, e4 = "number" == typeof s2 ? this._$AC(t2) : (void 0 === s2.el && (s2.el = B.createElement(N(s2.h, s2.h[0]), this.options)), s2);
-    if (this._$AH?._$AD === e4)
-      this._$AH.p(i3);
+    if (this._$AH?._$AD === e4) this._$AH.p(i3);
     else {
       const t3 = new F(e4, this), s3 = t3.u(this.options);
       t3.p(i3), this.T(s3), this._$AH = t3;
@@ -467,8 +435,7 @@ var et = class _et {
     g(this._$AH) || (this._$AH = [], this._$AR());
     const i3 = this._$AH;
     let s2, e4 = 0;
-    for (const h4 of t2)
-      e4 === i3.length ? i3.push(s2 = new _et(this.O(lt()), this.O(lt()), this, this.options)) : s2 = i3[e4], s2._$AI(h4), e4++;
+    for (const h4 of t2) e4 === i3.length ? i3.push(s2 = new _et(this.O(lt()), this.O(lt()), this, this.options)) : s2 = i3[e4], s2._$AI(h4), e4++;
     e4 < i3.length && (this._$AR(s2 && s2._$AB.nextSibling, e4), i3.length = e4);
   }
   _$AR(t2 = this._$AA.nextSibling, i3) {
@@ -494,13 +461,11 @@ var G = class {
   _$AI(t2, i3 = this, s2, e4) {
     const h4 = this.strings;
     let o4 = false;
-    if (void 0 === h4)
-      t2 = z(this, t2, i3, 0), o4 = !st(t2) || t2 !== this._$AH && t2 !== R, o4 && (this._$AH = t2);
+    if (void 0 === h4) t2 = z(this, t2, i3, 0), o4 = !st(t2) || t2 !== this._$AH && t2 !== R, o4 && (this._$AH = t2);
     else {
       const e5 = t2;
       let n5, r4;
-      for (t2 = h4[0], n5 = 0; n5 < h4.length - 1; n5++)
-        r4 = z(this, e5[s2 + n5], i3, n5), r4 === R && (r4 = this._$AH[n5]), o4 ||= !st(r4) || r4 !== this._$AH[n5], r4 === D ? t2 = D : t2 !== D && (t2 += (r4 ?? "") + h4[n5 + 1]), this._$AH[n5] = r4;
+      for (t2 = h4[0], n5 = 0; n5 < h4.length - 1; n5++) r4 = z(this, e5[s2 + n5], i3, n5), r4 === R && (r4 = this._$AH[n5]), o4 ||= !st(r4) || r4 !== this._$AH[n5], r4 === D ? t2 = D : t2 !== D && (t2 += (r4 ?? "") + h4[n5 + 1]), this._$AH[n5] = r4;
     }
     o4 && !e4 && this.j(t2);
   }
@@ -529,8 +494,7 @@ var q = class extends G {
     super(t2, i3, s2, e4, h4), this.type = 5;
   }
   _$AI(t2, i3 = this) {
-    if ((t2 = z(this, t2, i3, 0) ?? D) === R)
-      return;
+    if ((t2 = z(this, t2, i3, 0) ?? D) === R) return;
     const s2 = this._$AH, e4 = t2 === D && s2 !== D || t2.capture !== s2.capture || t2.once !== s2.once || t2.passive !== s2.passive, h4 = t2 !== D && (s2 === D || e4);
     e4 && this.element.removeEventListener(this.name, this, s2), h4 && this.element.addEventListener(this.name, this, t2), this._$AH = t2;
   }
@@ -561,7 +525,7 @@ var Q = (t2, i3, s2) => {
   return h4._$AI(t2), h4;
 };
 
-// ../../../node_modules/lit-element/lit-element.js
+// ../node_modules/lit-element/lit-element.js
 var h3 = class extends b {
   constructor() {
     super(...arguments), this.renderOptions = { host: this }, this.o = void 0;
@@ -589,7 +553,7 @@ var f3 = globalThis.litElementPolyfillSupport;
 f3?.({ LitElement: h3 });
 (globalThis.litElementVersions ??= []).push("4.1.0");
 
-// ../../../node_modules/@lit/reactive-element/decorators/property.js
+// ../node_modules/@lit/reactive-element/decorators/property.js
 var o3 = { attribute: true, type: String, converter: u, reflect: false, hasChanged: f };
 var r3 = (t2 = o3, e4, r4) => {
   const { kind: n5, metadata: i3 } = r4;
@@ -673,7 +637,7 @@ var BsServerList = class extends h3 {
     this.styles = [
       base,
       i`
-    
+
     `
     ];
   }
@@ -715,7 +679,7 @@ var BsServerDetail = class extends h3 {
   }
   render() {
     return ke`
-       <pre><code>${JSON.stringify(this.server, null, 2)}</code></pre>
+        <pre><code>${JSON.stringify(this.server, null, 2)}</code></pre>
     `;
   }
 };
@@ -755,14 +719,15 @@ var BsHeader = class extends h3 {
     this.styles = [
       base,
       i`
-    .logo {
-        position: relative;
-        color: var(--theme-txt-color);  
-    }   
-    .logo bs-icon::part(svg) {
-        height: 30px;
-        width: 140px;
-    }
+        .logo {
+            position: relative;
+            color: var(--theme-txt-color);
+        }
+
+        .logo bs-icon::part(svg) {
+            height: 30px;
+            width: 140px;
+        }
     `
     ];
   }
@@ -785,22 +750,28 @@ var BsIcon = class extends h3 {
     this.styles = [
       base,
       i`
-    .svg-icon {
-        display: inline-block;
-        fill: var(--bs-icon-color, currentColor);
-        height: var(--bs-icon-height, 1em);
-        width: var(--bs-icon-width, 1em);
-        vertical-align: middle;
-    }
+        .svg-icon {
+            display: inline-block;
+            fill: var(--bs-icon-color, currentColor);
+            height: var(--bs-icon-height, 1em);
+            width: var(--bs-icon-width, 1em);
+            vertical-align: middle;
+        }
     `
     ];
   }
   get icon() {
     switch (this.iconName) {
       case "logo":
-        return ke`<svg class="svg-icon" part="svg"><use xlink:href="#svg-logo"></use></svg>`;
+        return ke`
+            <svg class="svg-icon" part="svg">
+                <use xlink:href="#svg-logo"></use>
+            </svg>`;
       case "wordmark":
-        return ke`<svg class="svg-icon" part="svg"><use xlink:href="#svg-wordmark"></use></svg>`;
+        return ke`
+            <svg class="svg-icon" part="svg">
+                <use xlink:href="#svg-wordmark"></use>
+            </svg>`;
       default:
         return `unknown`;
     }
@@ -824,7 +795,8 @@ var BsIcon = class extends h3 {
                 <path d="M17.89 17.707L16.892 20c-3.137-1.366-5.496-3.152-6.892-5.275-1.396 2.123-3.755 3.91-6.892 5.275l-.998-2.293C5.14 16.39 8.55 14.102 8.55 10V7H5.5L10 0l4.5 7h-3.05v3c0 4.102 3.41 6.39 6.44 7.707z"/>
             </symbol>
             <symbol id="svg-text" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M15.5 11h-11c-.275 0-.5.225-.5.5v1c0 .276.225.5.5.5h11c.276 0 .5-.224.5-.5v-1c0-.275-.224-.5-.5-.5zm0-4h-11c-.275 0-.5.225-.5.5v1c0 .276.225.5.5.5h11c.276 0 .5-.224.5-.5v-1c0-.275-.224-.5-.5-.5zm-5 8h-6c-.275 0-.5.225-.5.5v1c0 .276.225.5.5.5h6c.276 0 .5-.224.5-.5v-1c0-.275-.224-.5-.5-.5zm5-12h-11c-.275 0-.5.225-.5.5v1c0 .276.225.5.5.5h11c.276 0 .5-.224.5-.5v-1c0-.275-.224-.5-.5-.5z"/>
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                      d="M15.5 11h-11c-.275 0-.5.225-.5.5v1c0 .276.225.5.5.5h11c.276 0 .5-.224.5-.5v-1c0-.275-.224-.5-.5-.5zm0-4h-11c-.275 0-.5.225-.5.5v1c0 .276.225.5.5.5h11c.276 0 .5-.224.5-.5v-1c0-.275-.224-.5-.5-.5zm-5 8h-6c-.275 0-.5.225-.5.5v1c0 .276.225.5.5.5h6c.276 0 .5-.224.5-.5v-1c0-.275-.224-.5-.5-.5zm5-12h-11c-.275 0-.5.225-.5.5v1c0 .276.225.5.5.5h11c.276 0 .5-.224.5-.5v-1c0-.275-.224-.5-.5-.5z"/>
             </symbol>
             <symbol id="svg-tv" viewBox="0 0 20 20">
                 <path d="M18 1H2C.9 1 0 1.9 0 3v11c0 1.1.882 2.178 1.96 2.393l4.373.875S2.57 19 5 19h10c2.43 0-1.334-1.732-1.334-1.732l4.373-.875C19.116 16.178 20 15.1 20 14V3c0-1.1-.9-2-2-2zm0 13H2V3h16v11z"/>
@@ -842,13 +814,16 @@ var BsIcon = class extends h3 {
                 <path d="M33 .2L.9 16.2c-.6.3-.9.8-.9 1.4v70.8c0 .6.3 1.1.9 1.4l32.1 16c1 .5 2.3-.2 2.3-1.4V1.6C35.2.4 34-.4 33 .2zM39.7 105.8l32.1-16c.5-.3.9-.8.9-1.4V54c0-.6-.3-1.1-.9-1.4l-32.1-16c-1-.5-2.3.2-2.3 1.4v66.5c.1 1.1 1.3 1.8 2.3 1.3zM129.7 34.8c10.8 0 16.6 4 16.6 14.1 0 6.6-2.1 9.8-6.4 12.2 4.7 1.8 7.8 5.2 7.8 12.6 0 11.1-6.7 15.4-17.3 15.4H109V34.8h20.7zm-11.8 7.6V58h11.7c5.4 0 7.8-2.7 7.8-8 0-5.2-2.7-7.5-8.1-7.5h-11.4zm0 23v16.1h12c5.5 0 8.7-1.7 8.7-8.3 0-6.2-4.6-7.9-8.9-7.9h-11.8zM156.6 49.5h8.6v4.8s6.7-4.4 13.5-5.6v8.6c-7.2 1.4-13.4 6.3-13.4 6.3v25.6h-8.6V49.5zM365.4 49.5h8.6v4.8s6.7-4.4 13.5-5.6v8.6c-7.2 1.4-13.4 6.3-13.4 6.3v25.6h-8.6V49.5zM218.4 69.1c0 13.2-4 20.9-17.7 20.9-13.6 0-17.7-7.8-17.7-20.9 0-12.9 4.4-20.5 17.7-20.5s17.7 7.6 17.7 20.5zm-8.7 0c0-9.2-2-13.2-9-13.2s-9 4-9 13.2 1.6 13.6 9 13.6 9-4.4 9-13.6zM232.3 49.5l6.3 32.3h1.6l7.5-31.5h8.9l7.5 31.5h1.6l6.2-32.3h8.6l-8.4 39.7h-13.7L252.2 62 246 89.2h-13.7l-8.4-39.7h8.4zM315.4 57.7s-9.4-1.3-14.1-1.3c-4.8 0-6.9 1.1-6.9 4.4 0 2.6 1.7 3.3 9.4 4.7 9.5 1.7 12.9 4 12.9 12 0 9.3-5.9 12.6-15.7 12.6-5.5 0-14.7-1.7-14.7-1.7l.3-7.2s9.5 1.3 13.6 1.3c5.7 0 7.9-1.2 7.9-4.7 0-2.8-1.3-3.6-9.2-4.9-8.7-1.4-13.2-3.3-13.2-11.7 0-9 7-12.3 14.8-12.3 5.8 0 14.9 1.7 14.9 1.7v7.1zM355.6 81.8l.2 6.4s-9 1.8-16 1.8c-11.9 0-16.5-6.3-16.5-20.3 0-14.5 6.3-21.1 17.2-21.1 11.1 0 16.7 5.8 16.7 18.2l-.6 6.2H332c.1 6.3 2.5 9.5 9 9.5 6.2 0 14.6-.7 14.6-.7zm-7-15.5c0-7.9-2.4-10.6-8.2-10.6-5.9 0-8.5 2.9-8.6 10.6h16.8zM420.5 54.3S412 53 406.8 53c-4.9 0-9.4 1.3-9.4 6.7 0 4.1 2 5.3 10.6 6.7 10.2 1.7 14 3.5 14 11.1 0 9.3-5.8 12.3-15.3 12.3-4.8 0-13.6-1.4-13.6-1.4l.3-4.2s8.9 1.3 12.9 1.3c6.8 0 10.8-1.6 10.8-7.8 0-4.8-2.4-5.8-11.3-7.1-9.1-1.4-13.3-3.1-13.3-10.8 0-8.6 7.1-11.2 14-11.2 6 0 14 1.3 14 1.3v4.4zM432 49.5L442.5 85h2.9L456 49.5h4.8l-16.9 57.3h-4.8l5.1-17.7h-5.5L427 49.4h5zM468.9 89.2V49.5h4.7v2.9s6.7-3.7 12.9-3.7c10.9 0 13.3 5.1 13.3 19.6v20.9H495V68.5c0-11.7-1.3-15.6-9.2-15.6-6.2 0-12.2 3.3-12.2 3.3V89h-4.7zM536.2 49.7l-.2 4s-6.3-.8-9.3-.8c-9.5 0-12.3 4.2-12.3 15.6 0 12.5 1.9 17.1 12.3 17.1 3 0 9.4-.7 9.4-.7l.2 4s-7.1 1-10.5 1c-12.9 0-16.3-5.7-16.3-21.3 0-14.5 4.6-19.9 16.4-19.9 3.4 0 10.3 1 10.3 1z"/>
             </symbol>
             <symbol id="svg-github" viewBox="0 0 32 32">
-                <path clip-rule="evenodd" d="M16.003 0C7.17 0 .008 7.162.008 15.997c0 7.067 4.582 13.063 10.94 15.18.8.145 1.052-.33 1.052-.753 0-.38.008-1.442 0-2.777-4.45.967-5.37-2.107-5.37-2.107-.728-1.848-1.776-2.34-1.776-2.34-1.452-.992.11-.973.11-.973 1.604.113 2.45 1.65 2.45 1.65 1.427 2.442 3.743 1.736 4.654 1.328.146-1.034.56-1.74 1.017-2.14C9.533 22.663 5.8 21.29 5.8 15.16c0-1.747.622-3.174 1.645-4.292-.165-.404-.715-2.03.157-4.234 0 0 1.343-.43 4.398 1.64 1.276-.354 2.645-.53 4.005-.537 1.36.006 2.727.183 4.005.538 3.055-2.07 4.396-1.64 4.396-1.64.872 2.202.323 3.83.16 4.233 1.022 1.118 1.643 2.545 1.643 4.292 0 6.146-3.74 7.498-7.305 7.893C19.48 23.548 20 24.508 20 26v4.428c0 .428.258.9 1.07.746C27.422 29.054 32 23.062 32 15.997 32 7.162 24.838 0 16.003 0z" fill-rule="evenodd"/>
+                <path clip-rule="evenodd"
+                      d="M16.003 0C7.17 0 .008 7.162.008 15.997c0 7.067 4.582 13.063 10.94 15.18.8.145 1.052-.33 1.052-.753 0-.38.008-1.442 0-2.777-4.45.967-5.37-2.107-5.37-2.107-.728-1.848-1.776-2.34-1.776-2.34-1.452-.992.11-.973.11-.973 1.604.113 2.45 1.65 2.45 1.65 1.427 2.442 3.743 1.736 4.654 1.328.146-1.034.56-1.74 1.017-2.14C9.533 22.663 5.8 21.29 5.8 15.16c0-1.747.622-3.174 1.645-4.292-.165-.404-.715-2.03.157-4.234 0 0 1.343-.43 4.398 1.64 1.276-.354 2.645-.53 4.005-.537 1.36.006 2.727.183 4.005.538 3.055-2.07 4.396-1.64 4.396-1.64.872 2.202.323 3.83.16 4.233 1.022 1.118 1.643 2.545 1.643 4.292 0 6.146-3.74 7.498-7.305 7.893C19.48 23.548 20 24.508 20 26v4.428c0 .428.258.9 1.07.746C27.422 29.054 32 23.062 32 15.997 32 7.162 24.838 0 16.003 0z"
+                      fill-rule="evenodd"/>
             </symbol>
             <symbol id="svg-twitter" viewBox="0 0 273.4 222.2">
                 <path d="M273.4 26.3c-10.1 4.5-20.9 7.5-32.2 8.8 11.6-6.9 20.5-17.9 24.7-31-10.9 6.4-22.9 11.1-35.7 13.6C220 6.8 205.4 0 189.3 0c-31 0-56.1 25.1-56.1 56.1 0 4.4.5 8.7 1.5 12.8C88 66.5 46.7 44.2 19 10.3c-4.8 8.3-7.6 17.9-7.6 28.2 0 19.5 9.9 36.6 25 46.7-9.2-.3-17.8-2.8-25.4-7v.7c0 27.2 19.3 49.8 45 55-4.7 1.3-9.7 2-14.8 2-3.6 0-7.1-.4-10.6-1 7.1 22.3 27.9 38.5 52.4 39-19.2 15-43.4 24-69.7 24-4.5 0-9-.3-13.4-.8 24.8 15.9 54.3 25.2 86 25.2 103.2 0 159.6-85.5 159.6-159.6 0-2.4-.1-4.9-.2-7.3 11.1-8 20.6-17.9 28.1-29.1z"/>
             </symbol>
             <symbol id="svg-circle-play" viewBox="0 0 191.4 191.4">
-                <circle fill="none" stroke="#FFF" stroke-width="22" stroke-miterlimit="10" cx="95.7" cy="95.7" r="84.7"/>
+                <circle fill="none" stroke="#FFF" stroke-width="22" stroke-miterlimit="10" cx="95.7" cy="95.7"
+                        r="84.7"/>
                 <path d="M87.8 57l46.7 32.6c4.2 3 4.2 9.2 0 12.2l-45.3 31.6c-4.7 3.3-11.1-.1-11.1-5.8V62c0-4.9 5.6-7.9 9.7-5z"/>
             </symbol>
             <symbol id="svg-code" viewBox="0 0 20 20">
@@ -886,8 +861,7 @@ Promise.all([all, me]).then(([servers, me2]) => {
   let next = ke`
         <bs-debug .servers=${servers} .me=${me2}></bs-debug>`;
   let app = document.querySelector("#app");
-  if (!app)
-    throw new Error("cannot...");
+  if (!app) throw new Error("cannot...");
   Q(next, app);
 }).catch(console.error);
 /*! Bundled license information:
