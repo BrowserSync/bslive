@@ -46,6 +46,9 @@ jobs:
       - name: Npm test (binary)
         run: npm run test:build
 
+      - name: Npm run schema
+        run: npm run schema
+
       - name: Npm run build:client
         run: npm run build:client
 
