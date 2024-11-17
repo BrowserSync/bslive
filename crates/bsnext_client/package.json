@@ -1,6 +1,6 @@
 {
   "name": "bsnext_client",
-  "version": "1.0.0",
+  "version": "0.0.30",
   "description": "",
   "main": "index.js",
   "scripts": {
