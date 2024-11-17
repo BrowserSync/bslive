@@ -44,7 +44,7 @@ jobs:
         run: npm run build:debug
 
       - name: Check tree is clean
-        run: ./clean-tree.sh
+        run: bash ./clean-tree.sh
 
       - name: Npm test (binary)
         run: npm run test:build
