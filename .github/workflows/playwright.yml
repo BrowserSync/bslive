@@ -49,6 +49,9 @@ jobs:
       - name: Npm run build:client
         run: npm run build:client
 
+      - name: Npm run build:example
+        run: npm run build:example
+
       - name: Install Playwright Browsers
         run: npx playwright install chromium --with-deps
 

@@ -1,7 +1,7 @@
 import {css, html, LitElement} from "lit";
 import {property} from "lit/decorators.js";
-import {ServerDTO} from "../../../generated/dto";
-import { base } from "../../styles/base.css";
+import {ServerDTO} from "@browsersync/generated/dto";
+import {base} from "../../styles/base.css";
 
 class BsServerList extends LitElement {
   @property({type: Object})
@@ -10,7 +10,7 @@ class BsServerList extends LitElement {
   static styles = [
     base,
     css`
-    
+
     `
   ]
 

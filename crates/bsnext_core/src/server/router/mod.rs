@@ -70,7 +70,7 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
             .into_response()
     }
     async fn js_handler(_uri: Uri) -> impl IntoResponse {
-        let markup = include_str!("../../../../bsnext_client/inject/dist/index.js");
+        let markup = include_str!("../../../../../inject/dist/index.js");
         (
             [(
                 CONTENT_TYPE,

@@ -1,6 +1,6 @@
 import {html, LitElement} from "lit";
 import {property} from "lit/decorators.js";
-import {ServerIdentityDTO} from "../../../generated/dto";
+import {ServerIdentityDTO} from "@browsersync/generated/dto";
 import {base} from "../../styles/base.css";
 
 class BsServerIdentity extends LitElement {

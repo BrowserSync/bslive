@@ -1,6 +1,6 @@
 import z from "zod";
 import {fork} from "node:child_process";
-import {internalEventsDTOSchema, externalEventsSchema} from "./crates/bsnext_client/generated/schema.js";
+import {internalEventsDTOSchema, externalEventsSchema} from "./generated/schema.js";
 
 const m = fork('./bin.js', ['-f', 'json'], {stdio: 'pipe'});
 const either = z.union([internalEventsDTOSchema, externalEventsSchema]);

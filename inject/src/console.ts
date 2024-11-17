@@ -1,5 +1,5 @@
 import {Subject} from "rxjs";
-import {LogLevelDTO} from "../../generated/dto";
+import {LogLevelDTO} from "@browsersync/generated/dto";
 
 export interface ConsoleEvent {
   level: LogLevelDTO,

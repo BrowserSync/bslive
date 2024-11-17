@@ -5,7 +5,7 @@ import "./components/bs-server-detail";
 import "./components/bs-server-identity";
 import "./components/bs-header";
 import "./components/bs-icon";
-import {GetServersMessageResponseDTO, ServerDesc} from "../../generated/dto";
+import {GetServersMessageResponseDTO, ServerDesc} from "@browsersync/generated/dto";
 import {html, render} from "lit";
 
 const all = fetch('/__bs_api/servers').then(x => x.json())

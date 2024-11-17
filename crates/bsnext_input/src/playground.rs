@@ -64,7 +64,7 @@ impl Playground {
         };
         let reset_route = Route {
             path: reset_path,
-            kind: RouteKind::new_raw(include_str!("../../bsnext_client/ui/styles/reset.css")),
+            kind: RouteKind::new_raw(include_str!("../../../ui/styles/reset.css")),
             ..Default::default()
         };
         vec![home_route, js_route, css_route, reset_route]

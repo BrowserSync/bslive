@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "name": "@browsersync/generated",
+  "scripts": {
+    "schema": "ts-to-zod dto.ts schema.ts",
+    "postschema": "esbuild --bundle --external:zod --format=esm schema.ts > schema.js",
+    "build:client": "npm run build --workspaces --if-present"
+  },
+  "dependencies": {
+    "ts-to-zod": "^3.11.0"
+  }
+}

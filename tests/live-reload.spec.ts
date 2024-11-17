@@ -1,8 +1,8 @@
-import { bstest, installMockHandler, readCalls, test } from "./utils";
-import { expect } from "@playwright/test";
-import { z } from "zod";
-import { clientEventSchema } from "bsnext_client/generated/schema";
-import { ChangeKind } from "bsnext_client/generated/dto";
+import {bstest, installMockHandler, readCalls, test} from "./utils";
+import {expect} from "@playwright/test";
+import {z} from "zod";
+import {clientEventSchema} from "../generated/schema";
+import {ChangeKind} from "@browsersync/generated/dto";
 
 test.describe("examples/basic/live-reload.yml", {
   annotation: {
@@ -12,7 +12,7 @@ test.describe("examples/basic/live-reload.yml", {
     description: "",
   },
 }, () => {
-  test("live-reloading css", async ({ page, bs }) => {
+  test("live-reloading css", async ({page, bs}) => {
     // Array to store console messages
     const messages: [type: string, text: string][] = [];
 
@@ -22,14 +22,14 @@ test.describe("examples/basic/live-reload.yml", {
     });
 
     // Navigate to the page and wait until network is idle
-    await page.goto(bs.path("/"), { waitUntil: "networkidle" });
+    await page.goto(bs.path("/"), {waitUntil: "networkidle"});
 
     // Set up the request waiting promise
     const requestPromise = page.waitForRequest((req) => {
       const url = new URL(req.url());
       return url.searchParams.has("livereload") &&
         url.pathname === "/styles.css";
-    }, { timeout: 2000 });
+    }, {timeout: 2000});
 
     // Trigger the live-reload by touching the CSS file
     bs.touch("examples/basic/public/styles.css");
@@ -41,8 +41,8 @@ test.describe("examples/basic/live-reload.yml", {
     );
     expect(log).toHaveLength(1);
   });
-  test("reloads with HTML change", async ({ page, bs, request }) => {
-    await page.goto(bs.path("/"), { waitUntil: "networkidle" });
+  test("reloads with HTML change", async ({page, bs, request}) => {
+    await page.goto(bs.path("/"), {waitUntil: "networkidle"});
 
     // Define the change event
     const change: z.infer<typeof clientEventSchema> = {
@@ -58,7 +58,7 @@ test.describe("examples/basic/live-reload.yml", {
 
     // Install mock handler and send change event
     await page.evaluate(installMockHandler);
-    await request.post(bs.api("events"), { data: change });
+    await request.post(bs.api("events"), {data: change});
 
     // Wait for the reloadPage call
     await page.waitForFunction(() => {
@@ -75,9 +75,9 @@ test.describe("examples/basic/live-reload.yml", {
       ],
     ]);
   });
-  test("no css reloads with HTML + CSS change", async ({ page, bs, request }) => {
+  test("no css reloads with HTML + CSS change", async ({page, bs, request}) => {
     // Navigate to the page and wait until network is idle
-    await page.goto(bs.path("/"), { waitUntil: "networkidle" });
+    await page.goto(bs.path("/"), {waitUntil: "networkidle"});
 
     // Define the change event
     const change: z.infer<typeof clientEventSchema> = {
@@ -105,7 +105,7 @@ test.describe("examples/basic/live-reload.yml", {
 
     // Install mock handler and send change event
     await page.evaluate(installMockHandler);
-    await request.post(bs.api("events"), { data: change });
+    await request.post(bs.api("events"), {data: change});
 
     // Wait for a short period
     await page.waitForTimeout(500);

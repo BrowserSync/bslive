@@ -3,6 +3,7 @@ use bsnext_input::target::TargetKind;
 use bsnext_tracing::{LogLevel, OutputFormat};
 
 #[derive(clap::Parser, Debug)]
+#[command(version, name = "Browsersync Live")]
 pub struct Args {
     #[arg(short, long, value_enum)]
     pub log_level: Option<LogLevel>,

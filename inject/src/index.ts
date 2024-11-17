@@ -1,10 +1,10 @@
-import {Reloader} from "../../vendor/live-reload/src/reloader";
-import {Timer} from "../../vendor/live-reload/src/timer";
+import {Reloader} from "../vendor/live-reload/src/reloader";
+import {Timer} from "../vendor/live-reload/src/timer";
 
 import {webSocket} from "rxjs/webSocket";
 import {filter, map, retry, withLatestFrom} from "rxjs";
 import {clientEventSchema} from "../../generated/schema.js";
-import {ChangeDTO, ClientConfigDTO, ClientEvent, LogLevelDTO} from "../../generated/dto";
+import {ChangeDTO, ClientConfigDTO, ClientEvent, LogLevelDTO} from "@browsersync/generated/dto";
 import {createLRConsoleObserver} from "./console";
 
 const [consoleSubject, consoleApi] = createLRConsoleObserver();
