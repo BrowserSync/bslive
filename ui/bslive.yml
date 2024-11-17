@@ -1,19 +1,19 @@
 servers:
-  - bind_address: 0.0.0.0:3009
-    name: api
-    routes:
-      - path: /
-        html: hello world other
-  - bind_address: 0.0.0.0:3007
-    routes:
-      - path: /
-        html: hello world!
-  - bind_address: 0.0.0.0:3008
-    name: bslive ui
-    routes:
-      - path: /
-        watch: false
-        dir: .
-    watchers:
-      - dir: index.html
-      - dir: dist
+    - bind_address: 0.0.0.0:3009
+      name: api
+      routes:
+          - path: /
+            html: hello world other
+    - bind_address: 0.0.0.0:3007
+      routes:
+          - path: /
+            html: hello world!
+    - bind_address: 0.0.0.0:3008
+      name: bslive ui
+      routes:
+          - path: /
+            watch: false
+            dir: .
+      watchers:
+          - dir: index.html
+          - dir: dist

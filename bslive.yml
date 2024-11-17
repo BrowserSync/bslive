@@ -1,7 +1,7 @@
 servers:
   - bind_address: 0.0.0.0:3000
     clients:
-      log: info
+      log: trace
     routes:
       - path: /
         dir: examples/basic/public

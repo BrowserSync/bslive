@@ -21,6 +21,9 @@
     "@types/node": "20.17.6",
     "prettier": "^3.3.3"
   },
+  "prettier": {
+    "tabWidth": 4
+  },
   "workspaces": [
     "ui",
     "inject",
@@ -40,6 +43,7 @@
     "test:build": "ava",
     "universal": "napi universal",
     "version": "napi version",
+    "schema": "npm run schema --workspace=generated",
     "tsc": "tsc",
     "tsc:watch": "tsc --watch",
     "fmt": "prettier tests inject ui --write"
