@@ -78,13 +78,13 @@ fn playground_wrap() -> InjectOpts {
   <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>Document</title>
+      <title>Browsersync Live - Playground</title>
       <link rel="stylesheet" href="/__bslive_playground.css">
   </head>
   <body>
 "#;
     let append = r#"
-  <script src="/__bslive_playground.js"></script>
+  <script src="/__bslive_playground.js" type="module"></script>
   </body>
 </html>
 "#;
