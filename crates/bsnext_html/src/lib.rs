@@ -1,33 +1,30 @@
 use bsnext_input::playground::Playground;
-use bsnext_input::server_config::{ServerConfig, ServerIdentity};
-use bsnext_input::{Input, InputCreation, InputError};
+use bsnext_input::server_config::ServerConfig;
+use bsnext_input::{Input, InputCreation, InputCtx, InputError};
 use std::fs::read_to_string;
 use std::path::Path;
 
 pub struct HtmlFs;
 
 impl InputCreation for HtmlFs {
-    fn from_input_path<P: AsRef<Path>>(
-        path: P,
-        server_ids: Vec<ServerIdentity>,
-    ) -> Result<Input, Box<InputError>> {
+    fn from_input_path<P: AsRef<Path>>(path: P, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
         let str = read_to_string(path).map_err(|e| Box::new(e.into()))?;
-        let input = playground_html_str_to_input(&str, server_ids)
+        let input = playground_html_str_to_input(&str, ctx)
             .map_err(|e| Box::new(InputError::HtmlError(e.to_string())))?;
         Ok(input)
     }
 
-    fn from_input_str<P: AsRef<str>>(content: P) -> Result<Input, Box<InputError>> {
-        let input = playground_html_str_to_input(&content.as_ref(), vec![])
+    fn from_input_str<P: AsRef<str>>(
+        content: P,
+        _ctx: &InputCtx,
+    ) -> Result<Input, Box<InputError>> {
+        let input = playground_html_str_to_input(&content.as_ref(), &InputCtx::default())
             .map_err(|e| Box::new(InputError::HtmlError(e.to_string())))?;
         Ok(input)
     }
 }
 
-fn playground_html_str_to_input(
-    html: &str,
-    server_ids: Vec<ServerIdentity>,
-) -> Result<Input, Box<InputError>> {
+fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
     use unindent::unindent;
     let mut document = scraper::Html::parse_fragment(html);
     let style = scraper::Selector::parse("style:first-of-type").unwrap();
@@ -71,59 +68,9 @@ fn playground_html_str_to_input(
     let mut input = Input::default();
     let server = ServerConfig {
         routes: playground.as_routes(),
-        identity: server_ids
-            .get(0)
-            .map(ToOwned::to_owned)
-            .unwrap_or_else(|| ServerIdentity::named()),
+        identity: ctx.first_id_or_default(),
         ..Default::default()
     };
     input.servers.push(server);
-    // dbg!(&input.servers.get(0).unwrap().identity);
     Ok(input)
-}
-
-#[test]
-fn has_selector() {
-    let mut html = r#"
-        huh?
-        <style>
-            @import url("reset.css")
-            body {
-                color: red;
-            }
-        </style>
-        <main>
-            <ul>
-                <li>first</li>
-                <li>second</li>
-                <li>third</li>
-            </ul>
-        </main>
-        <footer>
-            <p><a href=""></a></p>
-        </footer>
-        <script type="module">
-            console.log(document.querySelectorAll("li"))
-        </script>"#;
-
-    let mut document = scraper::Html::parse_fragment(html);
-
-    #[derive(Debug)]
-    struct Item {
-        pub html: String,
-        pub css: Option<String>,
-        pub js: Option<String>,
-    }
-
-    let mut item = Item {
-        html: "".to_string(),
-        css: None,
-        js: None,
-    };
-
-    dbg!(&item);
-
-    // fs::write("origin.html", item.html).unwrap();
-    // fs::write("origin.js", item.js.unwrap()).unwrap();
-    // fs::write("origin.css", item.css.unwrap()).unwrap();
 }

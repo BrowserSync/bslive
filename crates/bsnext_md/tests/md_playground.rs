@@ -27,7 +27,7 @@ console.log("hello world")
 ```
 
         "#;
-    let config = md_to_input(&input).expect("unwrap");
+    let config = md_to_input(&input, &Default::default()).expect("unwrap");
     let first_server = config.servers.get(0).unwrap();
     let routes = first_server
         .playground

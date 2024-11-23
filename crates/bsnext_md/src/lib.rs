@@ -5,7 +5,7 @@ use bsnext_input::path_def::PathDef;
 use bsnext_input::playground::Playground;
 use bsnext_input::route::{Route, RouteKind};
 use bsnext_input::server_config::ServerConfig;
-use bsnext_input::Input;
+use bsnext_input::{Input, InputCtx};
 use markdown::mdast::Node;
 use markdown::{Constructs, ParseOptions};
 use nom::branch::alt;
@@ -220,7 +220,7 @@ enum Convert {
     Playground(Playground),
 }
 
-pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
+pub fn nodes_to_input(nodes: &[Node], ctx: &InputCtx) -> Result<Input, MarkdownError> {
     let mut routes = vec![];
     let mut input: Option<Input> = None;
     let mut parser = many0(alt((
@@ -334,6 +334,7 @@ pub fn nodes_to_input(nodes: &[Node]) -> Result<Input, MarkdownError> {
             let mut input = Input::default();
             let server = ServerConfig {
                 routes,
+                identity: ctx.first_id_or_default(),
                 ..Default::default()
             };
             input.servers.push(server);
@@ -378,7 +379,7 @@ fn str_to_nodes(input: &str) -> Result<Vec<Node>, MarkdownError> {
     }
 }
 
-pub fn md_to_input(input: &str) -> Result<Input, MarkdownError> {
+pub fn md_to_input(input: &str, ctx: &InputCtx) -> Result<Input, MarkdownError> {
     let root = str_to_nodes(input)?;
-    nodes_to_input(&root)
+    nodes_to_input(&root, ctx)
 }

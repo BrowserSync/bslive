@@ -1,7 +1,7 @@
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 
 use crate::input_fs::from_input_path;
-use bsnext_input::{Input, InputError};
+use bsnext_input::{Input, InputCtx, InputError};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ fn from_input_paths<T: AsRef<str>>(
 
     tracing::info!(?input_path);
 
-    let result = from_input_path(input_path, vec![]);
+    let result = from_input_path(input_path, &InputCtx::default());
     match result {
         Ok(input) => Ok(SystemStartArgs::PathWithInput {
             path: input_path.to_path_buf(),

@@ -89,12 +89,38 @@ pub trait InputSource {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct InputCtx {
+    prev_server_ids: Option<Vec<ServerIdentity>>,
+}
+
+impl InputCtx {
+    pub fn new(servers: &[ServerIdentity]) -> Self {
+        if servers.is_empty() {
+            Self::default()
+        } else {
+            Self {
+                prev_server_ids: Some(servers.to_vec()),
+            }
+        }
+    }
+
+    pub fn server_ids(&self) -> Option<&[ServerIdentity]> {
+        self.prev_server_ids.as_ref().map(Vec::as_slice)
+    }
+
+    pub fn first_id_or_default(&self) -> ServerIdentity {
+        self.prev_server_ids
+            .as_ref()
+            .and_then(|x| x.get(0))
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| ServerIdentity::named())
+    }
+}
+
 pub trait InputCreation {
-    fn from_input_path<P: AsRef<Path>>(
-        path: P,
-        server_ids: Vec<ServerIdentity>,
-    ) -> Result<Input, Box<InputError>>;
-    fn from_input_str<P: AsRef<str>>(content: P) -> Result<Input, Box<InputError>>;
+    fn from_input_path<P: AsRef<Path>>(path: P, ctx: &InputCtx) -> Result<Input, Box<InputError>>;
+    fn from_input_str<P: AsRef<str>>(content: P, ctx: &InputCtx) -> Result<Input, Box<InputError>>;
 }
 
 pub trait InputWriter {

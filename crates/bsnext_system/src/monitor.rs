@@ -10,7 +10,7 @@ use bsnext_fs::{
 };
 use bsnext_input::route::{DebounceDuration, DirRoute, FilterKind, RouteKind, Spec, SpecOpts};
 use bsnext_input::server_config::ServerIdentity;
-use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
+use bsnext_input::{Input, InputCtx, InputError, PathDefinition, PathDefs, PathError};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -33,7 +33,7 @@ pub struct Monitor {
 pub struct MonitorInput {
     pub path: PathBuf,
     pub cwd: PathBuf,
-    pub server_identities: Vec<ServerIdentity>,
+    pub ctx: InputCtx,
 }
 
 impl actix::Handler<MonitorInput> for BsSystem {
@@ -56,9 +56,9 @@ impl actix::Handler<MonitorInput> for BsSystem {
         let input_watcher_addr = input_watcher.start();
         let input_monitor = InputMonitor {
             addr: input_watcher_addr.clone(),
-            server_identities: msg.server_identities.clone(),
+            ctx: msg.ctx.clone(),
         };
-        self.input_monitors.push(input_monitor);
+        self.input_monitors = Some(input_monitor);
 
         input_watcher_addr.do_send(RequestWatchPath {
             recipients: vec![ctx.address().recipient()],
@@ -99,19 +99,31 @@ impl BsSystem {
             0 => {
                 tracing::info!("InputFile file changed {:?}", inner);
 
-                let server_identities: Vec<ServerIdentity> = self
+                let ctx = self
                     .input_monitors
-                    .iter()
-                    .map(|x| x.server_identities.clone())
-                    .flatten()
-                    .collect::<Vec<_>>();
+                    .as_ref()
+                    .map(|x| x.ctx.clone())
+                    .unwrap_or_default();
 
-                let input = from_input_path(&inner.absolute_path, server_identities);
+                let input = from_input_path(&inner.absolute_path, &ctx);
 
                 let Ok(input) = input else {
                     let err = input.unwrap_err();
                     return Some(AnyEvent::Internal(InternalEvents::InputError(*err)));
                 };
+
+                if let Some(mon) = self.input_monitors.as_mut() {
+                    let next = input
+                        .servers
+                        .iter()
+                        .map(|s| s.identity.clone())
+                        .collect::<Vec<_>>();
+                    let ctx = InputCtx::new(&next);
+                    tracing::info!("will set next ids {:?}", next);
+                    if !next.is_empty() {
+                        mon.ctx = ctx
+                    }
+                }
 
                 self.accept_watchables(&input);
                 self.resolve_servers(input);

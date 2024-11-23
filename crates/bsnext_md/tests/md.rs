@@ -21,7 +21,7 @@ body {
 }
 ```
         "#;
-    let config = md_to_input(&input).expect("unwrap");
+    let config = md_to_input(&input, &Default::default()).expect("unwrap");
     let server_1 = config.servers.first().unwrap();
     assert_eq!(
         server_1.routes[0],
@@ -61,7 +61,7 @@ body {
 }
 ```
         "#;
-    let config = md_to_input(&input).expect("unwrap");
+    let config = md_to_input(&input, &Default::default()).expect("unwrap");
     let server_1 = config.servers.first().unwrap();
     assert_eq!(
         server_1.routes[0],
@@ -114,7 +114,7 @@ path: /abc
 
 # Before
         "#;
-    let input = md_to_input(&markdown).expect("unwrap");
+    let input = md_to_input(&markdown, &Default::default()).expect("unwrap");
     let server_1 = input.servers.first().unwrap();
     let expected_id = ServerIdentity::Address {
         bind_address: "0.0.0.0:3001".into(),
@@ -149,7 +149,7 @@ path: /abc
 }
 
 fn default_md_assertions(input: &str) -> anyhow::Result<()> {
-    let input = md_to_input(&input).expect("unwrap");
+    let input = md_to_input(&input, &Default::default()).expect("unwrap");
     let server_1 = input.servers.first().unwrap();
     let expected_id = ServerIdentity::Address {
         bind_address: "0.0.0.0:5001".into(),

@@ -3,7 +3,7 @@ use crate::monitor::{
 };
 use actix::{Actor, Addr, AsyncContext, Handler, Running};
 
-use bsnext_input::Input;
+use bsnext_input::{Input, InputCtx};
 use std::collections::HashMap;
 
 use actix_rt::Arbiter;
@@ -24,7 +24,6 @@ use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
 use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
-use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::startup::{
     DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
 };
@@ -44,7 +43,7 @@ pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
-    input_monitors: Vec<InputMonitor>,
+    input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<AnyWatchable, Monitor>,
     cwd: Option<PathBuf>,
 }
@@ -52,7 +51,7 @@ pub struct BsSystem {
 #[derive(Debug, Clone)]
 pub struct InputMonitor {
     pub addr: Addr<FsWatcher>,
-    pub server_identities: Vec<ServerIdentity>,
+    pub ctx: InputCtx,
 }
 
 #[derive(Debug)]
@@ -80,7 +79,7 @@ impl BsSystem {
             self_addr: None,
             servers_addr: None,
             any_event_sender: None,
-            input_monitors: vec![],
+            input_monitors: None,
             any_monitors: Default::default(),
             cwd: None,
         }
@@ -301,14 +300,16 @@ impl Handler<Start> for BsSystem {
         match msg.kind.input(&start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
                 tracing::debug!("PathWithInput");
+                let ids = input
+                    .servers
+                    .iter()
+                    .map(|x| x.identity.clone())
+                    .collect::<Vec<_>>();
+                let input_ctx = InputCtx::new(&ids);
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
-                    server_identities: input
-                        .servers
-                        .iter()
-                        .map(|x| x.identity.clone())
-                        .collect::<Vec<_>>(),
+                    ctx: input_ctx,
                 });
 
                 self.accept_watchables(&input);
@@ -326,7 +327,7 @@ impl Handler<Start> for BsSystem {
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
-                    server_identities: vec![],
+                    ctx: InputCtx::default(),
                 });
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
                 Ok(DidStart::Started)

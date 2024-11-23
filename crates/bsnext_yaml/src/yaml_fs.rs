@@ -1,6 +1,5 @@
-use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::yml::YamlError;
-use bsnext_input::{BsLiveRulesError, Input, InputCreation, InputError};
+use bsnext_input::{BsLiveRulesError, Input, InputCreation, InputCtx, InputError};
 use miette::NamedSource;
 use std::fs::read_to_string;
 use std::path::Path;
@@ -8,10 +7,7 @@ use std::path::Path;
 pub struct YamlFs;
 
 impl InputCreation for YamlFs {
-    fn from_input_path<P: AsRef<Path>>(
-        path: P,
-        server_ids: Vec<ServerIdentity>,
-    ) -> Result<Input, Box<InputError>> {
+    fn from_input_path<P: AsRef<Path>>(path: P, _ctx: &InputCtx) -> Result<Input, Box<InputError>> {
         let str = read_to_string(&path).map_err(|e| Box::new(e.into()))?;
         if str.trim().is_empty() {
             return Err(Box::new(InputError::YamlError(YamlError::EmptyError {
@@ -36,7 +32,10 @@ impl InputCreation for YamlFs {
         Ok(output)
     }
 
-    fn from_input_str<P: AsRef<str>>(_content: P) -> Result<Input, Box<InputError>> {
+    fn from_input_str<P: AsRef<str>>(
+        _content: P,
+        _ctx: &InputCtx,
+    ) -> Result<Input, Box<InputError>> {
         todo!()
     }
 }

@@ -1,12 +1,7 @@
----
-servers:
-  - name: playground
----
-
 ```html playground
 
 <div class="main">
-    Hello world!
+    Hello world 5.0
 </div>
 ```
 
@@ -14,7 +9,7 @@ servers:
 @import url("reset.css");
 
 :root {
-    border: 1px dotted red;
+    border: 1px dotted pink;
 }
 
 * {
@@ -23,6 +18,10 @@ servers:
 ```
 
 ```js
-console.log('Hello from playground.md')
+let int = 0;
+setInterval(() => {
+    int += 1;
+    document.body.textContent += int
+}, 1000);
 ```
 
