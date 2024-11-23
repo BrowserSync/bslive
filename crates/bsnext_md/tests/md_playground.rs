@@ -1,4 +1,5 @@
-use bsnext_md::md_to_input;
+use bsnext_input::InputCreation;
+use bsnext_md::md_fs::MdFs;
 
 #[test]
 fn test_md_playground() -> anyhow::Result<()> {
@@ -27,7 +28,7 @@ console.log("hello world")
 ```
 
         "#;
-    let config = md_to_input(&input, &Default::default()).expect("unwrap");
+    let config = MdFs::from_input_str(&input, &Default::default()).expect("unwrap");
     let first_server = config.servers.get(0).unwrap();
     let routes = first_server
         .playground

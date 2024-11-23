@@ -361,7 +361,7 @@ fn code_val(n: &Node) -> &str {
     }
 }
 
-fn str_to_nodes(input: &str) -> Result<Vec<Node>, MarkdownError> {
+pub(crate) fn str_to_nodes(input: &str) -> Result<Vec<Node>, MarkdownError> {
     let opts = ParseOptions {
         constructs: Constructs {
             frontmatter: true,
@@ -377,9 +377,4 @@ fn str_to_nodes(input: &str) -> Result<Vec<Node>, MarkdownError> {
             unreachable!("?");
         }
     }
-}
-
-pub fn md_to_input(input: &str, ctx: &InputCtx) -> Result<Input, MarkdownError> {
-    let root = str_to_nodes(input)?;
-    nodes_to_input(&root, ctx)
 }

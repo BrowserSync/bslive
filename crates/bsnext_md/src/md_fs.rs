@@ -1,4 +1,4 @@
-use crate::md_to_input;
+use crate::{nodes_to_input, str_to_nodes, MarkdownError};
 use bsnext_input::{Input, InputCreation, InputCtx, InputError};
 use std::fs::read_to_string;
 use std::path::Path;
@@ -17,4 +17,9 @@ impl InputCreation for MdFs {
             .map_err(|e| Box::new(InputError::MarkdownError(e.to_string())))?;
         Ok(input)
     }
+}
+
+fn md_to_input(input: &str, ctx: &InputCtx) -> Result<Input, MarkdownError> {
+    let root = str_to_nodes(input)?;
+    nodes_to_input(&root, ctx)
 }
