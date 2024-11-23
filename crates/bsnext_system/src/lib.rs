@@ -305,7 +305,7 @@ impl Handler<Start> for BsSystem {
                     .iter()
                     .map(|x| x.identity.clone())
                     .collect::<Vec<_>>();
-                let input_ctx = InputCtx::new(&ids);
+                let input_ctx = InputCtx::new(&ids, None);
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),

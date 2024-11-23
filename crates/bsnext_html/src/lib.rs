@@ -1,5 +1,5 @@
 use bsnext_input::playground::Playground;
-use bsnext_input::server_config::ServerConfig;
+use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::{Input, InputCreation, InputCtx, InputError};
 use std::fs::read_to_string;
 use std::path::Path;
@@ -72,10 +72,18 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
     // Now start to build up the input
     let mut input = Input::default();
 
+    // 1: first try prev
+    // 2: next try if 'port' was provided
+    // 3: finally, make one up
+    let iden = ctx
+        .first_id()
+        .or_else(|| ServerIdentity::from_port_or_named(ctx.port()).ok())
+        .unwrap_or_default();
+
     // Create the server
     let server = ServerConfig {
         routes: playground.as_routes(),
-        identity: ctx.first_id_or_named(),
+        identity: iden,
         ..Default::default()
     };
 

@@ -90,18 +90,26 @@ pub trait InputSource {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct InputArgs {
+    pub port: Option<u16>,
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct InputCtx {
     prev_server_ids: Option<Vec<ServerIdentity>>,
+    args: Option<InputArgs>,
 }
 
 impl InputCtx {
-    pub fn new(servers: &[ServerIdentity]) -> Self {
-        if servers.is_empty() {
-            Self::default()
+    pub fn new(servers: &[ServerIdentity], args: Option<InputArgs>) -> Self {
+        let prev = if servers.is_empty() {
+            None
         } else {
-            Self {
-                prev_server_ids: Some(servers.to_vec()),
-            }
+            Some(servers.to_vec())
+        };
+        Self {
+            prev_server_ids: prev,
+            args: args.to_owned(),
         }
     }
 
@@ -115,6 +123,17 @@ impl InputCtx {
             .and_then(|x| x.get(0))
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| ServerIdentity::named())
+    }
+
+    pub fn first_id(&self) -> Option<ServerIdentity> {
+        self.prev_server_ids
+            .as_ref()
+            .and_then(|x| x.get(0))
+            .map(ToOwned::to_owned)
+    }
+
+    pub fn port(&self) -> Option<u16> {
+        self.args.as_ref().and_then(|x| x.port)
     }
 }
 

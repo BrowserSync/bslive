@@ -1,7 +1,7 @@
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 
 use crate::input_fs::from_input_path;
-use bsnext_input::{Input, InputCtx, InputError};
+use bsnext_input::{Input, InputArgs, InputCtx, InputError};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -12,7 +12,7 @@ pub struct StartFromInputPaths {
 
 impl SystemStart for StartFromInputPaths {
     fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        from_input_paths(&ctx.cwd, &self.input_paths)
+        from_input_paths(&ctx.cwd, &self.input_paths, &self.port)
     }
 }
 
@@ -32,6 +32,7 @@ impl SystemStart for StartFromInput {
 fn from_input_paths<T: AsRef<str>>(
     cwd: &Path,
     inputs: &[T],
+    port: &Option<u16>,
 ) -> Result<SystemStartArgs, Box<InputError>> {
     let input_candidates = inputs
         .iter()
@@ -76,7 +77,11 @@ fn from_input_paths<T: AsRef<str>>(
 
     tracing::info!(?input_path);
 
-    let result = from_input_path(input_path, &InputCtx::default());
+    let input_args = InputArgs {
+        port: port.to_owned(),
+    };
+    let initial_ctx = InputCtx::new(&[], Some(input_args));
+    let result = from_input_path(input_path, &initial_ctx);
     match result {
         Ok(input) => Ok(SystemStartArgs::PathWithInput {
             path: input_path.to_path_buf(),

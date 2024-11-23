@@ -118,7 +118,7 @@ impl BsSystem {
                         .iter()
                         .map(|s| s.identity.clone())
                         .collect::<Vec<_>>();
-                    let ctx = InputCtx::new(&next);
+                    let ctx = InputCtx::new(&next, None);
                     tracing::info!("will set next ids {:?}", next);
                     if !next.is_empty() {
                         mon.ctx = ctx
