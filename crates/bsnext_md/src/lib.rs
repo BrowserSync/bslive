@@ -334,7 +334,7 @@ pub fn nodes_to_input(nodes: &[Node], ctx: &InputCtx) -> Result<Input, MarkdownE
             let mut input = Input::default();
             let server = ServerConfig {
                 routes,
-                identity: ctx.first_id_or_default(),
+                identity: ctx.first_id_or_named(),
                 ..Default::default()
             };
             input.servers.push(server);

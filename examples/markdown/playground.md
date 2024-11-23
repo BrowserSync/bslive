@@ -1,7 +1,7 @@
 ```html playground
 
 <div class="main">
-    Hello world 5.0
+    Hello world 6.0
 </div>
 ```
 
@@ -9,7 +9,7 @@
 @import url("reset.css");
 
 :root {
-    border: 1px dotted pink;
+    border: 50px dotted orange;
 }
 
 * {

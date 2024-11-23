@@ -7,3 +7,7 @@ edition = "2021"
 bsnext_input = { path = "../bsnext_input" }
 unindent = "0.2.3"
 scraper = "0.21.0"
+
+[dev-dependencies]
+anyhow = { workspace = true }
+insta = { workspace = true }

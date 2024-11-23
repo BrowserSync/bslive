@@ -552,7 +552,9 @@ dependencies = [
 name = "bsnext_html"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bsnext_input",
+ "insta",
  "scraper",
  "unindent",
 ]

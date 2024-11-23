@@ -109,7 +109,7 @@ impl InputCtx {
         self.prev_server_ids.as_ref().map(Vec::as_slice)
     }
 
-    pub fn first_id_or_default(&self) -> ServerIdentity {
+    pub fn first_id_or_named(&self) -> ServerIdentity {
         self.prev_server_ids
             .as_ref()
             .and_then(|x| x.get(0))

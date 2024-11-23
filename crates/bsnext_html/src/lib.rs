@@ -14,11 +14,8 @@ impl InputCreation for HtmlFs {
         Ok(input)
     }
 
-    fn from_input_str<P: AsRef<str>>(
-        content: P,
-        _ctx: &InputCtx,
-    ) -> Result<Input, Box<InputError>> {
-        let input = playground_html_str_to_input(&content.as_ref(), &InputCtx::default())
+    fn from_input_str<P: AsRef<str>>(content: P, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
+        let input = playground_html_str_to_input(&content.as_ref(), ctx)
             .map_err(|e| Box::new(InputError::HtmlError(e.to_string())))?;
         Ok(input)
     }
@@ -26,13 +23,18 @@ impl InputCreation for HtmlFs {
 
 fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
     use unindent::unindent;
+
+    // parse the HTML
     let mut document = scraper::Html::parse_fragment(html);
+
     let style = scraper::Selector::parse("style:first-of-type").unwrap();
     let script = scraper::Selector::parse("script:first-of-type").unwrap();
+
     let mut style_elems = document.select(&style);
     let mut script_elems = document.select(&script);
-    let mut removals = vec![];
+    let mut node_ids_to_remove = vec![];
 
+    // start an empty playground
     let mut playground = Playground {
         html: "".to_string(),
         css: None,
@@ -40,23 +42,24 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
     };
 
     if let Some(style) = style_elems.next() {
-        removals.push(style.id());
+        node_ids_to_remove.push(style.id());
         let t = style.text().nth(0).unwrap();
         let unindented = unindent(t);
         playground.css = Some(unindented);
     }
 
     if let Some(script) = script_elems.next() {
-        removals.push(script.id());
+        node_ids_to_remove.push(script.id());
         let t = script.text().nth(0).unwrap();
         let unindented = unindent(t);
         playground.js = Some(unindented);
     }
 
-    for x in removals {
-        document.tree.get_mut(x).unwrap().detach();
+    for node_id in node_ids_to_remove {
+        document.tree.get_mut(node_id).unwrap().detach();
     }
 
+    // grab the HTML
     let as_html = document.html();
     let trimmed = as_html
         .strip_prefix("<html>")
@@ -65,12 +68,19 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
         .unwrap();
     let un_indented = unindent(trimmed);
     playground.html = un_indented;
+
+    // Now start to build up the input
     let mut input = Input::default();
+
+    // Create the server
     let server = ServerConfig {
         routes: playground.as_routes(),
-        identity: ctx.first_id_or_default(),
+        identity: ctx.first_id_or_named(),
         ..Default::default()
     };
+
+    // Add it to the input
     input.servers.push(server);
+
     Ok(input)
 }
