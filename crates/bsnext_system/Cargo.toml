@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bsnext_input = { path = "../bsnext_input" }
 bsnext_md = { path = "../bsnext_md" }
+bsnext_html = { path = "../bsnext_html" }
 bsnext_yaml = { path = "../bsnext_yaml" }
 bsnext_tracing = { path = "../bsnext_tracing" }
 bsnext_core = { path = "../bsnext_core" }

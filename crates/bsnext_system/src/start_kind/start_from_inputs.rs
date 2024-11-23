@@ -7,15 +7,16 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub struct StartFromInputPaths {
     pub input_paths: Vec<String>,
+    pub port: Option<u16>,
 }
 
 impl SystemStart for StartFromInputPaths {
     fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        from_yml_paths(&ctx.cwd, &self.input_paths)
+        from_input_paths(&ctx.cwd, &self.input_paths)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StartFromInput {
     pub input: Input,
 }
@@ -28,7 +29,7 @@ impl SystemStart for StartFromInput {
     }
 }
 
-fn from_yml_paths<T: AsRef<str>>(
+fn from_input_paths<T: AsRef<str>>(
     cwd: &Path,
     inputs: &[T],
 ) -> Result<SystemStartArgs, Box<InputError>> {
@@ -37,7 +38,7 @@ fn from_yml_paths<T: AsRef<str>>(
         .map(|path| cwd.join(path.as_ref()))
         .collect::<Vec<PathBuf>>();
 
-    let lookups = ["bslive.yml", "bslive.yaml", "bslive.md"]
+    let lookups = ["bslive.yml", "bslive.yaml", "bslive.md", "bslive.html"]
         .iter()
         .map(|path| cwd.join(path))
         .collect::<Vec<PathBuf>>();
@@ -75,7 +76,7 @@ fn from_yml_paths<T: AsRef<str>>(
 
     tracing::info!(?input_path);
 
-    let result = from_input_path(input_path);
+    let result = from_input_path(input_path, vec![]);
     match result {
         Ok(input) => Ok(SystemStartArgs::PathWithInput {
             path: input_path.to_path_buf(),

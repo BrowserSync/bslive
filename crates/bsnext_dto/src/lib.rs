@@ -287,6 +287,7 @@ pub enum InputErrorDTO {
     DirError(String),
     YamlError(String),
     MarkdownError(String),
+    HtmlError(String),
     Io(String),
     UnsupportedExtension(String),
     MissingExtension(String),
@@ -305,6 +306,7 @@ impl From<&InputError> for InputErrorDTO {
             e @ InputError::PortError(_) => InputErrorDTO::PortError(e.to_string()),
             e @ InputError::DirError(_) => InputErrorDTO::DirError(e.to_string()),
             e @ InputError::MarkdownError(_) => InputErrorDTO::MarkdownError(e.to_string()),
+            e @ InputError::HtmlError(_) => InputErrorDTO::HtmlError(e.to_string()),
             e @ InputError::YamlError(_) => InputErrorDTO::YamlError(e.to_string()),
             e @ InputError::Io(_) => InputErrorDTO::Io(e.to_string()),
             e @ InputError::UnsupportedExtension(_) => {

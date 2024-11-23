@@ -1,0 +1,17 @@
+<style>
+    p {
+        color: red;
+    }
+</style>
+
+<abc-shane></abc-shane>
+
+<script type="module">
+    class BSlive extends HTMLElement {
+        connectedCallback() {
+            this.innerHTML = "Hello world";
+        }
+    }
+
+    customElements.define("abc-shane", BSlive);
+</script>

@@ -1,4 +1,4 @@
-use crate::BsSystem;
+use crate::{BsSystem, InputMonitor};
 use actix::{Actor, Addr, AsyncContext};
 use std::hash::Hash;
 
@@ -33,6 +33,7 @@ pub struct Monitor {
 pub struct MonitorInput {
     pub path: PathBuf,
     pub cwd: PathBuf,
+    pub server_identities: Vec<ServerIdentity>,
 }
 
 impl actix::Handler<MonitorInput> for BsSystem {
@@ -53,7 +54,11 @@ impl actix::Handler<MonitorInput> for BsSystem {
         tracing::trace!("[main.rs] starting input monitor");
 
         let input_watcher_addr = input_watcher.start();
-        self.input_monitors.push(input_watcher_addr.clone());
+        let input_monitor = InputMonitor {
+            addr: input_watcher_addr.clone(),
+            server_identities: msg.server_identities.clone(),
+        };
+        self.input_monitors.push(input_monitor);
 
         input_watcher_addr.do_send(RequestWatchPath {
             recipients: vec![ctx.address().recipient()],
@@ -92,8 +97,16 @@ impl BsSystem {
         let _guard = span.enter();
         match msg.ctx.id() {
             0 => {
-                tracing::info!(?inner, "InputFile file changed");
-                let input = from_input_path(&inner.absolute_path);
+                tracing::info!("InputFile file changed {:?}", inner);
+
+                let server_identities: Vec<ServerIdentity> = self
+                    .input_monitors
+                    .iter()
+                    .map(|x| x.server_identities.clone())
+                    .flatten()
+                    .collect::<Vec<_>>();
+
+                let input = from_input_path(&inner.absolute_path, server_identities);
 
                 let Ok(input) = input else {
                     let err = input.unwrap_err();

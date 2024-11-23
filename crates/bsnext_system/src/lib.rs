@@ -24,6 +24,7 @@ use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
 use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
+use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::startup::{
     DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
 };
@@ -43,9 +44,15 @@ pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
-    input_monitors: Vec<Addr<FsWatcher>>,
+    input_monitors: Vec<InputMonitor>,
     any_monitors: HashMap<AnyWatchable, Monitor>,
     cwd: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+pub struct InputMonitor {
+    pub addr: Addr<FsWatcher>,
+    pub server_identities: Vec<ServerIdentity>,
 }
 
 #[derive(Debug)]
@@ -297,6 +304,11 @@ impl Handler<Start> for BsSystem {
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
+                    server_identities: input
+                        .servers
+                        .iter()
+                        .map(|x| x.identity.clone())
+                        .collect::<Vec<_>>(),
                 });
 
                 self.accept_watchables(&input);
@@ -314,6 +326,7 @@ impl Handler<Start> for BsSystem {
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
+                    server_identities: vec![],
                 });
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
                 Ok(DidStart::Started)

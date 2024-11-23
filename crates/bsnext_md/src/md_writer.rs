@@ -12,7 +12,7 @@ impl InputWriter for MdWriter {
     }
 }
 
-pub fn _input_to_str(input: &Input) -> String {
+fn _input_to_str(input: &Input) -> String {
     let mut chunks = vec![];
     if let Some(server_config) = input.servers.first() {
         #[derive(Debug, serde::Serialize)]

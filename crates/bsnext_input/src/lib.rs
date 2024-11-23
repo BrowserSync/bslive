@@ -10,7 +10,6 @@ pub mod client_config;
 #[cfg(test)]
 pub mod input_test;
 pub mod path_def;
-pub mod paths;
 pub mod playground;
 pub mod route;
 pub mod route_manifest;
@@ -91,7 +90,10 @@ pub trait InputSource {
 }
 
 pub trait InputCreation {
-    fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Input, Box<InputError>>;
+    fn from_input_path<P: AsRef<Path>>(
+        path: P,
+        server_ids: Vec<ServerIdentity>,
+    ) -> Result<Input, Box<InputError>>;
     fn from_input_str<P: AsRef<str>>(content: P) -> Result<Input, Box<InputError>>;
 }
 
@@ -125,6 +127,8 @@ pub enum InputError {
     DirError(#[from] DirError),
     #[error("Markdown error: {0}")]
     MarkdownError(String),
+    #[error("HTML error: {0}")]
+    HtmlError(String),
     #[error("{0}")]
     YamlError(#[from] YamlError),
     #[error(transparent)]

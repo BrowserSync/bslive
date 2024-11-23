@@ -1,0 +1,9 @@
+[package]
+name = "bsnext_html"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bsnext_input = { path = "../bsnext_input" }
+unindent = "0.2.3"
+scraper = "0.21.0"
