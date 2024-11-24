@@ -236,6 +236,10 @@ var inputErrorDTOSchema = z.union([
     payload: z.string()
   }),
   z.object({
+    kind: z.literal("HtmlError"),
+    payload: z.string()
+  }),
+  z.object({
     kind: z.literal("Io"),
     payload: z.string()
   }),

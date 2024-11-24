@@ -1,0 +1,13 @@
+---
+source: crates/bsnext_html/src/html_writer.rs
+expression: output
+---
+<style>
+    body {
+        background: red;
+    }
+</style>
+<p>Hello world</p>
+<script type="module">
+    console.log("hello world!")
+</script>

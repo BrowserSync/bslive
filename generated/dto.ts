@@ -149,6 +149,7 @@ export type InputErrorDTO =
 	| { kind: "DirError", payload: string }
 	| { kind: "YamlError", payload: string }
 	| { kind: "MarkdownError", payload: string }
+	| { kind: "HtmlError", payload: string }
 	| { kind: "Io", payload: string }
 	| { kind: "UnsupportedExtension", payload: string }
 	| { kind: "MissingExtension", payload: string }

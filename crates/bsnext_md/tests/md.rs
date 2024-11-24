@@ -1,7 +1,8 @@
 use bsnext_input::path_def::PathDef;
 use bsnext_input::route::{Route, RouteKind};
 use bsnext_input::server_config::ServerIdentity;
-use bsnext_md::md_to_input;
+use bsnext_input::InputCreation;
+use bsnext_md::md_fs::MdFs;
 use std::str::FromStr;
 
 #[test]
@@ -21,7 +22,7 @@ body {
 }
 ```
         "#;
-    let config = md_to_input(&input).expect("unwrap");
+    let config = MdFs::from_input_str(&input, &Default::default()).expect("unwrap");
     let server_1 = config.servers.first().unwrap();
     assert_eq!(
         server_1.routes[0],
@@ -61,7 +62,7 @@ body {
 }
 ```
         "#;
-    let config = md_to_input(&input).expect("unwrap");
+    let config = MdFs::from_input_str(&input, &Default::default()).expect("unwrap");
     let server_1 = config.servers.first().unwrap();
     assert_eq!(
         server_1.routes[0],
@@ -114,7 +115,7 @@ path: /abc
 
 # Before
         "#;
-    let input = md_to_input(&markdown).expect("unwrap");
+    let input = MdFs::from_input_str(&markdown, &Default::default()).expect("unwrap");
     let server_1 = input.servers.first().unwrap();
     let expected_id = ServerIdentity::Address {
         bind_address: "0.0.0.0:3001".into(),
@@ -149,7 +150,7 @@ path: /abc
 }
 
 fn default_md_assertions(input: &str) -> anyhow::Result<()> {
-    let input = md_to_input(&input).expect("unwrap");
+    let input = MdFs::from_input_str(&input, &Default::default()).expect("unwrap");
     let server_1 = input.servers.first().unwrap();
     let expected_id = ServerIdentity::Address {
         bind_address: "0.0.0.0:5001".into(),

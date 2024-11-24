@@ -1,7 +1,7 @@
 use crate::args::Args;
 use crate::start_kind::start_from_example::StartFromExample;
 use crate::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
-use crate::start_kind::start_from_paths::StartFromPaths;
+use crate::start_kind::start_from_paths::StartFromDirPaths;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::{Input, InputError};
 
@@ -14,7 +14,7 @@ pub enum StartKind {
     FromInput(StartFromInput),
     FromInputPaths(StartFromInputPaths),
     FromExample(StartFromExample),
-    FromPaths(StartFromPaths),
+    FromDirPaths(StartFromDirPaths),
 }
 
 impl StartKind {
@@ -33,7 +33,7 @@ impl StartKind {
         }
 
         if !args.paths.is_empty() {
-            StartKind::FromPaths(StartFromPaths {
+            StartKind::FromDirPaths(StartFromDirPaths {
                 paths: args.paths,
                 write_input: args.write,
                 port: args.port,
@@ -42,6 +42,7 @@ impl StartKind {
         } else {
             StartKind::FromInputPaths(StartFromInputPaths {
                 input_paths: args.input.clone(),
+                port: args.port,
             })
         }
     }
@@ -55,7 +56,7 @@ impl SystemStart for StartKind {
         match self {
             StartKind::FromInputPaths(from_inputs) => from_inputs.input(ctx),
             StartKind::FromExample(from_example) => from_example.input(ctx),
-            StartKind::FromPaths(from_input_paths) => from_input_paths.input(ctx),
+            StartKind::FromDirPaths(from_dir_paths) => from_dir_paths.input(ctx),
             StartKind::FromInput(from_inputs) => from_inputs.input(ctx),
         }
     }
@@ -67,7 +68,7 @@ pub mod start_fs {
     use std::path::{Path, PathBuf};
 
     use bsnext_input::target::TargetKind;
-    use bsnext_input::{DirError, Input, InputWriteError};
+    use bsnext_input::{DirError, Input, InputWriteError, InputWriter};
 
     #[derive(Default, Debug, PartialEq)]
     pub enum WriteMode {
@@ -82,14 +83,16 @@ pub mod start_fs {
         write_mode: &WriteMode,
     ) -> Result<PathBuf, InputWriteError> {
         let string = match target_kind {
-            TargetKind::Yaml => bsnext_yaml::input_to_str(input),
+            TargetKind::Yaml => bsnext_yaml::yaml_writer::YamlWriter.input_to_str(input),
             TargetKind::Toml => todo!("toml missing"),
-            TargetKind::Md => bsnext_md::md_writer::_input_to_str(input),
+            TargetKind::Md => bsnext_md::md_writer::MdWriter.input_to_str(input),
+            TargetKind::Html => bsnext_html::html_writer::HtmlWriter.input_to_str(input),
         };
         let name = match target_kind {
             TargetKind::Yaml => "bslive.yml",
             TargetKind::Toml => todo!("toml missing"),
             TargetKind::Md => "bslive.md",
+            TargetKind::Html => "bslive.html",
         };
         let next_path = cwd.join(name);
         tracing::info!(

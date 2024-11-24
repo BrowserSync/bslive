@@ -4,4 +4,5 @@ pub enum TargetKind {
     Yaml,
     Toml,
     Md,
+    Html,
 }

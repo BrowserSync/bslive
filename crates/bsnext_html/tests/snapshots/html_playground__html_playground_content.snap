@@ -1,0 +1,9 @@
+---
+source: crates/bsnext_html/tests/html_playground.rs
+expression: html.kind
+---
+Raw(
+    Html {
+        html: "\n<main>\n    <h1>Test!</h1>\n    <abc-shane></abc-shane>\n</main>\n",
+    },
+)

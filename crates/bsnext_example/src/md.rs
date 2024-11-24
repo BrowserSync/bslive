@@ -1,6 +1,6 @@
 use bsnext_input::server_config::ServerIdentity;
-use bsnext_input::{InputSource, InputSourceKind};
-use bsnext_md::md_to_input;
+use bsnext_input::{InputCreation, InputSource, InputSourceKind};
+use bsnext_md::md_fs::MdFs;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MdExample;
@@ -8,7 +8,8 @@ pub struct MdExample;
 impl InputSource for MdExample {
     fn into_input(self, identity: Option<ServerIdentity>) -> InputSourceKind {
         let input_str = include_str!("../../../examples/markdown/single.md");
-        let mut input = md_to_input(input_str).expect("example cannot fail?");
+        let mut input =
+            MdFs::from_input_str(input_str, &Default::default()).expect("example cannot fail?");
         let server = input
             .servers
             .first_mut()

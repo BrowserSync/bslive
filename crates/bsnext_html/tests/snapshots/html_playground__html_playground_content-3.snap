@@ -1,0 +1,9 @@
+---
+source: crates/bsnext_html/tests/html_playground.rs
+expression: css.kind
+---
+Raw(
+    Raw {
+        raw: "p {\n    color: red;\n}\n\nabc-shane {\n    color: red;\n}\n",
+    },
+)

@@ -1,0 +1,9 @@
+---
+source: crates/bsnext_html/tests/html_playground.rs
+expression: js.kind
+---
+Raw(
+    Raw {
+        raw: "class BSlive extends HTMLElement {\n    connectedCallback() {\n        this.innerHTML = \"Hello world\";\n    }\n}\n\ncustomElements.define(\"abc-shane\", BSlive);\n",
+    },
+)

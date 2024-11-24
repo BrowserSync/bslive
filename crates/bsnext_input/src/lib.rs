@@ -10,7 +10,6 @@ pub mod client_config;
 #[cfg(test)]
 pub mod input_test;
 pub mod path_def;
-pub mod paths;
 pub mod playground;
 pub mod route;
 pub mod route_manifest;
@@ -90,9 +89,57 @@ pub trait InputSource {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct InputArgs {
+    pub port: Option<u16>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct InputCtx {
+    prev_server_ids: Option<Vec<ServerIdentity>>,
+    args: Option<InputArgs>,
+}
+
+impl InputCtx {
+    pub fn new(servers: &[ServerIdentity], args: Option<InputArgs>) -> Self {
+        let prev = if servers.is_empty() {
+            None
+        } else {
+            Some(servers.to_vec())
+        };
+        Self {
+            prev_server_ids: prev,
+            args: args.to_owned(),
+        }
+    }
+
+    pub fn server_ids(&self) -> Option<&[ServerIdentity]> {
+        self.prev_server_ids.as_deref()
+    }
+
+    pub fn first_id_or_named(&self) -> ServerIdentity {
+        self.prev_server_ids
+            .as_ref()
+            .and_then(|x| x.get(0))
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| ServerIdentity::named())
+    }
+
+    pub fn first_id(&self) -> Option<ServerIdentity> {
+        self.prev_server_ids
+            .as_ref()
+            .and_then(|x| x.get(0))
+            .map(ToOwned::to_owned)
+    }
+
+    pub fn port(&self) -> Option<u16> {
+        self.args.as_ref().and_then(|x| x.port)
+    }
+}
+
 pub trait InputCreation {
-    fn from_input_path<P: AsRef<Path>>(path: P) -> Result<Input, Box<InputError>>;
-    fn from_input_str<P: AsRef<str>>(content: P) -> Result<Input, Box<InputError>>;
+    fn from_input_path<P: AsRef<Path>>(path: P, ctx: &InputCtx) -> Result<Input, Box<InputError>>;
+    fn from_input_str<P: AsRef<str>>(content: P, ctx: &InputCtx) -> Result<Input, Box<InputError>>;
 }
 
 pub trait InputWriter {
@@ -125,6 +172,8 @@ pub enum InputError {
     DirError(#[from] DirError),
     #[error("Markdown error: {0}")]
     MarkdownError(String),
+    #[error("HTML error: {0}")]
+    HtmlError(String),
     #[error("{0}")]
     YamlError(#[from] YamlError),
     #[error(transparent)]

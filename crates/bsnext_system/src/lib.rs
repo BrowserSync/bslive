@@ -3,7 +3,7 @@ use crate::monitor::{
 };
 use actix::{Actor, Addr, AsyncContext, Handler, Running};
 
-use bsnext_input::Input;
+use bsnext_input::{Input, InputCtx};
 use std::collections::HashMap;
 
 use actix_rt::Arbiter;
@@ -43,9 +43,15 @@ pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
-    input_monitors: Vec<Addr<FsWatcher>>,
+    input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<AnyWatchable, Monitor>,
     cwd: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+pub struct InputMonitor {
+    pub addr: Addr<FsWatcher>,
+    pub ctx: InputCtx,
 }
 
 #[derive(Debug)]
@@ -73,7 +79,7 @@ impl BsSystem {
             self_addr: None,
             servers_addr: None,
             any_event_sender: None,
-            input_monitors: vec![],
+            input_monitors: None,
             any_monitors: Default::default(),
             cwd: None,
         }
@@ -294,9 +300,16 @@ impl Handler<Start> for BsSystem {
         match msg.kind.input(&start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
                 tracing::debug!("PathWithInput");
+                let ids = input
+                    .servers
+                    .iter()
+                    .map(|x| x.identity.clone())
+                    .collect::<Vec<_>>();
+                let input_ctx = InputCtx::new(&ids, None);
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
+                    ctx: input_ctx,
                 });
 
                 self.accept_watchables(&input);
@@ -314,6 +327,7 @@ impl Handler<Start> for BsSystem {
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
+                    ctx: InputCtx::default(),
                 });
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
                 Ok(DidStart::Started)
