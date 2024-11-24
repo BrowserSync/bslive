@@ -114,7 +114,7 @@ impl InputCtx {
     }
 
     pub fn server_ids(&self) -> Option<&[ServerIdentity]> {
-        self.prev_server_ids.as_ref().map(Vec::as_slice)
+        self.prev_server_ids.as_deref()
     }
 
     pub fn first_id_or_named(&self) -> ServerIdentity {
