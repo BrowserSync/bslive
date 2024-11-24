@@ -525,6 +525,7 @@ dependencies = [
 name = "bsnext_example"
 version = "0.2.2"
 dependencies = [
+ "bsnext_html",
  "bsnext_input",
  "bsnext_md",
  "clap",
@@ -554,6 +555,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bsnext_input",
+ "indent",
  "insta",
  "scraper",
  "unindent",

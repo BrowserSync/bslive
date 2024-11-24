@@ -42,17 +42,6 @@ fn test_html_playground_content() -> anyhow::Result<()> {
     assert_debug_snapshot!(html.kind);
     assert_debug_snapshot!(js.kind);
     assert_debug_snapshot!(css.kind);
-    // assert_debug_snapshot!(js.kind);
-    // assert_debug_snapshot!(css.kind);
-    // Ok(())
-    // for x in server.routes() {
-    //     dbg!(&x.kind);
-    // match &x.kind {
-    //     RouteKind::Raw(RawRoute::()) => {}
-    //     RouteKind::Proxy(_) => {}
-    //     RouteKind::Dir(_) => {}
-    // }
-    // }
     Ok(())
 }
 #[test]

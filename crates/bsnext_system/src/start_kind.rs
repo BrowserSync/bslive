@@ -86,11 +86,13 @@ pub mod start_fs {
             TargetKind::Yaml => bsnext_yaml::yaml_writer::YamlWriter.input_to_str(input),
             TargetKind::Toml => todo!("toml missing"),
             TargetKind::Md => bsnext_md::md_writer::MdWriter.input_to_str(input),
+            TargetKind::Html => bsnext_html::html_writer::HtmlWriter.input_to_str(input),
         };
         let name = match target_kind {
             TargetKind::Yaml => "bslive.yml",
             TargetKind::Toml => todo!("toml missing"),
             TargetKind::Md => "bslive.md",
+            TargetKind::Html => "bslive.html",
         };
         let next_path = cwd.join(name);
         tracing::info!(

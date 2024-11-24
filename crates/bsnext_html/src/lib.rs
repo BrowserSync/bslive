@@ -4,6 +4,8 @@ use bsnext_input::{Input, InputCreation, InputCtx, InputError};
 use std::fs::read_to_string;
 use std::path::Path;
 
+pub mod html_writer;
+
 pub struct HtmlFs;
 
 impl InputCreation for HtmlFs {
@@ -82,8 +84,8 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
 
     // Create the server
     let server = ServerConfig {
-        routes: playground.as_routes(),
         identity: iden,
+        playground: Some(playground),
         ..Default::default()
     };
 
