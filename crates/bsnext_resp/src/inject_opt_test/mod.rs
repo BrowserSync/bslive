@@ -3,7 +3,7 @@ use crate::builtin_strings::{BuiltinStringDef, BuiltinStrings};
 use crate::inject_addition::{AdditionPosition, InjectAddition};
 use crate::inject_opts::{InjectOpts, Injection, InjectionItem, UnknownStringDef};
 use crate::inject_replacement::{InjectReplacement, Pos};
-use bsnext_guards::path_matcher::{PathMatcher, PathMatcherDef};
+use bsnext_guards::path_matcher::PathMatcher;
 use bsnext_guards::MatcherList;
 
 #[test]
@@ -208,10 +208,8 @@ inject:
                 addition_position: AdditionPosition::Append("lol".to_string()),
             }),
             only: Some(MatcherList::Items(vec![
-                PathMatcher::Str("/*.css".to_string()),
-                PathMatcher::Def(PathMatcherDef {
-                    pathname: Some("/*.css".to_string()),
-                }),
+                PathMatcher::str("/*.css"),
+                PathMatcher::pathname("/*.css"),
             ])),
         }),
     };
@@ -235,7 +233,7 @@ fn test_path_matcher_single() {
             inner: Injection::Addition(InjectAddition {
                 addition_position: AdditionPosition::Append("lol".to_string()),
             }),
-            only: Some(MatcherList::Item(PathMatcher::Str("/*.css".to_string()))),
+            only: Some(MatcherList::Item(PathMatcher::str("/*.css"))),
         }),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
