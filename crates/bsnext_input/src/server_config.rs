@@ -31,7 +31,7 @@ impl ServerConfig {
         }
         routes
     }
-    pub fn routes(&self) -> &[Route] {
+    pub fn raw_routes(&self) -> &[Route] {
         &self.routes
     }
 }

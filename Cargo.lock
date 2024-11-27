@@ -485,6 +485,7 @@ dependencies = [
  "bsnext_client",
  "bsnext_dto",
  "bsnext_fs",
+ "bsnext_guards",
  "bsnext_input",
  "bsnext_resp",
  "bsnext_utils",
@@ -550,6 +551,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bsnext_guards"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "http",
+ "serde",
+ "tracing",
+ "urlpattern",
+]
+
+[[package]]
 name = "bsnext_html"
 version = "0.2.3"
 dependencies = [
@@ -566,6 +578,7 @@ name = "bsnext_input"
 version = "0.2.3"
 dependencies = [
  "anyhow",
+ "bsnext_guards",
  "bsnext_resp",
  "bsnext_tracing",
  "clap",
@@ -623,6 +636,7 @@ version = "0.2.3"
 dependencies = [
  "anyhow",
  "axum",
+ "bsnext_guards",
  "bytes",
  "http",
  "http-body-util",
@@ -631,7 +645,6 @@ dependencies = [
  "tokio",
  "tower 0.4.13",
  "tracing",
- "urlpattern",
 ]
 
 [[package]]

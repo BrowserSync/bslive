@@ -17,7 +17,7 @@ impl InputCreation for HtmlFs {
     }
 
     fn from_input_str<P: AsRef<str>>(content: P, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
-        let input = playground_html_str_to_input(&content.as_ref(), ctx)
+        let input = playground_html_str_to_input(content.as_ref(), ctx)
             .map_err(|e| Box::new(InputError::HtmlError(e.to_string())))?;
         Ok(input)
     }
@@ -45,14 +45,14 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
 
     if let Some(style) = style_elems.next() {
         node_ids_to_remove.push(style.id());
-        let t = style.text().nth(0).unwrap();
+        let t = style.text().next().unwrap();
         let unindented = unindent(t);
         playground.css = Some(unindented);
     }
 
     if let Some(script) = script_elems.next() {
         node_ids_to_remove.push(script.id());
-        let t = script.text().nth(0).unwrap();
+        let t = script.text().next().unwrap();
         let unindented = unindent(t);
         playground.js = Some(unindented);
     }

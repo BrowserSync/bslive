@@ -43,7 +43,7 @@ fn _input_to_str(input: &Input) -> String {
             }
         }
 
-        for route in server_config.routes() {
+        for route in server_config.raw_routes() {
             let path_only = json!({"path": route.path.as_str()});
             let route_yaml = serde_yaml::to_string(&path_only).expect("never fail here on route?");
             chunks.push(fenced_route(&route_yaml));

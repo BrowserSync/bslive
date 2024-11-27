@@ -1,5 +1,6 @@
-use crate::injector_guard::{ByteReplacer, InjectorGuard};
+use crate::injector_guard::ByteReplacer;
 use axum::extract::Request;
+use bsnext_guards::route_guard::RouteGuard;
 use http::Response;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -17,7 +18,7 @@ pub enum Pos {
     Replace(String),
 }
 
-impl InjectorGuard for InjectReplacement {
+impl RouteGuard for InjectReplacement {
     fn accept_req(&self, _req: &Request) -> bool {
         true
     }

@@ -3,6 +3,8 @@ use crate::builtin_strings::{BuiltinStringDef, BuiltinStrings};
 use crate::inject_addition::{AdditionPosition, InjectAddition};
 use crate::inject_opts::{InjectOpts, Injection, InjectionItem, UnknownStringDef};
 use crate::inject_replacement::{InjectReplacement, Pos};
+use bsnext_guards::path_matcher::{PathMatcher, PathMatcherDef};
+use bsnext_guards::MatcherList;
 
 #[test]
 fn test_inject_opts_bool() {
@@ -182,6 +184,59 @@ fn test_inject_append_prepend() {
                 only: None,
             },
         ]),
+    };
+    let actual: Result<A, _> = serde_yaml::from_str(input);
+    assert_eq!(actual.unwrap().inject, expected.inject);
+}
+
+#[test]
+fn test_path_matchers() {
+    #[derive(Debug, serde::Deserialize)]
+    struct A {
+        inject: InjectOpts,
+    }
+    let input = r#"
+inject:
+    append: lol
+    only:
+      - /*.css
+      - pathname: /*.css
+"#;
+    let expected = A {
+        inject: InjectOpts::Item(InjectionItem {
+            inner: Injection::Addition(InjectAddition {
+                addition_position: AdditionPosition::Append("lol".to_string()),
+            }),
+            only: Some(MatcherList::Items(vec![
+                PathMatcher::Str("/*.css".to_string()),
+                PathMatcher::Def(PathMatcherDef {
+                    pathname: Some("/*.css".to_string()),
+                }),
+            ])),
+        }),
+    };
+    let actual: Result<A, _> = serde_yaml::from_str(input);
+    assert_eq!(actual.unwrap().inject, expected.inject);
+}
+
+#[test]
+fn test_path_matcher_single() {
+    #[derive(Debug, serde::Deserialize)]
+    struct A {
+        inject: InjectOpts,
+    }
+    let input = r#"
+    inject:
+        append: lol
+        only: /*.css
+    "#;
+    let expected = A {
+        inject: InjectOpts::Item(InjectionItem {
+            inner: Injection::Addition(InjectAddition {
+                addition_position: AdditionPosition::Append("lol".to_string()),
+            }),
+            only: Some(MatcherList::Item(PathMatcher::Str("/*.css".to_string()))),
+        }),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);
     assert_eq!(actual.unwrap().inject, expected.inject);

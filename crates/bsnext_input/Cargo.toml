@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bsnext_resp = { path = "../bsnext_resp" }
 bsnext_tracing = { path = "../bsnext_tracing" }
+bsnext_guards = { path = "../bsnext_guards" }
 
 miette = { workspace = true }
 

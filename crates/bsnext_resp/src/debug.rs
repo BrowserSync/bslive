@@ -1,11 +1,12 @@
-use crate::injector_guard::{ByteReplacer, InjectorGuard};
+use crate::injector_guard::ByteReplacer;
 use axum::extract::Request;
+use bsnext_guards::route_guard::RouteGuard;
 use http::Response;
 
 #[derive(Debug, Default)]
 pub struct Debug;
 
-impl InjectorGuard for Debug {
+impl RouteGuard for Debug {
     fn accept_req(&self, req: &Request) -> bool {
         req.uri().path().contains("core.css")
     }

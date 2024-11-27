@@ -1,7 +1,8 @@
 use crate::connector::Connector;
 use crate::debug::Debug;
-use crate::injector_guard::{ByteReplacer, InjectorGuard};
+use crate::injector_guard::ByteReplacer;
 use axum::extract::Request;
+use bsnext_guards::route_guard::RouteGuard;
 use http::Response;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -16,7 +17,7 @@ pub enum BuiltinStrings {
     Debug,
 }
 
-impl InjectorGuard for BuiltinStringDef {
+impl RouteGuard for BuiltinStringDef {
     fn accept_req(&self, req: &Request) -> bool {
         match self.name {
             BuiltinStrings::Connector => Connector.accept_req(req),

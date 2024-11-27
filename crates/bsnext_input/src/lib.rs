@@ -120,15 +120,15 @@ impl InputCtx {
     pub fn first_id_or_named(&self) -> ServerIdentity {
         self.prev_server_ids
             .as_ref()
-            .and_then(|x| x.get(0))
+            .and_then(|x| x.first())
             .map(ToOwned::to_owned)
-            .unwrap_or_else(|| ServerIdentity::named())
+            .unwrap_or_else(ServerIdentity::named)
     }
 
     pub fn first_id(&self) -> Option<ServerIdentity> {
         self.prev_server_ids
             .as_ref()
-            .and_then(|x| x.get(0))
+            .and_then(|x| x.first())
             .map(ToOwned::to_owned)
     }
 

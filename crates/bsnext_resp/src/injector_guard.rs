@@ -1,13 +1,8 @@
-use axum::extract::Request;
+use bsnext_guards::route_guard::RouteGuard;
 use bytes::Bytes;
-use http::{HeaderMap, Response};
+use http::HeaderMap;
 
-pub trait InjectorGuard {
-    fn accept_req(&self, req: &Request) -> bool;
-    fn accept_res<T>(&self, res: &Response<T>) -> bool;
-}
-
-pub trait ByteReplacer: InjectorGuard {
+pub trait ByteReplacer: RouteGuard {
     fn apply(&self, body: &'_ str) -> Option<String>;
 
     fn replace_bytes(

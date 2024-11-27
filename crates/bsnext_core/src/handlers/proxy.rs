@@ -5,7 +5,7 @@ use axum::handler::Handler;
 use axum::response::{IntoResponse, Response};
 use axum::routing::any;
 use axum::Extension;
-use bsnext_resp::injector_guard::InjectorGuard;
+use bsnext_guards::route_guard::RouteGuard;
 use bsnext_resp::InjectHandling;
 use http::{HeaderValue, StatusCode, Uri};
 use hyper_tls::HttpsConnector;

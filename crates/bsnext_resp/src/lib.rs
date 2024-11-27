@@ -6,17 +6,17 @@ pub mod inject_addition;
 pub mod inject_opts;
 pub mod inject_replacement;
 pub mod injector_guard;
-pub mod path_matcher;
 use crate::inject_opts::InjectionItem;
 #[cfg(test)]
 pub mod inject_opt_test;
 
-use crate::injector_guard::{ByteReplacer, InjectorGuard};
+use crate::injector_guard::ByteReplacer;
 use axum::body::Body;
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::IntoResponse;
 use axum::Extension;
+use bsnext_guards::route_guard::RouteGuard;
 use http::header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE};
 use http::{Response, StatusCode};
 use http_body_util::BodyExt;

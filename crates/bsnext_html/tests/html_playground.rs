@@ -35,7 +35,7 @@ fn test_html_playground_content() -> anyhow::Result<()> {
     let Some(server) = as_input.servers.get(0) else {
         return Err(anyhow::anyhow!("no server"));
     };
-    let routes = server.routes();
+    let routes = server.combined_routes();
     let html = routes.get(0).unwrap();
     let js = routes.get(1).unwrap();
     let css = routes.get(2).unwrap();
