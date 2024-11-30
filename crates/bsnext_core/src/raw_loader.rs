@@ -52,6 +52,7 @@ async fn raw_resp_for(uri: Uri, route: &RawRoute) -> impl IntoResponse {
 mod raw_test {
     use super::*;
     use crate::handler_stack::RouteMap;
+    use crate::runtime_ctx::RuntimeCtx;
     use crate::server::router::common::to_resp_parts_and_body;
     use bsnext_input::route::Route;
     use tower::ServiceExt;
@@ -75,7 +76,7 @@ mod raw_test {
 
         {
             let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
-            let router = RouteMap::new_from_routes(&routes).into_router();
+            let router = RouteMap::new_from_routes(&routes).into_router(&RuntimeCtx::default());
             // Define the request
             let request = Request::get("/route1").body(Body::empty())?;
             // Make a one-shot request on the router
@@ -86,7 +87,7 @@ mod raw_test {
 
         {
             let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
-            let router = RouteMap::new_from_routes(&routes).into_router();
+            let router = RouteMap::new_from_routes(&routes).into_router(&RuntimeCtx::default());
             // Define the request
             let request = Request::get("/raw1").body(Body::empty())?;
             // Make a one-shot request on the router
@@ -97,7 +98,7 @@ mod raw_test {
 
         {
             let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
-            let router = RouteMap::new_from_routes(&routes).into_router();
+            let router = RouteMap::new_from_routes(&routes).into_router(&RuntimeCtx::default());
             // Define the request
             let request = Request::get("/json").body(Body::empty())?;
             // Make a one-shot request on the router
@@ -108,7 +109,7 @@ mod raw_test {
 
         {
             let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;
-            let router = RouteMap::new_from_routes(&routes).into_router();
+            let router = RouteMap::new_from_routes(&routes).into_router(&RuntimeCtx::default());
             // Define the request
             let request = Request::get("/sse").body(Body::empty())?;
             // Make a one-shot request on the router

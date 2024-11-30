@@ -3,6 +3,12 @@ servers:
     routes:
       - path: /styles.css
         raw: 'body { background: red }'
+  - name: "raw+dir"
+    routes:
+      - path: /
+        html: hello world!
+      - path: /
+        dir: examples/basic/public
   - name: "2dirs"
     routes:
       - path: /

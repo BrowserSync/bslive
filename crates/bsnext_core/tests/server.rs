@@ -1,4 +1,5 @@
 use actix::Actor;
+use bsnext_core::runtime_ctx::RuntimeCtx;
 use bsnext_core::server::actor::ServerActor;
 use bsnext_core::server::handler_listen::Listen;
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
@@ -32,6 +33,7 @@ async fn system_test_01() {
 
     let listen_result = s
         .send(Listen {
+            runtime_ctx: RuntimeCtx::default(),
             parent: parent.clone().recipient(),
             evt_receiver: parent.recipient(),
         })
@@ -70,6 +72,7 @@ async fn system_test_02() {
 
     let list_result = server_actor
         .send(Listen {
+            runtime_ctx: RuntimeCtx::default(),
             parent: parent.clone().recipient(),
             evt_receiver: parent.clone().recipient(),
         })

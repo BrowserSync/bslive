@@ -8,6 +8,7 @@ use bsnext_input::Input;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 
+use crate::runtime_ctx::RuntimeCtx;
 use crate::server::handler_listen::Listen;
 use crate::server::handler_patch::Patch;
 use bsnext_dto::internal::{
@@ -117,6 +118,8 @@ impl ServersSupervisor {
                     let c = server_config.clone();
                     actor_addr
                         .send(Listen {
+                            // todo: tie this to the input somehow?
+                            runtime_ctx: RuntimeCtx::default(),
                             parent: self_addr.clone().recipient(),
                             evt_receiver: self_addr.clone().recipient(),
                         })

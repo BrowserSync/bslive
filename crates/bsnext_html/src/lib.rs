@@ -31,9 +31,11 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
 
     let style = scraper::Selector::parse("style:first-of-type").unwrap();
     let script = scraper::Selector::parse("script:first-of-type").unwrap();
+    let meta = scraper::Selector::parse("meta[name][content]").unwrap();
 
     let mut style_elems = document.select(&style);
     let mut script_elems = document.select(&script);
+    let _meta_elems = document.select(&meta);
     let mut node_ids_to_remove = vec![];
 
     // start an empty playground

@@ -2,21 +2,23 @@
 source: crates/bsnext_core/src/handler_stack.rs
 expression: actual
 ---
-Raw {
-    raw: Raw {
-        raw: "body { background: red }",
+Raw(
+    RawRouteOpts {
+        raw_route: Raw {
+            raw: "body { background: red }",
+        },
+        opts: Opts {
+            cors: None,
+            delay: None,
+            watch: Bool(
+                true,
+            ),
+            inject: Bool(
+                true,
+            ),
+            headers: None,
+            cache: Prevent,
+            compression: None,
+        },
     },
-    opts: Opts {
-        cors: None,
-        delay: None,
-        watch: Bool(
-            true,
-        ),
-        inject: Bool(
-            true,
-        ),
-        headers: None,
-        cache: Prevent,
-        compression: None,
-    },
-}
+)

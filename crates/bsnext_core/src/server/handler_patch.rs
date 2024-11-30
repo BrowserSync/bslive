@@ -41,12 +41,17 @@ impl actix::Handler<Patch> for ServerActor {
             .clients
             .changeset_for(&msg.server_config.clients);
 
+        let Some(app_state) = &self.app_state else {
+            unreachable!("app_state should be set");
+        };
+
         // todo(alpha): use the actix dedicated methods for async state mutation?
         Box::pin({
             let c = span.clone();
+            let ctx = app_state.runtime_ctx.clone();
 
             async move {
-                let router = RouteMap::new_from_routes(&routes).into_router();
+                let router = RouteMap::new_from_routes(&routes).into_router(&ctx);
                 let mut mut_raw_router = app_state_clone.raw_router.write().await;
                 *mut_raw_router = router;
                 drop(mut_raw_router);

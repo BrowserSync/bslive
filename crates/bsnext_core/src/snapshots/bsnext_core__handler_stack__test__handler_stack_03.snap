@@ -2,25 +2,27 @@
 source: crates/bsnext_core/src/handler_stack.rs
 expression: actual
 ---
-Raw {
-    raw: Raw {
-        raw: "console.log(\"hello world!\")",
-    },
-    opts: Opts {
-        cors: Some(
-            Cors(
+Raw(
+    RawRouteOpts {
+        raw_route: Raw {
+            raw: "console.log(\"hello world!\")",
+        },
+        opts: Opts {
+            cors: Some(
+                Cors(
+                    true,
+                ),
+            ),
+            delay: None,
+            watch: Bool(
                 true,
             ),
-        ),
-        delay: None,
-        watch: Bool(
-            true,
-        ),
-        inject: Bool(
-            true,
-        ),
-        headers: None,
-        cache: Prevent,
-        compression: None,
+            inject: Bool(
+                true,
+            ),
+            headers: None,
+            cache: Prevent,
+            compression: None,
+        },
     },
-}
+)

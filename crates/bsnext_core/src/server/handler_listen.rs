@@ -1,4 +1,5 @@
 use crate::handler_stack::RouteMap;
+use crate::runtime_ctx::RuntimeCtx;
 use crate::server::actor::ServerActor;
 use crate::server::router::make_router;
 use crate::server::state::ServerState;
@@ -17,6 +18,7 @@ use tokio::sync::{oneshot, RwLock};
 pub struct Listen {
     pub parent: Recipient<GetServersMessage>,
     pub evt_receiver: Recipient<IncomingEvents>,
+    pub runtime_ctx: RuntimeCtx,
 }
 
 impl actix::Handler<Listen> for ServerActor {
@@ -30,12 +32,14 @@ impl actix::Handler<Listen> for ServerActor {
         let h1 = handle.clone();
         let h2 = handle.clone();
 
-        let router = RouteMap::new_from_routes(&self.config.combined_routes()).into_router();
+        let router =
+            RouteMap::new_from_routes(&self.config.combined_routes()).into_router(&msg.runtime_ctx);
 
         let app_state = Arc::new(ServerState {
             // parent: ,
             routes: Arc::new(RwLock::new(self.config.combined_routes())),
             raw_router: Arc::new(RwLock::new(router)),
+            runtime_ctx: msg.runtime_ctx,
             client_config: Arc::new(RwLock::new(self.config.clients.clone())),
             id: self.config.identity.as_id(),
             parent: Some(msg.parent.clone()),

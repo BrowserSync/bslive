@@ -2,6 +2,7 @@
 mod test {
 
     use crate::handler_stack::RouteMap;
+    use crate::runtime_ctx::RuntimeCtx;
     use crate::server::router::common::{test_proxy, to_resp_parts_and_body};
     use axum::body::Body;
     use axum::extract::Request;
@@ -37,7 +38,7 @@ mod test {
         {
             let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
             let router = RouteMap::new_from_routes(&routes)
-                .into_router()
+                .into_router(&RuntimeCtx::default())
                 .layer(Extension(client));
 
             let expected_body = "target!";

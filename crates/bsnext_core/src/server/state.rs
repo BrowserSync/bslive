@@ -1,3 +1,4 @@
+use crate::runtime_ctx::RuntimeCtx;
 use crate::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
 use actix::Recipient;
 use axum::Router;
@@ -11,6 +12,7 @@ use tokio::sync::{broadcast, RwLock};
 #[derive(Clone)]
 pub struct ServerState {
     pub routes: Arc<RwLock<Vec<Route>>>,
+    pub runtime_ctx: RuntimeCtx,
     pub raw_router: Arc<RwLock<Router>>,
     pub client_config: Arc<RwLock<ClientConfig>>,
     pub id: u64,
