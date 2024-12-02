@@ -1,6 +1,9 @@
 ---
 servers:
   - name: playground
+    routes:
+      - path: /
+        dir: examples/basic/public
 ---
 
 ```html playground
