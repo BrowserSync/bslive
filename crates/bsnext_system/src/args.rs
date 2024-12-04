@@ -2,6 +2,8 @@ use crate::Example;
 use bsnext_input::target::TargetKind;
 use bsnext_tracing::{LogLevel, OutputFormat};
 
+// bslive route --path=/ --dir=
+
 #[derive(clap::Parser, Debug)]
 #[command(version, name = "Browsersync Live")]
 pub struct Args {

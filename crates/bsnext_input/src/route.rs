@@ -1,4 +1,5 @@
 use crate::path_def::PathDef;
+use crate::route_cli::RouteCli;
 use crate::watch_opts::WatchOpts;
 use bsnext_resp::cache_opts::CacheOpts;
 use bsnext_resp::inject_opts::InjectOpts;
@@ -77,6 +78,10 @@ impl AsRef<Route> for Route {
 impl Route {
     pub fn path(&self) -> &str {
         self.path.as_str()
+    }
+    pub fn from_cli_str<A: AsRef<str>>(a: A) -> Result<Self, anyhow::Error> {
+        let cli = RouteCli::try_from_cli_str(a)?;
+        cli.try_into()
     }
 }
 

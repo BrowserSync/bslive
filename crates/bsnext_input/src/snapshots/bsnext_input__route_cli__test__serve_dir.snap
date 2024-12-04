@@ -1,0 +1,10 @@
+---
+source: crates/bsnext_input/src/route_cli.rs
+expression: parsed
+---
+RouteCli {
+    command: ServeDir {
+        path: "/",
+        dir: "examples/basic/public",
+    },
+}

@@ -232,9 +232,7 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
 }
 
 pub fn routes_to_stack(routes: Vec<Route>) -> HandlerStack {
-    routes
-        .into_iter()
-        .fold(HandlerStack::None, |s, route| append_stack(s, route))
+    routes.into_iter().fold(HandlerStack::None, append_stack)
 }
 
 pub fn stack_to_router(path: &str, stack: HandlerStack, ctx: &RuntimeCtx) -> Router {
@@ -411,7 +409,7 @@ mod test {
             let router = route_map.into_router(&RuntimeCtx::default());
             let raw_request = Request::get("/").body(Body::empty())?;
             let response = router.oneshot(raw_request).await?;
-            let (parts, body) = to_resp_parts_and_body(response).await;
+            let (_parts, body) = to_resp_parts_and_body(response).await;
             assert_eq!(body, "hello world!");
 
             let cwd = current_dir().unwrap();

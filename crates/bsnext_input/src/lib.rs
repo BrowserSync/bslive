@@ -12,6 +12,8 @@ pub mod input_test;
 pub mod path_def;
 pub mod playground;
 pub mod route;
+
+pub mod route_cli;
 pub mod route_manifest;
 pub mod server_config;
 pub mod startup;

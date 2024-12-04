@@ -50,10 +50,16 @@ test.describe(
         test("html playground", async ({ page, bs }) => {
             const text: string[] = [];
             page.on("console", (msg) => text.push(msg.text()));
+            let waitForImage = page.waitForResponse((res) => {
+                const url = res.url();
+                return url.includes("bg-01.jpg");
+            });
             await page.goto(bs.path("/"), { waitUntil: "networkidle" });
             await expect(page.locator("abc-element")).toContainText(
                 "Hello World!",
             );
+            let imageResponse = await waitForImage;
+            expect(imageResponse.ok()).toBeTruthy();
         });
     },
 );

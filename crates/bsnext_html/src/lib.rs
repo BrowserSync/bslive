@@ -1,4 +1,5 @@
 use bsnext_input::playground::Playground;
+use bsnext_input::route::Route;
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::{Input, InputCreation, InputCtx, InputError};
 use std::fs::read_to_string;
@@ -45,6 +46,8 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
         js: None,
     };
 
+    let mut routes = vec![];
+
     if let Some(style) = style_elems.next() {
         node_ids_to_remove.push(style.id());
         let t = style.text().next().unwrap();
@@ -57,6 +60,22 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
         let t = script.text().next().unwrap();
         let unindented = unindent(t);
         playground.js = Some(unindented);
+    }
+
+    for x in _meta_elems {
+        let name = x.attr("name");
+        let content = x.attr("content");
+        match (name, content) {
+            (Some(name), Some(content)) => {
+                let joined = format!("{} {}", name, content);
+                let r = Route::from_cli_str(joined);
+                if let Ok(route) = r {
+                    routes.push(route);
+                    node_ids_to_remove.push(x.id());
+                }
+            }
+            _ => todo!("not supported!"),
+        }
     }
 
     for node_id in node_ids_to_remove {
@@ -88,6 +107,7 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
     let server = ServerConfig {
         identity: iden,
         playground: Some(playground),
+        routes,
         ..Default::default()
     };
 
