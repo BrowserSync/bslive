@@ -15,8 +15,23 @@ test.describe(
         test("markdown playground", async ({ page, bs }) => {
             const text: string[] = [];
             page.on("console", (msg) => text.push(msg.text()));
+
+            /**
+             * This first request should be picked up by the playground
+             */
             await page.goto(bs.path("/"), { waitUntil: "networkidle" });
-            expect(text).toContain("Hello from playground.md");
+            const html = await page.locator(":root").innerHTML();
+            expect(html).toMatchSnapshot();
+
+            await test.step("serving dir alongside playground", async () => {
+                /**
+                 * This index.html request should bypass the playground and serve from disk
+                 */
+                await page.goto(bs.path("/index.html"), {
+                    waitUntil: "networkidle",
+                });
+                await page.getByText("Edit me! - a full HTML").waitFor();
+            });
         });
     },
 );
@@ -35,10 +50,16 @@ test.describe(
         test("html playground", async ({ page, bs }) => {
             const text: string[] = [];
             page.on("console", (msg) => text.push(msg.text()));
+            let waitForImage = page.waitForResponse((res) => {
+                const url = res.url();
+                return url.includes("bg-01.jpg");
+            });
             await page.goto(bs.path("/"), { waitUntil: "networkidle" });
             await expect(page.locator("abc-element")).toContainText(
                 "Hello World!",
             );
+            let imageResponse = await waitForImage;
+            expect(imageResponse.ok()).toBeTruthy();
         });
     },
 );

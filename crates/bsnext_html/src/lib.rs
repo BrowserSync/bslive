@@ -1,4 +1,5 @@
 use bsnext_input::playground::Playground;
+use bsnext_input::route::Route;
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::{Input, InputCreation, InputCtx, InputError};
 use std::fs::read_to_string;
@@ -17,7 +18,7 @@ impl InputCreation for HtmlFs {
     }
 
     fn from_input_str<P: AsRef<str>>(content: P, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
-        let input = playground_html_str_to_input(&content.as_ref(), ctx)
+        let input = playground_html_str_to_input(content.as_ref(), ctx)
             .map_err(|e| Box::new(InputError::HtmlError(e.to_string())))?;
         Ok(input)
     }
@@ -31,9 +32,11 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
 
     let style = scraper::Selector::parse("style:first-of-type").unwrap();
     let script = scraper::Selector::parse("script:first-of-type").unwrap();
+    let meta = scraper::Selector::parse("meta[name][content]").unwrap();
 
     let mut style_elems = document.select(&style);
     let mut script_elems = document.select(&script);
+    let _meta_elems = document.select(&meta);
     let mut node_ids_to_remove = vec![];
 
     // start an empty playground
@@ -43,18 +46,36 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
         js: None,
     };
 
+    let mut routes = vec![];
+
     if let Some(style) = style_elems.next() {
         node_ids_to_remove.push(style.id());
-        let t = style.text().nth(0).unwrap();
+        let t = style.text().next().unwrap();
         let unindented = unindent(t);
         playground.css = Some(unindented);
     }
 
     if let Some(script) = script_elems.next() {
         node_ids_to_remove.push(script.id());
-        let t = script.text().nth(0).unwrap();
+        let t = script.text().next().unwrap();
         let unindented = unindent(t);
         playground.js = Some(unindented);
+    }
+
+    for x in _meta_elems {
+        let name = x.attr("name");
+        let content = x.attr("content");
+        match (name, content) {
+            (Some(name), Some(content)) => {
+                let joined = format!("{} {}", name, content);
+                let r = Route::from_cli_str(joined);
+                if let Ok(route) = r {
+                    routes.push(route);
+                    node_ids_to_remove.push(x.id());
+                }
+            }
+            _ => todo!("not supported!"),
+        }
     }
 
     for node_id in node_ids_to_remove {
@@ -86,6 +107,7 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
     let server = ServerConfig {
         identity: iden,
         playground: Some(playground),
+        routes,
         ..Default::default()
     };
 

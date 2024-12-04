@@ -1,5 +1,3 @@
-use bsnext_input::playground::Playground;
-use bsnext_input::server_config::ServerConfig;
 use bsnext_input::{Input, InputWriter};
 
 pub struct HtmlWriter;
@@ -36,6 +34,8 @@ impl InputWriter for HtmlWriter {
 
 #[test]
 fn test_html_writer_for_playground() {
+    use bsnext_input::playground::Playground;
+    use bsnext_input::server_config::ServerConfig;
     let css = r#"body {
     background: red;
 }"#;

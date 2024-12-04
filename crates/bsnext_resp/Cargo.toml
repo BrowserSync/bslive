@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-urlpattern = { version = "0.3.0" }
+bsnext_guards = { path = "../bsnext_guards" }
 
 tracing = { workspace = true }
 axum = { workspace = true }

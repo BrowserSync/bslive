@@ -25,13 +25,17 @@ impl ServerConfig {
     /// All regular routes, plus dynamically added ones (for example, through a playground)
     ///
     pub fn combined_routes(&self) -> Vec<Route> {
-        let mut routes = self.routes.clone();
-        if let Some(playground) = &self.playground {
-            routes.extend(playground.as_routes())
+        let routes = self.routes.clone();
+        match &self.playground {
+            None => self.routes.clone(),
+            Some(playground) => {
+                let mut pg_routes = playground.as_routes();
+                pg_routes.extend(routes);
+                pg_routes
+            }
         }
-        routes
     }
-    pub fn routes(&self) -> &[Route] {
+    pub fn raw_routes(&self) -> &[Route] {
         &self.routes
     }
 }

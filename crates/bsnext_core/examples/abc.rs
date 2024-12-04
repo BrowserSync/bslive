@@ -1,4 +1,5 @@
 use actix::Actor;
+use bsnext_core::runtime_ctx::RuntimeCtx;
 use bsnext_core::server::actor::ServerActor;
 use bsnext_core::server::handler_listen::Listen;
 use bsnext_core::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
@@ -28,6 +29,7 @@ async fn main() {
 
     let a = s
         .send(Listen {
+            runtime_ctx: RuntimeCtx::default(),
             parent: parent.clone().recipient(),
             evt_receiver: parent.recipient(),
         })

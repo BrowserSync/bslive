@@ -1,12 +1,13 @@
-use crate::injector_guard::{ByteReplacer, InjectorGuard};
+use crate::injector_guard::ByteReplacer;
 use crate::RespMod;
 use axum::extract::Request;
+use bsnext_guards::route_guard::RouteGuard;
 use http::Response;
 
 #[derive(Debug, Default)]
 pub struct Connector;
 
-impl InjectorGuard for Connector {
+impl RouteGuard for Connector {
     fn accept_req(&self, req: &Request) -> bool {
         RespMod::accepts_html(req)
     }

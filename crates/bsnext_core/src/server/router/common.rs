@@ -3,6 +3,7 @@ use crate::server::state::ServerState;
 use std::net::SocketAddr;
 
 use crate::handler_stack::RouteMap;
+use crate::runtime_ctx::RuntimeCtx;
 use axum::body::Body;
 use axum::extract::Request;
 use axum::response::Response;
@@ -22,8 +23,10 @@ use tower::ServiceExt;
 
 pub fn into_state(val: ServerConfig) -> ServerState {
     let (sender, _) = tokio::sync::broadcast::channel::<ClientEvent>(10);
-    let router = RouteMap::new_from_routes(&val.combined_routes()).into_router();
+    let runtime_ctx = RuntimeCtx::default();
+    let router = RouteMap::new_from_routes(&val.combined_routes()).into_router(&runtime_ctx);
     ServerState {
+        runtime_ctx: RuntimeCtx::default(),
         routes: Arc::new(RwLock::new(val.combined_routes())),
         raw_router: Arc::new(RwLock::new(router)),
         client_config: Arc::new(RwLock::new(val.clients.clone())),

@@ -2,6 +2,7 @@ use crate::handlers::proxy::{proxy_handler, ProxyConfig};
 use crate::not_found::not_found_service::not_found_loader;
 use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
+use crate::runtime_ctx::RuntimeCtx;
 use crate::serve_dir::try_many_services_dir;
 use axum::handler::Handler;
 use axum::middleware::{from_fn, from_fn_with_state};
@@ -9,15 +10,17 @@ use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{Extension, Router};
 use bsnext_input::route::{DirRoute, FallbackRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Debug, PartialEq)]
 pub enum HandlerStack {
     None,
     // todo: make this a separate thing
-    Raw {
-        raw: RawRoute,
-        opts: Opts,
+    Raw(RawRouteOpts),
+    RawAndDirs {
+        raw: RawRouteOpts,
+        dirs: Vec<DirRouteOpts>,
     },
     Dirs(Vec<DirRouteOpts>),
     Proxy {
@@ -38,8 +41,14 @@ pub struct DirRouteOpts {
     fallback_route: Option<FallbackRoute>,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct RawRouteOpts {
+    raw_route: RawRoute,
+    opts: Opts,
+}
+
 impl DirRouteOpts {
-    pub fn as_serve_dir(&self) -> ServeDir {
+    pub fn as_serve_dir(&self, cwd: &Path) -> ServeDir {
         match &self.dir_route.base {
             Some(base_dir) => {
                 tracing::trace!(
@@ -50,8 +59,19 @@ impl DirRouteOpts {
                 ServeDir::new(base_dir.join(&self.dir_route.dir))
             }
             None => {
-                tracing::trace!("no root given, using `{}` directly", self.dir_route.dir);
-                ServeDir::new(&self.dir_route.dir)
+                let pb = PathBuf::from(&self.dir_route.dir);
+                if pb.is_absolute() {
+                    tracing::trace!("no root given, using `{}` directly", self.dir_route.dir);
+                    ServeDir::new(&self.dir_route.dir)
+                } else {
+                    let joined = cwd.join(pb);
+                    tracing::trace!(
+                        "prepending the current directory to relative path {} {}",
+                        cwd.display(),
+                        joined.display()
+                    );
+                    ServeDir::new(joined)
+                }
             }
         }
         .append_index_html_on_directories(true)
@@ -102,7 +122,7 @@ impl RouteMap {
         }
     }
 
-    pub fn into_router(self) -> Router {
+    pub fn into_router(self, ctx: &RuntimeCtx) -> Router {
         let mut router = Router::new();
 
         tracing::trace!("processing `{}` different routes", self.mapping.len());
@@ -114,8 +134,8 @@ impl RouteMap {
                 route_list.len()
             );
 
-            let stack = routes_to_stack(&route_list);
-            let path_router = stack_to_router(&path, stack);
+            let stack = routes_to_stack(route_list);
+            let path_router = stack_to_router(&path, stack, ctx);
 
             tracing::trace!("will merge router at path: `{path}`");
             router = router.merge(path_router);
@@ -128,10 +148,10 @@ impl RouteMap {
 pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
     match state {
         HandlerStack::None => match route.kind {
-            RouteKind::Raw(raw_route) => HandlerStack::Raw {
-                raw: raw_route,
+            RouteKind::Raw(raw_route) => HandlerStack::Raw(RawRouteOpts {
+                raw_route,
                 opts: route.opts,
-            },
+            }),
             RouteKind::Proxy(new_proxy_route) => HandlerStack::Proxy {
                 proxy: new_proxy_route,
                 opts: route.opts,
@@ -140,15 +160,22 @@ pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
                 HandlerStack::Dirs(vec![DirRouteOpts::new(dir, route.opts, route.fallback)])
             }
         },
-        HandlerStack::Raw { raw, opts } => match route.kind {
+        HandlerStack::Raw(RawRouteOpts { raw_route, opts }) => match route.kind {
             // if a second 'raw' is seen, just use it, discarding the previous
-            RouteKind::Raw(raw_route) => HandlerStack::Raw {
-                raw: raw_route,
+            RouteKind::Raw(raw_route) => HandlerStack::Raw(RawRouteOpts {
+                raw_route,
                 opts: route.opts,
+            }),
+            RouteKind::Dir(dir) => HandlerStack::RawAndDirs {
+                dirs: vec![DirRouteOpts::new(dir, route.opts, None)],
+                raw: RawRouteOpts { raw_route, opts },
             },
             // 'raw' handlers never get updated
-            _ => HandlerStack::Raw { raw, opts },
+            _ => HandlerStack::Raw(RawRouteOpts { raw_route, opts }),
         },
+        HandlerStack::RawAndDirs { .. } => {
+            todo!("support RawAndDirs")
+        }
         HandlerStack::Dirs(mut dirs) => match route.kind {
             RouteKind::Dir(next_dir) => {
                 dirs.push(DirRouteOpts::new(next_dir, route.opts, route.fallback));
@@ -204,22 +231,29 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
     }
 }
 
-pub fn routes_to_stack(routes: &[Route]) -> HandlerStack {
-    routes.iter().fold(HandlerStack::None, |s, route| {
-        append_stack(s, route.clone())
-    })
+pub fn routes_to_stack(routes: Vec<Route>) -> HandlerStack {
+    routes.into_iter().fold(HandlerStack::None, append_stack)
 }
 
-pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
+pub fn stack_to_router(path: &str, stack: HandlerStack, ctx: &RuntimeCtx) -> Router {
     match stack {
         HandlerStack::None => unreachable!(),
-        HandlerStack::Raw { raw, opts } => {
-            let svc = any_service(serve_raw_one.with_state(raw));
+        HandlerStack::Raw(RawRouteOpts { raw_route, opts }) => {
+            let svc = any_service(serve_raw_one.with_state(raw_route));
             let out = optional_layers(svc, &opts);
             Router::new().route_service(path, out)
         }
+        HandlerStack::RawAndDirs {
+            dirs,
+            raw: RawRouteOpts { raw_route, opts },
+        } => {
+            let svc = any_service(serve_raw_one.with_state(raw_route));
+            let raw_out = optional_layers(svc, &opts);
+            let service = serve_dir_layer(&dirs, Router::new(), ctx);
+            Router::new().route(path, raw_out).fallback_service(service)
+        }
         HandlerStack::Dirs(dirs) => {
-            let service = serve_dir_layer(&dirs, Router::new());
+            let service = serve_dir_layer(&dirs, Router::new(), ctx);
             Router::new()
                 .nest_service(path, service)
                 .layer(from_fn(not_found_loader))
@@ -236,26 +270,30 @@ pub fn stack_to_router(path: &str, stack: HandlerStack) -> Router {
             Router::new().nest_service(path, optional_layers(as_service, &opts))
         }
         HandlerStack::DirsProxy { dirs, proxy, opts } => {
-            let proxy_router = stack_to_router(path, HandlerStack::Proxy { proxy, opts });
-            let r1 = serve_dir_layer(&dirs, Router::new().fallback_service(proxy_router));
+            let proxy_router = stack_to_router(path, HandlerStack::Proxy { proxy, opts }, ctx);
+            let r1 = serve_dir_layer(&dirs, Router::new().fallback_service(proxy_router), ctx);
             Router::new().nest_service(path, r1)
         }
     }
 }
 
-fn serve_dir_layer(dir_list_with_opts: &[DirRouteOpts], initial: Router) -> Router {
+fn serve_dir_layer(
+    dir_list_with_opts: &[DirRouteOpts],
+    initial: Router,
+    ctx: &RuntimeCtx,
+) -> Router {
     let serve_dir_items = dir_list_with_opts
         .iter()
         .map(|dir_route| match &dir_route.fallback_route {
             None => {
-                let serve_dir_service = dir_route.as_serve_dir();
+                let serve_dir_service = dir_route.as_serve_dir(ctx.cwd());
                 let service = get_service(serve_dir_service);
                 optional_layers(service, &dir_route.opts)
             }
             Some(fallback) => {
                 let stack = fallback_to_layered_method_router(fallback.clone());
                 let serve_dir_service = dir_route
-                    .as_serve_dir()
+                    .as_serve_dir(ctx.cwd())
                     .fallback(stack)
                     .call_fallback_on_method_not_allowed(true);
                 let service = any_service(serve_dir_service);
@@ -272,6 +310,7 @@ mod test {
     use super::*;
     use crate::server::router::common::to_resp_parts_and_body;
     use axum::body::Body;
+    use std::env::current_dir;
 
     use bsnext_input::Input;
     use http::Request;
@@ -287,9 +326,10 @@ mod test {
             .servers
             .iter()
             .find(|x| x.identity.is_named("raw"))
+            .map(ToOwned::to_owned)
             .unwrap();
 
-        let actual = routes_to_stack(&first.routes);
+        let actual = routes_to_stack(first.routes);
         assert_debug_snapshot!(actual);
         Ok(())
     }
@@ -302,9 +342,10 @@ mod test {
             .servers
             .iter()
             .find(|x| x.identity.is_named("2dirs+proxy"))
+            .map(ToOwned::to_owned)
             .unwrap();
 
-        let actual = routes_to_stack(&first.routes);
+        let actual = routes_to_stack(first.routes);
 
         assert_debug_snapshot!(actual);
         Ok(())
@@ -317,9 +358,10 @@ mod test {
             .servers
             .iter()
             .find(|s| s.identity.is_named("raw+opts"))
+            .map(ToOwned::to_owned)
             .unwrap();
 
-        let actual = routes_to_stack(&first.routes);
+        let actual = routes_to_stack(first.routes);
 
         assert_debug_snapshot!(actual);
         Ok(())
@@ -338,7 +380,7 @@ mod test {
                 .unwrap();
 
             let route_map = RouteMap::new_from_routes(&first.routes);
-            let router = route_map.into_router();
+            let router = route_map.into_router(&RuntimeCtx::default());
             let request = Request::get("/styles.css").body(Body::empty())?;
 
             // Define the request
@@ -347,6 +389,39 @@ mod test {
             let (_parts, body) = to_resp_parts_and_body(response).await;
 
             assert_eq!(body, "body { background: red }");
+        }
+
+        Ok(())
+    }
+    #[tokio::test]
+    async fn test_raw_with_dir_fallback() -> anyhow::Result<()> {
+        let yaml = include_str!("../../../examples/basic/handler_stack.yml");
+        let input = serde_yaml::from_str::<Input>(&yaml)?;
+
+        {
+            let first = input
+                .servers
+                .iter()
+                .find(|x| x.identity.is_named("raw+dir"))
+                .unwrap();
+
+            let route_map = RouteMap::new_from_routes(&first.routes);
+            let router = route_map.into_router(&RuntimeCtx::default());
+            let raw_request = Request::get("/").body(Body::empty())?;
+            let response = router.oneshot(raw_request).await?;
+            let (_parts, body) = to_resp_parts_and_body(response).await;
+            assert_eq!(body, "hello world!");
+
+            let cwd = current_dir().unwrap();
+            let cwd = cwd.ancestors().nth(2).unwrap();
+            let ctx = RuntimeCtx::new(cwd);
+            let route_map = RouteMap::new_from_routes(&first.routes);
+            let router = route_map.into_router(&ctx);
+            let dir_request = Request::get("/script.js").body(Body::empty())?;
+            let response = router.oneshot(dir_request).await?;
+            let (_parts, body) = to_resp_parts_and_body(response).await;
+            let expected = include_str!("../../../examples/basic/public/script.js");
+            assert_eq!(body, expected);
         }
 
         Ok(())

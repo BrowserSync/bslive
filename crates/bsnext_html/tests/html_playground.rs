@@ -1,4 +1,5 @@
 use bsnext_html::HtmlFs;
+use bsnext_input::route::RouteKind;
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::{InputArgs, InputCreation, InputCtx};
 use insta::assert_debug_snapshot;
@@ -35,7 +36,7 @@ fn test_html_playground_content() -> anyhow::Result<()> {
     let Some(server) = as_input.servers.get(0) else {
         return Err(anyhow::anyhow!("no server"));
     };
-    let routes = server.routes();
+    let routes = server.combined_routes();
     let html = routes.get(0).unwrap();
     let js = routes.get(1).unwrap();
     let css = routes.get(2).unwrap();
@@ -78,5 +79,32 @@ fn test_html_playground_with_port() -> anyhow::Result<()> {
     let as_input = HtmlFs::from_input_str(INPUT, &ctx)?;
     let first = as_input.servers.get(0).unwrap();
     assert_eq!(first.identity, ident);
+    Ok(())
+}
+
+const INPUT_WITH_META: &str = r#"
+<meta name="bslive serve-dir" content="--path=/ --dir=examples/basic/public" />
+<main>
+    <h1>Test!</h1>
+    <abc-shane></abc-shane>
+</main>"#;
+
+#[test]
+fn test_html_playground_with_meta() -> anyhow::Result<()> {
+    let ident = ServerIdentity::Address {
+        bind_address: String::from("0.0.0.0:8080"),
+    };
+    let input_args = InputArgs { port: Some(8080) };
+    let ctx = InputCtx::new(&[], Some(input_args));
+    let as_input = HtmlFs::from_input_str(INPUT_WITH_META, &ctx)?;
+    let first = as_input.servers.get(0).unwrap();
+    assert_eq!(first.identity, ident);
+    let routes = first.combined_routes();
+    let found = routes
+        .iter()
+        .find(|x| matches!(x.kind, RouteKind::Dir(..)))
+        .expect("must find dir");
+    assert_debug_snapshot!(found.path);
+    assert_debug_snapshot!(found.kind);
     Ok(())
 }

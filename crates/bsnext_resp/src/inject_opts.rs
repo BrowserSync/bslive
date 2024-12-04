@@ -1,9 +1,10 @@
 use crate::builtin_strings::{BuiltinStringDef, BuiltinStrings};
 use crate::inject_addition::InjectAddition;
 use crate::inject_replacement::InjectReplacement;
-use crate::injector_guard::{ByteReplacer, InjectorGuard};
-use crate::path_matcher::PathMatcher;
+use crate::injector_guard::ByteReplacer;
 use axum::extract::Request;
+use bsnext_guards::route_guard::RouteGuard;
+use bsnext_guards::MatcherList;
 use http::Response;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -57,14 +58,6 @@ pub struct InjectionItem {
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
-pub enum MatcherList {
-    None,
-    Item(PathMatcher),
-    Items(Vec<PathMatcher>),
-}
-
-#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(untagged)]
 pub enum Injection {
     BsLive(BuiltinStringDef),
     UnknownNamed(UnknownStringDef),
@@ -76,20 +69,13 @@ pub enum Injection {
 pub struct UnknownStringDef {
     pub name: String,
 }
-
-impl InjectorGuard for InjectionItem {
+impl RouteGuard for InjectionItem {
     fn accept_req(&self, req: &Request) -> bool {
-        // right now, we only support matching on the pathname
-        let path_and_query = req.uri().path_and_query().expect("?");
-        let path = path_and_query.path();
-
-        let path_is_allowed = match self.only.as_ref() {
+        let uri_is_allowed = match self.only.as_ref() {
             None => true,
-            Some(MatcherList::None) => true,
-            Some(MatcherList::Item(matcher)) => matcher.test(path),
-            Some(MatcherList::Items(matchers)) => matchers.iter().any(|m| m.test(path)),
+            Some(ml) => ml.test_uri(req.uri()),
         };
-        if path_is_allowed {
+        if uri_is_allowed {
             match &self.inner {
                 Injection::BsLive(built_ins) => built_ins.accept_req(req),
                 Injection::UnknownNamed(_) => todo!("accept_req Injection::UnknownNamed"),

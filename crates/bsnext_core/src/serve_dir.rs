@@ -61,6 +61,7 @@ mod test {
     use crate::handler_stack::RouteMap;
     use crate::server::router::common::to_resp_parts_and_body;
 
+    use crate::runtime_ctx::RuntimeCtx;
     use bsnext_input::route::Route;
     use std::env::current_dir;
 
@@ -84,7 +85,7 @@ mod test {
         let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
 
         {
-            let router = RouteMap::new_from_routes(&routes).into_router();
+            let router = RouteMap::new_from_routes(&routes).into_router(&RuntimeCtx::default());
             let expected_body = include_str!("../../../examples/basic/public/index.html");
 
             // Define the request
@@ -96,7 +97,7 @@ mod test {
         }
 
         {
-            let router = RouteMap::new_from_routes(&routes).into_router();
+            let router = RouteMap::new_from_routes(&routes).into_router(&RuntimeCtx::default());
             let expected_body = include_str!("../../../examples/kitchen-sink/input.html");
 
             // Define the request

@@ -12,6 +12,8 @@ pub mod input_test;
 pub mod path_def;
 pub mod playground;
 pub mod route;
+
+pub mod route_cli;
 pub mod route_manifest;
 pub mod server_config;
 pub mod startup;
@@ -120,15 +122,15 @@ impl InputCtx {
     pub fn first_id_or_named(&self) -> ServerIdentity {
         self.prev_server_ids
             .as_ref()
-            .and_then(|x| x.get(0))
+            .and_then(|x| x.first())
             .map(ToOwned::to_owned)
-            .unwrap_or_else(|| ServerIdentity::named())
+            .unwrap_or_else(ServerIdentity::named)
     }
 
     pub fn first_id(&self) -> Option<ServerIdentity> {
         self.prev_server_ids
             .as_ref()
-            .and_then(|x| x.get(0))
+            .and_then(|x| x.first())
             .map(ToOwned::to_owned)
     }
 
