@@ -1,8 +1,9 @@
-use crate::args::Args;
+use crate::args::{Args, SubCommands};
 use crate::start_kind::StartKind;
 use crate::{AnyEvent, BsSystem, Start};
 use actix::Actor;
 
+use crate::export::test_playground_export;
 use bsnext_dto::internal::StartupEvent;
 use bsnext_input::startup::DidStart;
 use bsnext_output::ratatui::Ratatui;
@@ -25,6 +26,18 @@ where
     std::env::set_var("RUST_LIB_BACKTRACE", "0");
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
     let args = Args::parse_from(itr);
+    match &args.command {
+        None => {}
+        Some(command) => match command {
+            SubCommands::Export(cmd) => {
+                let result = test_playground_export(cmd).await;
+                match result {
+                    Ok(()) => todo!("handle result"),
+                    Err(_) => todo!("handle error"),
+                }
+            }
+        },
+    }
     let format_clone = args.format;
     let write_opt = if args.write_log {
         WriteOption::File

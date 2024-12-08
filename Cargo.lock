@@ -666,6 +666,8 @@ dependencies = [
  "bsnext_tracing",
  "bsnext_yaml",
  "clap",
+ "futures-util",
+ "http",
  "insta",
  "rand",
  "tempfile",

@@ -22,12 +22,11 @@ impl TryInto<Route> for RouteCli {
 
     fn try_into(self) -> Result<Route, Self::Error> {
         Ok(match self.command {
-            SubCommands::ServeDir { dir, path } => {
-                let mut route = Route::default();
-                route.path = PathDef::try_new(path)?;
-                route.kind = RouteKind::Dir(DirRoute { dir, base: None });
-                route
-            }
+            SubCommands::ServeDir { dir, path } => Route {
+                path: PathDef::try_new(path)?,
+                kind: RouteKind::Dir(DirRoute { dir, base: None }),
+                ..std::default::Default::default()
+            },
         })
     }
 }

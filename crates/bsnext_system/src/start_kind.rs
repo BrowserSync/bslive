@@ -139,20 +139,26 @@ pub mod start_fs {
             .map_err(|_e| InputWriteError::FailedWrite { path: next_path })
     }
 
-    pub fn create_dir(dir: &PathBuf, write_mode: &WriteMode) -> Result<PathBuf, DirError> {
-        let exists =
-            fs::exists(dir).map_err(|_e| DirError::CannotQueryStatus { path: dir.clone() })?;
+    pub fn create_dir(dir: &Path, write_mode: &WriteMode) -> Result<PathBuf, DirError> {
+        let exists = fs::exists(dir).map_err(|_e| DirError::CannotQueryStatus {
+            path: dir.to_path_buf(),
+        })?;
 
         if exists && *write_mode == WriteMode::Safe {
-            return Err(DirError::Exists { path: dir.clone() });
+            return Err(DirError::Exists {
+                path: dir.to_path_buf(),
+            });
         }
 
         fs::create_dir_all(dir)
-            .map_err(|_e| DirError::CannotCreate { path: dir.clone() })
-            .and_then(|_pb| {
-                std::env::set_current_dir(dir)
-                    .map_err(|_e| DirError::CannotMove { path: dir.clone() })
+            .map_err(|_e| DirError::CannotCreate {
+                path: dir.to_path_buf(),
             })
-            .map(|_| dir.clone())
+            .and_then(|_pb| {
+                std::env::set_current_dir(dir).map_err(|_e| DirError::CannotMove {
+                    path: dir.to_path_buf(),
+                })
+            })
+            .map(|_| dir.to_path_buf())
     }
 }

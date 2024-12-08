@@ -1,6 +1,7 @@
 use crate::Example;
 use bsnext_input::target::TargetKind;
 use bsnext_tracing::{LogLevel, OutputFormat};
+use std::path::PathBuf;
 
 // bslive route --path=/ --dir=
 
@@ -51,10 +52,29 @@ pub struct Args {
     #[arg(long, requires = "example", conflicts_with = "dir")]
     pub name: Option<String>,
 
-    /// Only works with `--example` - specify a port instead of a random one    
+    /// Only works with `--example` - specify a port instead of a random one
     #[arg(short, long)]
     pub port: Option<u16>,
 
+    #[command(subcommand)]
+    pub command: Option<SubCommands>,
+
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub paths: Vec<String>,
+}
+
+#[derive(Debug, clap::Subcommand)]
+pub enum SubCommands {
+    /// Export raw entries to files
+    Export(ExportCommand),
+}
+
+#[derive(Debug, clap::Parser)]
+pub struct ExportCommand {
+    /// The folder to export the files to. For current, provide '.'
+    #[arg(long = "dir")]
+    pub out_dir: PathBuf,
+    /// When provided, just prints what might happen
+    #[arg(long)]
+    pub dry_run: bool,
 }
