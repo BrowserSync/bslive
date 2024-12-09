@@ -36,7 +36,7 @@ struct ExportRequest<'a> {
 
 type ExportResult = (Parts, String, Duration);
 
-pub async fn test_playground_export(cmd: &ExportCommand) -> anyhow::Result<()> {
+pub async fn test_playground_export(cwd: &PathBuf, cmd: &ExportCommand) -> anyhow::Result<()> {
     let pg = Playground {
         html: "hello world".to_string(),
         ..Default::default()
@@ -53,7 +53,7 @@ pub async fn test_playground_export(cmd: &ExportCommand) -> anyhow::Result<()> {
     let raw_entry_paths = raw_entries.clone().map(|r| r.filepath);
     let async_requests = raw_entries.map(|req| uri_to_res_parts(state.clone(), req.url_path));
 
-    let ctx = RuntimeCtx::default();
+    let ctx = RuntimeCtx::new(cwd);
 
     let job_results = join_all(async_requests)
         .await
