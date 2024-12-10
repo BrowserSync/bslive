@@ -1,4 +1,4 @@
-use crate::start_kind::start_fs;
+use crate::start_kind::fs_write_input;
 use bsnext_fs_helpers::WriteMode;
 use bsnext_input::route::{DirRoute, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
@@ -27,7 +27,7 @@ impl SystemStart for StartFromDirPaths {
             WriteMode::Safe
         };
         if self.write_input {
-            let path = start_fs::fs_write_input(&ctx.cwd, &input, TargetKind::Yaml, &write_mode)
+            let path = fs_write_input(&ctx.cwd, &input, TargetKind::Yaml, &write_mode)
                 .map_err(|e| Box::new(e.into()))?;
             Ok(SystemStartArgs::PathWithInput { input, path })
         } else {

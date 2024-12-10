@@ -29,7 +29,7 @@ where
     match &args.command {
         None => start_command::start_cmd(cwd, args).await,
         Some(command) => match command {
-            SubCommands::Export(cmd) => export_cmd::export_cmd(&cwd, cmd).await,
+            SubCommands::Export(cmd) => export_cmd::export_cmd(&cwd, cmd, &args).await,
         },
     }
 }

@@ -10,6 +10,7 @@ bsnext_utils = { path = "../bsnext_utils" }
 
 [dependencies]
 bsnext_input = { path = "../bsnext_input" }
+bsnext_fs_helpers = { path = "../bsnext_fs_helpers" }
 bsnext_fs = { path = "../bsnext_fs" }
 bsnext_resp = { path = "../bsnext_resp" }
 bsnext_client = { path = "../bsnext_client" }

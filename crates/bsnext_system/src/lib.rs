@@ -35,7 +35,6 @@ use tracing::{debug_span, Instrument};
 pub mod args;
 pub mod cli;
 pub mod commands;
-mod export;
 pub mod input_fs;
 pub mod monitor;
 mod monitor_any_watchables;

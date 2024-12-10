@@ -485,6 +485,7 @@ dependencies = [
  "bsnext_client",
  "bsnext_dto",
  "bsnext_fs",
+ "bsnext_fs_helpers",
  "bsnext_guards",
  "bsnext_input",
  "bsnext_resp",
