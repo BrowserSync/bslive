@@ -64,24 +64,17 @@ impl SystemStart for StartKind {
 
 pub mod start_fs {
 
-    use std::fs;
+    use bsnext_fs_helpers::{fs_write_input_src, FsWriteError, WriteMode};
+    use bsnext_input::target::TargetKind;
+    use bsnext_input::{Input, InputWriter};
     use std::path::{Path, PathBuf};
 
-    use bsnext_input::target::TargetKind;
-    use bsnext_input::{DirError, Input, InputWriteError, InputWriter};
-
-    #[derive(Default, Debug, PartialEq)]
-    pub enum WriteMode {
-        #[default]
-        Safe,
-        Override,
-    }
     pub fn fs_write_input(
         cwd: &Path,
         input: &Input,
         target_kind: TargetKind,
         write_mode: &WriteMode,
-    ) -> Result<PathBuf, InputWriteError> {
+    ) -> Result<PathBuf, FsWriteError> {
         let string = match target_kind {
             TargetKind::Yaml => bsnext_yaml::yaml_writer::YamlWriter.input_to_str(input),
             TargetKind::Toml => todo!("toml missing"),
@@ -94,71 +87,7 @@ pub mod start_fs {
             TargetKind::Md => "bslive.md",
             TargetKind::Html => "bslive.html",
         };
-        let next_path = cwd.join(name);
-        tracing::info!(
-            "✏️ writing {} bytes to {}",
-            string.len(),
-            next_path.display()
-        );
 
-        let exists = fs::exists(&next_path).map_err(|_e| InputWriteError::CannotQueryStatus {
-            path: next_path.clone(),
-        })?;
-
-        if exists && *write_mode == WriteMode::Safe {
-            return Err(InputWriteError::Exists { path: next_path });
-        }
-
-        fs::write(&next_path, string)
-            .map(|()| next_path.clone())
-            .map_err(|_e| InputWriteError::FailedWrite { path: next_path })
-    }
-    pub fn fs_write_input_src(
-        cwd: &Path,
-        path: &Path,
-        string: &str,
-        write_mode: &WriteMode,
-    ) -> Result<PathBuf, InputWriteError> {
-        let next_path = cwd.join(path);
-        tracing::info!(
-            "✏️ writing {} bytes to {}",
-            string.len(),
-            next_path.display()
-        );
-
-        let exists = fs::exists(&next_path).map_err(|_e| InputWriteError::CannotQueryStatus {
-            path: next_path.clone(),
-        })?;
-
-        if exists && *write_mode == WriteMode::Safe {
-            return Err(InputWriteError::Exists { path: next_path });
-        }
-
-        fs::write(&next_path, string)
-            .map(|()| next_path.clone())
-            .map_err(|_e| InputWriteError::FailedWrite { path: next_path })
-    }
-
-    pub fn create_dir(dir: &Path, write_mode: &WriteMode) -> Result<PathBuf, DirError> {
-        let exists = fs::exists(dir).map_err(|_e| DirError::CannotQueryStatus {
-            path: dir.to_path_buf(),
-        })?;
-
-        if exists && *write_mode == WriteMode::Safe {
-            return Err(DirError::Exists {
-                path: dir.to_path_buf(),
-            });
-        }
-
-        fs::create_dir_all(dir)
-            .map_err(|_e| DirError::CannotCreate {
-                path: dir.to_path_buf(),
-            })
-            .and_then(|_pb| {
-                std::env::set_current_dir(dir).map_err(|_e| DirError::CannotMove {
-                    path: dir.to_path_buf(),
-                })
-            })
-            .map(|_| dir.to_path_buf())
+        fs_write_input_src(&cwd, &PathBuf::from(name), &string, write_mode)
     }
 }

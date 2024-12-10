@@ -23,6 +23,7 @@ hyper-util = { version = "0.1.1", features = ["client-legacy"] }
 
 mime_guess = { workspace = true }
 insta = { workspace = true }
+clap = { workspace = true }
 axum = { workspace = true }
 http-body-util = { workspace = true }
 tokio = { workspace = true }

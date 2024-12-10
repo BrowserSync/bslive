@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bsnext_resp = { path = "../bsnext_resp" }
+bsnext_fs_helpers = { path = "../bsnext_fs_helpers" }
 bsnext_tracing = { path = "../bsnext_tracing" }
 bsnext_guards = { path = "../bsnext_guards" }
 shell-words = { version = "1.1.0" }

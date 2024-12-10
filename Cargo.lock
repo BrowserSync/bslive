@@ -490,6 +490,7 @@ dependencies = [
  "bsnext_resp",
  "bsnext_utils",
  "bytes",
+ "clap",
  "futures",
  "futures-util",
  "http",
@@ -551,6 +552,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bsnext_fs_helpers"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "bsnext_guards"
 version = "0.3.1"
 dependencies = [
@@ -578,6 +587,7 @@ name = "bsnext_input"
 version = "0.3.1"
 dependencies = [
  "anyhow",
+ "bsnext_fs_helpers",
  "bsnext_guards",
  "bsnext_resp",
  "bsnext_tracing",
@@ -659,6 +669,7 @@ dependencies = [
  "bsnext_dto",
  "bsnext_example",
  "bsnext_fs",
+ "bsnext_fs_helpers",
  "bsnext_html",
  "bsnext_input",
  "bsnext_md",

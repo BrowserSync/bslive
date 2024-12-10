@@ -24,7 +24,7 @@ expression: routes
                         inner: Addition(
                             InjectAddition {
                                 addition_position: Prepend(
-                                    "\n<!doctype html>\n  <html lang=\"en\">\n  <head>\n      <meta charset=\"UTF-8\">\n      <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n      <title>Browsersync Live - Playground</title>\n      <link rel=\"stylesheet\" href=\"/__bslive_playground.css\">\n  </head>\n  <body>\n",
+                                    "\n<!doctype html>\n  <html lang=\"en\">\n  <head>\n      <meta charset=\"UTF-8\">\n      <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n      <title>Browsersync Live - Playground</title>\n      <link rel=\"stylesheet\" href=\"__bslive_playground.css\">\n  </head>\n  <body>\n",
                                 ),
                             },
                         ),
@@ -40,7 +40,7 @@ expression: routes
                         inner: Addition(
                             InjectAddition {
                                 addition_position: Append(
-                                    "\n  <script src=\"/__bslive_playground.js\" type=\"module\"></script>\n  </body>\n</html>\n",
+                                    "\n  <script src=\"__bslive_playground.js\" type=\"module\"></script>\n  </body>\n</html>\n",
                                 ),
                             },
                         ),

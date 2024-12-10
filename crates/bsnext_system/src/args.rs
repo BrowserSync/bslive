@@ -1,8 +1,7 @@
 use crate::Example;
+use bsnext_core::export::ExportCommand;
 use bsnext_input::target::TargetKind;
 use bsnext_tracing::{LogLevel, OutputFormat};
-use std::path::PathBuf;
-
 // bslive route --path=/ --dir=
 
 #[derive(clap::Parser, Debug)]
@@ -67,14 +66,4 @@ pub struct Args {
 pub enum SubCommands {
     /// Export raw entries to files
     Export(ExportCommand),
-}
-
-#[derive(Debug, clap::Parser)]
-pub struct ExportCommand {
-    /// The folder to export the files to. For current, provide '.'
-    #[arg(long = "dir")]
-    pub out_dir: PathBuf,
-    /// When provided, just prints what might happen instead of actually causing side effects
-    #[arg(long)]
-    pub dry_run: bool,
 }

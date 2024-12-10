@@ -1,5 +1,5 @@
 use crate::start_kind::start_fs;
-use crate::start_kind::start_fs::WriteMode;
+use bsnext_fs_helpers::WriteMode;
 use bsnext_input::route::{DirRoute, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
