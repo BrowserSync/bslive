@@ -1,4 +1,5 @@
 use crate::OutputWriter;
+use bsnext_core::export::ExportEvent;
 use bsnext_dto::internal::{ChildResult, InternalEvents, StartupEvent};
 use bsnext_dto::{
     ExternalEventsDTO, FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, ServerIdentityDTO,
@@ -6,7 +7,7 @@ use bsnext_dto::{
 };
 use bsnext_input::startup::StartupError;
 use bsnext_input::InputError;
-use std::io::Write;
+use std::io::{sink, Write};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
@@ -97,6 +98,26 @@ impl OutputWriter for PrettyPrint {
                         writeln!(sink, "{}", err)?;
                     }
                 }
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_export_event<W: Write>(&self, sink: &mut W, evt: &ExportEvent) -> anyhow::Result<()> {
+        match evt {
+            ExportEvent::DryRunDirCreate(dir) => {
+                writeln!(sink, "[export:dry-run]: would create dir {}", dir.display())?;
+            }
+            ExportEvent::DryRunFileCreate(file) => writeln!(
+                sink,
+                "[export:dry-run]: would create file {}",
+                file.display()
+            )?,
+            ExportEvent::DidCreateFile(dir) => {
+                writeln!(sink, "[export]: did create file {}", dir.display())?;
+            }
+            ExportEvent::DidCreateDir(file) => {
+                writeln!(sink, "[export]: did create dir {}", file.display())?;
             }
         }
         Ok(())

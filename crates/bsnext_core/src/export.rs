@@ -1,14 +1,28 @@
 use crate::runtime_ctx::RuntimeCtx;
 use crate::server::router::common::{into_state, uri_to_res_parts};
-use bsnext_fs_helpers::WriteMode;
-use bsnext_input::playground::Playground;
+use bsnext_fs_helpers::{FsWriteError, WriteMode};
 use bsnext_input::route::{Route, RouteKind};
 use bsnext_input::server_config::ServerConfig;
 use futures_util::future::join_all;
 use http::response::Parts;
 use std::clone::Clone;
+use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
+
+#[derive(Debug)]
+pub enum ExportEvent {
+    DryRunDirCreate(PathBuf),
+    DryRunFileCreate(PathBuf),
+    DidCreateFile(PathBuf),
+    DidCreateDir(PathBuf),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ExportError {
+    #[error("{0}")]
+    Fs(#[from] FsWriteError),
+}
 
 #[derive(Debug, clap::Parser)]
 pub struct ExportCommand {
@@ -44,16 +58,12 @@ struct ExportRequest<'a> {
 
 type ExportResult = (Parts, String, Duration);
 
-pub async fn test_playground_export(cwd: &PathBuf, cmd: &ExportCommand) -> anyhow::Result<()> {
-    let pg = Playground {
-        html: "hello world".to_string(),
-        ..Default::default()
-    };
-
-    let server = ServerConfig {
-        playground: Some(pg),
-        ..Default::default()
-    };
+pub async fn export_one_server(
+    cwd: &PathBuf,
+    server: ServerConfig,
+    cmd: &ExportCommand,
+    write_mode: WriteMode,
+) -> anyhow::Result<Vec<ExportEvent>> {
     let routes = server.combined_routes();
     let state = into_state(server);
 
@@ -69,52 +79,52 @@ pub async fn test_playground_export(cwd: &PathBuf, cmd: &ExportCommand) -> anyho
         .zip(raw_entry_paths)
         .map(to_export_type);
 
-    let sink = match cmd.dry_run {
-        true => print_sink,
-        false => fs_sink,
-    };
+    let events = job_results
+        .map(move |ref ex_type| match cmd.dry_run {
+            true => print_sink(ex_type, &cmd.out_dir, &ctx),
+            false => fs_sink(ex_type, &cmd.out_dir, &ctx, &write_mode),
+        })
+        .flatten()
+        .flatten();
 
-    let sinked = job_results
-        .map(|ref ex_type| sink(ex_type, &ctx))
-        .collect::<Vec<_>>();
-
-    dbg!(sinked);
-
-    Ok(())
+    Ok(events.collect())
 }
 
-fn fs_sink(ex_type: &ExportType, ctx: &RuntimeCtx) -> anyhow::Result<()> {
+fn fs_sink(
+    ex_type: &ExportType,
+    out_dir: &PathBuf,
+    ctx: &RuntimeCtx,
+    write_mode: &WriteMode,
+) -> Result<Vec<ExportEvent>, ExportError> {
     match ex_type {
         ExportType::Write {
             export_result,
             filepath,
         } => {
-            write_one(export_result, filepath, ctx)?;
+            let filepath = ctx.cwd().join(out_dir).join(filepath);
+            write_one(export_result, &filepath, ctx, write_mode)
+                .map_err(|e| ExportError::Fs(e.into()))
         }
-        ExportType::Excluded { reason: _ } => {
-            // nothing
-        }
+        ExportType::Excluded { reason: _ } => Ok(vec![]),
     }
-    Ok(())
 }
 
-fn print_sink(ex_type: &ExportType, ctx: &RuntimeCtx) -> anyhow::Result<()> {
+fn print_sink(
+    ex_type: &ExportType,
+    out_dir: &PathBuf,
+    ctx: &RuntimeCtx,
+) -> Result<Vec<ExportEvent>, ExportError> {
+    let mut events = vec![];
     match ex_type {
-        ExportType::Write {
-            export_result,
-            filepath,
-        } => {
-            println!(
-                "will write {} bytes to {}",
-                export_result.1.len(),
-                ctx.cwd().join(filepath).display()
-            );
+        ExportType::Write { filepath, .. } => {
+            let path = ctx.cwd().join(out_dir).join(filepath);
+            events.push(ExportEvent::DryRunFileCreate(path));
         }
         ExportType::Excluded { reason } => {
-            println!("Ignoring {:?}", reason)
+            todo!("Ignoring {:?}", reason)
         }
     }
-    Ok(())
+    Ok(events)
 }
 
 fn to_export_type((export_result, filepath): (ExportResult, PathBuf)) -> ExportType {
@@ -145,17 +155,15 @@ fn write_one(
     export_result: &ExportResult,
     filepath: &PathBuf,
     ctx: &RuntimeCtx,
-) -> anyhow::Result<PathBuf> {
-    let next = ctx.cwd().join("test01").join(filepath);
-    let dir = next.parent();
+    write_mode: &WriteMode,
+) -> Result<Vec<ExportEvent>, FsWriteError> {
+    let dir = filepath.parent();
+    let mut events = vec![];
     if let Some(dir) = dir {
-        bsnext_fs_helpers::create_dir(dir, &WriteMode::Override)?;
+        fs::create_dir_all(dir).map_err(|e| FsWriteError::FailedDir(e.into()))?;
     }
     let (_, ref body, _) = export_result;
-    Ok(bsnext_fs_helpers::fs_write_input_src(
-        ctx.cwd(),
-        &next,
-        body,
-        &WriteMode::Override,
-    )?)
+    let pb = bsnext_fs_helpers::fs_write_str(ctx.cwd(), &filepath, body, write_mode)?;
+    events.push(ExportEvent::DidCreateFile(pb.clone()));
+    Ok(events)
 }

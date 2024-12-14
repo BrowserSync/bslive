@@ -52,6 +52,14 @@ impl OutputWriter for RatatuiSender {
         }
         Ok(())
     }
+
+    fn handle_export_event<W: Write>(
+        &self,
+        _sink: &mut W,
+        _evt: &ExportEvent,
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 impl OutputWriter for Ratatui {
     fn handle_startup_event<W: Write>(
@@ -60,6 +68,14 @@ impl OutputWriter for Ratatui {
         evt: &StartupEvent,
     ) -> anyhow::Result<()> {
         PrettyPrint.handle_startup_event(sink, evt)
+    }
+
+    fn handle_export_event<W: Write>(
+        &self,
+        _sink: &mut W,
+        _evt: &ExportEvent,
+    ) -> anyhow::Result<()> {
+        todo!()
     }
 }
 
@@ -389,6 +405,7 @@ mod common {
     }
 }
 
+use bsnext_core::export::ExportEvent;
 use std::collections::VecDeque;
 
 #[derive(Debug)]

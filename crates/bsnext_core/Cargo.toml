@@ -35,6 +35,7 @@ tracing = { workspace = true }
 actix = { workspace = true }
 actix-rt = { workspace = true }
 anyhow = { workspace = true }
+thiserror = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 serde = { workspace = true }

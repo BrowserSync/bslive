@@ -3,7 +3,7 @@ use crate::start_kind::StartKind;
 use crate::{BsSystem, Start};
 use actix::Actor;
 use bsnext_dto::internal::{AnyEvent, StartupEvent};
-use bsnext_input::startup::DidStart;
+use bsnext_input::startup::{DidStart, SystemStart};
 use bsnext_output::ratatui::Ratatui;
 use bsnext_output::{OutputWriter, Writers};
 use bsnext_tracing::OutputFormat;
@@ -27,7 +27,7 @@ pub async fn start_cmd(cwd: PathBuf, args: Args) -> Result<(), anyhow::Error> {
         OutputFormat::Normal => Writers::Pretty,
     };
 
-    let start_kind = StartKind::from_args(args);
+    let start_kind = StartKind::from_args(&args);
 
     tracing::debug!(?start_kind);
 

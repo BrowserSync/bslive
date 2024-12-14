@@ -37,10 +37,10 @@ impl SystemStart for StartFromExample {
             let word = name.unwrap_or_else(rand_word);
             let num = rand::random::<f64>();
             let next_dir = temp_dir.join(format!("bslive-{word}-{num}"));
-            bsnext_fs_helpers::create_dir(&next_dir, &write_mode)?
+            bsnext_fs_helpers::create_dir_and_cd(&next_dir, &write_mode)?
         } else if let Some(dir) = &self.dir {
             let next_dir = ctx.cwd.join(dir);
-            bsnext_fs_helpers::create_dir(&next_dir, &write_mode)?
+            bsnext_fs_helpers::create_dir_and_cd(&next_dir, &write_mode)?
         } else {
             ctx.cwd.to_path_buf()
         };
@@ -66,7 +66,7 @@ impl SystemStart for StartFromExample {
                 (path, input)
             }
             InputSourceKind::File { src_file, input } => {
-                let path = bsnext_fs_helpers::fs_write_input_src(
+                let path = bsnext_fs_helpers::fs_write_str(
                     &target_dir,
                     src_file.path(),
                     src_file.content(),

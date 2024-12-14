@@ -503,6 +503,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "thiserror",
  "tokio",
  "tokio-stream",
  "tower 0.4.13",
@@ -628,6 +629,7 @@ version = "0.3.1"
 dependencies = [
  "ansi_term",
  "anyhow",
+ "bsnext_core",
  "bsnext_dto",
  "bsnext_input",
  "chrono",

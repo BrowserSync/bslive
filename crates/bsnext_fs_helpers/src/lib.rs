@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 pub enum FsWriteError {
     #[error("couldn't write file to {path}")]
     FailedWrite { path: PathBuf },
+    #[error("couldn't create dir {0}")]
+    FailedDir(#[from] std::io::Error),
     #[error("couldn't read the status of {path}")]
     CannotQueryStatus { path: PathBuf },
     #[error("file already exists, override with --force (dangerous) {path}")]
@@ -31,7 +33,7 @@ pub enum WriteMode {
     Override,
 }
 
-pub fn fs_write_input_src(
+pub fn fs_write_str(
     cwd: &Path,
     path: &Path,
     string: &str,
@@ -57,7 +59,8 @@ pub fn fs_write_input_src(
         .map_err(|_e| FsWriteError::FailedWrite { path: next_path })
 }
 
-pub fn create_dir(dir: &Path, write_mode: &WriteMode) -> Result<PathBuf, DirError> {
+/// Create a directory and move the current process's CWD there
+pub fn create_dir_and_cd(dir: &Path, write_mode: &WriteMode) -> Result<PathBuf, DirError> {
     let exists = fs::exists(dir).map_err(|_e| DirError::CannotQueryStatus {
         path: dir.to_path_buf(),
     })?;

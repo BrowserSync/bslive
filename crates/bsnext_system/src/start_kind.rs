@@ -2,7 +2,7 @@ use crate::args::Args;
 use crate::start_kind::start_from_example::StartFromExample;
 use crate::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
 use crate::start_kind::start_from_paths::StartFromDirPaths;
-use bsnext_fs_helpers::{fs_write_input_src, FsWriteError, WriteMode};
+use bsnext_fs_helpers::{fs_write_str, FsWriteError, WriteMode};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::target::TargetKind;
 use bsnext_input::InputWriter;
@@ -22,15 +22,19 @@ pub enum StartKind {
 }
 
 impl StartKind {
-    pub fn from_args(args: Args) -> Self {
+    pub fn from_args(args: &Args) -> Self {
         if let Some(example) = args.example {
             return StartKind::FromExample(StartFromExample {
                 example,
                 write_input: args.write,
                 port: args.port,
                 temp: args.temp,
-                name: args.name,
-                target_kind: args.target.unwrap_or_default(),
+                name: args.name.clone(),
+                target_kind: args
+                    .target
+                    .as_ref()
+                    .map(ToOwned::to_owned)
+                    .unwrap_or_default(),
                 dir: args.dir.clone(),
                 force: args.force,
             });
@@ -38,7 +42,7 @@ impl StartKind {
 
         if !args.paths.is_empty() {
             StartKind::FromDirPaths(StartFromDirPaths {
-                paths: args.paths,
+                paths: args.paths.clone(),
                 write_input: args.write,
                 port: args.port,
                 force: args.force,
@@ -85,5 +89,5 @@ pub fn fs_write_input(
         TargetKind::Html => "bslive.html",
     };
 
-    fs_write_input_src(cwd, &PathBuf::from(name), &string, write_mode)
+    fs_write_str(cwd, &PathBuf::from(name), &string, write_mode)
 }
