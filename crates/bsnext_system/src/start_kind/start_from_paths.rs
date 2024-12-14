@@ -46,17 +46,17 @@ fn from_dir_paths<T: AsRef<str>>(
         .map(|p| {
             let pb = PathBuf::from(p.as_ref());
             if pb.is_absolute() {
-                return PathDefinition {
+                PathDefinition {
                     input: p.as_ref().to_string(),
                     cwd: cwd.to_path_buf(),
                     absolute: pb,
-                };
+                }
             } else {
-                return PathDefinition {
+                PathDefinition {
                     input: p.as_ref().to_string(),
                     cwd: cwd.to_path_buf(),
                     absolute: cwd.join(pb),
-                };
+                }
             }
         })
         .map(|path_def| {

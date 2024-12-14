@@ -7,7 +7,7 @@ use futures_util::future::join_all;
 use http::response::Parts;
 use std::clone::Clone;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -16,12 +16,13 @@ pub enum ExportEvent {
     DryRunFileCreate(PathBuf),
     DidCreateFile(PathBuf),
     DidCreateDir(PathBuf),
+    Failed { error: ExportError },
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExportError {
     #[error("{0}")]
-    Fs(#[from] FsWriteError),
+    Fs(FsWriteError),
 }
 
 #[derive(Debug, clap::Parser)]
@@ -63,7 +64,7 @@ pub async fn export_one_server(
     server: ServerConfig,
     cmd: &ExportCommand,
     write_mode: WriteMode,
-) -> anyhow::Result<Vec<ExportEvent>> {
+) -> Result<Vec<ExportEvent>, ExportError> {
     let routes = server.combined_routes();
     let state = into_state(server);
 
@@ -72,22 +73,34 @@ pub async fn export_one_server(
     let async_requests = raw_entries.map(|req| uri_to_res_parts(state.clone(), req.url_path));
 
     let ctx = RuntimeCtx::new(cwd);
+    // let job_count = raw_entry_paths.len();
 
-    let job_results = join_all(async_requests)
+    let results = join_all(async_requests)
         .await
         .into_iter()
         .zip(raw_entry_paths)
-        .map(to_export_type);
+        .map(to_export_type)
+        .try_fold(vec![], move |mut acc, ref ex_type| match cmd.dry_run {
+            true => match print_sink(ex_type, &cmd.out_dir, &ctx) {
+                Ok(evts) => {
+                    acc.extend(evts);
+                    Ok(acc)
+                }
+                Err(e) => Err(e),
+            },
+            false => match fs_sink(ex_type, &cmd.out_dir, &ctx, &write_mode) {
+                Ok(evts) => {
+                    acc.extend(evts);
+                    Ok(acc)
+                }
+                Err(e) => Err(e),
+            },
+        });
 
-    let events = job_results
-        .map(move |ref ex_type| match cmd.dry_run {
-            true => print_sink(ex_type, &cmd.out_dir, &ctx),
-            false => fs_sink(ex_type, &cmd.out_dir, &ctx, &write_mode),
-        })
-        .flatten()
-        .flatten();
-
-    Ok(events.collect())
+    match results {
+        Ok(events) => Ok(events),
+        Err(e) => Ok(vec![ExportEvent::Failed { error: e }]),
+    }
 }
 
 fn fs_sink(
@@ -102,8 +115,7 @@ fn fs_sink(
             filepath,
         } => {
             let filepath = ctx.cwd().join(out_dir).join(filepath);
-            write_one(export_result, &filepath, ctx, write_mode)
-                .map_err(|e| ExportError::Fs(e.into()))
+            write_one(export_result, &filepath, ctx, write_mode).map_err(ExportError::Fs)
         }
         ExportType::Excluded { reason: _ } => Ok(vec![]),
     }
@@ -153,17 +165,17 @@ fn only_raw_entries(route: &Route) -> Option<ExportRequest> {
 
 fn write_one(
     export_result: &ExportResult,
-    filepath: &PathBuf,
+    filepath: &Path,
     ctx: &RuntimeCtx,
     write_mode: &WriteMode,
 ) -> Result<Vec<ExportEvent>, FsWriteError> {
     let dir = filepath.parent();
     let mut events = vec![];
     if let Some(dir) = dir {
-        fs::create_dir_all(dir).map_err(|e| FsWriteError::FailedDir(e.into()))?;
+        fs::create_dir_all(dir).map_err(FsWriteError::FailedDir)?;
     }
     let (_, ref body, _) = export_result;
-    let pb = bsnext_fs_helpers::fs_write_str(ctx.cwd(), &filepath, body, write_mode)?;
+    let pb = bsnext_fs_helpers::fs_write_str(ctx.cwd(), filepath, body, write_mode)?;
     events.push(ExportEvent::DidCreateFile(pb.clone()));
     Ok(events)
 }

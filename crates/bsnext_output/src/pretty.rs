@@ -1,5 +1,5 @@
 use crate::OutputWriter;
-use bsnext_core::export::ExportEvent;
+use bsnext_core::export::{ExportError, ExportEvent};
 use bsnext_dto::internal::{ChildResult, InternalEvents, StartupEvent};
 use bsnext_dto::{
     ExternalEventsDTO, FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, ServerIdentityDTO,
@@ -7,7 +7,7 @@ use bsnext_dto::{
 };
 use bsnext_input::startup::StartupError;
 use bsnext_input::InputError;
-use std::io::{sink, Write};
+use std::io::Write;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
@@ -118,6 +118,11 @@ impl OutputWriter for PrettyPrint {
             }
             ExportEvent::DidCreateDir(file) => {
                 writeln!(sink, "[export]: did create dir {}", file.display())?;
+            }
+            ExportEvent::Failed {
+                error: ExportError::Fs(fs_write_error),
+            } => {
+                writeln!(sink, "[export]: Error! {}", fs_write_error)?;
             }
         }
         Ok(())

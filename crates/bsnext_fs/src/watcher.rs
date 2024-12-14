@@ -128,16 +128,15 @@ fn is_auto_excluded<P: AsRef<Path>>(cwd: &P, subject: &P) -> bool {
     .map(OsStr::new)
     .collect();
     let rel = subject.as_ref().strip_prefix(cwd.as_ref());
-    return rel
-        .map(|p| match p.components().next() {
-            None => false,
-            Some(Component::Normal(str)) => excluded.contains(str),
-            Some(Component::Prefix(_)) => unreachable!("here? Prefix"),
-            Some(Component::RootDir) => unreachable!("here? RootDir"),
-            Some(Component::CurDir) => unreachable!("here? CurDir"),
-            Some(Component::ParentDir) => unreachable!("here? ParentDir"),
-        })
-        .unwrap_or(false);
+    rel.map(|p| match p.components().next() {
+        None => false,
+        Some(Component::Normal(str)) => excluded.contains(str),
+        Some(Component::Prefix(_)) => unreachable!("here? Prefix"),
+        Some(Component::RootDir) => unreachable!("here? RootDir"),
+        Some(Component::CurDir) => unreachable!("here? CurDir"),
+        Some(Component::ParentDir) => unreachable!("here? ParentDir"),
+    })
+    .unwrap_or(false)
 }
 
 #[test]

@@ -3,7 +3,7 @@ use crate::start_kind::StartKind;
 use crate::{BsSystem, Start};
 use actix::Actor;
 use bsnext_dto::internal::{AnyEvent, StartupEvent};
-use bsnext_input::startup::{DidStart, SystemStart};
+use bsnext_input::startup::DidStart;
 use bsnext_output::ratatui::Ratatui;
 use bsnext_output::{OutputWriter, Writers};
 use bsnext_tracing::OutputFormat;
