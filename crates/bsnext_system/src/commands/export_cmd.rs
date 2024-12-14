@@ -28,27 +28,44 @@ pub async fn export_cmd(
         Ok(SystemStartArgs::InputOnly { input: _ }) => todo!("handle InputOnly"),
         Ok(SystemStartArgs::PathWithInput { path: _, input }) if input.servers.len() == 1 => {
             let first = &input.servers[0];
+
             let write_mode = if args.force {
                 WriteMode::Override
             } else {
                 WriteMode::Safe
             };
+
             let events = export_one_server(cwd, first.clone(), cmd, write_mode).await?;
-            let stdout = &mut std::io::stdout();
-            for export_event in &events {
-                match printer.handle_export_event(stdout, export_event) {
-                    Ok(_) => {}
-                    Err(e) => tracing::error!(?e),
-                };
-            }
-            match stdout.flush() {
-                Ok(_) => {}
-                Err(e) => tracing::error!("could not flush {e}"),
-            };
-            if events
+
+            let has_error = events
                 .iter()
-                .any(|e| matches!(e, ExportEvent::Failed { .. }))
-            {
+                .any(|e| matches!(e, ExportEvent::Failed { .. }));
+
+            let stdout = &mut std::io::stdout();
+            let stderr = &mut std::io::stderr();
+
+            for export_event in &events {
+                match &export_event {
+                    ExportEvent::Failed { .. } => {
+                        match printer.handle_export_event(stderr, export_event) {
+                            Ok(_) => {}
+                            Err(e) => tracing::error!(?e),
+                        };
+                    }
+                    _ => {
+                        match printer.handle_export_event(stdout, export_event) {
+                            Ok(_) => {}
+                            Err(e) => tracing::error!(?e),
+                        };
+                    }
+                }
+            }
+
+            match (stderr.flush(), stdout.flush()) {
+                (Ok(_), Ok(_)) => {}
+                _ => tracing::error!("could not flush"),
+            };
+            if has_error {
                 return Err(anyhow::anyhow!("export failed"));
             }
         }
