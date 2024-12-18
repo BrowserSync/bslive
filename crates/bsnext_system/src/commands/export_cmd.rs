@@ -20,16 +20,20 @@ pub async fn export_cmd(
         OutputFormat::Json => Writers::Json,
         OutputFormat::Normal => Writers::Pretty,
     };
+    tracing::debug!("printer: {}", printer);
+
     let ctx = StartupContext::from_cwd(Some(cwd));
+    tracing::debug!("StartupContext: {:?}", ctx);
+
     let start_kind = StartKind::from_args(args).input(&ctx);
 
     match start_kind {
         Err(e) => eprintln!("an error occured here?, {}", e),
-        Ok(SystemStartArgs::InputOnly { input: _ }) => todo!("handle InputOnly"),
+        Ok(SystemStartArgs::InputOnly { input: _ }) => todo!("handle InputOnly?"),
         Ok(SystemStartArgs::PathWithInput { path: _, input }) if input.servers.len() == 1 => {
             let first = &input.servers[0];
 
-            let write_mode = if args.force {
+            let write_mode = if cmd.force {
                 WriteMode::Override
             } else {
                 WriteMode::Safe

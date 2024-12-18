@@ -33,6 +33,9 @@ pub struct ExportCommand {
     /// When provided, just prints what might happen instead of actually causing side effects
     #[arg(long)]
     pub dry_run: bool,
+    /// when providing, will overwrite existing files
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Debug)]

@@ -108,3 +108,31 @@ fn test_html_playground_with_meta() -> anyhow::Result<()> {
     assert_debug_snapshot!(found.kind);
     Ok(())
 }
+
+const INPUT_WITH_META_DEFAULT: &str = r#"
+<meta name="bslive serve-dir" />
+<main>
+    <h1>Test!</h1>
+    <abc-shane></abc-shane>
+</main>"#;
+
+/// In this test, I am making sure `bslive serve-dir` works the same as the long-hand version above
+#[test]
+fn test_html_playground_with_meta_default() -> anyhow::Result<()> {
+    let ident = ServerIdentity::Address {
+        bind_address: String::from("0.0.0.0:8080"),
+    };
+    let input_args = InputArgs { port: Some(8080) };
+    let ctx = InputCtx::new(&[], Some(input_args));
+    let as_input = HtmlFs::from_input_str(INPUT_WITH_META_DEFAULT, &ctx)?;
+    let first = as_input.servers.get(0).unwrap();
+    assert_eq!(first.identity, ident);
+    let routes = first.combined_routes();
+    let found2 = routes
+        .iter()
+        .find(|x| matches!(x.kind, RouteKind::Dir(..)))
+        .expect("must find dir");
+    assert_debug_snapshot!(found2.path);
+    assert_debug_snapshot!(found2.kind);
+    Ok(())
+}

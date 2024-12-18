@@ -35,10 +35,11 @@ impl TryInto<Route> for RouteCli {
 pub enum SubCommands {
     /// does testing things
     ServeDir {
-        /// lists test values
-        #[arg(short, long)]
+        /// Which path should this directory be served from
+        #[arg(short, long, default_value = "/")]
         path: String,
-        #[arg(short, long)]
+        /// Which directory should be served
+        #[arg(short, long, default_value = ".")]
         dir: String,
     },
 }

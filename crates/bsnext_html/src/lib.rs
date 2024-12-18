@@ -32,7 +32,7 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
 
     let style = scraper::Selector::parse("style:first-of-type").unwrap();
     let script = scraper::Selector::parse("script:first-of-type").unwrap();
-    let meta = scraper::Selector::parse("meta[name][content]").unwrap();
+    let meta = scraper::Selector::parse("meta[name]").unwrap();
 
     let mut style_elems = document.select(&style);
     let mut script_elems = document.select(&script);
@@ -65,16 +65,24 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
     for meta_elem in meta_elems {
         let name = meta_elem.attr("name");
         let content = meta_elem.attr("content");
-        match (name, content) {
-            (Some(name), Some(content)) => {
-                let joined = format!("{} {}", name, content);
-                let r = Route::from_cli_str(joined);
-                if let Ok(route) = r {
-                    routes.push(route);
-                    node_ids_to_remove.push(meta_elem.id());
-                }
+
+        if !name.unwrap().starts_with("bslive ") {
+            continue;
+        }
+
+        let joined = match (name, content) {
+            (Some(name), Some(content)) => Some(format!("{} {}", name, content)),
+            (Some(name), None) => Some(format!("{}", name)),
+            _ => None,
+        };
+
+        if let Some(joined) = joined {
+            if let Ok(route) = Route::from_cli_str(joined) {
+                routes.push(route);
+                node_ids_to_remove.push(meta_elem.id());
+            } else {
+                tracing::error!("cannot parse CLI args");
             }
-            _ => todo!("not supported!"),
         }
     }
 

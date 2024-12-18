@@ -8,6 +8,7 @@ bsnext_input = { path = "../bsnext_input" }
 unindent = "0.2.3"
 indent = "0.1.1"
 scraper = { git = "https://github.com/shakyShane/scraper.git", branch = "master" }
+tracing = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
