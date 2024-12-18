@@ -1,5 +1,5 @@
-use crate::start_kind::start_fs;
-use crate::start_kind::start_fs::WriteMode;
+use crate::start_kind::fs_write_input;
+use bsnext_fs_helpers::WriteMode;
 use bsnext_input::route::{DirRoute, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
@@ -27,7 +27,7 @@ impl SystemStart for StartFromDirPaths {
             WriteMode::Safe
         };
         if self.write_input {
-            let path = start_fs::fs_write_input(&ctx.cwd, &input, TargetKind::Yaml, &write_mode)
+            let path = fs_write_input(&ctx.cwd, &input, TargetKind::Yaml, &write_mode)
                 .map_err(|e| Box::new(e.into()))?;
             Ok(SystemStartArgs::PathWithInput { input, path })
         } else {
@@ -46,17 +46,17 @@ fn from_dir_paths<T: AsRef<str>>(
         .map(|p| {
             let pb = PathBuf::from(p.as_ref());
             if pb.is_absolute() {
-                return PathDefinition {
+                PathDefinition {
                     input: p.as_ref().to_string(),
                     cwd: cwd.to_path_buf(),
                     absolute: pb,
-                };
+                }
             } else {
-                return PathDefinition {
+                PathDefinition {
                     input: p.as_ref().to_string(),
                     cwd: cwd.to_path_buf(),
                     absolute: cwd.join(pb),
-                };
+                }
             }
         })
         .map(|path_def| {

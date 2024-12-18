@@ -10,6 +10,7 @@ bsnext_utils = { path = "../bsnext_utils" }
 
 [dependencies]
 bsnext_input = { path = "../bsnext_input" }
+bsnext_fs_helpers = { path = "../bsnext_fs_helpers" }
 bsnext_fs = { path = "../bsnext_fs" }
 bsnext_resp = { path = "../bsnext_resp" }
 bsnext_client = { path = "../bsnext_client" }
@@ -23,6 +24,7 @@ hyper-util = { version = "0.1.1", features = ["client-legacy"] }
 
 mime_guess = { workspace = true }
 insta = { workspace = true }
+clap = { workspace = true }
 axum = { workspace = true }
 http-body-util = { workspace = true }
 tokio = { workspace = true }
@@ -33,6 +35,7 @@ tracing = { workspace = true }
 actix = { workspace = true }
 actix-rt = { workspace = true }
 anyhow = { workspace = true }
+thiserror = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 serde = { workspace = true }

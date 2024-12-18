@@ -76,8 +76,26 @@ impl AsRef<Route> for Route {
 }
 
 impl Route {
-    pub fn path(&self) -> &str {
+    pub fn url_path(&self) -> &str {
         self.path.as_str()
+    }
+    pub fn path_buf(&self) -> PathBuf {
+        PathBuf::from(self.path.as_str())
+    }
+    pub fn as_filepath(&self) -> PathBuf {
+        let next = PathBuf::from(self.path.as_str());
+
+        let next = if next == PathBuf::from("/") {
+            next.join("index.html")
+        } else {
+            next
+        };
+
+        if next.starts_with("/") {
+            next.strip_prefix("/").unwrap().to_path_buf()
+        } else {
+            next
+        }
     }
     pub fn from_cli_str<A: AsRef<str>>(a: A) -> Result<Self, anyhow::Error> {
         let cli = RouteCli::try_from_cli_str(a)?;

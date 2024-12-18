@@ -1,5 +1,6 @@
 use crate::server_config::ServerIdentity;
 use crate::yml::YamlError;
+use bsnext_fs_helpers::{DirError, FsWriteError};
 use miette::JSONReportHandler;
 use std::fmt::{Display, Formatter};
 use std::net::AddrParseError;
@@ -165,7 +166,7 @@ pub enum InputError {
     #[error("Unsupported extension: {0}")]
     UnsupportedExtension(String),
     #[error("{0}")]
-    InputWriteError(#[from] InputWriteError),
+    InputWriteError(#[from] FsWriteError),
     #[error("{0}")]
     PathError(#[from] PathError),
     #[error("{0}")]
@@ -191,16 +192,6 @@ pub enum WatchError {
     EmptyExtensionFilter,
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum InputWriteError {
-    #[error("couldn't write input to {path}")]
-    FailedWrite { path: PathBuf },
-    #[error("couldn't read the status of {path}")]
-    CannotQueryStatus { path: PathBuf },
-    #[error("input already exists, override with --force (dangerous) {path}")]
-    Exists { path: PathBuf },
-}
-
 #[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize)]
 pub enum PathError {
     #[error("path(s) not found \n{paths}")]
@@ -212,19 +203,6 @@ pub enum PathError {
 pub enum PortError {
     #[error("could not use that port: {port} {err}")]
     InvalidPort { port: u16, err: AddrParseError },
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error(transparent)]
-pub enum DirError {
-    #[error("could not create that dir: {path}")]
-    CannotCreate { path: PathBuf },
-    #[error("could not change the process CWD to: {path}")]
-    CannotMove { path: PathBuf },
-    #[error("could not query the status")]
-    CannotQueryStatus { path: PathBuf },
-    #[error("directory already exists, override with --force (dangerous) {path}")]
-    Exists { path: PathBuf },
 }
 
 impl From<DirError> for Box<InputError> {

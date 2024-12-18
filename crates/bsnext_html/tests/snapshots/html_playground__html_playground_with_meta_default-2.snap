@@ -1,0 +1,10 @@
+---
+source: crates/bsnext_html/tests/html_playground.rs
+expression: found2.kind
+---
+Dir(
+    DirRoute {
+        dir: ".",
+        base: None,
+    },
+)

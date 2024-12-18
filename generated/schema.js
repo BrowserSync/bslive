@@ -9,18 +9,64 @@ var LogLevelDTO = /* @__PURE__ */ ((LogLevelDTO2) => {
   LogLevelDTO2["Error"] = "error";
   return LogLevelDTO2;
 })(LogLevelDTO || {});
-var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
-  EventLevel2["External"] = "BSLIVE_EXTERNAL";
-  return EventLevel2;
-})(EventLevel || {});
 var ChangeKind = /* @__PURE__ */ ((ChangeKind2) => {
   ChangeKind2["Changed"] = "Changed";
   ChangeKind2["Added"] = "Added";
   ChangeKind2["Removed"] = "Removed";
   return ChangeKind2;
 })(ChangeKind || {});
+var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
+  EventLevel2["External"] = "BSLIVE_EXTERNAL";
+  return EventLevel2;
+})(EventLevel || {});
 
 // schema.ts
+var logLevelDTOSchema = z.nativeEnum(LogLevelDTO);
+var clientConfigDTOSchema = z.object({
+  log_level: logLevelDTOSchema
+});
+var debounceDTOSchema = z.object({
+  kind: z.string(),
+  ms: z.string()
+});
+var fileChangedDTOSchema = z.object({
+  path: z.string()
+});
+var filesChangedDTOSchema = z.object({
+  paths: z.array(z.string())
+});
+var serverIdentityDTOSchema = z.union([
+  z.object({
+    kind: z.literal("Both"),
+    payload: z.object({
+      name: z.string(),
+      bind_address: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Address"),
+    payload: z.object({
+      bind_address: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Named"),
+    payload: z.object({
+      name: z.string()
+    })
+  })
+]);
+var serverDTOSchema = z.object({
+  id: z.string(),
+  identity: serverIdentityDTOSchema,
+  socket_addr: z.string()
+});
+var getServersMessageResponseDTOSchema = z.object({
+  servers: z.array(serverDTOSchema)
+});
+var inputAcceptedDTOSchema = z.object({
+  path: z.string()
+});
 var routeKindDTOSchema = z.union([
   z.object({
     kind: z.literal("Html"),
@@ -64,62 +110,6 @@ var routeDTOSchema = z.object({
   path: z.string(),
   kind: routeKindDTOSchema
 });
-var serverDescSchema = z.object({
-  routes: z.array(routeDTOSchema),
-  id: z.string()
-});
-var serverIdentityDTOSchema = z.union([
-  z.object({
-    kind: z.literal("Both"),
-    payload: z.object({
-      name: z.string(),
-      bind_address: z.string()
-    })
-  }),
-  z.object({
-    kind: z.literal("Address"),
-    payload: z.object({
-      bind_address: z.string()
-    })
-  }),
-  z.object({
-    kind: z.literal("Named"),
-    payload: z.object({
-      name: z.string()
-    })
-  })
-]);
-var serverDTOSchema = z.object({
-  id: z.string(),
-  identity: serverIdentityDTOSchema,
-  socket_addr: z.string()
-});
-var getServersMessageResponseDTOSchema = z.object({
-  servers: z.array(serverDTOSchema)
-});
-var serversChangedDTOSchema = z.object({
-  servers_resp: getServersMessageResponseDTOSchema
-});
-var inputAcceptedDTOSchema = z.object({
-  path: z.string()
-});
-var fileChangedDTOSchema = z.object({
-  path: z.string()
-});
-var filesChangedDTOSchema = z.object({
-  paths: z.array(z.string())
-});
-var debounceDTOSchema = z.object({
-  kind: z.string(),
-  ms: z.string()
-});
-var watchingDTOSchema = z.object({
-  paths: z.array(z.string()),
-  debounce: debounceDTOSchema
-});
-var stoppedWatchingDTOSchema = z.object({
-  paths: z.array(z.string())
-});
 var serverChangeSchema = z.union([
   z.object({
     kind: z.literal("Stopped"),
@@ -149,14 +139,50 @@ var serverChangeSetItemSchema = z.object({
 var serverChangeSetSchema = z.object({
   items: z.array(serverChangeSetItemSchema)
 });
-var logLevelDTOSchema = z.nativeEnum(LogLevelDTO);
-var clientConfigDTOSchema = z.object({
-  log_level: logLevelDTOSchema
+var serverDescSchema = z.object({
+  routes: z.array(routeDTOSchema),
+  id: z.string()
 });
-var internalEventsDTOSchema = z.object({
-  kind: z.literal("ServersChanged"),
-  payload: getServersMessageResponseDTOSchema
+var serversChangedDTOSchema = z.object({
+  servers_resp: getServersMessageResponseDTOSchema
 });
+var stoppedWatchingDTOSchema = z.object({
+  paths: z.array(z.string())
+});
+var watchingDTOSchema = z.object({
+  paths: z.array(z.string()),
+  debounce: debounceDTOSchema
+});
+var changeKindSchema = z.nativeEnum(ChangeKind);
+var changeDTOSchema = z.lazy(
+  () => z.union([
+    z.object({
+      kind: z.literal("Fs"),
+      payload: z.object({
+        path: z.string(),
+        change_kind: changeKindSchema
+      })
+    }),
+    z.object({
+      kind: z.literal("FsMany"),
+      payload: z.array(changeDTOSchema)
+    })
+  ])
+);
+var clientEventSchema = z.union([
+  z.object({
+    kind: z.literal("Change"),
+    payload: changeDTOSchema
+  }),
+  z.object({
+    kind: z.literal("WsConnection"),
+    payload: clientConfigDTOSchema
+  }),
+  z.object({
+    kind: z.literal("Config"),
+    payload: clientConfigDTOSchema
+  })
+]);
 var eventLevelSchema = z.nativeEnum(EventLevel);
 var externalEventsDTOSchema = z.union([
   z.object({
@@ -186,16 +212,6 @@ var externalEventsDTOSchema = z.union([
   z.object({
     kind: z.literal("InputAccepted"),
     payload: inputAcceptedDTOSchema
-  })
-]);
-var startupEventDTOSchema = z.union([
-  z.object({
-    kind: z.literal("Started"),
-    payload: z.undefined().optional()
-  }),
-  z.object({
-    kind: z.literal("FailedStartup"),
-    payload: z.string()
   })
 ]);
 var inputErrorDTOSchema = z.union([
@@ -260,34 +276,18 @@ var inputErrorDTOSchema = z.union([
     payload: z.string()
   })
 ]);
-var changeKindSchema = z.nativeEnum(ChangeKind);
-var changeDTOSchema = z.lazy(
-  () => z.union([
-    z.object({
-      kind: z.literal("Fs"),
-      payload: z.object({
-        path: z.string(),
-        change_kind: changeKindSchema
-      })
-    }),
-    z.object({
-      kind: z.literal("FsMany"),
-      payload: z.array(changeDTOSchema)
-    })
-  ])
-);
-var clientEventSchema = z.union([
+var internalEventsDTOSchema = z.object({
+  kind: z.literal("ServersChanged"),
+  payload: getServersMessageResponseDTOSchema
+});
+var startupEventDTOSchema = z.union([
   z.object({
-    kind: z.literal("Change"),
-    payload: changeDTOSchema
+    kind: z.literal("Started"),
+    payload: z.undefined().optional()
   }),
   z.object({
-    kind: z.literal("WsConnection"),
-    payload: clientConfigDTOSchema
-  }),
-  z.object({
-    kind: z.literal("Config"),
-    payload: clientConfigDTOSchema
+    kind: z.literal("FailedStartup"),
+    payload: z.string()
   })
 ]);
 export {

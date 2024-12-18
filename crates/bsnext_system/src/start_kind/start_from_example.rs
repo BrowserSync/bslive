@@ -1,5 +1,6 @@
-use crate::start_kind::start_fs;
+use crate::start_kind::fs_write_input;
 use bsnext_example::Example;
+use bsnext_fs_helpers::WriteMode;
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::target::TargetKind;
@@ -25,9 +26,9 @@ impl SystemStart for StartFromExample {
         let input_source_kind = self.example.into_input(Some(identity));
 
         let write_mode = if self.force {
-            start_fs::WriteMode::Override
+            WriteMode::Override
         } else {
-            start_fs::WriteMode::Safe
+            WriteMode::Safe
         };
 
         let target_dir = if self.temp {
@@ -36,10 +37,10 @@ impl SystemStart for StartFromExample {
             let word = name.unwrap_or_else(rand_word);
             let num = rand::random::<f64>();
             let next_dir = temp_dir.join(format!("bslive-{word}-{num}"));
-            start_fs::create_dir(&next_dir, &write_mode)?
+            bsnext_fs_helpers::create_dir_and_cd(&next_dir, &write_mode)?
         } else if let Some(dir) = &self.dir {
             let next_dir = ctx.cwd.join(dir);
-            start_fs::create_dir(&next_dir, &write_mode)?
+            bsnext_fs_helpers::create_dir_and_cd(&next_dir, &write_mode)?
         } else {
             ctx.cwd.to_path_buf()
         };
@@ -59,17 +60,13 @@ impl SystemStart for StartFromExample {
 
         let (path, input) = match input_source_kind {
             InputSourceKind::Type(input) => {
-                let path = start_fs::fs_write_input(
-                    &target_dir,
-                    &input,
-                    self.target_kind.clone(),
-                    &write_mode,
-                )
-                .map_err(|e| Box::new(e.into()))?;
+                let path =
+                    fs_write_input(&target_dir, &input, self.target_kind.clone(), &write_mode)
+                        .map_err(|e| Box::new(e.into()))?;
                 (path, input)
             }
             InputSourceKind::File { src_file, input } => {
-                let path = start_fs::fs_write_input_src(
+                let path = bsnext_fs_helpers::fs_write_str(
                     &target_dir,
                     src_file.path(),
                     src_file.content(),

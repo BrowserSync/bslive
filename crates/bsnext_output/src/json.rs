@@ -1,4 +1,5 @@
 use crate::OutputWriter;
+use bsnext_core::export::ExportEvent;
 use bsnext_dto::internal::{InternalEvents, InternalEventsDTO, StartupEvent};
 use bsnext_dto::{ExternalEventsDTO, StartupEventDTO};
 use std::io::Write;
@@ -40,5 +41,13 @@ impl OutputWriter for JsonPrint {
         let as_dto = StartupEventDTO::from(evt);
         writeln!(sink, "{}", serde_json::to_string(&as_dto)?)
             .map_err(|e| anyhow::anyhow!(e.to_string()))
+    }
+
+    fn handle_export_event<W: Write>(
+        &self,
+        _sink: &mut W,
+        _evt: &ExportEvent,
+    ) -> anyhow::Result<()> {
+        todo!()
     }
 }
