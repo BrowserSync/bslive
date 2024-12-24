@@ -72,11 +72,12 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
 
         let joined = match (name, content) {
             (Some(name), Some(content)) => Some(format!("{} {}", name, content)),
-            (Some(name), None) => Some(format!("{}", name)),
+            (Some(name), None) => Some(name.to_string()),
             _ => None,
         };
 
         if let Some(joined) = joined {
+            tracing::trace!("Joined meta : {}", joined);
             if let Ok(route) = Route::from_cli_str(joined) {
                 routes.push(route);
                 node_ids_to_remove.push(meta_elem.id());
