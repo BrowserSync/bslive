@@ -2,7 +2,7 @@ pub mod server;
 pub mod servers_supervisor;
 
 pub mod dir_loader;
-mod dynamic_query_params;
+pub mod dynamic_query_params;
 pub mod export;
 pub mod handler_stack;
 pub mod handlers;

@@ -94,6 +94,19 @@ pub fn from_yaml(yaml: &str) -> anyhow::Result<ServerState> {
     let state = into_state(config);
     Ok(state)
 }
+pub fn from_yaml_blocking(yaml: &str, uri: &str) -> anyhow::Result<(Parts, String, Duration)> {
+    let state = from_yaml(yaml)?;
+    tokio::runtime::Runtime::new()?
+        .block_on(async { Ok(uri_to_res_parts(state.clone(), uri).await) })
+}
+
+pub fn header_pairs(parts: &Parts) -> Vec<(String, String)> {
+    parts
+        .headers
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_str().unwrap().to_string()))
+        .collect::<Vec<_>>()
+}
 
 pub struct TestProxy {
     pub socker_addr: SocketAddr,

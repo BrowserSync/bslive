@@ -6,10 +6,8 @@ use axum::routing::MethodRouter;
 use axum::{middleware, Extension};
 use axum_extra::middleware::option_layer;
 use bsnext_input::route::{CompType, CompressionOpts, CorsOpts, DelayKind, DelayOpts, Opts};
-use bsnext_resp::cache_opts::CacheOpts;
 use bsnext_resp::{response_modifications_layer, InjectHandling};
 use dynamic_query_params::dynamic_query_params_handler;
-use http::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
 use http::{HeaderName, HeaderValue};
 use std::collections::BTreeMap;
 use std::convert::Infallible;
@@ -44,22 +42,13 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
         .as_ref()
         .map(|headers| map_response_with_state(headers.clone(), set_resp_headers_from_strs));
 
-    let prevent_cache_headers_layer = matches!(opts.cache, CacheOpts::Prevent).then(|| {
-        let headers: Vec<(HeaderName, HeaderValue)> = vec![
-            (
-                CACHE_CONTROL,
-                HeaderValue::from_static("no-store, no-cache, must-revalidate"),
-            ),
-            (PRAGMA, HeaderValue::from_static("no-cache")),
-            (EXPIRES, HeaderValue::from_static("0")),
-        ];
-        map_response_with_state(headers, set_resp_headers)
-    });
+    let headers = opts.cache.as_headers();
+    let prevent_cache_headers_layer = map_response_with_state(headers, set_resp_headers);
 
     let optional_stack = ServiceBuilder::new()
         .layer(middleware::from_fn(dynamic_query_params_handler))
         .layer(option_layer(inject_layer))
-        .layer(option_layer(prevent_cache_headers_layer))
+        .layer(prevent_cache_headers_layer)
         .layer(option_layer(set_response_headers_layer))
         .layer(option_layer(cors_enabled_layer))
         .layer(option_layer(delay_enabled_layer));
