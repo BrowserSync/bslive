@@ -8,6 +8,8 @@ servers:
         html: first - 200ms delay
         delay:
           ms: 200
+      - path: /none
+        html: no config-based delay
       - path: /500
         html: second - 500ms delay
         delay:
