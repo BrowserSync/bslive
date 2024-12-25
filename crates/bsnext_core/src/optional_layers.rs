@@ -1,4 +1,5 @@
-use axum::extract::{Query, Request, State};
+use crate::dynamic_query_params;
+use axum::extract::{Request, State};
 use axum::middleware::{map_response_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::MethodRouter;
@@ -7,6 +8,7 @@ use axum_extra::middleware::option_layer;
 use bsnext_input::route::{CompType, CompressionOpts, CorsOpts, DelayKind, DelayOpts, Opts};
 use bsnext_resp::cache_opts::CacheOpts;
 use bsnext_resp::{response_modifications_layer, InjectHandling};
+use dynamic_query_params::dynamic_query_params_handler;
 use http::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
 use http::{HeaderName, HeaderValue};
 use std::collections::BTreeMap;
@@ -55,7 +57,7 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
     });
 
     let optional_stack = ServiceBuilder::new()
-        .layer(middleware::from_fn(delay_mw_dynamic))
+        .layer(middleware::from_fn(dynamic_query_params_handler))
         .layer(option_layer(inject_layer))
         .layer(option_layer(prevent_cache_headers_layer))
         .layer(option_layer(set_response_headers_layer))
@@ -88,21 +90,6 @@ async fn delay_mw(
             Ok::<_, Infallible>(res)
         }
     }
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct DynamicQueryParams {
-    /// Allow a request to have a ?bslive.delay.ms=200 style param to simulate a TTFB delay
-    #[serde(rename = "bslive.delay.ms")]
-    delay: Option<u64>,
-}
-
-async fn delay_mw_dynamic(req: Request, next: Next) -> impl IntoResponse {
-    if let Ok(Query(DynamicQueryParams { delay: Some(ms) })) = Query::try_from_uri(req.uri()) {
-        sleep(Duration::from_millis(ms)).await;
-    }
-    let res = next.run(req).await;
-    Ok::<_, Infallible>(res)
 }
 
 async fn set_resp_headers_from_strs<B>(
