@@ -14,7 +14,13 @@ Route {
     ),
     opts: Opts {
         cors: None,
-        delay: None,
+        delay: Some(
+            Delay(
+                Ms(
+                    1000,
+                ),
+            ),
+        ),
         watch: Bool(
             true,
         ),

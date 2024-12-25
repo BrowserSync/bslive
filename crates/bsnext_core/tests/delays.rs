@@ -33,6 +33,27 @@ async fn test_delays() -> Result<(), anyhow::Error> {
 }
 
 #[tokio::test]
+async fn test_delays_01() -> Result<(), anyhow::Error> {
+    let input = r#"
+servers:
+  - name: first-byte-delays
+    routes:
+      - path: /
+        raw: hello world!
+    "#;
+    let state = from_yaml(&input)?;
+
+    let (parts1, body1, dur1) = uri_to_res_parts(state.clone(), "/?bslive.delay.ms=200").await;
+    let dur1_ms = dur1.as_millis();
+
+    assert_eq!(body1, "hello world!");
+    assert_eq!(parts1.status, 200);
+    assert!(dur1_ms > 200 && dur1_ms < 210);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_proxy_delay() -> Result<(), anyhow::Error> {
     let proxy_app = Router::new().route("/", get(|| async { "target - proxy delay" }));
     let proxy = test_proxy(proxy_app).await?;
@@ -43,7 +64,7 @@ async fn test_proxy_delay() -> Result<(), anyhow::Error> {
 
     // update the proxy target to use local test proxy
     let mut config: ServerConfig = input.servers.first().expect("first").to_owned();
-    let proxy_route = config.routes.get_mut(3).unwrap();
+    let proxy_route = config.routes.get_mut(4).unwrap();
     assert!(
         matches!(proxy_route.kind, RouteKind::Proxy(..)),
         "must be a proxy route, check delays.yml"
