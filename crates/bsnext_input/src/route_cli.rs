@@ -1,5 +1,5 @@
 use crate::path_def::PathDef;
-use crate::route::{DelayKind, DelayOpts, DirRoute, Route, RouteKind};
+use crate::route::{DelayKind, DelayOpts, DirRoute, Opts, Route, RouteKind};
 use clap::Parser;
 use shell_words::split;
 
@@ -35,17 +35,15 @@ impl TryInto<Route> for RouteCli {
                 dir,
                 path,
                 delay: ms,
-            } => {
-                let mut route = Route {
-                    path: PathDef::try_new(path)?,
-                    kind: RouteKind::Dir(DirRoute { dir, base: None }),
+            } => Route {
+                path: PathDef::try_new(path)?,
+                kind: RouteKind::Dir(DirRoute { dir, base: None }),
+                opts: Opts {
+                    delay: ms.map(|ms| DelayOpts::Delay(DelayKind::Ms(ms))),
                     ..std::default::Default::default()
-                };
-                if let Some(ms) = ms {
-                    route.opts.delay = Some(DelayOpts::Delay(DelayKind::Ms(ms)))
-                }
-                route
-            }
+                },
+                ..std::default::Default::default()
+            },
         })
     }
 }
@@ -77,9 +75,8 @@ mod test {
         let input = "bslive serve-dir --path=/ --dir=examples/basic/public";
         let as_args = split(input)?;
         let parsed = RouteCli::try_parse_from(as_args)?;
-        let as_route: Result<Route, _> = parsed.try_into();
-        dbg!(&as_route);
-        // assert_debug_snapshot!(parsed);
+        let as_route: Route = parsed.try_into().unwrap();
+        insta::assert_debug_snapshot!(as_route);
         Ok(())
     }
     #[test]
@@ -87,9 +84,8 @@ mod test {
         let input = "bslive serve-dir --path=/ --dir=examples/basic/public --delay=1000";
         let as_args = split(input)?;
         let parsed = RouteCli::try_parse_from(as_args)?;
-        let as_route: Result<Route, _> = parsed.try_into();
-        dbg!(&as_route);
-        // assert_debug_snapshot!(parsed);
+        let as_route: Route = parsed.try_into().unwrap();
+        insta::assert_debug_snapshot!(as_route);
         Ok(())
     }
 }
