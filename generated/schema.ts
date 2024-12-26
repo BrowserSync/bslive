@@ -8,6 +8,10 @@ export const clientConfigDTOSchema = z.object({
     log_level: logLevelDTOSchema,
 });
 
+export const connectInfoSchema = z.object({
+    host: z.string().optional(),
+});
+
 export const debounceDTOSchema = z.object({
     kind: z.string(),
     ms: z.string(),
@@ -51,6 +55,11 @@ export const serverDTOSchema = z.object({
 
 export const getServersMessageResponseDTOSchema = z.object({
     servers: z.array(serverDTOSchema),
+});
+
+export const injectConfigSchema = z.object({
+    connect: connectInfoSchema,
+    ctx_message: z.string(),
 });
 
 export const inputAcceptedDTOSchema = z.object({

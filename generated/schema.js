@@ -25,6 +25,9 @@ var logLevelDTOSchema = z.nativeEnum(LogLevelDTO);
 var clientConfigDTOSchema = z.object({
   log_level: logLevelDTOSchema
 });
+var connectInfoSchema = z.object({
+  host: z.string().optional()
+});
 var debounceDTOSchema = z.object({
   kind: z.string(),
   ms: z.string()
@@ -63,6 +66,10 @@ var serverDTOSchema = z.object({
 });
 var getServersMessageResponseDTOSchema = z.object({
   servers: z.array(serverDTOSchema)
+});
+var injectConfigSchema = z.object({
+  connect: connectInfoSchema,
+  ctx_message: z.string()
 });
 var inputAcceptedDTOSchema = z.object({
   path: z.string()
@@ -295,12 +302,14 @@ export {
   changeKindSchema,
   clientConfigDTOSchema,
   clientEventSchema,
+  connectInfoSchema,
   debounceDTOSchema,
   eventLevelSchema,
   externalEventsDTOSchema,
   fileChangedDTOSchema,
   filesChangedDTOSchema,
   getServersMessageResponseDTOSchema,
+  injectConfigSchema,
   inputAcceptedDTOSchema,
   inputErrorDTOSchema,
   internalEventsDTOSchema,

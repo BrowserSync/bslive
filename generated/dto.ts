@@ -13,6 +13,10 @@ export interface ClientConfigDTO {
 	log_level: LogLevelDTO;
 }
 
+export interface ConnectInfo {
+	host?: string;
+}
+
 export interface DebounceDTO {
 	kind: string;
 	ms: string;
@@ -46,6 +50,11 @@ export interface ServerDTO {
 
 export interface GetServersMessageResponseDTO {
 	servers: ServerDTO[];
+}
+
+export interface InjectConfig {
+	connect: ConnectInfo;
+	ctx_message: string;
 }
 
 export interface InputAcceptedDTO {

@@ -395,3 +395,16 @@ pub enum ChangeKind {
     Added,
     Removed,
 }
+
+#[typeshare::typeshare]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct InjectConfig {
+    pub connect: ConnectInfo,
+    pub ctx_message: String,
+}
+
+#[typeshare::typeshare]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ConnectInfo {
+    pub host: Option<String>,
+}
