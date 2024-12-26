@@ -14,9 +14,9 @@ use crate::server::router::pub_api::pub_api;
 use crate::server::state::ServerState;
 use crate::ws::ws_handler;
 use axum::body::Body;
-use bsnext_client::html_with_base;
-use bsnext_dto::{RouteDTO, ServerDesc};
-use http::header::CONTENT_TYPE;
+use bsnext_client::{html_with_base, inject_js_with_config, WS_PATH};
+use bsnext_dto::{ConnectInfo, InjectConfig, RouteDTO, ServerDesc};
+use http::header::{CONTENT_TYPE, HOST};
 use http::{HeaderValue, StatusCode};
 use hyper_tls::HttpsConnector;
 use hyper_util::client::legacy::connect::HttpConnector;
@@ -26,6 +26,7 @@ use mime_guess::mime;
 use std::sync::Arc;
 use tower::{ServiceBuilder, ServiceExt};
 use tower_http::catch_panic::CatchPanicLayer;
+use tower_http::cors::CorsLayer;
 use tracing::{span, Level};
 
 mod assets;
@@ -37,7 +38,7 @@ pub fn make_router(state: &Arc<ServerState>) -> Router {
         Client::builder(TokioExecutor::new()).build(https);
 
     let router = Router::new()
-        .merge(built_ins(state.clone()))
+        .merge(built_ins(state.clone()).layer(CorsLayer::permissive()))
         .merge(dynamic_loaders(state.clone()));
 
     router
@@ -68,21 +69,28 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
         )
             .into_response()
     }
-    async fn js_handler(_uri: Uri) -> impl IntoResponse {
-        let markup = include_str!("../../../../../inject/dist/index.js");
+    async fn js_handler(_uri: Uri, req: Request) -> impl IntoResponse {
+        let host = req.headers().get(HOST);
+        let inject = InjectConfig {
+            ctx_message: "This InjectConfig was created in the Browsersync LIVE js_handler".into(),
+            connect: ConnectInfo {
+                ws_path: WS_PATH.into(),
+                host: host.and_then(|x| x.to_str().ok().map(ToOwned::to_owned)),
+            },
+        };
         (
             [(
                 CONTENT_TYPE,
                 HeaderValue::from_static(mime::APPLICATION_JAVASCRIPT_UTF_8.as_ref()),
             )],
-            markup,
+            inject_js_with_config(inject),
         )
             .into_response()
     }
 
     route("/__bslive", get(handler))
         .route("/__bs_js", get(js_handler))
-        .route("/__bs_ws", get(ws_handler))
+        .route(WS_PATH, get(ws_handler))
         .nest("/__bs_api", pub_api(state.clone()))
         .nest("/__bs_assets/ui", pub_ui_assets(state.clone()))
         .with_state(state.clone())

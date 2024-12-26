@@ -5,13 +5,26 @@ import { retry } from "rxjs";
 
 export function ws(): Producer {
     return {
-        create: () => {
-            const url = new URL(window.location.href);
+        create: (connectInfo) => {
+            const current = new URL(window.location.href);
 
-            url.protocol = url.protocol === "http:" ? "ws" : "wss";
-            url.pathname = "/__bs_ws";
+            // only use 'wss' protocol when we know it's safe to do so
+            const ws_proto = current.protocol === "https:" ? "wss" : "ws";
 
-            const socket = webSocket<ClientEvent>(url.origin + url.pathname);
+            let ws_url;
+            if (connectInfo.host) {
+                ws_url = new URL(
+                    connectInfo.ws_path,
+                    ws_proto + "://" + connectInfo.host,
+                );
+            } else {
+                const clone = new URL(current);
+                clone.protocol = ws_proto;
+                clone.pathname = connectInfo.ws_path;
+                ws_url = clone;
+            }
+
+            const socket = webSocket<ClientEvent>(ws_url.toString());
             return socket.pipe(retry({ delay: 5000 }));
         },
     };
