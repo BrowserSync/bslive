@@ -90,7 +90,7 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
 
     route("/__bslive", get(handler))
         .route("/__bs_js", get(js_handler))
-        .route("/__bs_ws", get(ws_handler))
+        .route(WS_PATH, get(ws_handler))
         .nest("/__bs_api", pub_api(state.clone()))
         .nest("/__bs_assets/ui", pub_ui_assets(state.clone()))
         .with_state(state.clone())
