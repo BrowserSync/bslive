@@ -14,6 +14,7 @@ export interface ClientConfigDTO {
 }
 
 export interface ConnectInfo {
+	ws_path: string;
 	host?: string;
 }
 

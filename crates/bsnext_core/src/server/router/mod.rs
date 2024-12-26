@@ -14,7 +14,7 @@ use crate::server::router::pub_api::pub_api;
 use crate::server::state::ServerState;
 use crate::ws::ws_handler;
 use axum::body::Body;
-use bsnext_client::{html_with_base, inject_js_with_config};
+use bsnext_client::{html_with_base, inject_js_with_config, WS_PATH};
 use bsnext_dto::{ConnectInfo, InjectConfig, RouteDTO, ServerDesc};
 use http::header::{CONTENT_TYPE, HOST};
 use http::{HeaderValue, StatusCode};
@@ -74,6 +74,7 @@ pub fn built_ins(state: Arc<ServerState>) -> Router {
         let inject = InjectConfig {
             ctx_message: "This InjectConfig was created in the Browsersync LIVE js_handler".into(),
             connect: ConnectInfo {
+                ws_path: WS_PATH.into(),
                 host: host.and_then(|x| x.to_str().ok().map(ToOwned::to_owned)),
             },
         };

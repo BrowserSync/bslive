@@ -9,6 +9,7 @@ export const clientConfigDTOSchema = z.object({
 });
 
 export const connectInfoSchema = z.object({
+    ws_path: z.string(),
     host: z.string().optional(),
 });
 

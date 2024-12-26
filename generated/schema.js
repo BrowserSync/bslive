@@ -26,6 +26,7 @@ var clientConfigDTOSchema = z.object({
   log_level: logLevelDTOSchema
 });
 var connectInfoSchema = z.object({
+  ws_path: z.string(),
   host: z.string().optional()
 });
 var debounceDTOSchema = z.object({

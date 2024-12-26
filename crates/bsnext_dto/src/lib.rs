@@ -406,5 +406,6 @@ pub struct InjectConfig {
 #[typeshare::typeshare]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConnectInfo {
+    pub ws_path: String,
     pub host: Option<String>,
 }

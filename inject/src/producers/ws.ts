@@ -13,11 +13,14 @@ export function ws(): Producer {
 
             let ws_url;
             if (connectInfo.host) {
-                ws_url = new URL(ws_proto + "://" + connectInfo.host);
+                ws_url = new URL(
+                    connectInfo.ws_path,
+                    ws_proto + "://" + connectInfo.host,
+                );
             } else {
                 const clone = new URL(current);
                 clone.protocol = ws_proto;
-                clone.pathname = "/__bs_ws";
+                clone.pathname = connectInfo.ws_path;
                 ws_url = clone;
             }
 
