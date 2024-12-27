@@ -8,6 +8,12 @@ pub struct PathDef {
     inner: String,
 }
 
+impl PathDef {
+    pub fn root() -> PathDef {
+        "/".to_string().parse().unwrap()
+    }
+}
+
 impl FromStr for PathDef {
     type Err = PathDefError;
 
