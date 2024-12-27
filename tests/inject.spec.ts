@@ -31,5 +31,22 @@ test.describe(
                 expect(body.toString()).toMatchSnapshot();
             }
         });
+        test("injects with bslive:js-connector query param", async ({
+            page,
+            bs,
+        }) => {
+            await page.goto(bs.named("no-inject", "/"));
+            const waiter = page.waitForRequest((req) =>
+                new URL(req.url()).pathname.startsWith("/__bs_js"),
+            );
+            await page.addScriptTag({
+                url: bs.named(
+                    "no-inject",
+                    "/script2.js?bslive.inject=bslive:js-connector",
+                ),
+                type: "module",
+            });
+            await waiter;
+        });
     },
 );

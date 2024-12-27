@@ -1,6 +1,5 @@
 ---
 source: crates/bsnext_system/src/start_kind/start_from_paths.rs
-assertion_line: 125
 expression: input
 ---
 Input {

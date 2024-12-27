@@ -7,6 +7,7 @@ query params.
 
 - [delay](#delay-example) - simulate a delay in TTFB.
 - [cache](#cache-example) - add or remove the headers that Browsersync to control cache
+- [inject](#inject-example) - dynamically inject content into responses
 
 ---
 
@@ -138,3 +139,37 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 ```
+
+## Inject example
+
+If you're serving Browsersync assets, but not using it to serve HTML, it makes it impossible
+to inject our scripts.
+
+Assuming you're running Browsersync on port 3000 - then you can use that to serve some assets like this:
+
+```bash
+# start a static file server from the current folder
+bslive . --cors
+```
+
+```html
+<-- Now in your HTML, reference a file -->
+<script src="http://localhost:3000/dist/index.js">
+```
+
+This works, but we don't have Browsersync loaded in the page - to solve this problem append the following query param
+and an auto-connecting script will be appended to the JS file.
+
+- `?bslive.inject=bslive:js-connector`
+
+```html
+<-- Now in your HTML, reference a file -->
+<script src="http://localhost:3000/dist/index.js?bslive.inject=bslive:js-connector">
+```
+
+## Inject example 2
+
+If you want to prevent Browsersync from appending a script tag (or anything else), you can
+use a query param to remove all injections.
+
+Just add `?bslive.inject=false` as a query param to any page - that will prevent HTML injections
