@@ -21,8 +21,7 @@ impl RouteGuard for JsConnector {
 impl ByteReplacer for JsConnector {
     fn apply(&self, body: &'_ str) -> Option<String> {
         let footer = format!(
-            r#"
-            {body};
+            r#"{body};
             // this was injected by the Browsersync Live Js Connector
             ;import('/__bs_js').catch(console.error);
         "#
