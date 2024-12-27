@@ -51,6 +51,10 @@ pub struct Args {
     #[arg(long, requires = "example", conflicts_with = "dir")]
     pub name: Option<String>,
 
+    /// Should permissive cors headers be added to responses?
+    #[arg(long)]
+    pub cors: bool,
+
     /// Only works with `--example` - specify a port instead of a random one
     #[arg(short, long)]
     pub port: Option<u16>,

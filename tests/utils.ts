@@ -1,6 +1,6 @@
 import { test as base } from "@playwright/test";
 import { execSync, fork } from "node:child_process";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 import * as z from "zod";
 import {
     externalEventsSchema,
@@ -34,9 +34,16 @@ type Msg = z.infer<typeof messageSchema>;
 const inputSchema = z.object({
     input: z.string(),
 });
+const cliInputSchema = z.object({
+    args: z.array(z.string()),
+});
 
 export function bstest(input: z.infer<typeof inputSchema>) {
-    return JSON.stringify(input);
+    return JSON.stringify(input, null, 2);
+}
+
+export function cli(input: z.infer<typeof cliInputSchema>) {
+    return JSON.stringify(input, null, 2);
 }
 
 interface NextArgs {
@@ -61,35 +68,61 @@ export const test = base.extend<{
     };
 }>({
     bs: async ({}, use, testInfo) => {
-        const ann = inputSchema.parse(JSON.parse(testInfo.annotations[0].type));
+        const json = JSON.parse(testInfo.annotations[0].type);
+        let ann;
+        if ("args" in json) {
+            ann = cliInputSchema.parse(json);
+        } else {
+            ann = inputSchema.parse(json);
+        }
+
         const test_dir = ["tests"];
         const cwd = process.cwd();
         const base = join(cwd, ...test_dir);
         const file = join(base, "..", "bin.js");
         const stdout: string[] = [];
 
-        const exampleInput = join(cwd, ann.input);
-        if (!existsSync(exampleInput)) {
-            throw new Error("example input not found");
+        let child;
+        if ("input" in ann) {
+            const exampleInput = join(cwd, ann.input);
+            if (!existsSync(exampleInput)) {
+                throw new Error("example input not found");
+            }
+            child = fork(
+                file,
+                [
+                    "-i",
+                    ann.input,
+                    "-f",
+                    "json",
+                    // uncomment these 2 lines to debug trace data in a bslive.log file
+                    // tip: ensure you only run 1 test at a time
+                    // '-l', 'trace',
+                    // '--write-log'
+                ],
+                {
+                    cwd,
+                    stdio: "pipe",
+                },
+            );
+        } else {
+            child = fork(
+                file,
+                [
+                    ...ann.args,
+                    "-f",
+                    "json",
+                    // uncomment these 2 lines to debug trace data in a bslive.log file
+                    // tip: ensure you only run 1 test at a time
+                    // '-l', 'trace',
+                    // '--write-log'
+                ],
+                {
+                    cwd,
+                    stdio: "pipe",
+                },
+            );
         }
-
-        const child = fork(
-            file,
-            [
-                "-i",
-                ann.input,
-                "-f",
-                "json",
-                // uncomment these 2 lines to debug trace data in a bslive.log file
-                // tip: ensure you only run 1 test at a time
-                // '-l', 'trace',
-                // '--write-log'
-            ],
-            {
-                cwd,
-                stdio: "pipe",
-            },
-        );
 
         const lines: string[] = [];
         const servers_changed_msg: Promise<TServersResp> = new Promise(

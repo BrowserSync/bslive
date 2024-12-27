@@ -3,6 +3,7 @@ use crate::start_kind::start_from_example::StartFromExample;
 use crate::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
 use crate::start_kind::start_from_paths::StartFromDirPaths;
 use bsnext_fs_helpers::{fs_write_str, FsWriteError, WriteMode};
+use bsnext_input::route::{CorsOpts, Opts};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::target::TargetKind;
 use bsnext_input::InputWriter;
@@ -41,11 +42,16 @@ impl StartKind {
         }
 
         if !args.paths.is_empty() {
+            tracing::info!("cors arg {}", args.cors);
             StartKind::FromDirPaths(StartFromDirPaths {
                 paths: args.paths.clone(),
                 write_input: args.write,
                 port: args.port,
                 force: args.force,
+                route_opts: Opts {
+                    cors: args.cors.then_some(CorsOpts::Cors(true)),
+                    ..Default::default()
+                },
             })
         } else {
             StartKind::FromInputPaths(StartFromInputPaths {
