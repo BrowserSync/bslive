@@ -1,6 +1,7 @@
 use crate::connector::Connector;
 use crate::debug::Debug;
 use crate::injector_guard::ByteReplacer;
+use crate::js_connector::JsConnector;
 use axum::extract::Request;
 use bsnext_guards::route_guard::RouteGuard;
 use http::Response;
@@ -13,6 +14,8 @@ pub struct BuiltinStringDef {
 pub enum BuiltinStrings {
     #[serde(rename = "bslive:connector")]
     Connector,
+    #[serde(rename = "bslive:js-connector")]
+    JsConnector,
     #[serde(rename = "bslive:debug")]
     Debug,
 }
@@ -22,6 +25,7 @@ impl RouteGuard for BuiltinStringDef {
         match self.name {
             BuiltinStrings::Connector => Connector.accept_req(req),
             BuiltinStrings::Debug => Debug.accept_req(req),
+            BuiltinStrings::JsConnector => JsConnector.accept_req(req),
         }
     }
 
@@ -29,6 +33,7 @@ impl RouteGuard for BuiltinStringDef {
         match self.name {
             BuiltinStrings::Connector => Connector.accept_res(res),
             BuiltinStrings::Debug => Debug.accept_res(res),
+            BuiltinStrings::JsConnector => JsConnector.accept_res(res),
         }
     }
 }
@@ -38,6 +43,7 @@ impl ByteReplacer for BuiltinStringDef {
         match self.name {
             BuiltinStrings::Connector => Connector.apply(body),
             BuiltinStrings::Debug => Debug.apply(body),
+            BuiltinStrings::JsConnector => JsConnector.apply(body),
         }
     }
 }

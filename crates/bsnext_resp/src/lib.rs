@@ -10,6 +10,7 @@ pub mod injector_guard;
 use crate::inject_opts::InjectionItem;
 #[cfg(test)]
 pub mod inject_opt_test;
+pub mod js_connector;
 
 use crate::injector_guard::ByteReplacer;
 use axum::body::Body;
@@ -36,6 +37,16 @@ impl RespMod {
         res.headers()
             .get(CONTENT_TYPE)
             .and_then(|v| v.to_str().ok().map(|s| s.contains("text/html")))
+            .unwrap_or(false)
+    }
+    pub fn is_js<T>(res: &Response<T>) -> bool {
+        res.headers()
+            .get(CONTENT_TYPE)
+            .and_then(|v| {
+                v.to_str()
+                    .ok()
+                    .map(|s| s.contains("application/javascript"))
+            })
             .unwrap_or(false)
     }
 }

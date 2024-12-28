@@ -17,3 +17,8 @@ servers:
         inject:
           - append: lol
             only: '/*.css'
+  - name: 'no-inject'
+    routes:
+      - path: /
+        dir: examples/basic/public
+        inject: false
