@@ -1,6 +1,6 @@
 use crate::OutputWriter;
-use bsnext_dto::internal::{InternalEvents, InternalEventsDTO, StartupEvent};
-use bsnext_dto::{ExternalEventsDTO, StartupEventDTO};
+use bsnext_dto::internal::{InternalEvents, InternalEventsDTO};
+use bsnext_dto::ExternalEventsDTO;
 use std::io::Write;
 
 pub struct JsonPrint;
@@ -30,15 +30,5 @@ impl OutputWriter for JsonPrint {
             InternalEvents::StartupError(_) => {}
         }
         Ok(())
-    }
-
-    fn handle_startup_event<W: Write>(
-        &self,
-        sink: &mut W,
-        evt: &StartupEvent,
-    ) -> anyhow::Result<()> {
-        let as_dto = StartupEventDTO::from(evt);
-        writeln!(sink, "{}", serde_json::to_string(&as_dto)?)
-            .map_err(|e| anyhow::anyhow!(e.to_string()))
     }
 }

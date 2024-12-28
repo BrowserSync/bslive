@@ -1,10 +1,9 @@
 use crate::OutputWriter;
-use bsnext_dto::internal::{ChildResult, InternalEvents, StartupEvent};
+use bsnext_dto::internal::{ChildResult, InternalEvents};
 use bsnext_dto::{
     ExternalEventsDTO, FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, ServerIdentityDTO,
     ServersChangedDTO, StoppedWatchingDTO, WatchingDTO,
 };
-use bsnext_input::startup::StartupError;
 use bsnext_input::InputError;
 use std::io::Write;
 use std::marker::PhantomData;
@@ -65,38 +64,6 @@ impl OutputWriter for PrettyPrint {
             }
             InternalEvents::StartupError(err) => {
                 writeln!(sink, "{}", err)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_startup_event<W: Write>(
-        &self,
-        sink: &mut W,
-        evt: &StartupEvent,
-    ) -> anyhow::Result<()> {
-        match evt {
-            StartupEvent::Started => {
-                writeln!(sink, "{}", Line::prefixed().info("started..."))?;
-            }
-            StartupEvent::FailedStartup(err) => {
-                writeln!(
-                    sink,
-                    "{}",
-                    Line::prefixed().info("An error prevented startup!")
-                )?;
-                writeln!(sink)?;
-                match err {
-                    StartupError::InputError(InputError::BsLiveRules(bs_rules)) => {
-                        let n = miette::GraphicalReportHandler::new();
-                        let mut inner = String::new();
-                        n.render_report(&mut inner, bs_rules).expect("write?");
-                        writeln!(sink, "{}", inner)?;
-                    }
-                    StartupError::InputError(err) => {
-                        writeln!(sink, "{}", err)?;
-                    }
-                }
             }
         }
         Ok(())

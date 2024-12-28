@@ -521,9 +521,12 @@ name = "bsnext_dto"
 version = "0.7.0"
 dependencies = [
  "actix",
+ "anyhow",
  "bsnext_fs",
  "bsnext_input",
+ "bsnext_output2",
  "bsnext_tracing",
+ "miette",
  "serde",
  "serde_json",
  "thiserror",

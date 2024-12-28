@@ -6,6 +6,8 @@ use bsnext_dto::internal::{AnyEvent, StartupEvent};
 use bsnext_input::startup::DidStart;
 use bsnext_output::ratatui::Ratatui;
 use bsnext_output::{OutputWriter, Writers};
+use bsnext_output2::stdout::StdoutTarget;
+use bsnext_output2::OutputWriters;
 use bsnext_tracing::OutputFormat;
 use std::io::Write;
 use std::path::PathBuf;
@@ -22,9 +24,9 @@ pub async fn start_cmd(cwd: PathBuf, args: Args) -> Result<(), anyhow::Error> {
 
     // for the startup message, don't allow a TUI yet
     let start_printer = match format_clone {
-        OutputFormat::Tui => Writers::Pretty,
-        OutputFormat::Json => Writers::Json,
-        OutputFormat::Normal => Writers::Pretty,
+        OutputFormat::Tui => OutputWriters::Pretty,
+        OutputFormat::Json => OutputWriters::Json,
+        OutputFormat::Normal => OutputWriters::Pretty,
     };
 
     let start_kind = StartKind::from_args(&args);
@@ -38,30 +40,27 @@ pub async fn start_cmd(cwd: PathBuf, args: Args) -> Result<(), anyhow::Error> {
         events_sender,
     };
 
+    // let stdout = &mut std::io::stdout();
     let stdout = &mut std::io::stdout();
+    let stderr = &mut std::io::stderr();
+    let mut sink = StdoutTarget::new(stdout, stderr);
 
     match sys_addr.send(start).await? {
         Ok(DidStart::Started) => {
             let evt = StartupEvent::Started;
-            match start_printer.handle_startup_event(stdout, &evt) {
+            match start_printer.write_evt(evt, &mut sink.output()) {
                 Ok(_) => {}
                 Err(e) => tracing::error!(?e),
             };
-            match stdout.flush() {
-                Ok(_) => {}
-                Err(e) => tracing::error!("could not flush {e}"),
-            };
+            sink.close();
         }
         Err(e) => {
             let evt = StartupEvent::FailedStartup(e);
-            match start_printer.handle_startup_event(stdout, &evt) {
+            match start_printer.write_evt(evt, &mut sink.error()) {
                 Ok(_) => {}
                 Err(e) => tracing::error!(?e),
             };
-            match stdout.flush() {
-                Ok(_) => {}
-                Err(e) => tracing::error!("could not flush {e}"),
-            };
+            sink.close();
             return Err(anyhow::anyhow!("could not flush"));
         }
     };

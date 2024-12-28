@@ -12,7 +12,7 @@ use std::{
 };
 
 use crate::pretty::{print_server_updates, server_display, PrettyPrint};
-use bsnext_dto::internal::{AnyEvent, InternalEvents, StartupEvent};
+use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{self, Event},
@@ -51,15 +51,6 @@ impl OutputWriter for RatatuiSender {
             Err(_) => tracing::error!("could not send"),
         }
         Ok(())
-    }
-}
-impl OutputWriter for Ratatui {
-    fn handle_startup_event<W: Write>(
-        &self,
-        sink: &mut W,
-        evt: &StartupEvent,
-    ) -> anyhow::Result<()> {
-        PrettyPrint.handle_startup_event(sink, evt)
     }
 }
 

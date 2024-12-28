@@ -9,9 +9,12 @@ edition = "2021"
 bsnext_input = { path = "../bsnext_input" }
 bsnext_fs = { path = "../bsnext_fs" }
 bsnext_tracing = { path = "../bsnext_tracing" }
+bsnext_output2 = { path = "../bsnext_output2" }
 
 serde = { workspace = true }
 thiserror = { workspace = true }
 serde_json = { workspace = true }
 actix = { workspace = true }
 typeshare = { workspace = true }
+anyhow = { workspace = true }
+miette = { workspace = true }
