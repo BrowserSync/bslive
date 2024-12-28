@@ -1,5 +1,8 @@
 use std::fmt::{Display, Formatter};
-use std::io::{Stderr, Stdout, Write};
+use std::io::Write;
+use stdout::StdoutTarget;
+
+pub mod stdout;
 
 #[derive(Debug, Default)]
 pub enum OutputWriters {
@@ -39,34 +42,4 @@ impl OutputWriters {
 #[derive(Debug)]
 pub enum OutputTarget<'a> {
     Stdout(StdoutTarget<'a>),
-}
-
-#[derive(Debug)]
-pub struct StdoutTarget<'a> {
-    stdout: &'a Stdout,
-    stderr: &'a Stderr,
-}
-
-impl<'a> StdoutTarget<'a> {
-    pub fn new(out: &'a Stdout, err: &'a Stderr) -> Self {
-        Self {
-            stdout: out,
-            stderr: err,
-        }
-    }
-
-    pub fn close(&mut self) {
-        match (self.stderr.flush(), self.stdout.flush()) {
-            (Ok(_), Ok(_)) => {}
-            _ => tracing::error!("could not flush"),
-        };
-    }
-
-    pub fn output(&mut self) -> impl Write + use<'a> {
-        self.stdout
-    }
-
-    pub fn error(&mut self) -> impl Write + use<'a> {
-        self.stderr
-    }
 }

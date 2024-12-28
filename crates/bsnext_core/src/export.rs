@@ -12,7 +12,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum ExportEvent {
     DryRunDirCreate(PathBuf),
     DryRunFileCreate(PathBuf),
@@ -28,7 +28,16 @@ pub enum ExportError {
 
 impl OutputWriterTrait for ExportError {
     fn write_json<W: Write>(&self, _sink: &mut W) -> anyhow::Result<()> {
-        todo!()
+        let error_string = self.to_string();
+        let named = match self {
+            ExportError::Fs(_) => "fs",
+        };
+        let v = serde_json::json!({
+            "kind": named,
+            "error": error_string
+        });
+        writeln!(_sink, "{}", v)?;
+        Ok(())
     }
 
     fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
@@ -41,9 +50,11 @@ impl OutputWriterTrait for ExportError {
     }
 }
 
-impl OutputWriterTrait for &ExportEvent {
+impl OutputWriterTrait for ExportEvent {
     fn write_json<W: Write>(&self, _sink: &mut W) -> anyhow::Result<()> {
-        todo!()
+        let str = serde_json::to_string(&self)?;
+        writeln!(_sink, "{}", str)?;
+        Ok(())
     }
 
     fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
