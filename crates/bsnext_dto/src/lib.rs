@@ -12,8 +12,10 @@ use bsnext_input::startup::StartupError;
 use bsnext_tracing::LogLevel;
 use typeshare::typeshare;
 
-pub mod dto_output;
+pub mod external_events;
 pub mod internal;
+pub mod internal_events;
+pub mod startup_events;
 
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
@@ -89,19 +91,6 @@ pub struct ServersChangedDTO {
 pub enum EventLevel {
     #[serde(rename = "BSLIVE_EXTERNAL")]
     External,
-}
-
-#[typeshare]
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(tag = "kind", content = "payload")]
-pub enum ExternalEventsDTO {
-    ServersChanged(ServersChangedDTO),
-    Watching(WatchingDTO),
-    WatchingStopped(StoppedWatchingDTO),
-    FileChanged(FileChangedDTO),
-    FilesChanged(FilesChangedDTO),
-    InputFileChanged(FileChangedDTO),
-    InputAccepted(InputAcceptedDTO),
 }
 
 #[typeshare]

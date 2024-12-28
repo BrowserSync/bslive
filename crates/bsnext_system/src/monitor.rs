@@ -3,7 +3,7 @@ use actix::{Actor, Addr, AsyncContext};
 use std::hash::Hash;
 
 use bsnext_core::servers_supervisor::file_changed_handler::{FileChanged, FilesChanged};
-use bsnext_dto::{ExternalEventsDTO, StoppedWatchingDTO, WatchingDTO};
+use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, Debounce, FsEvent, FsEventKind, PathAddedEvent, PathEvent,
@@ -18,6 +18,7 @@ use std::time::Duration;
 use bsnext_fs::actor::FsWatcher;
 
 use crate::input_fs::from_input_path;
+use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_input::watch_opts::WatchOpts;
 use tracing::trace_span;

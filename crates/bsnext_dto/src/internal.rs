@@ -1,4 +1,5 @@
-use crate::{ExternalEventsDTO, GetServersMessageResponseDTO};
+use crate::external_events::ExternalEventsDTO;
+use crate::GetServersMessageResponseDTO;
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::startup::StartupError;
 use bsnext_input::InputError;
@@ -76,7 +77,7 @@ pub enum ChildResult {
     Stopped(ServerIdentity),
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, thiserror::Error)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, thiserror::Error)]
 pub enum ServerError {
     // The `#[from]` attribute generates `From<JsonRejection> for ApiError`
     // implementation. See `thiserror` docs for more information
