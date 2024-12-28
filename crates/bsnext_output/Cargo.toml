@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 bsnext_dto = { path = "../bsnext_dto" }
 bsnext_input = { path = "../bsnext_input" }
-bsnext_core = { path = "../bsnext_core" }
 
 anyhow = { workspace = true }
 serde_json = { workspace = true }

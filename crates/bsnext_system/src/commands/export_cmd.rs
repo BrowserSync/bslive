@@ -1,11 +1,11 @@
 use crate::args::Args;
 use crate::start_kind::StartKind;
-use bsnext_core::export::{export_one_server, ExportCommand, ExportEvent};
+use bsnext_core::export::{export_one_server, ExportCommand};
 use bsnext_fs_helpers::WriteMode;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_output::{OutputWriter, Writers};
+use bsnext_output2::{OutputWriters, StdoutTarget};
 use bsnext_tracing::OutputFormat;
-use std::io::Write;
 use std::path::PathBuf;
 
 pub async fn export_cmd(
@@ -16,9 +16,9 @@ pub async fn export_cmd(
     let format_clone = args.format;
 
     let printer = match format_clone {
-        OutputFormat::Tui => Writers::Pretty,
-        OutputFormat::Json => Writers::Json,
-        OutputFormat::Normal => Writers::Pretty,
+        OutputFormat::Tui => OutputWriters::Pretty,
+        OutputFormat::Normal => OutputWriters::Pretty,
+        OutputFormat::Json => OutputWriters::Json,
     };
     tracing::debug!("printer: {}", printer);
 
@@ -39,39 +39,26 @@ pub async fn export_cmd(
                 WriteMode::Safe
             };
 
-            let events = export_one_server(cwd, first.clone(), cmd, write_mode).await?;
-
-            let has_error = events
-                .iter()
-                .any(|e| matches!(e, ExportEvent::Failed { .. }));
+            let results = export_one_server(cwd, first.clone(), cmd, write_mode).await;
 
             let stdout = &mut std::io::stdout();
             let stderr = &mut std::io::stderr();
+            let mut writer = StdoutTarget::new(stdout, stderr);
 
-            for export_event in &events {
-                match &export_event {
-                    ExportEvent::Failed { .. } => {
-                        match printer.handle_export_event(stderr, export_event) {
-                            Ok(_) => {}
-                            Err(e) => tracing::error!(?e),
-                        };
+            return match results {
+                Ok(events) => {
+                    for export_event in &events {
+                        printer.write_evt(export_event, &mut writer.output())?;
                     }
-                    _ => {
-                        match printer.handle_export_event(stdout, export_event) {
-                            Ok(_) => {}
-                            Err(e) => tracing::error!(?e),
-                        };
-                    }
+                    writer.close();
+                    Ok(())
                 }
-            }
-
-            match (stderr.flush(), stdout.flush()) {
-                (Ok(_), Ok(_)) => {}
-                _ => tracing::error!("could not flush"),
+                Err(err) => {
+                    printer.write_evt(err, &mut writer.error())?;
+                    writer.close();
+                    Err(anyhow::anyhow!("export failed"))
+                }
             };
-            if has_error {
-                return Err(anyhow::anyhow!("export failed"));
-            }
         }
         Ok(SystemStartArgs::PathWithInput { path: _, input: _ }) => {
             // let first =

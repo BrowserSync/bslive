@@ -103,6 +103,8 @@ pub enum ExternalEventsDTO {
     InputAccepted(InputAcceptedDTO),
 }
 
+// impl OutputWriterV2 for ExternalEventsDTO {}
+
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]

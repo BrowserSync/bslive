@@ -1,5 +1,4 @@
 use crate::OutputWriter;
-use bsnext_core::export::{ExportError, ExportEvent};
 use bsnext_dto::internal::{ChildResult, InternalEvents, StartupEvent};
 use bsnext_dto::{
     ExternalEventsDTO, FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, ServerIdentityDTO,
@@ -98,31 +97,6 @@ impl OutputWriter for PrettyPrint {
                         writeln!(sink, "{}", err)?;
                     }
                 }
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_export_event<W: Write>(&self, sink: &mut W, evt: &ExportEvent) -> anyhow::Result<()> {
-        match evt {
-            ExportEvent::DryRunDirCreate(dir) => {
-                writeln!(sink, "[export:dry-run]: would create dir {}", dir.display())?;
-            }
-            ExportEvent::DryRunFileCreate(file) => writeln!(
-                sink,
-                "[export:dry-run]: would create file {}",
-                file.display()
-            )?,
-            ExportEvent::DidCreateFile(dir) => {
-                writeln!(sink, "[export]: did create file {}", dir.display())?;
-            }
-            ExportEvent::DidCreateDir(file) => {
-                writeln!(sink, "[export]: did create dir {}", file.display())?;
-            }
-            ExportEvent::Failed {
-                error: ExportError::Fs(fs_write_error),
-            } => {
-                writeln!(sink, "[export]: Error! {}", fs_write_error)?;
             }
         }
         Ok(())
