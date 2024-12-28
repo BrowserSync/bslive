@@ -16,7 +16,7 @@ bsnext_resp = { path = "../bsnext_resp" }
 bsnext_client = { path = "../bsnext_client" }
 bsnext_dto = { path = "../bsnext_dto" }
 bsnext_guards = { path = "../bsnext_guards" }
-bsnext_output2 = { path = "../bsnext_output2" }
+bsnext_output = { path = "../bsnext_output" }
 
 axum-server = { version = "0.6.0", features = ["tls-rustls"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }

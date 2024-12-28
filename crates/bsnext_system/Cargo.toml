@@ -17,7 +17,6 @@ bsnext_fs_helpers = { path = "../bsnext_fs_helpers" }
 bsnext_dto = { path = "../bsnext_dto" }
 bsnext_example = { path = "../bsnext_example" }
 bsnext_output = { path = "../bsnext_output" }
-bsnext_output2 = { path = "../bsnext_output2" }
 rand = "0.8.5"
 
 anyhow = { workspace = true }

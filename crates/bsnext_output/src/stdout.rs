@@ -15,7 +15,7 @@ impl<'a> StdoutTarget<'a> {
         }
     }
 
-    pub fn close(&mut self) {
+    pub fn flush(&mut self) {
         match (self.stderr.flush(), self.stdout.flush()) {
             (Ok(_), Ok(_)) => {}
             _ => tracing::error!("could not flush"),
@@ -45,12 +45,12 @@ pub fn completion_writer(
             for export_event in events {
                 writer.write_evt(export_event, &mut sink.output())?;
             }
-            sink.close();
+            sink.flush();
             Ok(())
         }
         Err(err) => {
             writer.write_evt(err, &mut sink.error())?;
-            sink.close();
+            sink.flush();
             Err(anyhow::anyhow!("export failed"))
         }
     }

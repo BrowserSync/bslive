@@ -492,7 +492,7 @@ dependencies = [
  "bsnext_fs_helpers",
  "bsnext_guards",
  "bsnext_input",
- "bsnext_output2",
+ "bsnext_output",
  "bsnext_resp",
  "bsnext_utils",
  "bytes",
@@ -524,12 +524,13 @@ dependencies = [
  "anyhow",
  "bsnext_fs",
  "bsnext_input",
- "bsnext_output2",
+ "bsnext_output",
  "bsnext_tracing",
  "miette",
  "serde",
  "serde_json",
  "thiserror",
+ "tracing",
  "typeshare",
 ]
 
@@ -638,7 +639,6 @@ version = "0.7.0"
 dependencies = [
  "ansi_term",
  "anyhow",
- "bsnext_dto",
  "bsnext_input",
  "chrono",
  "color-eyre",
@@ -649,14 +649,6 @@ dependencies = [
  "ratatui",
  "serde_json",
  "strip-ansi-escapes",
- "tracing",
-]
-
-[[package]]
-name = "bsnext_output2"
-version = "0.1.0"
-dependencies = [
- "anyhow",
  "tracing",
 ]
 
@@ -693,7 +685,6 @@ dependencies = [
  "bsnext_input",
  "bsnext_md",
  "bsnext_output",
- "bsnext_output2",
  "bsnext_tracing",
  "bsnext_yaml",
  "clap",

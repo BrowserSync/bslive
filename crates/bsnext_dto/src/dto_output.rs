@@ -1,23 +1,22 @@
-use crate::OutputWriter;
-use bsnext_dto::internal::{ChildResult, InternalEvents};
-use bsnext_dto::{
+use crate::internal::{ChildResult, InternalEvents, InternalEventsDTO, StartupEvent};
+use crate::{
     ExternalEventsDTO, FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, ServerIdentityDTO,
-    ServersChangedDTO, StoppedWatchingDTO, WatchingDTO,
+    ServersChangedDTO, StartupEventDTO, StoppedWatchingDTO, WatchingDTO,
 };
+use bsnext_input::startup::StartupError;
 use bsnext_input::InputError;
+use bsnext_output::OutputWriterTrait;
 use std::io::Write;
-use std::marker::PhantomData;
 use std::path::PathBuf;
 
-pub struct PrettyPrint;
+impl OutputWriterTrait for ExternalEventsDTO {
+    fn write_json<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+        writeln!(sink, "{}", serde_json::to_string(&self)?)
+            .map_err(|e| anyhow::anyhow!(e.to_string()))
+    }
 
-impl OutputWriter for PrettyPrint {
-    fn handle_external_event<W: Write>(
-        &self,
-        sink: &mut W,
-        evt: &ExternalEventsDTO,
-    ) -> anyhow::Result<()> {
-        match &evt {
+    fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+        match self {
             ExternalEventsDTO::ServersChanged(servers_started) => {
                 print_servers_changed(sink, servers_started)
             }
@@ -35,18 +34,29 @@ impl OutputWriter for PrettyPrint {
             }
         }
     }
+}
 
-    fn handle_internal_event<W: Write>(
-        &self,
-        sink: &mut W,
-        evt: InternalEvents,
-    ) -> anyhow::Result<()> {
-        match evt {
+impl OutputWriterTrait for InternalEvents {
+    fn write_json<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+        match self {
+            InternalEvents::ServersChanged { server_resp, .. } => {
+                let output = InternalEventsDTO::ServersChanged(server_resp.clone());
+                writeln!(sink, "{}", serde_json::to_string(&output)?)
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            }
+            InternalEvents::InputError(_) => {}
+            InternalEvents::StartupError(_) => {}
+        }
+        Ok(())
+    }
+
+    fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+        match self {
             InternalEvents::ServersChanged {
                 server_resp: _,
                 child_results,
             } => {
-                let lines = print_server_updates(&child_results);
+                let lines = print_server_updates(child_results);
                 for x in lines {
                     if let Err(e) = writeln!(sink, "{x}") {
                         tracing::error!(?e);
@@ -56,7 +66,7 @@ impl OutputWriter for PrettyPrint {
             InternalEvents::InputError(InputError::BsLiveRules(bs_rules)) => {
                 let n = miette::GraphicalReportHandler::new();
                 let mut inner = String::new();
-                n.render_report(&mut inner, &bs_rules).expect("write?");
+                n.render_report(&mut inner, bs_rules).expect("write?");
                 writeln!(sink, "{}", inner)?;
             }
             InternalEvents::InputError(err) => {
@@ -70,35 +80,35 @@ impl OutputWriter for PrettyPrint {
     }
 }
 
-// const prefix: ANSIGenericString<str> = ansi_term::Color::Red.paint("[bslive]");
-
-trait LineState {}
-struct Line<T: LineState = Orig> {
-    _state: PhantomData<T>,
-}
-struct Orig;
-impl LineState for Orig {}
-struct Prefixed;
-impl LineState for Prefixed {}
-
-impl Line<Orig> {
-    pub fn prefixed() -> Line<Prefixed> {
-        Line {
-            _state: PhantomData,
-        }
+impl OutputWriterTrait for StartupEvent {
+    fn write_json<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+        let as_dto = StartupEventDTO::from(self);
+        writeln!(sink, "{}", serde_json::to_string(&as_dto)?)
+            .map_err(|e| anyhow::anyhow!(e.to_string()))
     }
-}
-impl Line<Orig> {
-    // pub fn unprefixed() -> Line<Unprefixed> {
-    //     Line {
-    //         indent: Indent::None,
-    //         _state: PhantomData,
-    //     }
-    // }
-}
-impl Line<Prefixed> {
-    pub fn info(self, str: &str) -> String {
-        format!("[bslive] {}", ansi_term::Color::Cyan.paint(str))
+
+    fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+        match self {
+            StartupEvent::Started => {
+                writeln!(sink, "started...")?;
+            }
+            StartupEvent::FailedStartup(err) => {
+                writeln!(sink, "An error prevented startup!",)?;
+                writeln!(sink)?;
+                match err {
+                    StartupError::InputError(InputError::BsLiveRules(bs_rules)) => {
+                        let n = miette::GraphicalReportHandler::new();
+                        let mut inner = String::new();
+                        n.render_report(&mut inner, bs_rules).expect("write?");
+                        writeln!(sink, "{}", inner)?;
+                    }
+                    StartupError::InputError(err) => {
+                        writeln!(sink, "{}", err)?;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 

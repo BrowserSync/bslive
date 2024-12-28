@@ -3,7 +3,7 @@ use crate::start_kind::StartKind;
 use bsnext_core::export::{export_one_server, ExportCommand};
 use bsnext_fs_helpers::WriteMode;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
-use bsnext_output2::OutputWriters;
+use bsnext_output::OutputWriters;
 use bsnext_tracing::OutputFormat;
 use std::path::PathBuf;
 
@@ -40,7 +40,7 @@ pub async fn export_cmd(
 
             let results = export_one_server(cwd, first.clone(), cmd, fs_write_mode).await;
 
-            bsnext_output2::stdout::completion_writer(writer, results)?;
+            bsnext_output::stdout::completion_writer(writer, results)?;
         }
         Ok(SystemStartArgs::PathWithInput { path: _, input: _ }) => {
             // let first =

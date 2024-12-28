@@ -12,6 +12,7 @@ use bsnext_input::startup::StartupError;
 use bsnext_tracing::LogLevel;
 use typeshare::typeshare;
 
+pub mod dto_output;
 pub mod internal;
 
 #[typeshare]
@@ -102,8 +103,6 @@ pub enum ExternalEventsDTO {
     InputFileChanged(FileChangedDTO),
     InputAccepted(InputAcceptedDTO),
 }
-
-// impl OutputWriterV2 for ExternalEventsDTO {}
 
 #[typeshare]
 #[derive(Debug, serde::Serialize)]

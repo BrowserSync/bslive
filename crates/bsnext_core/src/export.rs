@@ -3,7 +3,7 @@ use crate::server::router::common::{into_state, uri_to_res_parts};
 use bsnext_fs_helpers::{FsWriteError, WriteMode};
 use bsnext_input::route::{Route, RouteKind};
 use bsnext_input::server_config::ServerConfig;
-use bsnext_output2::OutputWriterTrait;
+use bsnext_output::OutputWriterTrait;
 use futures_util::future::join_all;
 use http::response::Parts;
 use std::clone::Clone;
