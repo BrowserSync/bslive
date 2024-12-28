@@ -3,26 +3,79 @@ use crate::server::router::common::{into_state, uri_to_res_parts};
 use bsnext_fs_helpers::{FsWriteError, WriteMode};
 use bsnext_input::route::{Route, RouteKind};
 use bsnext_input::server_config::ServerConfig;
+use bsnext_output::OutputWriterTrait;
 use futures_util::future::join_all;
 use http::response::Parts;
 use std::clone::Clone;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub enum ExportEvent {
     DryRunDirCreate(PathBuf),
     DryRunFileCreate(PathBuf),
     DidCreateFile(PathBuf),
     DidCreateDir(PathBuf),
-    Failed { error: ExportError },
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExportError {
     #[error("{0}")]
     Fs(FsWriteError),
+}
+
+impl OutputWriterTrait for ExportError {
+    fn write_json<W: Write>(&self, _sink: &mut W) -> anyhow::Result<()> {
+        let error_string = self.to_string();
+        let named = match self {
+            ExportError::Fs(_) => "fs",
+        };
+        let v = serde_json::json!({
+            "kind": named,
+            "error": error_string
+        });
+        writeln!(_sink, "{}", v)?;
+        Ok(())
+    }
+
+    fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+        match self {
+            ExportError::Fs(fs_write_error) => {
+                writeln!(sink, "[export]: Error! {}", fs_write_error)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl OutputWriterTrait for ExportEvent {
+    fn write_json<W: Write>(&self, _sink: &mut W) -> anyhow::Result<()> {
+        let str = serde_json::to_string(&self)?;
+        writeln!(_sink, "{}", str)?;
+        Ok(())
+    }
+
+    fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+        match self {
+            ExportEvent::DryRunDirCreate(dir) => {
+                writeln!(sink, "[export:dry-run]: would create dir {}", dir.display())?;
+            }
+            ExportEvent::DryRunFileCreate(file) => writeln!(
+                sink,
+                "[export:dry-run]: would create file {}",
+                file.display()
+            )?,
+            ExportEvent::DidCreateFile(dir) => {
+                writeln!(sink, "[export]: did create file {}", dir.display())?;
+            }
+            ExportEvent::DidCreateDir(file) => {
+                writeln!(sink, "[export]: did create dir {}", file.display())?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, clap::Parser)]
@@ -78,7 +131,7 @@ pub async fn export_one_server(
     let ctx = RuntimeCtx::new(cwd);
     // let job_count = raw_entry_paths.len();
 
-    let results = join_all(async_requests)
+    join_all(async_requests)
         .await
         .into_iter()
         .zip(raw_entry_paths)
@@ -98,12 +151,7 @@ pub async fn export_one_server(
                 }
                 Err(e) => Err(e),
             },
-        });
-
-    match results {
-        Ok(events) => Ok(events),
-        Err(e) => Ok(vec![ExportEvent::Failed { error: e }]),
-    }
+        })
 }
 
 fn fs_sink(

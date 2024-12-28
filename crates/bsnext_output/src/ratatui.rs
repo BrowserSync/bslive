@@ -1,7 +1,5 @@
 use self::common::{init_terminal, install_hooks, restore_terminal, Tui};
-use crate::OutputWriter;
-use bsnext_dto::{ExternalEventsDTO, GetServersMessageResponseDTO};
-use std::io::{BufWriter, Write};
+// use bsnext_dto::GetServersMessageResponseDTO;
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
@@ -11,8 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::pretty::{print_server_updates, server_display, PrettyPrint};
-use bsnext_dto::internal::{AnyEvent, InternalEvents, StartupEvent};
+// use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{self, Event},
@@ -25,59 +22,6 @@ use ratatui::{
 pub struct Ratatui(App);
 
 pub struct RatatuiSender(Sender<RatatuiEvent>);
-
-impl OutputWriter for RatatuiSender {
-    fn handle_external_event<W: Write>(
-        &self,
-        _sink: &mut W,
-        evt: &ExternalEventsDTO,
-    ) -> anyhow::Result<()> {
-        match self
-            .0
-            .send(RatatuiEvent::Evt(AnyEvent::External(evt.clone())))
-        {
-            Ok(_) => tracing::info!("sent..."),
-            Err(_) => tracing::error!("could not send"),
-        }
-        Ok(())
-    }
-    fn handle_internal_event<W: Write>(
-        &self,
-        _sink: &mut W,
-        evt: InternalEvents,
-    ) -> anyhow::Result<()> {
-        match self.0.send(RatatuiEvent::Evt(AnyEvent::Internal(evt))) {
-            Ok(_) => tracing::info!("sent..."),
-            Err(_) => tracing::error!("could not send"),
-        }
-        Ok(())
-    }
-
-    fn handle_export_event<W: Write>(
-        &self,
-        _sink: &mut W,
-        _evt: &ExportEvent,
-    ) -> anyhow::Result<()> {
-        todo!()
-    }
-}
-impl OutputWriter for Ratatui {
-    fn handle_startup_event<W: Write>(
-        &self,
-        sink: &mut W,
-        evt: &StartupEvent,
-    ) -> anyhow::Result<()> {
-        PrettyPrint.handle_startup_event(sink, evt)
-    }
-
-    fn handle_export_event<W: Write>(
-        &self,
-        _sink: &mut W,
-        _evt: &ExportEvent,
-    ) -> anyhow::Result<()> {
-        todo!()
-    }
-}
 
 impl Ratatui {
     pub fn try_new() -> anyhow::Result<Self> {
@@ -258,55 +202,58 @@ impl App {
 
     /// Create some lines to display in the paragraph.
     fn create_servers(&self) -> Vec<Line<'static>> {
-        self.server_status
-            .as_ref()
-            .map(|server_resp| {
-                server_resp
-                    .servers
-                    .iter()
-                    .map(|s| Line::raw(server_display(&s.identity, &s.socket_addr)))
-                    .collect()
-            })
-            .unwrap_or_default()
+        // self.server_status
+        //     .as_ref()
+        //     .map(|server_resp| {
+        //         server_resp
+        //             .servers
+        //             .iter()
+        //             .map(|s| Line::raw(server_display(&s.identity, &s.socket_addr)))
+        //             .collect()
+        //     })
+        //     .unwrap_or_default()
+        todo!("re-implement")
     }
 
     /// Create some lines to display in the paragraph.
     fn create_events(&mut self) -> Vec<Line<'static>> {
-        self.events
-            .get()
-            .iter()
-            .map(|evt| match &evt.evt {
-                AnyEvent::Internal(int) => match int {
-                    InternalEvents::ServersChanged { child_results, .. } => {
-                        (evt.now, print_server_updates(child_results))
-                    }
-                    InternalEvents::InputError(_) => {
-                        todo!("InternalEvents::InputError")
-                    }
-                    InternalEvents::StartupError(_) => {
-                        todo!("InternalEvents::StartupError")
-                    }
-                },
-                AnyEvent::External(ext) => {
-                    let mut writer = BufWriter::new(Vec::new());
-                    PrettyPrint
-                        .handle_external_event(&mut writer, ext)
-                        .expect("can write");
-                    (
-                        evt.now,
-                        vec![String::from_utf8(writer.into_inner().expect("into_inner"))
-                            .expect("as_utf8")],
-                    )
-                }
-            })
-            .flat_map(|(dt, strs)| {
-                strs.iter()
-                    .map(|str| Line::raw(format!("{} {str}", dt.format("%-I.%M%P"))))
-                    .collect::<Vec<_>>()
-            })
-            .collect()
+        // self.events
+        //     .get()
+        //     .iter()
+        //     .map(|evt| match &evt.evt {
+        //         AnyEvent::Internal(int) => match int {
+        //             InternalEvents::ServersChanged { child_results, .. } => {
+        //                 (evt.now, print_server_updates(child_results))
+        //             }
+        //             InternalEvents::InputError(_) => {
+        //                 todo!("InternalEvents::InputError")
+        //             }
+        //             InternalEvents::StartupError(_) => {
+        //                 todo!("InternalEvents::StartupError")
+        //             }
+        //         },
+        //         AnyEvent::External(_ext) => {
+        //             todo!("re-implement")
+        //             // let mut writer = BufWriter::new(Vec::new());
+        //             // PrettyPrint
+        //             //     .handle_external_event(&mut writer, ext)
+        //             //     .expect("can write");
+        //             // (
+        //             //     evt.now,
+        //             //     vec![String::from_utf8(writer.into_inner().expect("into_inner"))
+        //             //         .expect("as_utf8")],
+        //             // )
+        //         }
+        //     })
+        //     .flat_map(|(dt, strs)| {
+        //         strs.iter()
+        //             .map(|str| Line::raw(format!("{} {str}", dt.format("%-I.%M%P"))))
+        //             .collect::<Vec<_>>()
+        //     })
+        //     .collect()
         // .flatten()
         // .collect()
+        todo!("re-implement")
     }
 }
 
@@ -405,7 +352,6 @@ mod common {
     }
 }
 
-use bsnext_core::export::ExportEvent;
 use std::collections::VecDeque;
 
 #[derive(Debug)]

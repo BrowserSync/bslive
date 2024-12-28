@@ -26,8 +26,6 @@ actix = { workspace = true }
 actix-rt = { workspace = true }
 tracing = { workspace = true }
 tempfile = { workspace = true }
-futures-util = { workspace = true }
-http = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
