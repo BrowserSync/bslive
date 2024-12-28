@@ -108,6 +108,9 @@ impl From<&StartupEvent> for StartupEventDTO {
             StartupEvent::FailedStartup(StartupError::InputError(err)) => {
                 StartupEventDTO::FailedStartup(err.to_string())
             }
+            StartupEvent::FailedStartup(StartupError::Other(err)) => {
+                StartupEventDTO::FailedStartup(err.to_string())
+            }
         }
     }
 }

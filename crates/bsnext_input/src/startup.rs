@@ -62,6 +62,8 @@ pub enum DidStart {
 pub enum StartupError {
     #[error("{0}")]
     InputError(#[from] InputError),
+    #[error("{0}")]
+    Other(String),
 }
 
 pub enum StartupTask {}
