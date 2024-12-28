@@ -6,20 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bsnext_input = { path = "../bsnext_input" }
-
 anyhow = { workspace = true }
-serde_json = { workspace = true }
-insta = { workspace = true }
-miette = { workspace = true }
 tracing = { workspace = true }
 
-ansi_term = { version = "0.12.1" }
-indent = { version = "0.1.1" }
-ratatui = { version = "0.27.0" }
-crossterm = { version = "0.27.0" }
-color-eyre = { version = "0.6.3" }
-chrono = { version = "0.4.38" }
-
 [dev-dependencies]
-strip-ansi-escapes = { version = "0.2.0" }

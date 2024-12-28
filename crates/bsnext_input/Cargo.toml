@@ -16,13 +16,11 @@ miette = { workspace = true }
 
 random_word = { workspace = true }
 matchit = { workspace = true }
-mime_guess = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
 serde_yaml = { workspace = true }
 serde_json = { workspace = true }
-toml = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
