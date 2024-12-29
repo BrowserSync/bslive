@@ -2,7 +2,7 @@ use crate::args::Args;
 use crate::commands::start_command::StartCommand;
 use crate::start_kind::start_from_example::StartFromExample;
 use crate::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
-use crate::start_kind::start_from_paths::StartFromDirPaths;
+use crate::start_kind::start_from_paths::StartFromTrailingArgs;
 use bsnext_fs_helpers::{fs_write_str, FsWriteError, WriteMode};
 use bsnext_input::route::{CorsOpts, Opts};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
@@ -20,7 +20,7 @@ pub enum StartKind {
     FromInput(StartFromInput),
     FromInputPaths(StartFromInputPaths),
     FromExample(StartFromExample),
-    FromDirPaths(StartFromDirPaths),
+    FromTrailingArgs(StartFromTrailingArgs),
 }
 
 impl StartKind {
@@ -43,10 +43,10 @@ impl StartKind {
         //     });
         // }
 
-        if !cmd.paths.is_empty() {
+        if !cmd.trailing.is_empty() {
             tracing::info!("cors arg {}", cmd.cors);
-            StartKind::FromDirPaths(StartFromDirPaths {
-                paths: cmd.paths.clone(),
+            StartKind::FromTrailingArgs(StartFromTrailingArgs {
+                paths: cmd.trailing.clone(),
                 write_input: args.fs_opts.write,
                 port: cmd.port,
                 force: args.fs_opts.force,
@@ -72,7 +72,7 @@ impl SystemStart for StartKind {
         match self {
             StartKind::FromInputPaths(from_inputs) => from_inputs.input(ctx),
             StartKind::FromExample(from_example) => from_example.input(ctx),
-            StartKind::FromDirPaths(from_dir_paths) => from_dir_paths.input(ctx),
+            StartKind::FromTrailingArgs(from_trailing_args) => from_trailing_args.input(ctx),
             StartKind::FromInput(from_inputs) => from_inputs.input(ctx),
         }
     }

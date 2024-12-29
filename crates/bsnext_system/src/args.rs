@@ -22,6 +22,9 @@ pub struct Args {
 
     #[command(subcommand)]
     pub command: Option<SubCommands>,
+
+    /// Paths to serve + possibly watch, incompatible with `-i` option
+    pub trailing: Vec<String>,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]

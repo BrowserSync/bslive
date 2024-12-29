@@ -48,15 +48,15 @@ where
     let (events_sender, channel_future) = stdout_channel(format_clone);
     let cmd_clone = args.command.clone();
     match cmd_clone {
-        None => todo!("unreachable?"),
+        None => todo!("unreachable? {:?}", args),
         Some(command) => match command {
             SubCommands::Export(cmd) => {
                 let start_cmd = StartCommand {
                     cors: false,
                     port: None,
-                    paths: cmd.paths.clone(),
+                    trailing: cmd.paths.clone(),
                 };
-                let result = export_cmd::export_cmd(&cwd, &args, &cmd, start_cmd).await;
+                let result = export_cmd::export_cmd(&cwd, &args, &cmd, &start_cmd).await;
                 bsnext_output::stdout::completion_writer(writer, result)
             }
             SubCommands::Example(example) => {

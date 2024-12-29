@@ -19,7 +19,7 @@ pub struct StartCommand {
     pub port: Option<u16>,
 
     /// Paths to serve + possibly watch, incompatible with `-i` option
-    pub paths: Vec<String>,
+    pub trailing: Vec<String>,
 }
 
 pub async fn start_cmd(

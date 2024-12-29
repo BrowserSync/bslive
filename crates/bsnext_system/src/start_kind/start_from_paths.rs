@@ -9,7 +9,7 @@ use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
-pub struct StartFromDirPaths {
+pub struct StartFromTrailingArgs {
     pub paths: Vec<String>,
     pub write_input: bool,
     pub port: Option<u16>,
@@ -17,7 +17,7 @@ pub struct StartFromDirPaths {
     pub route_opts: Opts,
 }
 
-impl SystemStart for StartFromDirPaths {
+impl SystemStart for StartFromTrailingArgs {
     fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         let identity =
             ServerIdentity::from_port_or_named(self.port).map_err(|e| Box::new(e.into()))?;
@@ -75,7 +75,7 @@ fn from_dir_paths<T: AsRef<str>>(
         .collect::<Vec<_>>();
 
     if !invalid.is_empty() {
-        tracing::info!("bailing because no paths were found {:?}", invalid);
+        tracing::info!("bailing because a path wasn't found {:?}", invalid);
         return Err(PathError::MissingPaths {
             paths: PathDefs(invalid),
         });
@@ -112,7 +112,7 @@ mod test {
     fn test() -> anyhow::Result<()> {
         use tempfile::tempdir;
         let tmp_dir = tempdir()?;
-        let v = StartFromDirPaths {
+        let v = StartFromTrailingArgs {
             paths: vec![".".into()],
             write_input: false,
             port: Some(3000),

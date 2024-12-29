@@ -11,15 +11,18 @@ pub async fn export_cmd(
     cwd: &PathBuf,
     args: &Args,
     cmd: &ExportCommand,
-    start_command: StartCommand,
+    start_command: &StartCommand,
 ) -> Result<Vec<impl OutputWriterTrait>, impl OutputWriterTrait> {
     let ctx = StartupContext::from_cwd(Some(cwd));
     tracing::debug!("StartupContext: {:?}", ctx);
 
-    let start_kind = StartKind::from_args(args, &start_command).input(&ctx);
+    let start_kind = StartKind::from_args(args, start_command).input(&ctx);
 
     match start_kind {
-        Err(e) => todo!("handle an error here: {:?}", e),
+        Err(e) => todo!(
+            "handle errors here, eg: when the startup was invalid {:?}",
+            e
+        ),
         Ok(SystemStartArgs::InputOnly { input: _ }) => todo!("handle InputOnly?"),
         Ok(SystemStartArgs::PathWithInput { path: _, input }) if input.servers.len() == 1 => {
             let first = &input.servers[0];
