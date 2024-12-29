@@ -64,7 +64,6 @@ pub async fn with_stdout(
                     }
                 }
             };
-            println!("did exit?");
             end
         }
         Err(err) => Err(anyhow::anyhow!("{:?}", err)),

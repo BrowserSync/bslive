@@ -11,7 +11,7 @@ pub struct LoggingOpts {
     pub write_log: bool,
 }
 
-#[derive(Debug, Clone, clap::Parser)]
+#[derive(Debug, Default, Clone, clap::Parser)]
 pub struct FsOpts {
     /// Write input to disk
     #[arg(long)]
@@ -22,7 +22,7 @@ pub struct FsOpts {
     pub force: bool,
 }
 
-#[derive(Debug, Clone, clap::Parser)]
+#[derive(Debug, Default, Clone, clap::Parser)]
 pub struct InputOpts {
     /// Provide a path to an input file
     #[arg(short, long)]
