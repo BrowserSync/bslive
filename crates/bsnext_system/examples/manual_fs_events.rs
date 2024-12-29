@@ -3,7 +3,7 @@ use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_fs::{ChangeEvent, FsEvent, FsEventContext, FsEventKind};
 use bsnext_input::startup::DidStart;
 use bsnext_input::Input;
-use bsnext_system::start_kind::StartKind;
+use bsnext_system::start::start_kind::StartKind;
 use bsnext_system::{BsSystem, Start};
 use std::env::current_dir;
 use std::path::PathBuf;

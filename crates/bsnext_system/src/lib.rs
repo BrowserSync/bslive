@@ -1,7 +1,7 @@
 use crate::monitor::{
     to_route_watchables, to_server_watchables, AnyWatchable, Monitor, MonitorInput,
 };
-use actix::{Actor, Addr, AsyncContext, Handler, Running};
+use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Running};
 
 use bsnext_input::{Input, InputCtx};
 use std::collections::HashMap;
@@ -25,18 +25,18 @@ use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
 use bsnext_input::startup::{
     DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
 };
-use start_kind::StartKind;
+use start::start_kind::StartKind;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tracing::{debug_span, Instrument};
 
 pub mod args;
 pub mod cli;
-pub mod commands;
+pub mod export;
 pub mod input_fs;
 pub mod monitor;
 mod monitor_any_watchables;
-pub mod start_kind;
+pub mod start;
 
 pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
@@ -61,14 +61,6 @@ pub struct EventWithSpan {
 impl Default for BsSystem {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl Handler<StopSystem> for BsSystem {
-    type Result = ();
-
-    fn handle(&mut self, _msg: StopSystem, _ctx: &mut Self::Context) -> Self::Result {
-        todo!("can the system as a whole be stopped?")
     }
 }
 
@@ -265,6 +257,15 @@ impl Actor for BsSystem {
 #[derive(actix::Message)]
 #[rtype(result = "()")]
 pub struct StopSystem;
+
+impl Handler<StopSystem> for BsSystem {
+    type Result = ();
+
+    fn handle(&mut self, _msg: StopSystem, ctx: &mut Self::Context) -> Self::Result {
+        tracing::trace!("handling StopSystem. Note: not graceful.");
+        ctx.stop();
+    }
+}
 
 #[derive(actix::Message)]
 #[rtype(result = "StartupResult")]

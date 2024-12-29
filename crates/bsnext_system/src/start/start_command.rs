@@ -1,6 +1,6 @@
-use crate::start_kind::StartKind;
+use crate::start::start_kind::StartKind;
 use crate::{BsSystem, Start};
-use actix::Actor;
+use actix::{Actor, Addr};
 use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_dto::internal::{AnyEvent, StartupEvent};
 use bsnext_input::startup::{DidStart, StartupError};
@@ -28,7 +28,7 @@ pub async fn start_cmd(
     input_opts: InputOpts,
     start_command: StartCommand,
     events_sender: tokio::sync::mpsc::Sender<AnyEvent>,
-) -> Result<(), impl OutputWriterTrait> {
+) -> Result<(oneshot::Receiver<()>, Addr<BsSystem>), impl OutputWriterTrait> {
     let (tx, rx) = oneshot::channel();
     let system = BsSystem::new();
     let sys_addr = system.start();
@@ -44,27 +44,11 @@ pub async fn start_cmd(
     };
 
     match sys_addr.send(start).await {
-        Ok(Ok(DidStart::Started)) => {
-            // everything good here, continue...
-        }
-        Ok(Err(e)) => {
-            return Err(StartupEvent::FailedStartup(e));
-        }
+        Ok(Ok(DidStart::Started)) => Ok((rx, sys_addr)),
+        Ok(Err(e)) => Err(StartupEvent::FailedStartup(e)),
         Err(e) => {
             let message = e.to_string();
-            return Err(StartupEvent::FailedStartup(StartupError::Other(message)));
+            Err(StartupEvent::FailedStartup(StartupError::Other(message)))
         }
-    };
-
-    match rx.await {
-        Ok(_) => {
-            tracing::info!("servers ended");
-        }
-        Err(e) => {
-            // dropped? this is ok
-            tracing::trace!(?e, "");
-        }
-    };
-
-    Ok(())
+    }
 }

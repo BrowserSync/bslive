@@ -22,7 +22,7 @@ impl Display for OutputWriters {
     }
 }
 
-pub trait OutputWriterTrait {
+pub trait OutputWriterTrait: std::fmt::Debug {
     fn write_json<W: Write>(&self, _sink: &mut W) -> anyhow::Result<()>;
     fn write_pretty<W: Write>(&self, _sink: &mut W) -> anyhow::Result<()>;
 }
