@@ -112,7 +112,7 @@ pub struct ExportCommand {
     pub dry_run: bool,
 
     /// Paths to serve + possibly watch, incompatible with `-i` option
-    pub paths: Vec<String>,
+    pub trailing: Vec<String>,
 }
 
 pub async fn export_one_server(

@@ -1,8 +1,8 @@
-use crate::args::Args;
 use crate::commands::start_command::StartCommand;
 use crate::start_kind::start_from_example::StartFromExample;
 use crate::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
 use crate::start_kind::start_from_paths::StartFromTrailingArgs;
+use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_fs_helpers::{fs_write_str, FsWriteError, WriteMode};
 use bsnext_input::route::{CorsOpts, Opts};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
@@ -24,7 +24,7 @@ pub enum StartKind {
 }
 
 impl StartKind {
-    pub fn from_args(args: &Args, cmd: &StartCommand) -> Self {
+    pub fn from_args(fs_opts: &FsOpts, input_opts: &InputOpts, cmd: &StartCommand) -> Self {
         // todo: re-implement example command
         // if let Some(example) = args.example {
         //     return StartKind::FromExample(StartFromExample {
@@ -44,12 +44,11 @@ impl StartKind {
         // }
 
         if !cmd.trailing.is_empty() {
-            tracing::info!("cors arg {}", cmd.cors);
             StartKind::FromTrailingArgs(StartFromTrailingArgs {
                 paths: cmd.trailing.clone(),
-                write_input: args.fs_opts.write,
+                write_input: fs_opts.write,
                 port: cmd.port,
-                force: args.fs_opts.force,
+                force: fs_opts.force,
                 route_opts: Opts {
                     cors: cmd.cors.then_some(CorsOpts::Cors(true)),
                     ..Default::default()
@@ -57,7 +56,7 @@ impl StartKind {
             })
         } else {
             StartKind::FromInputPaths(StartFromInputPaths {
-                input_paths: args.input_opts.input.clone(),
+                input_paths: input_opts.input.clone(),
                 port: cmd.port,
             })
         }

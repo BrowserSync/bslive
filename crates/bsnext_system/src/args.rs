@@ -20,6 +20,10 @@ pub struct Args {
     #[clap(flatten)]
     pub fs_opts: FsOpts,
 
+    /// Only used if we're going to fallback
+    #[arg(short, long)]
+    pub port: Option<u16>,
+
     #[command(subcommand)]
     pub command: Option<SubCommands>,
 

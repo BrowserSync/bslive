@@ -1,7 +1,7 @@
-use crate::args::Args;
 use crate::commands::start_command::StartCommand;
 use crate::start_kind::StartKind;
 use bsnext_core::export::{export_one_server, ExportCommand};
+use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_fs_helpers::WriteMode;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_output::OutputWriterTrait;
@@ -9,14 +9,15 @@ use std::path::PathBuf;
 
 pub async fn export_cmd(
     cwd: &PathBuf,
-    args: &Args,
+    fs_opts: &FsOpts,
+    input_opts: &InputOpts,
     cmd: &ExportCommand,
     start_command: &StartCommand,
 ) -> Result<Vec<impl OutputWriterTrait>, impl OutputWriterTrait> {
     let ctx = StartupContext::from_cwd(Some(cwd));
     tracing::debug!("StartupContext: {:?}", ctx);
 
-    let start_kind = StartKind::from_args(args, start_command).input(&ctx);
+    let start_kind = StartKind::from_args(fs_opts, input_opts, start_command).input(&ctx);
 
     match start_kind {
         Err(e) => todo!(
@@ -27,7 +28,7 @@ pub async fn export_cmd(
         Ok(SystemStartArgs::PathWithInput { path: _, input }) if input.servers.len() == 1 => {
             let first = &input.servers[0];
 
-            let fs_write_mode = if args.fs_opts.force {
+            let fs_write_mode = if fs_opts.force {
                 WriteMode::Override
             } else {
                 WriteMode::Safe

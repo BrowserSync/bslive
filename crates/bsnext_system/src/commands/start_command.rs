@@ -1,7 +1,7 @@
-use crate::args::Args;
 use crate::start_kind::StartKind;
 use crate::{BsSystem, Start};
 use actix::Actor;
+use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_dto::internal::{AnyEvent, StartupEvent};
 use bsnext_input::startup::{DidStart, StartupError};
 use bsnext_output::OutputWriterTrait;
@@ -24,14 +24,15 @@ pub struct StartCommand {
 
 pub async fn start_cmd(
     cwd: PathBuf,
-    args: Args,
+    fs_opts: FsOpts,
+    input_opts: InputOpts,
     start_command: StartCommand,
     events_sender: tokio::sync::mpsc::Sender<AnyEvent>,
 ) -> Result<(), impl OutputWriterTrait> {
     let (tx, rx) = oneshot::channel();
     let system = BsSystem::new();
     let sys_addr = system.start();
-    let start_kind = StartKind::from_args(&args, &start_command);
+    let start_kind = StartKind::from_args(&fs_opts, &input_opts, &start_command);
 
     tracing::debug!(?start_kind);
 

@@ -2,6 +2,7 @@ use crate::args::{Args, SubCommands};
 
 use crate::commands::start_command::StartCommand;
 use crate::commands::{export_cmd, start_command};
+use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_dto::internal::AnyEvent;
 use bsnext_output::stdout::StdoutTarget;
 use bsnext_output::OutputWriters;
@@ -18,11 +19,10 @@ use tracing::debug_span;
 /// The typical lifecycle when ran from a CLI environment
 pub async fn from_args<I, T>(itr: I) -> Result<(), anyhow::Error>
 where
-    I: IntoIterator<Item = T>,
+    I: IntoIterator<Item = T> + std::fmt::Debug,
     T: Into<OsString> + Clone,
 {
     std::env::set_var("RUST_LIB_BACKTRACE", "0");
-    let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
     let args = Args::parse_from(itr);
 
     let write_log_opt = if args.logging.write_log {
@@ -45,43 +45,41 @@ where
     tracing::debug!("writer: {}", writer);
 
     // create a channel onto which commands can publish events
-    let (events_sender, channel_future) = stdout_channel(format_clone);
     let cmd_clone = args.command.clone();
     match cmd_clone {
-        None => todo!("unreachable? {:?}", args),
+        None => {
+            let start_cmd = StartCommand {
+                cors: false,
+                port: args.port,
+                trailing: args.trailing.clone(),
+            };
+            try_start(
+                &args.fs_opts,
+                &args.input_opts,
+                format_clone,
+                writer,
+                start_cmd,
+            )
+            .await
+        }
         Some(command) => match command {
             SubCommands::Export(cmd) => {
                 let start_cmd = StartCommand {
                     cors: false,
                     port: None,
-                    trailing: cmd.paths.clone(),
+                    trailing: cmd.trailing.clone(),
                 };
-                let result = export_cmd::export_cmd(&cwd, &args, &cmd, &start_cmd).await;
+                let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
+                let result =
+                    export_cmd::export_cmd(&cwd, &args.fs_opts, &args.input_opts, &cmd, &start_cmd)
+                        .await;
                 bsnext_output::stdout::completion_writer(writer, result)
             }
             SubCommands::Example(example) => {
-                dbg!(&example);
-                Ok(())
+                todo!("{:?}", example);
             }
             SubCommands::Start(start) => {
-                let arg_clone = args.clone();
-                let start_cmd_future =
-                    start_command::start_cmd(cwd, arg_clone, start, events_sender);
-                tokio::select! {
-                    r = actix_rt::spawn(start_cmd_future) => {
-                        match r {
-                            Ok(Ok(_)) => Ok(()),
-                            Ok(Err(err)) => bsnext_output::stdout::write_one_err(writer, err),
-                            Err(er) => Err(anyhow::anyhow!("{:?}", er)),
-                        }
-                    }
-                    h = actix_rt::spawn(channel_future) => {
-                        match h {
-                            Ok(_) => Ok(()),
-                            Err(er) => Err(anyhow::anyhow!("{:?}", er))
-                        }
-                    }
-                }
+                try_start(&args.fs_opts, &args.input_opts, format_clone, writer, start).await
             }
         },
     }
@@ -114,4 +112,34 @@ fn stdout_channel(format: OutputFormat) -> (Sender<AnyEvent>, impl Future<Output
         }
     };
     (events_sender, channel_future)
+}
+
+async fn try_start(
+    fs_opts: &FsOpts,
+    input_opts: &InputOpts,
+    format: OutputFormat,
+    writer: OutputWriters,
+    start: StartCommand,
+) -> Result<(), anyhow::Error> {
+    let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
+    let (events_sender, channel_future) = stdout_channel(format);
+    let fs_opts_clone = fs_opts.clone();
+    let input_opts_clone = input_opts.clone();
+    let start_cmd_future =
+        start_command::start_cmd(cwd, fs_opts_clone, input_opts_clone, start, events_sender);
+    tokio::select! {
+        r = actix_rt::spawn(start_cmd_future) => {
+            match r {
+                Ok(Ok(_)) => Ok(()),
+                Ok(Err(err)) => bsnext_output::stdout::write_one_err(writer, err),
+                Err(er) => Err(anyhow::anyhow!("{:?}", er)),
+            }
+        }
+        h = actix_rt::spawn(channel_future) => {
+            match h {
+                Ok(_) => Ok(()),
+                Err(er) => Err(anyhow::anyhow!("{:?}", er))
+            }
+        }
+    }
 }
