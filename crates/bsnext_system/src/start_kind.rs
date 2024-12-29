@@ -1,4 +1,5 @@
 use crate::args::Args;
+use crate::commands::start_command::StartCommand;
 use crate::start_kind::start_from_example::StartFromExample;
 use crate::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
 use crate::start_kind::start_from_paths::StartFromDirPaths;
@@ -23,40 +24,41 @@ pub enum StartKind {
 }
 
 impl StartKind {
-    pub fn from_args(args: &Args) -> Self {
-        if let Some(example) = args.example {
-            return StartKind::FromExample(StartFromExample {
-                example,
-                write_input: args.write,
-                port: args.port,
-                temp: args.temp,
-                name: args.name.clone(),
-                target_kind: args
-                    .target
-                    .as_ref()
-                    .map(ToOwned::to_owned)
-                    .unwrap_or_default(),
-                dir: args.dir.clone(),
-                force: args.force,
-            });
-        }
+    pub fn from_args(args: &Args, cmd: &StartCommand) -> Self {
+        // todo: re-implement example command
+        // if let Some(example) = args.example {
+        //     return StartKind::FromExample(StartFromExample {
+        //         example,
+        //         write_input: args.write,
+        //         port: args.port,
+        //         temp: args.temp,
+        //         name: args.name.clone(),
+        //         target_kind: args
+        //             .target
+        //             .as_ref()
+        //             .map(ToOwned::to_owned)
+        //             .unwrap_or_default(),
+        //         dir: args.dir.clone(),
+        //         force: args.force,
+        //     });
+        // }
 
-        if !args.paths.is_empty() {
-            tracing::info!("cors arg {}", args.cors);
+        if !cmd.paths.is_empty() {
+            tracing::info!("cors arg {}", cmd.cors);
             StartKind::FromDirPaths(StartFromDirPaths {
-                paths: args.paths.clone(),
-                write_input: args.write,
-                port: args.port,
-                force: args.force,
+                paths: cmd.paths.clone(),
+                write_input: args.fs_opts.write,
+                port: cmd.port,
+                force: args.fs_opts.force,
                 route_opts: Opts {
-                    cors: args.cors.then_some(CorsOpts::Cors(true)),
+                    cors: cmd.cors.then_some(CorsOpts::Cors(true)),
                     ..Default::default()
                 },
             })
         } else {
             StartKind::FromInputPaths(StartFromInputPaths {
-                input_paths: args.input.clone(),
-                port: args.port,
+                input_paths: args.input_opts.input.clone(),
+                port: cmd.port,
             })
         }
     }

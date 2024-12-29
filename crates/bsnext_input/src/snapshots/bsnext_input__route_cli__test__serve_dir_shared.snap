@@ -1,0 +1,39 @@
+---
+source: crates/bsnext_input/src/route_cli.rs
+expression: as_route
+---
+Route {
+    path: PathDef {
+        inner: "/",
+    },
+    kind: Dir(
+        DirRoute {
+            dir: "examples/basic/public",
+            base: None,
+        },
+    ),
+    opts: Opts {
+        cors: Some(
+            Cors(
+                true,
+            ),
+        ),
+        delay: Some(
+            Delay(
+                Ms(
+                    1000,
+                ),
+            ),
+        ),
+        watch: Bool(
+            true,
+        ),
+        inject: Bool(
+            true,
+        ),
+        headers: None,
+        cache: Prevent,
+        compression: None,
+    },
+    fallback: None,
+}

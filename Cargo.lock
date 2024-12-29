@@ -479,6 +479,7 @@ dependencies = [
  "bsnext_input",
  "bsnext_output",
  "bsnext_resp",
+ "bsnext_tracing",
  "bsnext_utils",
  "bytes",
  "clap",

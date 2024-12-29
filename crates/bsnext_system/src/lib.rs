@@ -10,8 +10,6 @@ use actix_rt::Arbiter;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use bsnext_example::Example;
-
 use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 

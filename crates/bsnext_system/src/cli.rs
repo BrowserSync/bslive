@@ -1,5 +1,6 @@
 use crate::args::{Args, SubCommands};
 
+use crate::commands::start_command::StartCommand;
 use crate::commands::{export_cmd, start_command};
 use bsnext_dto::internal::AnyEvent;
 use bsnext_output::stdout::StdoutTarget;
@@ -24,13 +25,13 @@ where
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
     let args = Args::parse_from(itr);
 
-    let write_log_opt = if args.write_log {
+    let write_log_opt = if args.logging.write_log {
         WriteOption::File
     } else {
         WriteOption::None
     };
 
-    init_tracing(args.log_level, args.format, write_log_opt);
+    init_tracing(args.logging.log_level, args.format, write_log_opt);
 
     tracing::debug!("{:#?}", args);
 
@@ -45,30 +46,42 @@ where
 
     // create a channel onto which commands can publish events
     let (events_sender, channel_future) = stdout_channel(format_clone);
-
-    match &args.command {
-        None => {
-            let start_cmd_future = start_command::start_cmd(cwd, args, events_sender);
-            tokio::select! {
-                r = actix_rt::spawn(start_cmd_future) => {
-                    match r {
-                        Ok(Ok(_)) => Ok(()),
-                        Ok(Err(err)) => bsnext_output::stdout::write_one_err(writer, err),
-                        Err(er) => Err(anyhow::anyhow!("{:?}", er)),
-                    }
-                }
-                h = actix_rt::spawn(channel_future) => {
-                    match h {
-                        Ok(_) => Ok(()),
-                        Err(er) => Err(anyhow::anyhow!("{:?}", er))
-                    }
-                }
-            }
-        }
+    let cmd_clone = args.command.clone();
+    match cmd_clone {
+        None => todo!("unreachable?"),
         Some(command) => match command {
             SubCommands::Export(cmd) => {
-                let result = export_cmd::export_cmd(&cwd, cmd, &args).await;
+                let start_cmd = StartCommand {
+                    cors: false,
+                    port: None,
+                    paths: cmd.paths.clone(),
+                };
+                let result = export_cmd::export_cmd(&cwd, &args, &cmd, start_cmd).await;
                 bsnext_output::stdout::completion_writer(writer, result)
+            }
+            SubCommands::Example(example) => {
+                dbg!(&example);
+                Ok(())
+            }
+            SubCommands::Start(start) => {
+                let arg_clone = args.clone();
+                let start_cmd_future =
+                    start_command::start_cmd(cwd, arg_clone, start, events_sender);
+                tokio::select! {
+                    r = actix_rt::spawn(start_cmd_future) => {
+                        match r {
+                            Ok(Ok(_)) => Ok(()),
+                            Ok(Err(err)) => bsnext_output::stdout::write_one_err(writer, err),
+                            Err(er) => Err(anyhow::anyhow!("{:?}", er)),
+                        }
+                    }
+                    h = actix_rt::spawn(channel_future) => {
+                        match h {
+                            Ok(_) => Ok(()),
+                            Err(er) => Err(anyhow::anyhow!("{:?}", er))
+                        }
+                    }
+                }
             }
         },
     }

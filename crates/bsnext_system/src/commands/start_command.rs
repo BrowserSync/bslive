@@ -8,15 +8,30 @@ use bsnext_output::OutputWriterTrait;
 use std::path::PathBuf;
 use tokio::sync::oneshot;
 
+#[derive(Debug, Clone, clap::Parser)]
+pub struct StartCommand {
+    /// Should permissive cors headers be added to responses?
+    #[arg(long)]
+    pub cors: bool,
+
+    /// Only works with `--example` - specify a port instead of a random one
+    #[arg(short, long)]
+    pub port: Option<u16>,
+
+    /// Paths to serve + possibly watch, incompatible with `-i` option
+    pub paths: Vec<String>,
+}
+
 pub async fn start_cmd(
     cwd: PathBuf,
     args: Args,
+    start_command: StartCommand,
     events_sender: tokio::sync::mpsc::Sender<AnyEvent>,
 ) -> Result<(), impl OutputWriterTrait> {
     let (tx, rx) = oneshot::channel();
     let system = BsSystem::new();
     let sys_addr = system.start();
-    let start_kind = StartKind::from_args(&args);
+    let start_kind = StartKind::from_args(&args, &start_command);
 
     tracing::debug!(?start_kind);
 
