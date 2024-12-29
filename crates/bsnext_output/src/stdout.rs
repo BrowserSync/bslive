@@ -43,15 +43,24 @@ pub fn completion_writer(
     match result {
         Ok(events) => {
             for export_event in events {
-                writer.write_evt(export_event, &mut sink.output())?;
+                writer.write_evt(&export_event, &mut sink.output())?;
             }
             sink.flush();
             Ok(())
         }
         Err(err) => {
-            writer.write_evt(err, &mut sink.error())?;
+            writer.write_evt(&err, &mut sink.error())?;
             sink.flush();
-            Err(anyhow::anyhow!("export failed"))
+            Err(anyhow::anyhow!("exit"))
         }
     }
+}
+
+pub fn write_one_err(writer: OutputWriters, err: impl OutputWriterTrait) -> anyhow::Result<()> {
+    let stdout = &mut std::io::stdout();
+    let stderr = &mut std::io::stderr();
+    let mut sink = StdoutTarget::new(stdout, stderr);
+    writer.write_evt(&err, &mut sink.error())?;
+    sink.flush();
+    Err(anyhow::anyhow!("exit"))
 }

@@ -30,6 +30,9 @@ impl OutputWriterTrait for StartupEvent {
                     StartupError::InputError(err) => {
                         writeln!(sink, "{}", err)?;
                     }
+                    StartupError::Other(e) => {
+                        writeln!(sink, "{}", e)?;
+                    }
                 }
             }
         }

@@ -30,7 +30,7 @@ pub trait OutputWriterTrait {
 impl OutputWriters {
     pub fn write_evt<W: Write>(
         &self,
-        evt: impl OutputWriterTrait,
+        evt: &impl OutputWriterTrait,
         sink: &mut W,
     ) -> anyhow::Result<()> {
         match self {
