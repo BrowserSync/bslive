@@ -11,6 +11,7 @@ use tracing::debug_span;
 
 pub mod start_command;
 pub mod start_kind;
+pub mod start_system;
 
 pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<Output = ()>) {
     let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);
@@ -47,7 +48,8 @@ pub async fn with_stdout(
     let fs_opts_clone = fs_opts.clone();
     let input_opts_clone = input_opts.clone();
     let startup =
-        start_command::start_cmd(cwd, fs_opts_clone, input_opts_clone, start, events_sender).await;
+        start_system::start_system(cwd, fs_opts_clone, input_opts_clone, start, events_sender)
+            .await;
     match startup {
         Ok((handle, _sys_address)) => {
             let end = tokio::select! {

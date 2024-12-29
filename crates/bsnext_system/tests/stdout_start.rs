@@ -5,7 +5,7 @@ use bsnext_system::start::start_command::StartCommand;
 use std::fs;
 use std::path::PathBuf;
 
-#[actix_rt::test]
+// todo: add the higher-level tests like these
 pub async fn test_starting_with_stdout() -> Result<(), anyhow::Error> {
     let tmp_dir = tempfile::tempdir().unwrap();
     let index_file = tmp_dir.path().join("index.html");
