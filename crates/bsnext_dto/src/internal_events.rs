@@ -1,5 +1,5 @@
 use crate::internal::{ChildResult, InternalEvents, InternalEventsDTO};
-use crate::{GetActiveServersResponseDTO, ServerIdentityDTO};
+use crate::{GetActiveServersResponseDTO, InputErrorDTO, ServerIdentityDTO};
 use bsnext_input::InputError;
 use bsnext_output::OutputWriterTrait;
 use std::io::Write;
@@ -13,8 +13,19 @@ impl OutputWriterTrait for InternalEvents {
                 writeln!(sink, "{}", serde_json::to_string(&output)?)
                     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             }
-            InternalEvents::InputError(_) => {}
-            InternalEvents::StartupError(_) => {}
+            InternalEvents::InputError(err) => {
+                let e = InputErrorDTO::from(err);
+                writeln!(sink, "{}", serde_json::to_string(&e)?)
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            }
+            InternalEvents::StartupError(startup) => {
+                let str = startup.to_string();
+                let json = serde_json::json!({
+                    "_unstable_InternalEvents::StartupError": str
+                });
+                writeln!(sink, "{}", serde_json::to_string(&json)?)
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            }
         }
         Ok(())
     }
