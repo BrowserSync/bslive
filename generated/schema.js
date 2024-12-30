@@ -65,7 +65,7 @@ var serverDTOSchema = z.object({
   identity: serverIdentityDTOSchema,
   socket_addr: z.string()
 });
-var getServersMessageResponseDTOSchema = z.object({
+var getActiveServersResponseDTOSchema = z.object({
   servers: z.array(serverDTOSchema)
 });
 var injectConfigSchema = z.object({
@@ -152,7 +152,7 @@ var serverDescSchema = z.object({
   id: z.string()
 });
 var serversChangedDTOSchema = z.object({
-  servers_resp: getServersMessageResponseDTOSchema
+  servers_resp: getActiveServersResponseDTOSchema
 });
 var stoppedWatchingDTOSchema = z.object({
   paths: z.array(z.string())
@@ -286,7 +286,7 @@ var inputErrorDTOSchema = z.union([
 ]);
 var internalEventsDTOSchema = z.object({
   kind: z.literal("ServersChanged"),
-  payload: getServersMessageResponseDTOSchema
+  payload: getActiveServersResponseDTOSchema
 });
 var startupEventDTOSchema = z.union([
   z.object({
@@ -309,7 +309,7 @@ export {
   externalEventsDTOSchema,
   fileChangedDTOSchema,
   filesChangedDTOSchema,
-  getServersMessageResponseDTOSchema,
+  getActiveServersResponseDTOSchema,
   injectConfigSchema,
   inputAcceptedDTOSchema,
   inputErrorDTOSchema,

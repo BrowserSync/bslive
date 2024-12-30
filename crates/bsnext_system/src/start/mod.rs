@@ -1,5 +1,6 @@
+use crate::start::start_system::start_system;
 use bsnext_core::shared_args::{FsOpts, InputOpts};
-use bsnext_dto::internal::AnyEvent;
+use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_output::stdout::StdoutTarget;
 use bsnext_output::OutputWriters;
 use start_command::StartCommand;
@@ -37,37 +38,27 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
     (events_sender, channel_future)
 }
 
-pub async fn with_stdout(
+pub async fn with_sender(
     cwd: PathBuf,
-    fs_opts: &FsOpts,
-    input_opts: &InputOpts,
-    writer: OutputWriters,
-    start: StartCommand,
+    fs_opts: FsOpts,
+    input_opts: InputOpts,
+    events_sender: Sender<AnyEvent>,
+    start_command: StartCommand,
 ) -> Result<(), anyhow::Error> {
-    let (events_sender, channel_future) = stdout_channel(writer);
-    let fs_opts_clone = fs_opts.clone();
-    let input_opts_clone = input_opts.clone();
-    let startup =
-        start_system::start_system(cwd, fs_opts_clone, input_opts_clone, start, events_sender)
-            .await;
+    let ecc = events_sender.clone();
+    let startup = start_system(cwd, fs_opts, input_opts, events_sender, start_command).await;
     match startup {
-        Ok((handle, _sys_address)) => {
-            let end = tokio::select! {
-                r = handle => {
-                    match r {
-                        Ok(_) => Ok(()),
-                        Err(er) => Err(anyhow::anyhow!("{:?}", er)),
-                    }
-                }
-                h = actix_rt::spawn(channel_future) => {
-                    match h {
-                        Ok(_) => Ok(()),
-                        Err(er) => Err(anyhow::anyhow!("{:?}", er))
-                    }
-                }
-            };
-            end
+        // If the startup was successful, keep hold of the handle to keep the system running
+        Ok(api) => match api.handle.await {
+            Ok(..) => Ok(()),
+            Err(er) => Err(anyhow::anyhow!("{}", er)),
+        },
+        Err(err) => {
+            let as_str = err.to_string();
+            let _ = ecc
+                .send(AnyEvent::Internal(InternalEvents::StartupError(err)))
+                .await;
+            Err(anyhow::anyhow!("{}", as_str))
         }
-        Err(err) => Err(anyhow::anyhow!("{:?}", err)),
     }
 }

@@ -33,7 +33,6 @@ impl Handler<RemoveWatchPath> for FsWatcher {
                         recip.do_send(FsEvent {
                             kind: evt,
                             ctx: self.ctx.clone(),
-                            span: None,
                         })
                     }
                 }

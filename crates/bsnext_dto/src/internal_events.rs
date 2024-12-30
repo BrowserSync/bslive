@@ -1,5 +1,5 @@
 use crate::internal::{ChildResult, InternalEvents, InternalEventsDTO};
-use crate::ServerIdentityDTO;
+use crate::{GetActiveServersResponseDTO, ServerIdentityDTO};
 use bsnext_input::InputError;
 use bsnext_output::OutputWriterTrait;
 use std::io::Write;
@@ -8,7 +8,8 @@ impl OutputWriterTrait for InternalEvents {
     fn write_json<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
         match self {
             InternalEvents::ServersChanged { server_resp, .. } => {
-                let output = InternalEventsDTO::ServersChanged(server_resp.clone());
+                let as_dto = GetActiveServersResponseDTO::from(server_resp);
+                let output = InternalEventsDTO::ServersChanged(as_dto);
                 writeln!(sink, "{}", serde_json::to_string(&output)?)
                     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             }
@@ -65,8 +66,7 @@ pub fn print_server_updates(evts: &[ChildResult]) -> Vec<String> {
             }
             ChildResult::CreateErr(errored) => {
                 vec![format!(
-                    "[server] errored... {:?} {} ",
-                    iden(&errored.identity),
+                    "[server] did not create, reason: {}",
                     errored.server_error
                 )]
             }

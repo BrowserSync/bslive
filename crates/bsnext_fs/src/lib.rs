@@ -11,9 +11,7 @@ pub mod watch_path_handler;
 mod watcher;
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::time::Duration;
-use tracing::Span;
 
 // use tokio_stream::StreamExt;
 
@@ -75,7 +73,18 @@ impl Default for FsEventContext {
 pub struct FsEvent {
     pub kind: FsEventKind,
     pub ctx: FsEventContext,
-    pub span: Option<Arc<Span>>,
+}
+
+impl FsEvent {
+    pub fn changed<A: AsRef<Path>>(abs: A, path: A, ctx_id: u64) -> Self {
+        Self {
+            kind: FsEventKind::Change(ChangeEvent {
+                absolute_path: PathBuf::from(abs.as_ref()),
+                path: PathBuf::from(path.as_ref()),
+            }),
+            ctx: FsEventContext { id: ctx_id },
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

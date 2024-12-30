@@ -21,7 +21,6 @@ impl Handler<RequestWatchPath> for FsWatcher {
     fn handle(&mut self, msg: RequestWatchPath, _ctx: &mut Self::Context) -> Self::Result {
         let span = trace_span!(parent: msg.span.id(), "RequestWatchPath for FsWatcher", ?msg.path);
         let s = Arc::new(span);
-        let span_c = s.clone();
         let _guard = s.enter();
         // tracing::trace!(path = ?msg.path, "-> WatchPath");
         if let Some(watcher) = self.watcher.as_mut() {
@@ -59,7 +58,6 @@ impl Handler<RequestWatchPath> for FsWatcher {
                         recip.do_send(FsEvent {
                             kind: evt,
                             ctx: self.ctx.clone(),
-                            span: Some(span_c.clone()),
                         })
                     }
                 }
@@ -72,7 +70,6 @@ impl Handler<RequestWatchPath> for FsWatcher {
                         recip.do_send(FsEvent {
                             kind: evt,
                             ctx: self.ctx.clone(),
-                            span: Some(span_c.clone()),
                         })
                     }
                     _ctx.stop();

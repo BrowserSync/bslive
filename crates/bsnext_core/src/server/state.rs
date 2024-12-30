@@ -1,5 +1,5 @@
 use crate::runtime_ctx::RuntimeCtx;
-use crate::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
+use crate::servers_supervisor::get_servers_handler::{GetActiveServers, IncomingEvents};
 use actix::Recipient;
 use axum::Router;
 use bsnext_dto::ClientEvent;
@@ -16,7 +16,7 @@ pub struct ServerState {
     pub raw_router: Arc<RwLock<Router>>,
     pub client_config: Arc<RwLock<ClientConfig>>,
     pub id: u64,
-    pub parent: Option<Recipient<GetServersMessage>>,
+    pub parent: Option<Recipient<GetActiveServers>>,
     pub evt_receiver: Option<Recipient<IncomingEvents>>,
     pub client_sender: Arc<broadcast::Sender<ClientEvent>>,
 }

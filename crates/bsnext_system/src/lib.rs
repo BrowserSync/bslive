@@ -1,30 +1,31 @@
 use crate::monitor::{
     to_route_watchables, to_server_watchables, AnyWatchable, Monitor, MonitorInput,
 };
-use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Running};
+use actix::{
+    Actor, ActorContext, Addr, AsyncContext, Handler, ResponseActFuture, ResponseFuture, Running,
+    WrapFuture,
+};
 
-use bsnext_input::{Input, InputCtx};
-use std::collections::HashMap;
-
+use actix::ActorFutureExt;
 use actix_rt::Arbiter;
-use std::path::PathBuf;
-use std::sync::Arc;
-
 use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
-
 use bsnext_fs::actor::FsWatcher;
+use bsnext_input::{Input, InputCtx};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::monitor_any_watchables::MonitorAnyWatchables;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
-use bsnext_core::servers_supervisor::get_servers_handler::GetServersMessage;
+use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
-use bsnext_input::startup::{
-    DidStart, StartupContext, StartupError, StartupResult, SystemStart, SystemStartArgs,
-};
+use bsnext_dto::internal::{AnyEvent, ChildNotCreated, ChildResult, InternalEvents, ServerError};
+use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
+use bsnext_fs::FsEvent;
+use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use start::start_kind::StartKind;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
@@ -38,13 +39,51 @@ pub mod monitor;
 mod monitor_any_watchables;
 pub mod start;
 
-pub struct BsSystem {
+pub(crate) struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<AnyWatchable, Monitor>,
     cwd: Option<PathBuf>,
+}
+
+#[derive(Debug)]
+pub struct BsSystemApi {
+    sys_address: Addr<BsSystem>,
+    handle: oneshot::Receiver<()>,
+}
+
+impl BsSystemApi {
+    ///
+    /// Stop the system entirely. Note: this consumes self
+    /// and you cannot interact with the system
+    ///
+    pub async fn stop(&self) -> anyhow::Result<()> {
+        self.sys_address
+            .send(StopSystem)
+            .await
+            .map_err(|e| anyhow::anyhow!("could not stop: {:?}", e))
+    }
+    ///
+    /// Use this to keep the server open
+    ///
+    pub async fn handle(self) -> anyhow::Result<()> {
+        self.handle
+            .await
+            .map_err(|e| anyhow::anyhow!("could not wait: {:?}", e))
+    }
+
+    pub fn fs_event(&self, evt: FsEvent) {
+        self.sys_address.do_send(evt)
+    }
+
+    pub async fn active_servers(&self) -> Result<Vec<ActiveServer>, ServerError> {
+        match self.sys_address.send(ReadActiveServers).await {
+            Ok(Ok(resp)) => Ok(resp.servers),
+            _ => todo!("how can this fail?"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -114,103 +153,18 @@ impl BsSystem {
         let cwd = cwd.clone();
         let addr = self_address.clone();
 
-        Arbiter::current().spawn(
-            async move {
-                match addr
-                    .send(MonitorAnyWatchables {
-                        watchables: all_watchables,
-                        cwd,
-                        span: c,
-                    })
-                    .await
-                {
-                    Ok(_) => tracing::info!("sent"),
-                    Err(e) => tracing::error!(%e),
-                };
-            }
-            .in_current_span(),
-        );
-    }
-
-    fn resolve_servers(&mut self, input: Input) {
-        let Some(servers_addr) = &self.servers_addr else {
-            unreachable!("self.servers_addr cannot be absent?");
-        };
-        Arbiter::current().spawn({
-            let addr = servers_addr.clone();
-            let external_event_sender = self.any_event_sender.as_ref().unwrap().clone();
-            let inner = debug_span!("inform_servers");
-            let _g = inner.enter();
-
-            async move {
-                let results = addr.send(InputChanged { input }).await;
-
-                let Ok(result_set) = results else {
-                    let e = results.unwrap_err();
-                    unreachable!("?1 {:?}", e);
-                };
-
-                for (maybe_addr, x) in &result_set {
-                    match x {
-                        ChildResult::Stopped(id) => addr.do_send(ChildStopped {
-                            identity: id.clone(),
-                        }),
-                        ChildResult::Created(c) if maybe_addr.is_some() => {
-                            let child_handler = ChildHandler {
-                                actor_address: maybe_addr.clone().expect("guarded above"),
-                                identity: c.server_handler.identity.clone(),
-                                socket_addr: c.server_handler.socket_addr,
-                            };
-                            addr.do_send(ChildCreatedInsert { child_handler })
-                        }
-                        ChildResult::Created(_c) => {
-                            unreachable!("can't be created without")
-                        }
-                        ChildResult::Patched(p) if maybe_addr.is_some() => {
-                            let inner = debug_span!("patching...");
-                            let _g = inner.enter();
-                            if let Some(child_actor) = maybe_addr {
-                                child_actor.do_send(ClientConfigChange {
-                                    change_set: p.client_config_change_set.clone(),
-                                });
-                                child_actor.do_send(RoutesUpdated {
-                                    change_set: p.route_change_set.clone(),
-                                    span: Arc::new(inner.clone()),
-                                })
-                            } else {
-                                tracing::error!("missing actor addr where it was needed")
-                            }
-                        }
-                        ChildResult::Patched(_p) => {
-                            todo!("not implemented yet")
-                        }
-                        ChildResult::PatchErr(_) => {}
-                        ChildResult::CreateErr(_) => {}
-                    }
-                }
-
-                // dbg!(result_set);
-                let servers = addr.send(GetServersMessage).await;
-                let Ok(servers_resp) = servers else {
-                    unreachable!("?2")
-                };
-
-                let res = result_set
-                    .into_iter()
-                    .map(|(_, child_result)| child_result)
-                    .collect();
-
-                let evt = InternalEvents::ServersChanged {
-                    server_resp: servers_resp,
-                    child_results: res,
-                };
-
-                match external_event_sender.send(AnyEvent::Internal(evt)).await {
-                    Ok(_) => tracing::trace!("Ok"),
-                    Err(_) => tracing::trace!("Err"),
-                };
-            }
-            .in_current_span()
+        Arbiter::current().spawn(async move {
+            match addr
+                .send(MonitorAnyWatchables {
+                    watchables: all_watchables,
+                    cwd,
+                    span: c,
+                })
+                .await
+            {
+                Ok(_) => tracing::info!("sent"),
+                Err(e) => tracing::error!(%e),
+            };
         });
     }
 
@@ -268,7 +222,7 @@ impl Handler<StopSystem> for BsSystem {
 }
 
 #[derive(actix::Message)]
-#[rtype(result = "StartupResult")]
+#[rtype(result = "Result<DidStart, StartupError>")]
 pub struct Start {
     pub kind: StartKind,
     pub cwd: Option<PathBuf>,
@@ -277,7 +231,7 @@ pub struct Start {
 }
 
 impl Handler<Start> for BsSystem {
-    type Result = StartupResult;
+    type Result = ResponseActFuture<Self, Result<DidStart, StartupError>>;
 
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
         self.any_event_sender = Some(msg.events_sender.clone());
@@ -305,7 +259,9 @@ impl Handler<Start> for BsSystem {
                     .iter()
                     .map(|x| x.identity.clone())
                     .collect::<Vec<_>>();
+
                 let input_ctx = InputCtx::new(&ids, None);
+
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
@@ -313,14 +269,53 @@ impl Handler<Start> for BsSystem {
                 });
 
                 self.accept_watchables(&input);
-                self.resolve_servers(input);
-                Ok(DidStart::Started)
+
+                let f = ctx
+                    .address()
+                    .send(ResolveServers { input })
+                    .into_actor(self)
+                    .map(|res, _act, _ctx| match res {
+                        Ok(Ok((resp, _))) => Ok(DidStart::Started(resp)),
+                        Ok(Err(e)) => Err(StartupError::Other(e.to_string())),
+                        Err(e) => Err(StartupError::Other(e.to_string())),
+                    });
+
+                Box::pin(f)
             }
             Ok(SystemStartArgs::InputOnly { input }) => {
                 tracing::debug!("InputOnly");
                 self.accept_watchables(&input);
-                self.resolve_servers(input);
-                Ok(DidStart::Started)
+
+                let f = ctx
+                    .address()
+                    .send(ResolveServers { input })
+                    .into_actor(self)
+                    .map(|res, _act, _ctx| match res {
+                        Ok(Ok((resp, child_results))) => {
+                            let errored = child_results
+                                .iter()
+                                .find(|x| matches!(x, ChildResult::CreateErr(..)));
+                            tracing::debug!("errored: {:?}", errored);
+                            if let Some(ChildResult::CreateErr(ChildNotCreated {
+                                server_error,
+                                ..
+                            })) = errored
+                            {
+                                Err(StartupError::ServerError((*server_error).to_owned()))
+                            } else {
+                                Ok(DidStart::Started(resp))
+                            }
+                        }
+                        Ok(Err(e)) => {
+                            tracing::debug!(?e, "server error");
+                            Err(StartupError::Other(e.to_string()))
+                        }
+                        Err(e) => {
+                            tracing::debug!(?e, "other error");
+                            Err(StartupError::Other(e.to_string()))
+                        }
+                    });
+                Box::pin(f)
             }
             Ok(SystemStartArgs::PathWithInvalidInput { path, input_error }) => {
                 tracing::debug!("PathWithInvalidInput");
@@ -330,9 +325,135 @@ impl Handler<Start> for BsSystem {
                     ctx: InputCtx::default(),
                 });
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
-                Ok(DidStart::Started)
+                let f = async move { Ok(DidStart::Started(Default::default())) }.into_actor(self);
+                Box::pin(f)
             }
-            Err(e) => Err(StartupError::InputError(*e)),
+            Err(e) => {
+                let f = async move { Err(StartupError::InputError(*e)) }.into_actor(self);
+                Box::pin(f)
+            }
         }
+    }
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>")]
+struct ResolveServers {
+    input: Input,
+}
+
+impl actix::Handler<ResolveServers> for BsSystem {
+    type Result = ResponseFuture<Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>>;
+
+    fn handle(&mut self, msg: ResolveServers, _ctx: &mut Self::Context) -> Self::Result {
+        let Some(servers_addr) = &self.servers_addr else {
+            unreachable!("self.servers_addr cannot be absent?");
+        };
+        let external_event_sender = self.any_event_sender.as_ref().unwrap().clone();
+
+        let addr = servers_addr.clone();
+        let inner = debug_span!("inform_servers");
+        let _g = inner.enter();
+
+        let f = async move {
+            let results = addr.send(InputChanged { input: msg.input }).await;
+
+            let Ok(result_set) = results else {
+                let e = results.unwrap_err();
+                unreachable!("?1 {:?}", e);
+            };
+
+            for (maybe_addr, x) in &result_set {
+                match x {
+                    ChildResult::Stopped(id) => addr.do_send(ChildStopped {
+                        identity: id.clone(),
+                    }),
+                    ChildResult::Created(c) if maybe_addr.is_some() => {
+                        let child_handler = ChildHandler {
+                            actor_address: maybe_addr.clone().expect("guarded above"),
+                            identity: c.server_handler.identity.clone(),
+                            socket_addr: c.server_handler.socket_addr,
+                        };
+                        addr.do_send(ChildCreatedInsert { child_handler })
+                    }
+                    ChildResult::Created(_c) => {
+                        unreachable!("can't be created without")
+                    }
+                    ChildResult::Patched(p) if maybe_addr.is_some() => {
+                        let inner = debug_span!("patching...");
+                        let _g = inner.enter();
+                        if let Some(child_actor) = maybe_addr {
+                            child_actor.do_send(ClientConfigChange {
+                                change_set: p.client_config_change_set.clone(),
+                            });
+                            child_actor.do_send(RoutesUpdated {
+                                change_set: p.route_change_set.clone(),
+                                span: Arc::new(inner.clone()),
+                            })
+                        } else {
+                            tracing::error!("missing actor addr where it was needed")
+                        }
+                    }
+                    ChildResult::Patched(_p) => {
+                        todo!("not implemented yet")
+                    }
+                    ChildResult::PatchErr(e) => {
+                        tracing::debug!("ChildResult::PatchErr {:?}", e);
+                    }
+                    ChildResult::CreateErr(e) => {
+                        tracing::debug!("ChildResult::CreateErr {:?}", e);
+                    }
+                }
+            }
+
+            let res = result_set
+                .into_iter()
+                .map(|(_, child_result)| child_result)
+                .collect::<Vec<_>>();
+
+            match addr.send(GetActiveServers).await {
+                Ok(resp) => {
+                    Arbiter::current().spawn({
+                        let evt = InternalEvents::ServersChanged {
+                            server_resp: resp.clone(),
+                            child_results: res.clone(),
+                        };
+                        tracing::debug!("will emit {:?}", evt);
+                        async move {
+                            match external_event_sender.send(AnyEvent::Internal(evt)).await {
+                                Ok(_) => tracing::debug!("SHAEOk"),
+                                Err(_) => tracing::debug!("SHANEErr"),
+                            };
+                        }
+                    });
+                    Ok((resp, res))
+                }
+                Err(e) => Err(ServerError::Unknown(e.to_string())),
+            }
+        };
+
+        Box::pin(f)
+    }
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "Result<GetActiveServersResponse, ServerError>")]
+struct ReadActiveServers;
+
+impl actix::Handler<ReadActiveServers> for BsSystem {
+    type Result = ResponseFuture<Result<GetActiveServersResponse, ServerError>>;
+
+    fn handle(&mut self, _msg: ReadActiveServers, _ctx: &mut Self::Context) -> Self::Result {
+        let Some(addr) = self.servers_addr.as_ref() else {
+            todo!("handle this?");
+        };
+        let cloned_address = addr.clone();
+
+        Box::pin(async move {
+            match cloned_address.send(GetActiveServers).await {
+                Ok(resp) => Ok(resp),
+                Err(e) => Err(ServerError::Unknown(e.to_string())),
+            }
+        })
     }
 }

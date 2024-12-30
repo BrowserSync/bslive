@@ -2,13 +2,13 @@ use actix::MessageResponse;
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
 use std::fmt::{Display, Formatter};
+use std::net::SocketAddr;
 use std::path::Path;
 
-use crate::internal::StartupEvent;
+use crate::internal::{ServerError, StartupEvent};
 use bsnext_fs::Debounce;
 use bsnext_input::client_config::ClientConfig;
 use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
-use bsnext_input::startup::StartupError;
 use bsnext_tracing::LogLevel;
 use typeshare::typeshare;
 
@@ -83,7 +83,7 @@ impl From<RouteKind> for RouteKindDTO {
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ServersChangedDTO {
-    pub servers_resp: GetServersMessageResponseDTO,
+    pub servers_resp: GetActiveServersResponseDTO,
 }
 
 #[typeshare]
@@ -101,6 +101,8 @@ pub enum StartupEventDTO {
     FailedStartup(String),
 }
 
+pub type StartupResult = Result<DidStart, StartupError>;
+
 impl From<&StartupEvent> for StartupEventDTO {
     fn from(value: &StartupEvent) -> Self {
         match value {
@@ -109,6 +111,9 @@ impl From<&StartupEvent> for StartupEventDTO {
                 StartupEventDTO::FailedStartup(err.to_string())
             }
             StartupEvent::FailedStartup(StartupError::Other(err)) => {
+                StartupEventDTO::FailedStartup(err.to_string())
+            }
+            StartupEvent::FailedStartup(StartupError::ServerError(err)) => {
                 StartupEventDTO::FailedStartup(err.to_string())
             }
         }
@@ -227,10 +232,37 @@ pub struct ServerChangeSet {
     pub items: Vec<ServerChangeSetItem>,
 }
 
+#[derive(Debug, Clone, Default, MessageResponse)]
+pub struct GetActiveServersResponse {
+    pub servers: Vec<ActiveServer>,
+}
+
+// impl Default for GetActiveServersResponse {
+//     fn default() -> Self {
+//         Self { servers: vec![] }
+//     }
+// }
+
 #[typeshare::typeshare]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, MessageResponse)]
-pub struct GetServersMessageResponseDTO {
+pub struct GetActiveServersResponseDTO {
     pub servers: Vec<ServerDTO>,
+}
+
+impl From<&GetActiveServersResponse> for GetActiveServersResponseDTO {
+    fn from(value: &GetActiveServersResponse) -> Self {
+        Self {
+            servers: value
+                .servers
+                .iter()
+                .map(|s| ServerDTO {
+                    id: s.identity.as_id().to_string(),
+                    identity: (&s.identity).into(),
+                    socket_addr: s.socket_addr.to_string(),
+                })
+                .collect(),
+        }
+    }
 }
 
 #[typeshare::typeshare]
@@ -239,6 +271,37 @@ pub struct ServerDTO {
     pub id: String,
     pub identity: ServerIdentityDTO,
     pub socket_addr: String,
+}
+
+impl From<&ActiveServer> for ServerDTO {
+    fn from(value: &ActiveServer) -> Self {
+        Self {
+            id: value.identity.as_id().to_string(),
+            identity: ServerIdentityDTO::from(&value.identity),
+            socket_addr: value.socket_addr.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ActiveServer {
+    pub identity: ServerIdentity,
+    pub socket_addr: SocketAddr,
+}
+
+#[derive(Debug)]
+pub enum DidStart {
+    Started(GetActiveServersResponse),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum StartupError {
+    #[error("{0}")]
+    InputError(#[from] InputError),
+    #[error("{0}")]
+    ServerError(#[from] ServerError),
+    #[error("{0}")]
+    Other(String),
 }
 
 #[typeshare::typeshare]

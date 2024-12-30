@@ -1,24 +1,23 @@
 use crate::servers_supervisor::actor::ServersSupervisor;
 use crate::servers_supervisor::file_changed_handler::FilesChanged;
 use actix::AsyncContext;
-use bsnext_dto::{GetServersMessageResponseDTO, ServerDTO};
+use bsnext_dto::{ActiveServer, GetActiveServersResponse};
 
 #[derive(actix::Message)]
-#[rtype(result = "GetServersMessageResponseDTO")]
-pub struct GetServersMessage;
+#[rtype(result = "GetActiveServersResponse")]
+pub struct GetActiveServers;
 
-impl actix::Handler<GetServersMessage> for ServersSupervisor {
-    type Result = GetServersMessageResponseDTO;
+impl actix::Handler<GetActiveServers> for ServersSupervisor {
+    type Result = GetActiveServersResponse;
 
-    fn handle(&mut self, _msg: GetServersMessage, _ctx: &mut Self::Context) -> Self::Result {
-        GetServersMessageResponseDTO {
+    fn handle(&mut self, _msg: GetActiveServers, _ctx: &mut Self::Context) -> Self::Result {
+        GetActiveServersResponse {
             servers: self
                 .handlers
                 .iter()
-                .map(|(identity, child_handler)| ServerDTO {
-                    id: identity.as_id().to_string(),
-                    identity: identity.into(),
-                    socket_addr: child_handler.socket_addr.to_string(),
+                .map(|(identity, child_handler)| ActiveServer {
+                    identity: identity.clone(),
+                    socket_addr: child_handler.socket_addr,
                 })
                 .collect(),
         }

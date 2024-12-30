@@ -1,4 +1,4 @@
-use crate::{BsSystem, InputMonitor};
+use crate::{BsSystem, InputMonitor, ResolveServers};
 use actix::{Actor, Addr, AsyncContext};
 use std::hash::Hash;
 
@@ -93,7 +93,11 @@ impl BsSystem {
             bsnext_dto::FilesChangedDTO { paths: as_strings },
         )))
     }
-    fn handle_change(&mut self, msg: &FsEvent, inner: &ChangeEvent) -> Option<AnyEvent> {
+    fn handle_change(
+        &mut self,
+        msg: &FsEvent,
+        inner: &ChangeEvent,
+    ) -> Option<(AnyEvent, Option<Input>)> {
         let span = trace_span!("handle_change", ?inner.absolute_path);
         let _guard = span.enter();
         match msg.ctx.id() {
@@ -110,7 +114,7 @@ impl BsSystem {
 
                 let Ok(input) = input else {
                     let err = input.unwrap_err();
-                    return Some(AnyEvent::Internal(InternalEvents::InputError(*err)));
+                    return Some((AnyEvent::Internal(InternalEvents::InputError(*err)), None));
                 };
 
                 if let Some(mon) = self.input_monitors.as_mut() {
@@ -126,12 +130,12 @@ impl BsSystem {
                     }
                 }
 
-                self.accept_watchables(&input);
-                self.resolve_servers(input);
-
-                Some(AnyEvent::External(ExternalEventsDTO::InputFileChanged(
-                    bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
-                )))
+                Some((
+                    AnyEvent::External(ExternalEventsDTO::InputFileChanged(
+                        bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
+                    )),
+                    Some(input),
+                ))
             }
             _id => {
                 tracing::trace!(?inner, "Other file changed");
@@ -142,9 +146,12 @@ impl BsSystem {
                         ctx: msg.ctx.clone(),
                     })
                 }
-                Some(AnyEvent::External(ExternalEventsDTO::FileChanged(
-                    bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
-                )))
+                Some((
+                    AnyEvent::External(ExternalEventsDTO::FileChanged(
+                        bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
+                    )),
+                    None,
+                ))
             }
         }
     }
@@ -190,17 +197,27 @@ impl actix::Handler<OverrideInput> for BsSystem {
 
     fn handle(&mut self, msg: OverrideInput, _ctx: &mut Self::Context) -> Self::Result {
         self.accept_watchables(&msg.input);
-        self.resolve_servers(msg.input);
+        todo!("implement resolve servers")
+        // self.resolve_servers(msg.input);
     }
 }
 
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
-    #[tracing::instrument(skip(self, _ctx), name = "FsEvent handler for BsSystem", parent=msg.span.as_ref().and_then(|s|s.id()))]
-    fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) -> Self::Result {
+    #[tracing::instrument(skip(self, ctx), name = "FsEvent handler for BsSystem")]
+    fn handle(&mut self, msg: FsEvent, ctx: &mut Self::Context) -> Self::Result {
         let next = match &msg.kind {
             FsEventKind::ChangeBuffered(buffer_change) => self.handle_buffered(&msg, buffer_change),
-            FsEventKind::Change(inner) => self.handle_change(&msg, inner),
+            FsEventKind::Change(inner) => {
+                if let Some((evt, input)) = self.handle_change(&msg, inner) {
+                    if let Some(input) = input {
+                        ctx.address().do_send(ResolveServers { input });
+                    }
+                    Some(evt)
+                } else {
+                    None
+                }
+            }
             FsEventKind::PathAdded(path) => self.handle_path_added(path),
             FsEventKind::PathRemoved(path) => self.handle_path_removed(path),
             FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),

@@ -3,6 +3,8 @@ use crate::args::{Args, SubCommands};
 use crate::export::export_cmd;
 use crate::start;
 use crate::start::start_command::StartCommand;
+use crate::start::stdout_channel;
+use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_output::OutputWriters;
 use bsnext_tracing::{init_tracing, OutputFormat, WriteOption};
 use clap::Parser;
@@ -37,6 +39,7 @@ where
         OutputFormat::Normal => OutputWriters::Pretty,
         OutputFormat::Json => OutputWriters::Json,
     };
+
     tracing::debug!("writer: {}", writer);
 
     // create a channel onto which commands can publish events
@@ -48,7 +51,7 @@ where
                 port: args.port,
                 trailing: args.trailing.clone(),
             };
-            start::with_stdout(cwd, &args.fs_opts, &args.input_opts, writer, start_cmd).await
+            stdout_wrapper(start_cmd, args.fs_opts, args.input_opts, cwd, writer).await
         }
         Some(command) => match command {
             SubCommands::Export(cmd) => {
@@ -66,8 +69,42 @@ where
                 todo!("{:?}", example);
             }
             SubCommands::Start(start) => {
-                start::with_stdout(cwd, &args.fs_opts, &args.input_opts, writer, start).await
+                stdout_wrapper(start, args.fs_opts, args.input_opts, cwd, writer).await
             }
         },
     }
+}
+
+async fn stdout_wrapper(
+    start_cmd: StartCommand,
+    fs_opts: FsOpts,
+    input_opts: InputOpts,
+    cwd: PathBuf,
+    writer: OutputWriters,
+) -> anyhow::Result<()> {
+    let (events_sender, channel_future) = stdout_channel(writer);
+    let system_handle = actix_rt::spawn(start::with_sender(
+        cwd,
+        fs_opts,
+        input_opts,
+        events_sender,
+        start_cmd,
+    ));
+    let channel_handle = actix_rt::spawn(channel_future);
+    let output = tokio::select! {
+        r = system_handle => {
+            match r {
+                Ok(Ok(..)) => Ok(()),
+                Ok(Err(err)) => Err(anyhow::anyhow!("1{}", err)),
+                Err(e) => Err(anyhow::anyhow!("2{}", e))
+            }
+        }
+        r = channel_handle => {
+            match r {
+                Ok(_) => Ok(()),
+                Err(e) => Err(anyhow::anyhow!("3{}", e))
+            }
+        }
+    };
+    output
 }
