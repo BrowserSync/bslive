@@ -1,14 +1,14 @@
 import { css, html, LitElement } from "lit";
 import { property } from "lit/decorators.js";
 import {
-    GetServersMessageResponseDTO,
+    GetActiveServersResponseDTO,
     ServerDesc,
     ServerDTO,
 } from "@browsersync/generated/dto";
 
 class BsDebug extends LitElement {
     @property({ type: Object })
-    servers: GetServersMessageResponseDTO = { servers: [] };
+    servers: GetActiveServersResponseDTO = { servers: [] };
 
     @property({ type: Object })
     me: ServerDesc = { routes: [], id: "" };

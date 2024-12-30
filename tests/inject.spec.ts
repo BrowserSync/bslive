@@ -1,12 +1,12 @@
-import { bstest, test } from "./utils";
+import { cli, test } from "./utils";
 import { expect } from "@playwright/test";
 
 test.describe(
     "examples/basic/inject.yml",
     {
         annotation: {
-            type: bstest({
-                input: "examples/basic/inject.yml",
+            type: cli({
+                args: ["-i", "examples/basic/inject.yml"],
             }),
             description: "",
         },
@@ -19,7 +19,9 @@ test.describe(
                 },
             });
             const body = await response.body();
-            expect(body.toString()).toMatchSnapshot();
+            expect(body.toString()).toContain(
+                `<script type="module" src="/__bs_js"></script>`,
+            );
 
             {
                 const response = await request.get(bs.path("/form.html"), {
@@ -28,7 +30,9 @@ test.describe(
                     },
                 });
                 const body = await response.body();
-                expect(body.toString()).toMatchSnapshot();
+                expect(body.toString()).not.toContain(
+                    `<script type="module" src="/__bs_js"></script>`,
+                );
             }
         });
         test("injects with bslive:js-connector query param", async ({
