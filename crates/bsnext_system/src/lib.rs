@@ -14,7 +14,6 @@ use bsnext_fs::actor::FsWatcher;
 use bsnext_input::{Input, InputCtx};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use crate::monitor_any_watchables::MonitorAnyWatchables;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
@@ -29,7 +28,6 @@ use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use start::start_kind::StartKind;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
-use tracing::{debug_span, Instrument};
 
 pub mod args;
 pub mod cli;
@@ -39,6 +37,7 @@ pub mod monitor;
 mod monitor_any_watchables;
 pub mod start;
 
+#[derive(Debug)]
 pub(crate) struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
@@ -116,11 +115,6 @@ impl BsSystem {
     }
 
     fn accept_watchables(&mut self, input: &Input) {
-        let span = debug_span!("accept_input");
-        let s = Arc::new(span);
-        let c = s.clone();
-        let _c2 = s.clone();
-        let _g = s.enter();
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
 
@@ -158,17 +152,15 @@ impl BsSystem {
                 .send(MonitorAnyWatchables {
                     watchables: all_watchables,
                     cwd,
-                    span: c,
                 })
                 .await
             {
-                Ok(_) => tracing::info!("sent"),
-                Err(e) => tracing::error!(%e),
+                Ok(_) => {}
+                Err(e) => tracing::debug!(%e),
             };
         });
     }
 
-    #[tracing::instrument(skip(self))]
     fn publish_any_event(&mut self, evt: AnyEvent) {
         tracing::debug!(?evt);
 
@@ -181,7 +173,6 @@ impl BsSystem {
                         Err(_) => tracing::error!("could not send"),
                     }
                 }
-                .in_current_span()
             });
         }
     }
@@ -225,7 +216,7 @@ impl Handler<StopSystem> for BsSystem {
 #[rtype(result = "Result<DidStart, StartupError>")]
 pub struct Start {
     pub kind: StartKind,
-    pub cwd: Option<PathBuf>,
+    pub cwd: PathBuf,
     pub ack: oneshot::Sender<()>,
     pub events_sender: Sender<AnyEvent>,
 }
@@ -235,13 +226,13 @@ impl Handler<Start> for BsSystem {
 
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
         self.any_event_sender = Some(msg.events_sender.clone());
-        self.cwd = msg.cwd;
+        self.cwd = Some(msg.cwd);
+
+        tracing::debug!("self.cwd {:?}", self.cwd);
 
         let Some(cwd) = &self.cwd else {
             unreachable!("?")
         };
-
-        tracing::debug!("{:?}", self.cwd);
 
         let servers = ServersSupervisor::new(msg.ack);
         // store the servers addr for later
@@ -253,7 +244,7 @@ impl Handler<Start> for BsSystem {
 
         match msg.kind.input(&start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
-                tracing::debug!("PathWithInput");
+                tracing::debug!("SystemStartArgs::PathWithInput");
                 let ids = input
                     .servers
                     .iter()
@@ -283,7 +274,7 @@ impl Handler<Start> for BsSystem {
                 Box::pin(f)
             }
             Ok(SystemStartArgs::InputOnly { input }) => {
-                tracing::debug!("InputOnly");
+                tracing::debug!("SystemStartArgs::InputOnly");
                 self.accept_watchables(&input);
 
                 let f = ctx
@@ -318,7 +309,7 @@ impl Handler<Start> for BsSystem {
                 Box::pin(f)
             }
             Ok(SystemStartArgs::PathWithInvalidInput { path, input_error }) => {
-                tracing::debug!("PathWithInvalidInput");
+                tracing::debug!("SystemStartArgs::PathWithInvalidInput");
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
@@ -352,8 +343,6 @@ impl actix::Handler<ResolveServers> for BsSystem {
         let external_event_sender = self.any_event_sender.as_ref().unwrap().clone();
 
         let addr = servers_addr.clone();
-        let inner = debug_span!("inform_servers");
-        let _g = inner.enter();
 
         let f = async move {
             let results = addr.send(InputChanged { input: msg.input }).await;
@@ -380,15 +369,12 @@ impl actix::Handler<ResolveServers> for BsSystem {
                         unreachable!("can't be created without")
                     }
                     ChildResult::Patched(p) if maybe_addr.is_some() => {
-                        let inner = debug_span!("patching...");
-                        let _g = inner.enter();
                         if let Some(child_actor) = maybe_addr {
                             child_actor.do_send(ClientConfigChange {
                                 change_set: p.client_config_change_set.clone(),
                             });
                             child_actor.do_send(RoutesUpdated {
                                 change_set: p.route_change_set.clone(),
-                                span: Arc::new(inner.clone()),
                             })
                         } else {
                             tracing::error!("missing actor addr where it was needed")
@@ -421,8 +407,8 @@ impl actix::Handler<ResolveServers> for BsSystem {
                         tracing::debug!("will emit {:?}", evt);
                         async move {
                             match external_event_sender.send(AnyEvent::Internal(evt)).await {
-                                Ok(_) => tracing::debug!("SHAEOk"),
-                                Err(_) => tracing::debug!("SHANEErr"),
+                                Ok(_) => {}
+                                Err(e) => tracing::debug!(?e),
                             };
                         }
                     });

@@ -8,7 +8,6 @@ use std::future::Future;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use tracing::debug_span;
 
 pub mod start_command;
 pub mod start_kind;
@@ -21,8 +20,6 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
         let stderr = &mut std::io::stderr();
         let mut sink = StdoutTarget::new(stdout, stderr);
         while let Some(evt) = events_receiver.recv().await {
-            let span = debug_span!("External Event processor");
-            let _g2 = span.enter();
             tracing::debug!(external_event = ?evt);
             let result = match evt {
                 AnyEvent::Internal(int) => writer.write_evt(&int, &mut sink.output()),

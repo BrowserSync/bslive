@@ -33,7 +33,6 @@ impl SystemStart for StartFromTrailingArgs {
                 .map_err(|e| Box::new(e.into()))?;
             Ok(SystemStartArgs::PathWithInput { input, path })
         } else {
-            tracing::info!("SystemStartArgs::InputOnly");
             Ok(SystemStartArgs::InputOnly { input })
         }
     }

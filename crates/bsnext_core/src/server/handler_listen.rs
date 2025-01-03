@@ -63,7 +63,7 @@ impl actix::Handler<Listen> for ServerActor {
             };
 
             let Ok(socket_addr) = maybe_socket_addr else {
-                tracing::error!(
+                tracing::debug!(
                     "{:?} [❌ NOT started] could not parse bind_address",
                     identity
                 );
@@ -72,7 +72,7 @@ impl actix::Handler<Listen> for ServerActor {
                     addr_parse_error: maybe_socket_addr.unwrap_err().to_string(),
                 })) {
                     Ok(_) => {}
-                    Err(_) => tracing::error!("oneshot send failed"),
+                    Err(_) => tracing::debug!("❌ oneshot send failed"),
                 }
                 return;
             };
@@ -87,17 +87,20 @@ impl actix::Handler<Listen> for ServerActor {
                 Ok(_) => {
                     tracing::debug!("{:?} [started] Server all done", identity);
                     if send_complete.send(()).is_err() {
-                        tracing::error!("{:?} [started] could not send complete message", identity);
+                        tracing::debug!(
+                            "❌ {:?} [started] could not send complete message",
+                            identity
+                        );
                     }
                     Ok(())
                 }
                 Err(e) => match e.kind() {
                     ErrorKind::AddrInUse => {
-                        tracing::error!("{:?} [not-started] [AddrInUse] {}", identity, e);
+                        tracing::debug!("❌ {:?} [not-started] [AddrInUse] {}", identity, e);
                         Err(ServerError::AddrInUse { socket_addr })
                     }
                     _ => {
-                        tracing::error!("{:?} [not-started] UNKNOWN {}", identity, e);
+                        tracing::debug!("❌ {:?} [not-started] UNKNOWN {}", identity, e);
                         Err(ServerError::Unknown(format!("{}", e)))
                     }
                 },

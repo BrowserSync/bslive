@@ -20,11 +20,11 @@ pub async fn start_system(
     let sys_addr = system.start();
     let start_kind = StartKind::from_args(&fs_opts, &input_opts, &start_command);
 
-    tracing::debug!(?start_kind);
+    tracing::debug!("{:#?}", start_kind);
 
     let start = Start {
         kind: start_kind,
-        cwd: Some(cwd),
+        cwd,
         ack: tx,
         events_sender,
     };
