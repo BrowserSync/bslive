@@ -49,7 +49,7 @@ export interface ServerDTO {
 	socket_addr: string;
 }
 
-export interface GetServersMessageResponseDTO {
+export interface GetActiveServersResponseDTO {
 	servers: ServerDTO[];
 }
 
@@ -113,7 +113,7 @@ export interface ServerDesc {
 }
 
 export interface ServersChangedDTO {
-	servers_resp: GetServersMessageResponseDTO;
+	servers_resp: GetActiveServersResponseDTO;
 }
 
 export interface StoppedWatchingDTO {
@@ -173,12 +173,8 @@ export type InputErrorDTO =
 	| { kind: "EmptyInput", payload: string }
 	| { kind: "BsLiveRules", payload: string };
 
-/**
- * public version of internal events
- * todo(alpha): clean this up
- */
 export type InternalEventsDTO = 
-	| { kind: "ServersChanged", payload: GetServersMessageResponseDTO };
+	| { kind: "ServersChanged", payload: GetActiveServersResponseDTO };
 
 export type StartupEventDTO = 
 	| { kind: "Started", payload?: undefined }

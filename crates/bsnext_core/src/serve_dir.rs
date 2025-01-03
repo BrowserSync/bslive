@@ -5,7 +5,6 @@ use axum::response::IntoResponse;
 use axum::routing::MethodRouter;
 use http::{StatusCode, Uri};
 use tower::ServiceExt;
-use tracing::trace_span;
 
 pub async fn try_many_services_dir(
     State(router_list): State<Vec<MethodRouter>>,
@@ -13,16 +12,11 @@ pub async fn try_many_services_dir(
     req: Request,
     next: Next,
 ) -> impl IntoResponse {
-    let span = trace_span!(parent: None, "handling");
-    let _ = span.enter();
-
     tracing::trace!(?uri, "{} services", router_list.len());
 
     let (a, b) = req.into_parts();
 
     for (index, method_router) in router_list.into_iter().enumerate() {
-        let span = trace_span!("trying {}", index);
-        let _ = span.enter();
         // tracing::trace!(?path_buf);
         let req_clone = Request::from_parts(a.clone(), Body::empty());
         let result = method_router.oneshot(req_clone).await;

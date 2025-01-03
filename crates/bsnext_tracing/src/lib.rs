@@ -86,11 +86,10 @@ pub fn level(log_level: Option<LogLevel>) -> String {
             let level = level.to_string();
             let lines = [
                 format!("bsnext={level}"),
-                format!("bsnext_core={level}"),
-                format!("tower_http={level}"),
                 "bsnext_fs::stream=info".to_string(),
-                "bsnext_fs::watcher=info".to_string(),
                 "bsnext_fs::buffered_debounce=info".to_string(),
+                // format!("tower_http={level}"),
+                // "bsnext_fs::watcher=info".to_string(),
                 // "bsnext_core::server_actor=info".to_string(),
             ];
 

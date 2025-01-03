@@ -54,7 +54,7 @@ export const serverDTOSchema = z.object({
     socket_addr: z.string(),
 });
 
-export const getServersMessageResponseDTOSchema = z.object({
+export const getActiveServersResponseDTOSchema = z.object({
     servers: z.array(serverDTOSchema),
 });
 
@@ -150,7 +150,7 @@ export const serverDescSchema = z.object({
 });
 
 export const serversChangedDTOSchema = z.object({
-    servers_resp: getServersMessageResponseDTOSchema,
+    servers_resp: getActiveServersResponseDTOSchema,
 });
 
 export const stoppedWatchingDTOSchema = z.object({
@@ -293,7 +293,7 @@ export const inputErrorDTOSchema = z.union([
 
 export const internalEventsDTOSchema = z.object({
     kind: z.literal("ServersChanged"),
-    payload: getServersMessageResponseDTOSchema,
+    payload: getActiveServersResponseDTOSchema,
 });
 
 export const startupEventDTOSchema = z.union([

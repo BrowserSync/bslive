@@ -4,7 +4,6 @@ use actix::ResponseFuture;
 use bsnext_input::client_config::ClientConfigChangeSet;
 use bsnext_input::route_manifest::{RouteChangeSet, RoutesManifest};
 use bsnext_input::server_config::ServerConfig;
-use tracing::{debug_span, Instrument};
 
 #[derive(actix::Message, Clone)]
 #[rtype(result = "anyhow::Result<(RouteChangeSet, ClientConfigChangeSet)>")]
@@ -16,11 +15,6 @@ impl actix::Handler<Patch> for ServerActor {
     type Result = ResponseFuture<anyhow::Result<(RouteChangeSet, ClientConfigChangeSet)>>;
 
     fn handle(&mut self, msg: Patch, _ctx: &mut Self::Context) -> Self::Result {
-        let span = debug_span!("Patch for ServerActor");
-
-        // todo(alpha): remove this
-        let _g = span.enter();
-
         // Log handler action initiation
         tracing::trace!("Handler<PatchOne> for ServerActor");
 
@@ -47,7 +41,6 @@ impl actix::Handler<Patch> for ServerActor {
 
         // todo(alpha): use the actix dedicated methods for async state mutation?
         Box::pin({
-            let c = span.clone();
             let ctx = app_state.runtime_ctx.clone();
 
             async move {
@@ -69,7 +62,6 @@ impl actix::Handler<Patch> for ServerActor {
 
                 Ok((changeset, client_config_change_set))
             }
-            .instrument(c)
         })
     }
 }

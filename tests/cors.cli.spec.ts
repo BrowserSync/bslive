@@ -33,7 +33,7 @@ test.describe(
     {
         annotation: {
             type: cli({
-                args: ["examples/basic/public", "--cors"],
+                args: ["start", "examples/basic/public", "--cors"],
             }),
             description: "",
         },

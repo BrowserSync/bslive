@@ -13,7 +13,6 @@ pub struct FileChanged {
 impl actix::Handler<FileChanged> for ServersSupervisor {
     type Result = ();
 
-    #[tracing::instrument(skip_all, name = "FileChanged for ServersSupervisor")]
     fn handle(&mut self, msg: FileChanged, _ctx: &mut Self::Context) -> Self::Result {
         for child in self.handlers.values() {
             if child.identity.as_id() == msg.ctx.id() {
@@ -36,7 +35,6 @@ pub struct FilesChanged {
 impl actix::Handler<FilesChanged> for ServersSupervisor {
     type Result = ();
 
-    #[tracing::instrument(skip_all, name = "FilesChanged for ServersSupervisor")]
     fn handle(&mut self, msg: FilesChanged, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("sending message to {} handlers", self.handlers.len());
         // todo(alpha): limit this to only the relevant server?

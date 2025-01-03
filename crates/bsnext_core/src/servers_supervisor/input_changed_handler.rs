@@ -16,7 +16,6 @@ pub struct InputChanged {
 impl actix::Handler<InputChanged> for ServersSupervisor {
     type Result = Pin<Box<dyn Future<Output = Vec<(Option<Addr<ServerActor>>, ChildResult)>>>>;
 
-    #[tracing::instrument(skip_all, name = "InputChanged for ServersSupervisor")]
     fn handle(&mut self, msg: InputChanged, ctx: &mut Self::Context) -> Self::Result {
         self.input_changed(ctx.address(), msg.input)
     }

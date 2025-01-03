@@ -1,7 +1,6 @@
 use crate::server::actor::ServerActor;
 use bsnext_dto::ClientEvent;
 use bsnext_input::client_config::ClientConfigChangeSet;
-use tracing::trace_span;
 
 #[derive(actix::Message, Clone, Debug)]
 #[rtype(result = "()")]
@@ -13,9 +12,6 @@ impl actix::Handler<ClientConfigChange> for ServerActor {
     type Result = ();
 
     fn handle(&mut self, msg: ClientConfigChange, _ctx: &mut Self::Context) -> Self::Result {
-        let s = trace_span!("ClientConfigChange for ServerActor");
-        let _g = s.enter();
-
         let sender = self.signals.as_ref().and_then(|s| s.client_sender.as_ref());
         let first_change = msg.change_set.changed.first();
 

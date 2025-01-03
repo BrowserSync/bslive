@@ -3,7 +3,7 @@ use crate::runtime_ctx::RuntimeCtx;
 use crate::server::actor::ServerActor;
 use crate::server::router::make_router;
 use crate::server::state::ServerState;
-use crate::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
+use crate::servers_supervisor::get_servers_handler::{GetActiveServers, IncomingEvents};
 use actix::{Recipient, ResponseFuture};
 use actix_rt::Arbiter;
 use bsnext_dto::internal::ServerError;
@@ -16,7 +16,7 @@ use tokio::sync::{oneshot, RwLock};
 #[derive(actix::Message)]
 #[rtype(result = "Result<SocketAddr, ServerError>")]
 pub struct Listen {
-    pub parent: Recipient<GetServersMessage>,
+    pub parent: Recipient<GetActiveServers>,
     pub evt_receiver: Recipient<IncomingEvents>,
     pub runtime_ctx: RuntimeCtx,
 }
@@ -63,7 +63,7 @@ impl actix::Handler<Listen> for ServerActor {
             };
 
             let Ok(socket_addr) = maybe_socket_addr else {
-                tracing::error!(
+                tracing::debug!(
                     "{:?} [❌ NOT started] could not parse bind_address",
                     identity
                 );
@@ -72,7 +72,7 @@ impl actix::Handler<Listen> for ServerActor {
                     addr_parse_error: maybe_socket_addr.unwrap_err().to_string(),
                 })) {
                     Ok(_) => {}
-                    Err(_) => tracing::error!("oneshot send failed"),
+                    Err(_) => tracing::debug!("❌ oneshot send failed"),
                 }
                 return;
             };
@@ -87,59 +87,47 @@ impl actix::Handler<Listen> for ServerActor {
                 Ok(_) => {
                     tracing::debug!("{:?} [started] Server all done", identity);
                     if send_complete.send(()).is_err() {
-                        tracing::error!("{:?} [started] could not send complete message", identity);
+                        tracing::debug!(
+                            "❌ {:?} [started] could not send complete message",
+                            identity
+                        );
                     }
                     Ok(())
                 }
                 Err(e) => match e.kind() {
                     ErrorKind::AddrInUse => {
-                        tracing::error!("{:?} [not-started] [AddrInUse] {}", identity, e);
+                        tracing::debug!("❌ {:?} [not-started] [AddrInUse] {}", identity, e);
                         Err(ServerError::AddrInUse { socket_addr })
                     }
                     _ => {
-                        tracing::error!("{:?} [not-started] UNKNOWN {}", identity, e);
+                        tracing::debug!("❌ {:?} [not-started] UNKNOWN {}", identity, e);
                         Err(ServerError::Unknown(format!("{}", e)))
                     }
                 },
             };
             if !oneshot_send.is_closed() {
                 let _r = oneshot_send.send(result);
+            } else {
+                tracing::debug!("a channel was closed? {:?}", result);
             }
         };
 
         Arbiter::current().spawn(server);
 
         Box::pin(async move {
-            tokio::select! {
-                listening = h2.listening() => {
-                    match listening {
-                        Some(socket_addr) => {
-                            tracing::debug!("{} listening...", socket_addr);
-                            Ok(socket_addr)
-                        }
-                        None => {
-                            Err(ServerError::Unknown("unknown".to_string()))
-                        }
-                    }
-                }
-                msg = oneshot_rec => {
-                    match msg {
-                        Ok(v) => {
-                            match v {
-                                Ok(_) => {
-                                    tracing::info!("All good from one_shot?");
-                                    Err(ServerError::Closed)
-                                }
-                                Err(e) => {
-                                    Err(e)
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("-->{e}");
-                            Err(ServerError::Unknown(format!("{:?}", e)))
-                        }
-                    }
+            let listen_r = h2.listening().await;
+
+            if let Some(socket_addr) = listen_r {
+                return Ok(socket_addr);
+            };
+
+            let once = oneshot_rec.await;
+            match once {
+                Ok(Ok(_)) => Err(ServerError::Closed),
+                Ok(Err(server_error)) => Err(server_error),
+                Err(other) => {
+                    tracing::error!("-->{other}");
+                    Err(ServerError::Unknown(format!("{:?}", other)))
                 }
             }
         })

@@ -1,11 +1,11 @@
 use crate::server::state::ServerState;
 use crate::servers_supervisor::file_changed_handler::FilesChanged;
-use crate::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
+use crate::servers_supervisor::get_servers_handler::{GetActiveServers, IncomingEvents};
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use bsnext_dto::{ChangeDTO, ClientEvent, RouteDTO, ServerDesc};
+use bsnext_dto::{ChangeDTO, ClientEvent, GetActiveServersResponseDTO, RouteDTO, ServerDesc};
 use bsnext_fs::FsEventContext;
 use http::{StatusCode, Uri};
 use serde_json::json;
@@ -15,8 +15,11 @@ use std::sync::Arc;
 async fn all_servers_handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> impl IntoResponse {
     match &app.parent {
         None => unreachable!("cannot get here"),
-        Some(parent) => match parent.send(GetServersMessage).await {
-            Ok(servers) => Json(servers).into_response(),
+        Some(parent) => match parent.send(GetActiveServers).await {
+            Ok(servers) => {
+                let active_servers_dto = GetActiveServersResponseDTO::from(&servers);
+                Json(active_servers_dto).into_response()
+            }
             Err(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Could not fetch servers: {}", err),

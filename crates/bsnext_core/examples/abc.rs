@@ -2,8 +2,8 @@ use actix::Actor;
 use bsnext_core::runtime_ctx::RuntimeCtx;
 use bsnext_core::server::actor::ServerActor;
 use bsnext_core::server::handler_listen::Listen;
-use bsnext_core::servers_supervisor::get_servers_handler::{GetServersMessage, IncomingEvents};
-use bsnext_dto::GetServersMessageResponseDTO;
+use bsnext_core::servers_supervisor::get_servers_handler::{GetActiveServers, IncomingEvents};
+use bsnext_dto::GetActiveServersResponse;
 use bsnext_input::route::{JsonWrapper, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use serde_json::Value;
@@ -74,10 +74,10 @@ impl ServerParent {
 impl actix::Actor for ServerParent {
     type Context = actix::Context<Self>;
 }
-impl actix::Handler<GetServersMessage> for ServerParent {
-    type Result = GetServersMessageResponseDTO;
+impl actix::Handler<GetActiveServers> for ServerParent {
+    type Result = GetActiveServersResponse;
 
-    fn handle(&mut self, _msg: GetServersMessage, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: GetActiveServers, _ctx: &mut Self::Context) -> Self::Result {
         todo!("woop!")
     }
 }

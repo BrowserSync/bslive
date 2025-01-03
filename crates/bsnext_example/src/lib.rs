@@ -11,12 +11,37 @@ pub mod md;
 
 pub mod playground;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
 pub enum Example {
     Basic,
     Lit,
     Md,
+    #[default]
     Playground,
+}
+
+use bsnext_input::target::TargetKind;
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct ExampleCommand {
+    /// Write input to disk
+    #[arg(long)]
+    pub target: Option<TargetKind>,
+
+    #[arg(long, value_enum, default_value_t)]
+    pub example: Example,
+
+    /// create a temp folder for examples instead of using the current dir
+    #[arg(long, requires = "example")]
+    pub temp: bool,
+
+    /// Override output folder (not compatible with 'temp')
+    #[arg(long, requires = "example", conflicts_with = "temp")]
+    pub dir: Option<String>,
+
+    /// create a temp folder for examples instead of using the current dir
+    #[arg(long, requires = "example", conflicts_with = "dir")]
+    pub name: Option<String>,
 }
 
 impl InputSource for Example {

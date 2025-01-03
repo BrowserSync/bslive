@@ -1,6 +1,5 @@
 use crate::internal::StartupEvent;
-use crate::StartupEventDTO;
-use bsnext_input::startup::StartupError;
+use crate::{StartupError, StartupEventDTO};
 use bsnext_input::InputError;
 use bsnext_output::OutputWriterTrait;
 use std::io::Write;
@@ -31,6 +30,9 @@ impl OutputWriterTrait for StartupEvent {
                         writeln!(sink, "{}", err)?;
                     }
                     StartupError::Other(e) => {
+                        writeln!(sink, "{}", e)?;
+                    }
+                    StartupError::ServerError(e) => {
                         writeln!(sink, "{}", e)?;
                     }
                 }

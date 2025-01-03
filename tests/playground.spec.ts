@@ -1,12 +1,12 @@
-import { bstest, test } from "./utils";
+import { cli, test } from "./utils";
 import { expect } from "@playwright/test";
 
 test.describe(
     "examples/markdown/playground.md",
     {
         annotation: {
-            type: bstest({
-                input: "examples/markdown/playground.md",
+            type: cli({
+                args: ["-i", "examples/markdown/playground.md"],
             }),
             description: "",
         },
@@ -40,8 +40,8 @@ test.describe(
     "examples/html/playground.html",
     {
         annotation: {
-            type: bstest({
-                input: "examples/html/playground.html",
+            type: cli({
+                args: ["-i", "examples/html/playground.html"],
             }),
             description: "",
         },

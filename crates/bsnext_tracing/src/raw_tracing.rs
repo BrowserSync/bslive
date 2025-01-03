@@ -35,6 +35,8 @@ pub fn init_tracing_subscriber(debug_str: &str, format: OutputFormat, write_opti
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)
                 .with_writer(file)
+                .with_thread_names(true)
+                .with_line_number(true)
                 .boxed()
         }
     };

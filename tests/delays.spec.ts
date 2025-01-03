@@ -1,12 +1,12 @@
-import { bstest, test } from "./utils";
+import { cli, test } from "./utils";
 import { expect } from "@playwright/test";
 
 test.describe(
     "examples/basic/delays.yml",
     {
         annotation: {
-            type: bstest({
-                input: "examples/basic/delays.yml",
+            type: cli({
+                args: ["-i", "examples/basic/delays.yml"],
             }),
             description: "",
         },

@@ -1,12 +1,12 @@
-import { bstest, test } from "./utils";
+import { cli, test } from "./utils";
 import { expect } from "@playwright/test";
 
 test.describe(
     "Browsersync bslive 404 UI",
     {
         annotation: {
-            type: bstest({
-                input: "examples/basic/headers.yml",
+            type: cli({
+                args: ["-i", "examples/basic/headers.yml"],
             }),
         },
     },
@@ -22,8 +22,8 @@ test.describe(
     "Browsersync bslive 404 fallback",
     {
         annotation: {
-            type: bstest({
-                input: "examples/basic/fallback.yml",
+            type: cli({
+                args: ["-i", "examples/basic/fallback.yml"],
             }),
         },
     },

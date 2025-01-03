@@ -1,11 +1,11 @@
-import { bstest, test } from "./utils";
+import { cli, test } from "./utils";
 
 test.describe(
     "examples/basic/client.yml",
     {
         annotation: {
-            type: bstest({
-                input: "examples/basic/client.yml",
+            type: cli({
+                args: ["-i", "examples/basic/client.yml"],
             }),
             description: "",
         },

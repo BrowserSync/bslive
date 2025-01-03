@@ -28,7 +28,7 @@ impl actix::Handler<Stop> for ServerActor {
             Box::pin(async move {
                 match complete_msg_receiver.await {
                     Ok(_) => {}
-                    Err(e) => tracing::error!("failed to get complete message {e}"),
+                    Err(e) => tracing::debug!("failed to get complete message {e}"),
                 }
             })
         } else {

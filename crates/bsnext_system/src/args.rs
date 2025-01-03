@@ -1,61 +1,26 @@
-use crate::Example;
+use crate::start::start_command::StartCommand;
 use bsnext_core::export::ExportCommand;
-use bsnext_input::target::TargetKind;
-use bsnext_tracing::{LogLevel, OutputFormat};
+use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
+use bsnext_example::ExampleCommand;
+use bsnext_tracing::OutputFormat;
 // bslive route --path=/ --dir=
 
-#[derive(clap::Parser, Debug)]
-#[command(version, name = "Browsersync Live")]
+#[derive(clap::Parser, Clone, Debug)]
+#[command(version, name = "Browsersync Live", propagate_version = true)]
 pub struct Args {
-    #[arg(short, long, value_enum)]
-    pub log_level: Option<LogLevel>,
-
-    #[arg(long)]
-    pub otel: bool,
-
-    /// output internal logs to bslive.log in the current directory
-    #[arg(long, name = "write-log")]
-    pub write_log: bool,
+    #[clap(flatten)]
+    pub logging: LoggingOpts,
 
     #[arg(short, long, value_enum, default_value_t)]
     pub format: OutputFormat,
 
-    /// Input files
-    #[arg(short, long)]
-    pub input: Vec<String>,
+    #[clap(flatten)]
+    pub input_opts: InputOpts,
 
-    /// Write input to disk
-    #[arg(long)]
-    pub write: bool,
+    #[clap(flatten)]
+    pub fs_opts: FsOpts,
 
-    /// Force write over directories or files (dangerous)
-    #[arg(long, requires = "write")]
-    pub force: bool,
-
-    /// Write input to disk
-    #[arg(long, requires = "write")]
-    pub target: Option<TargetKind>,
-
-    #[arg(long, value_enum)]
-    pub example: Option<Example>,
-
-    /// create a temp folder for examples instead of using the current dir
-    #[arg(long, requires = "example")]
-    pub temp: bool,
-
-    /// Override output folder (not compatible with 'temp')
-    #[arg(long, requires = "example", conflicts_with = "temp")]
-    pub dir: Option<String>,
-
-    /// create a temp folder for examples instead of using the current dir
-    #[arg(long, requires = "example", conflicts_with = "dir")]
-    pub name: Option<String>,
-
-    /// Should permissive cors headers be added to responses?
-    #[arg(long)]
-    pub cors: bool,
-
-    /// Only works with `--example` - specify a port instead of a random one
+    /// Only used if we're going to fallback
     #[arg(short, long)]
     pub port: Option<u16>,
 
@@ -63,11 +28,15 @@ pub struct Args {
     pub command: Option<SubCommands>,
 
     /// Paths to serve + possibly watch, incompatible with `-i` option
-    pub paths: Vec<String>,
+    pub trailing: Vec<String>,
 }
 
-#[derive(Debug, clap::Subcommand)]
+#[derive(Debug, Clone, clap::Subcommand)]
 pub enum SubCommands {
+    /// Start the services
+    Start(StartCommand),
     /// Export raw entries to files
     Export(ExportCommand),
+    /// Run an example project
+    Example(ExampleCommand),
 }

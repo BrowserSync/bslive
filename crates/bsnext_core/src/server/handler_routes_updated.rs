@@ -1,22 +1,18 @@
 use crate::server::actor::ServerActor;
 use crate::server::handler_change::Change;
-use std::sync::Arc;
 
 use bsnext_dto::ClientEvent;
 use bsnext_input::route_manifest::RouteChangeSet;
-use tracing::Span;
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
 pub struct RoutesUpdated {
     pub change_set: RouteChangeSet,
-    pub span: Arc<Span>,
 }
 
 impl actix::Handler<RoutesUpdated> for ServerActor {
     type Result = ();
 
-    #[tracing::instrument(skip_all, name="RoutesUpdated for ServerActor", parent=msg.span.id())]
     fn handle(&mut self, msg: RoutesUpdated, _ctx: &mut Self::Context) -> Self::Result {
         let Some(client_sender) = self.signals.as_ref().and_then(|s| s.client_sender.as_ref())
         else {

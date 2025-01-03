@@ -1,4 +1,4 @@
-use crate::start_kind::fs_write_input;
+use crate::start::start_kind::fs_write_input;
 use bsnext_example::Example;
 use bsnext_fs_helpers::WriteMode;
 use bsnext_input::server_config::ServerIdentity;

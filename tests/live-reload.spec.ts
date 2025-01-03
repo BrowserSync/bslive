@@ -1,4 +1,4 @@
-import { bstest, installMockHandler, readCalls, test } from "./utils";
+import { cli, installMockHandler, readCalls, test } from "./utils";
 import { expect } from "@playwright/test";
 import { z } from "zod";
 import { clientEventSchema } from "../generated/schema";
@@ -8,8 +8,8 @@ test.describe(
     "examples/basic/live-reload.yml",
     {
         annotation: {
-            type: bstest({
-                input: "examples/basic/live-reload.yml",
+            type: cli({
+                args: ["-i", "examples/basic/live-reload.yml"],
             }),
             description: "",
         },
