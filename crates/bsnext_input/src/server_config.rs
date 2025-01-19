@@ -2,6 +2,7 @@ use crate::client_config::ClientConfig;
 use crate::playground::Playground;
 use crate::route::{Route, Watcher};
 use crate::{rand_word, PortError};
+use serde::{de, Deserializer};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -45,9 +46,62 @@ impl ServerConfig {
 )]
 #[serde(untagged)]
 pub enum ServerIdentity {
-    Both { name: String, bind_address: String },
-    Address { bind_address: String },
-    Named { name: String },
+    PortNamed {
+        #[serde(deserialize_with = "deserialize_port")]
+        port: u16,
+        name: String,
+    },
+    Both {
+        name: String,
+        bind_address: String,
+    },
+    Address {
+        bind_address: String,
+    },
+    Named {
+        name: String,
+    },
+    Port {
+        #[serde(deserialize_with = "deserialize_port")]
+        port: u16,
+    },
+}
+
+fn deserialize_port<'de, D>(deserializer: D) -> Result<u16, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct PortVisitor;
+
+    impl<'de> de::Visitor<'de> for PortVisitor {
+        type Value = u16;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a string or integer representing a valid port number")
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<u16, E>
+        where
+            E: de::Error,
+        {
+            if value <= u16::MAX as u64 {
+                Ok(value as u16)
+            } else {
+                Err(E::custom(format!("port number out of range: {}", value)))
+            }
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<u16, E>
+        where
+            E: de::Error,
+        {
+            value
+                .parse::<u16>()
+                .map_err(|_| E::custom(format!("invalid port number: {}", value)))
+        }
+    }
+
+    deserializer.deserialize_any(PortVisitor)
 }
 
 impl Default for ServerIdentity {
@@ -90,6 +144,8 @@ impl ServerIdentity {
             ServerIdentity::Both { name, .. } => name == pred_name,
             ServerIdentity::Address { .. } => false,
             ServerIdentity::Named { name } => name == pred_name,
+            ServerIdentity::Port { .. } => false,
+            ServerIdentity::PortNamed { name, .. } => name == pred_name,
         }
     }
 }
@@ -119,4 +175,25 @@ servers:
     for x in &c.servers {
         assert_eq!(x.identity == baseline, false);
     }
+}
+
+#[test]
+fn with_port() {
+    #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+    struct C {
+        servers: Vec<ServerConfig>,
+    }
+    let input = r#"
+servers:
+    - port: 3000
+    - port: "3001"
+    "#;
+    let c: C = serde_yaml::from_str(input).unwrap();
+    let expected = ServerIdentity::Port { port: 3000 };
+    let first = c.servers.first().unwrap();
+    assert_eq!(first.identity, expected);
+
+    let second = c.servers.get(1).unwrap();
+    let second_expected = ServerIdentity::Port { port: 3001 };
+    assert_eq!(second.identity, second_expected);
 }

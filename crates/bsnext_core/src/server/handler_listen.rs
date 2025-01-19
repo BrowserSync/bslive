@@ -60,6 +60,13 @@ impl actix::Handler<Listen> for ServerActor {
                 ServerIdentity::Named { .. } => {
                     format!("127.0.0.1:{}", get_available_port().expect("port?")).parse()
                 }
+                ServerIdentity::Port { port } | ServerIdentity::PortNamed { port, .. } => {
+                    let address = SocketAddr::new(
+                        std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
+                        port,
+                    );
+                    Ok(address)
+                }
             };
 
             let Ok(socket_addr) = maybe_socket_addr else {

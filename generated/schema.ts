@@ -46,6 +46,19 @@ export const serverIdentityDTOSchema = z.union([
             name: z.string(),
         }),
     }),
+    z.object({
+        kind: z.literal("Port"),
+        payload: z.object({
+            port: z.number(),
+        }),
+    }),
+    z.object({
+        kind: z.literal("PortNamed"),
+        payload: z.object({
+            port: z.number(),
+            name: z.string(),
+        }),
+    }),
 ]);
 
 export const serverDTOSchema = z.object({

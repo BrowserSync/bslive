@@ -41,6 +41,13 @@ export type ServerIdentityDTO =
 }}
 	| { kind: "Named", payload: {
 	name: string;
+}}
+	| { kind: "Port", payload: {
+	port: number;
+}}
+	| { kind: "PortNamed", payload: {
+	port: number;
+	name: string;
 }};
 
 export interface ServerDTO {
