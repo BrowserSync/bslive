@@ -13,7 +13,7 @@ test.describe(
     },
     () => {
         test("inject bslive:connector", async ({ request, bs }) => {
-            const response = await request.get(bs.path("/"), {
+            const response = await request.get(bs.named("inject", "/"), {
                 headers: {
                     accept: "text/html",
                 },
@@ -24,11 +24,14 @@ test.describe(
             );
 
             {
-                const response = await request.get(bs.path("/form.html"), {
-                    headers: {
-                        accept: "text/html",
+                const response = await request.get(
+                    bs.named("inject", "/form.html"),
+                    {
+                        headers: {
+                            accept: "text/html",
+                        },
                     },
-                });
+                );
                 const body = await response.body();
                 expect(body.toString()).not.toContain(
                     `<script type="module" src="/__bs_js"></script>`,
