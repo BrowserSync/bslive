@@ -70,6 +70,12 @@ where
             ServerIdentityDTO::Named { name } => {
                 writeln!(w, "[server] [{}] http://{}", name, &server_dto.socket_addr)?
             }
+            ServerIdentityDTO::Port { .. } => {
+                writeln!(w, "[server] http://{}", &server_dto.socket_addr)?
+            }
+            ServerIdentityDTO::PortNamed { name, .. } => {
+                writeln!(w, "[server] [{}] http://{}", name, &server_dto.socket_addr)?
+            }
         }
     }
     Ok(())

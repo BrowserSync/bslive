@@ -122,6 +122,12 @@ pub fn server_display(identity_dto: &ServerIdentityDTO, socket_addr: &str) -> St
         ServerIdentityDTO::Named { name } => {
             format!("[server] [{}] http://{}", name, &socket_addr)
         }
+        ServerIdentityDTO::Port { port } => {
+            format!("[server] [{}] http://{}", port, &socket_addr)
+        }
+        ServerIdentityDTO::PortNamed { name, .. } => {
+            format!("[server] [{}] http://{}", name, &socket_addr)
+        }
     }
 }
 
@@ -130,5 +136,7 @@ pub fn iden(identity_dto: impl Into<ServerIdentityDTO>) -> String {
         ServerIdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
         ServerIdentityDTO::Address { bind_address } => bind_address.to_string(),
         ServerIdentityDTO::Named { name } => format!("[{name}]"),
+        ServerIdentityDTO::Port { port } => format!("[{port}]"),
+        ServerIdentityDTO::PortNamed { port, name } => format!("[{name}] {port}"),
     }
 }

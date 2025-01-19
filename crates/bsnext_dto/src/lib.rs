@@ -311,6 +311,8 @@ pub enum ServerIdentityDTO {
     Both { name: String, bind_address: String },
     Address { bind_address: String },
     Named { name: String },
+    Port { port: u16 },
+    PortNamed { port: u16, name: String },
 }
 
 impl From<&ServerIdentity> for ServerIdentityDTO {
@@ -325,6 +327,11 @@ impl From<&ServerIdentity> for ServerIdentityDTO {
             },
             ServerIdentity::Named { name } => ServerIdentityDTO::Named {
                 name: name.to_owned(),
+            },
+            ServerIdentity::Port { port } => ServerIdentityDTO::Port { port: *port },
+            ServerIdentity::PortNamed { port, name } => ServerIdentityDTO::PortNamed {
+                port: *port,
+                name: name.clone(),
             },
         }
     }
