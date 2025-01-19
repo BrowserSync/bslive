@@ -3,8 +3,6 @@ use crate::server::actor::ServerActor;
 use bsnext_dto::{ChangeDTO, ChangeKind, ClientEvent};
 use std::path::{Path, PathBuf};
 
-use tracing::trace_span;
-
 #[derive(Clone, Debug)]
 pub enum Change {
     Fs {
@@ -17,7 +15,13 @@ pub enum Change {
 #[derive(actix::Message, Clone, Debug)]
 #[rtype(result = "()")]
 pub struct ChangeWithSpan {
-    pub evt: Change,
+    evt: Change,
+}
+
+impl ChangeWithSpan {
+    pub fn new(change: Change) -> Self {
+        Self { evt: change }
+    }
 }
 
 impl Change {
@@ -113,9 +117,6 @@ impl actix::Handler<ChangeWithSpan> for ServerActor {
     type Result = ();
 
     fn handle(&mut self, msg: ChangeWithSpan, _ctx: &mut Self::Context) -> Self::Result {
-        // dbg!(msg.id);
-        let s = trace_span!("ChangeWithSpan for ServerActor");
-        let _g = s.enter();
         if let Some(client_sender) = self.signals.as_ref().and_then(|s| s.client_sender.as_ref()) {
             // todo: what messages are the clients expecting?
             tracing::info!("forwarding `Change` event to connected web socket clients");

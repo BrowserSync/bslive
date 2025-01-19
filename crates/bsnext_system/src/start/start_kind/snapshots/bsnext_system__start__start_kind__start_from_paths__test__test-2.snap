@@ -1,0 +1,20 @@
+---
+source: crates/bsnext_system/src/start/start_kind/start_from_paths.rs
+expression: input
+---
+servers:
+  - bind_address: "0.0.0.0:3000"
+    routes:
+      - path: /
+        dir: "."
+        base: ~
+        watch: true
+        inject: true
+        headers: ~
+        cache: prevent
+        compression: ~
+        fallback: ~
+    watchers: []
+    playground: ~
+    clients:
+      log: info

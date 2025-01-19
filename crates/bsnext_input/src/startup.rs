@@ -2,8 +2,6 @@ use crate::{Input, InputError};
 use std::env::current_dir;
 use std::path::PathBuf;
 
-pub type StartupResult = Result<DidStart, StartupError>;
-
 pub struct Startup {
     pub tasks: Vec<StartupTask>,
 }
@@ -51,19 +49,6 @@ impl Default for StartupContext {
     fn default() -> Self {
         Self::from_cwd(None)
     }
-}
-
-#[derive(Debug)]
-pub enum DidStart {
-    Started,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum StartupError {
-    #[error("{0}")]
-    InputError(#[from] InputError),
-    #[error("{0}")]
-    Other(String),
 }
 
 pub enum StartupTask {}

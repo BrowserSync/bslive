@@ -8,7 +8,7 @@ import { injectConfigSchema } from "@browsersync/generated/schema";
 
 ((injectConfig) => {
     injectConfigSchema.parse(injectConfig);
-    
+
     const producer: Producer = ws();
     const clientEvent$ = producer.create(injectConfig.connect);
 

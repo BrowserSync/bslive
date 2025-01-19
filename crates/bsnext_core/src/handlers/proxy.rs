@@ -13,7 +13,6 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
 use tower::ServiceExt;
 use tower_http::decompression::DecompressionLayer;
-use tracing::trace_span;
 
 #[derive(Debug, Clone)]
 pub struct ProxyConfig {
@@ -45,11 +44,8 @@ where
 
 pub async fn proxy_handler(
     Extension(config): Extension<ProxyConfig>,
-    uri: Uri,
     req: Request,
 ) -> Result<Response, AnyAppError> {
-    let s = trace_span!(parent: None, "proxy_handler", ?uri);
-    let _g = s.enter();
     let target = config.target.clone();
 
     tracing::trace!(?config);

@@ -27,7 +27,8 @@ pub fn init_tracing_subscriber(debug_str: &str, format: OutputFormat, write_opti
             tracing_subscriber::fmt::layer()
                 .without_time()
                 .with_ansi(true)
-                .with_file(false)
+                .with_target(false)
+                .with_file(true)
                 .boxed()
         }
         (OutputFormat::Normal, WriteOption::File) | (OutputFormat::Tui, WriteOption::File) => {
@@ -35,6 +36,10 @@ pub fn init_tracing_subscriber(debug_str: &str, format: OutputFormat, write_opti
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)
                 .with_writer(file)
+                .with_thread_names(true)
+                .with_line_number(true)
+                .with_target(false)
+                .with_file(true)
                 .boxed()
         }
     };

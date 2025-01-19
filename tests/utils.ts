@@ -38,10 +38,6 @@ const cliInputSchema = z.object({
     args: z.array(z.string()),
 });
 
-export function bstest(input: z.infer<typeof inputSchema>) {
-    return JSON.stringify(input, null, 2);
-}
-
 export function cli(input: z.infer<typeof cliInputSchema>) {
     return JSON.stringify(input, null, 2);
 }
@@ -73,7 +69,7 @@ export const test = base.extend<{
         if ("args" in json) {
             ann = cliInputSchema.parse(json);
         } else {
-            ann = inputSchema.parse(json);
+            throw new Error("unreachable?");
         }
 
         const test_dir = ["tests"];
@@ -82,47 +78,10 @@ export const test = base.extend<{
         const file = join(base, "..", "bin.js");
         const stdout: string[] = [];
 
-        let child;
-        if ("input" in ann) {
-            const exampleInput = join(cwd, ann.input);
-            if (!existsSync(exampleInput)) {
-                throw new Error("example input not found");
-            }
-            child = fork(
-                file,
-                [
-                    "-i",
-                    ann.input,
-                    "-f",
-                    "json",
-                    // uncomment these 2 lines to debug trace data in a bslive.log file
-                    // tip: ensure you only run 1 test at a time
-                    // '-l', 'trace',
-                    // '--write-log'
-                ],
-                {
-                    cwd,
-                    stdio: "pipe",
-                },
-            );
-        } else {
-            child = fork(
-                file,
-                [
-                    ...ann.args,
-                    "-f",
-                    "json",
-                    // uncomment these 2 lines to debug trace data in a bslive.log file
-                    // tip: ensure you only run 1 test at a time
-                    // '-l', 'trace',
-                    // '--write-log'
-                ],
-                {
-                    cwd,
-                    stdio: "pipe",
-                },
-            );
-        }
+        let child = fork(file, ["-f", "json", ...ann.args], {
+            cwd,
+            stdio: "pipe",
+        });
 
         const lines: string[] = [];
         const servers_changed_msg: Promise<TServersResp> = new Promise(

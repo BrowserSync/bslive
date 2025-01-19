@@ -13,12 +13,12 @@ use bsnext_client::html_with_base;
 use tracing::{span, Level};
 
 pub async fn not_found_loader(req: Request, next: Next) -> Result<Response, AnyAppError> {
-    let span = span!(parent: None, Level::INFO, "not_found_mw", path = req.uri().path());
+    let span = span!(parent: None, Level::TRACE, "not_found_mw", path = req.uri().path());
     let _guard = span.enter();
 
-    tracing::info!("not_found->");
+    tracing::trace!("not_found->");
     let r = next.run(req).await;
-    tracing::info!("<-not_found");
+    tracing::trace!("<-not_found");
     if r.status().as_u16() != 404 {
         return Ok(r);
     };
@@ -37,9 +37,9 @@ pub async fn not_found_loader(req: Request, next: Next) -> Result<Response, AnyA
 }
 
 pub async fn not_found_srv(req: Request) -> Result<Response, AnyAppError> {
-    let span = span!(parent: None, Level::INFO, "not_found_srv", path = req.uri().path());
+    let span = span!(parent: None, Level::TRACE, "not_found_srv", path = req.uri().path());
     let _guard = span.enter();
-    tracing::info!("responding");
+    tracing::trace!("responding");
 
     let markup = html_with_base("/__bs_assets/ui/");
 
@@ -58,9 +58,9 @@ pub async fn maybe_proxy(req: Request, next: Next) -> impl IntoResponse {
     let span = span!(parent: None, Level::INFO, "maybe_proxy", path = req.uri().path());
     let _guard = span.enter();
 
-    tracing::info!("p->");
+    tracing::trace!("p->");
     let r = next.run(req).await;
-    tracing::info!("<-p");
+    tracing::trace!("<-p");
     if r.status().as_u16() != 404 {
         return r.into_response();
     };

@@ -14,4 +14,5 @@ pub mod proxy_loader;
 pub mod raw_loader;
 pub mod runtime_ctx;
 pub mod serve_dir;
+pub mod shared_args;
 pub mod ws;

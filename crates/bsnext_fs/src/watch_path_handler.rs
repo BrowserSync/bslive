@@ -3,15 +3,12 @@ use crate::{FsEvent, FsEventKind, PathAddedEvent, PathEvent};
 use actix::{ActorContext, Handler, Recipient};
 use notify::{RecursiveMode, Watcher};
 use std::path::PathBuf;
-use std::sync::Arc;
-use tracing::{trace_span, Span};
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
 pub struct RequestWatchPath {
     pub recipients: Vec<Recipient<FsEvent>>,
     pub path: PathBuf,
-    pub span: Arc<Span>,
 }
 
 impl Handler<RequestWatchPath> for FsWatcher {
@@ -19,11 +16,6 @@ impl Handler<RequestWatchPath> for FsWatcher {
 
     // todo: ensure this isn't sent for every input change
     fn handle(&mut self, msg: RequestWatchPath, _ctx: &mut Self::Context) -> Self::Result {
-        let span = trace_span!(parent: msg.span.id(), "RequestWatchPath for FsWatcher", ?msg.path);
-        let s = Arc::new(span);
-        let span_c = s.clone();
-        let _guard = s.enter();
-        // tracing::trace!(path = ?msg.path, "-> WatchPath");
         if let Some(watcher) = self.watcher.as_mut() {
             match watcher.watch(&msg.path, RecursiveMode::Recursive) {
                 Ok(_) => {
@@ -46,7 +38,7 @@ impl Handler<RequestWatchPath> for FsWatcher {
                         match msg.path.strip_prefix(&self.cwd) {
                             Ok(stripped) => stripped.to_path_buf(),
                             Err(e) => {
-                                tracing::debug!(?e, "could not extract the CWD from a path");
+                                tracing::trace!(?e, "could not extract the CWD from a path");
                                 msg.path.clone()
                             }
                         }
@@ -59,7 +51,6 @@ impl Handler<RequestWatchPath> for FsWatcher {
                         recip.do_send(FsEvent {
                             kind: evt,
                             ctx: self.ctx.clone(),
-                            span: Some(span_c.clone()),
                         })
                     }
                 }
@@ -72,7 +63,6 @@ impl Handler<RequestWatchPath> for FsWatcher {
                         recip.do_send(FsEvent {
                             kind: evt,
                             ctx: self.ctx.clone(),
-                            span: Some(span_c.clone()),
                         })
                     }
                     _ctx.stop();

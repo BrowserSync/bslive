@@ -1,5 +1,5 @@
 use crate::internal::{ChildResult, InternalEvents, InternalEventsDTO};
-use crate::ServerIdentityDTO;
+use crate::{GetActiveServersResponseDTO, InputErrorDTO, ServerIdentityDTO};
 use bsnext_input::InputError;
 use bsnext_output::OutputWriterTrait;
 use std::io::Write;
@@ -8,12 +8,24 @@ impl OutputWriterTrait for InternalEvents {
     fn write_json<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
         match self {
             InternalEvents::ServersChanged { server_resp, .. } => {
-                let output = InternalEventsDTO::ServersChanged(server_resp.clone());
+                let as_dto = GetActiveServersResponseDTO::from(server_resp);
+                let output = InternalEventsDTO::ServersChanged(as_dto);
                 writeln!(sink, "{}", serde_json::to_string(&output)?)
                     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             }
-            InternalEvents::InputError(_) => {}
-            InternalEvents::StartupError(_) => {}
+            InternalEvents::InputError(err) => {
+                let e = InputErrorDTO::from(err);
+                writeln!(sink, "{}", serde_json::to_string(&e)?)
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            }
+            InternalEvents::StartupError(startup) => {
+                let str = startup.to_string();
+                let json = serde_json::json!({
+                    "_unstable_InternalEvents::StartupError": str
+                });
+                writeln!(sink, "{}", serde_json::to_string(&json)?)
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            }
         }
         Ok(())
     }
@@ -65,8 +77,7 @@ pub fn print_server_updates(evts: &[ChildResult]) -> Vec<String> {
             }
             ChildResult::CreateErr(errored) => {
                 vec![format!(
-                    "[server] errored... {:?} {} ",
-                    iden(&errored.identity),
+                    "[server] did not create, reason: {}",
                     errored.server_error
                 )]
             }

@@ -22,7 +22,7 @@ impl Handler<RemoveWatchPath> for FsWatcher {
                     let relative = match msg.path.strip_prefix(&self.cwd) {
                         Ok(stripped) => stripped.to_path_buf(),
                         Err(e) => {
-                            tracing::debug!(?e, "could not extract the CWD from a path");
+                            tracing::trace!(?e, "could not extract the CWD from a path");
                             msg.path.clone()
                         }
                     };
@@ -33,7 +33,6 @@ impl Handler<RemoveWatchPath> for FsWatcher {
                         recip.do_send(FsEvent {
                             kind: evt,
                             ctx: self.ctx.clone(),
-                            span: None,
                         })
                     }
                 }

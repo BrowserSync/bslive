@@ -1,12 +1,12 @@
-import { bstest, test } from "./utils";
+import { cli, test } from "./utils";
 import { expect } from "@playwright/test";
 
 test.describe(
     "examples/react-router/bslive.yaml",
     {
         annotation: {
-            type: bstest({
-                input: "examples/react-router/bslive.yaml",
+            type: cli({
+                args: ["-i", "examples/react-router/bslive.yaml"],
             }),
             description: "",
         },

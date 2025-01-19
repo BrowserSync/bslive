@@ -1,7 +1,6 @@
 use crate::external_events::ExternalEventsDTO;
-use crate::GetServersMessageResponseDTO;
+use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError};
 use bsnext_input::server_config::ServerIdentity;
-use bsnext_input::startup::StartupError;
 use bsnext_input::InputError;
 use std::net::SocketAddr;
 use typeshare::typeshare;
@@ -14,7 +13,7 @@ pub enum AnyEvent {
 #[derive(Debug)]
 pub enum InternalEvents {
     ServersChanged {
-        server_resp: GetServersMessageResponseDTO,
+        server_resp: GetActiveServersResponse,
         child_results: Vec<ChildResult>,
     },
     InputError(InputError),
@@ -27,13 +26,11 @@ pub enum StartupEvent {
     FailedStartup(StartupError),
 }
 
-/// public version of internal events
-/// todo(alpha): clean this up
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
 pub enum InternalEventsDTO {
-    ServersChanged(GetServersMessageResponseDTO),
+    ServersChanged(GetActiveServersResponseDTO),
 }
 
 #[derive(Debug, Clone)]
@@ -42,12 +39,12 @@ pub struct ChildHandlerMinimal {
     pub socket_addr: SocketAddr,
 }
 
-#[derive(Debug, actix::Message)]
+#[derive(Debug, Clone, actix::Message)]
 #[rtype(result = "()")]
 pub struct ChildCreated {
     pub server_handler: ChildHandlerMinimal,
 }
-#[derive(Debug, actix::Message)]
+#[derive(Debug, Clone, actix::Message)]
 #[rtype(result = "()")]
 pub struct ChildPatched {
     pub server_handler: ChildHandlerMinimal,
@@ -55,20 +52,20 @@ pub struct ChildPatched {
     pub client_config_change_set: bsnext_input::client_config::ClientConfigChangeSet,
 }
 
-#[derive(Debug, actix::Message)]
+#[derive(Debug, Clone, actix::Message)]
 #[rtype(result = "()")]
 pub struct ChildNotCreated {
     pub server_error: ServerError,
     pub identity: bsnext_input::server_config::ServerIdentity,
 }
 
-#[derive(Debug, actix::Message)]
+#[derive(Debug, Clone, actix::Message)]
 #[rtype(result = "()")]
 pub struct ChildNotPatched {
     pub patch_error: PatchError,
     pub identity: bsnext_input::server_config::ServerIdentity,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChildResult {
     Created(ChildCreated),
     CreateErr(ChildNotCreated),
@@ -77,7 +74,7 @@ pub enum ChildResult {
     Stopped(ServerIdentity),
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, thiserror::Error)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, thiserror::Error)]
 pub enum ServerError {
     // The `#[from]` attribute generates `From<JsonRejection> for ApiError`
     // implementation. See `thiserror` docs for more information
@@ -93,7 +90,7 @@ pub enum ServerError {
     Closed,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, thiserror::Error)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, thiserror::Error)]
 pub enum PatchError {
     // The `#[from]` attribute generates `From<JsonRejection> for ApiError`
     // implementation. See `thiserror` docs for more information

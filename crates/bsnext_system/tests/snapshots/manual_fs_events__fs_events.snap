@@ -1,0 +1,22 @@
+---
+source: crates/bsnext_system/tests/manual_fs_events.rs
+expression: events
+---
+Ok(
+    [
+        External(
+            FileChanged(
+                FileChangedDTO {
+                    path: "c.css",
+                },
+            ),
+        ),
+        External(
+            FileChanged(
+                FileChangedDTO {
+                    path: "c.css",
+                },
+            ),
+        ),
+    ],
+)

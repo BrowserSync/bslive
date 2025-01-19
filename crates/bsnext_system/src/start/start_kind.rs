@@ -1,7 +1,8 @@
-use crate::args::Args;
-use crate::start_kind::start_from_example::StartFromExample;
-use crate::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
-use crate::start_kind::start_from_paths::StartFromDirPaths;
+use crate::start::start_command::StartCommand;
+use crate::start::start_kind::start_from_example::StartFromExample;
+use crate::start::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
+use crate::start::start_kind::start_from_paths::StartFromTrailingArgs;
+use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_fs_helpers::{fs_write_str, FsWriteError, WriteMode};
 use bsnext_input::route::{CorsOpts, Opts};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
@@ -19,44 +20,44 @@ pub enum StartKind {
     FromInput(StartFromInput),
     FromInputPaths(StartFromInputPaths),
     FromExample(StartFromExample),
-    FromDirPaths(StartFromDirPaths),
+    FromTrailingArgs(StartFromTrailingArgs),
 }
 
 impl StartKind {
-    pub fn from_args(args: &Args) -> Self {
-        if let Some(example) = args.example {
-            return StartKind::FromExample(StartFromExample {
-                example,
-                write_input: args.write,
-                port: args.port,
-                temp: args.temp,
-                name: args.name.clone(),
-                target_kind: args
-                    .target
-                    .as_ref()
-                    .map(ToOwned::to_owned)
-                    .unwrap_or_default(),
-                dir: args.dir.clone(),
-                force: args.force,
-            });
-        }
+    pub fn from_args(fs_opts: &FsOpts, input_opts: &InputOpts, cmd: &StartCommand) -> Self {
+        // todo: re-implement example command
+        // if let Some(example) = args.example {
+        //     return StartKind::FromExample(StartFromExample {
+        //         example,
+        //         write_input: args.write,
+        //         port: args.port,
+        //         temp: args.temp,
+        //         name: args.name.clone(),
+        //         target_kind: args
+        //             .target
+        //             .as_ref()
+        //             .map(ToOwned::to_owned)
+        //             .unwrap_or_default(),
+        //         dir: args.dir.clone(),
+        //         force: args.force,
+        //     });
+        // }
 
-        if !args.paths.is_empty() {
-            tracing::info!("cors arg {}", args.cors);
-            StartKind::FromDirPaths(StartFromDirPaths {
-                paths: args.paths.clone(),
-                write_input: args.write,
-                port: args.port,
-                force: args.force,
+        if !cmd.trailing.is_empty() {
+            StartKind::FromTrailingArgs(StartFromTrailingArgs {
+                paths: cmd.trailing.clone(),
+                write_input: fs_opts.write,
+                port: cmd.port,
+                force: fs_opts.force,
                 route_opts: Opts {
-                    cors: args.cors.then_some(CorsOpts::Cors(true)),
+                    cors: cmd.cors.then_some(CorsOpts::Cors(true)),
                     ..Default::default()
                 },
             })
         } else {
             StartKind::FromInputPaths(StartFromInputPaths {
-                input_paths: args.input.clone(),
-                port: args.port,
+                input_paths: input_opts.input.clone(),
+                port: cmd.port,
             })
         }
     }
@@ -70,7 +71,7 @@ impl SystemStart for StartKind {
         match self {
             StartKind::FromInputPaths(from_inputs) => from_inputs.input(ctx),
             StartKind::FromExample(from_example) => from_example.input(ctx),
-            StartKind::FromDirPaths(from_dir_paths) => from_dir_paths.input(ctx),
+            StartKind::FromTrailingArgs(from_trailing_args) => from_trailing_args.input(ctx),
             StartKind::FromInput(from_inputs) => from_inputs.input(ctx),
         }
     }
