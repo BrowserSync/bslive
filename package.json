@@ -1,6 +1,6 @@
 {
   "name": "@browsersync/bslive",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "main": "index.js",
   "types": "index.d.ts",
   "bin": {
