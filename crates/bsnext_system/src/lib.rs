@@ -80,7 +80,12 @@ impl BsSystemApi {
     pub async fn active_servers(&self) -> Result<Vec<ActiveServer>, ServerError> {
         match self.sys_address.send(ReadActiveServers).await {
             Ok(Ok(resp)) => Ok(resp.servers),
-            _ => todo!("how can this fail?"),
+            _ => {
+                tracing::error!("Could not send ReadActiveServers to sys_address");
+                Err(ServerError::Unknown(
+                    "Could not send ReadActiveServers to sys_address".to_string(),
+                ))
+            }
         }
     }
 }
@@ -252,21 +257,23 @@ impl Handler<Start> for BsSystem {
                     .collect::<Vec<_>>();
 
                 let input_ctx = InputCtx::new(&ids, None);
-
-                ctx.notify(MonitorInput {
-                    path: path.clone(),
-                    cwd: cwd.clone(),
-                    ctx: input_ctx,
-                });
-
-                self.accept_watchables(&input);
+                let input_clone = input.clone();
 
                 let f = ctx
                     .address()
                     .send(ResolveServers { input })
                     .into_actor(self)
-                    .map(|res, _act, _ctx| match res {
-                        Ok(Ok((resp, _))) => Ok(DidStart::Started(resp)),
+                    .map(move |res, actor, ctx| match res {
+                        Ok(Ok((resp, _))) => {
+                            ctx.notify(MonitorInput {
+                                path: path.clone(),
+                                cwd: actor.cwd.clone().unwrap(),
+                                ctx: input_ctx,
+                            });
+                            // todo: where to better sequence these side-effects
+                            actor.accept_watchables(&input_clone);
+                            Ok(DidStart::Started(resp))
+                        }
                         Ok(Err(e)) => Err(StartupError::Other(e.to_string())),
                         Err(e) => Err(StartupError::Other(e.to_string())),
                     });
@@ -275,25 +282,26 @@ impl Handler<Start> for BsSystem {
             }
             Ok(SystemStartArgs::InputOnly { input }) => {
                 tracing::debug!("SystemStartArgs::InputOnly");
-                self.accept_watchables(&input);
 
+                let input_clone = input.clone();
                 let f = ctx
                     .address()
                     .send(ResolveServers { input })
                     .into_actor(self)
-                    .map(|res, _act, _ctx| match res {
+                    .map(move |res, actor, _ctx| match res {
                         Ok(Ok((resp, child_results))) => {
                             let errored = child_results
                                 .iter()
                                 .find(|x| matches!(x, ChildResult::CreateErr(..)));
-                            tracing::debug!("errored: {:?}", errored);
                             if let Some(ChildResult::CreateErr(ChildNotCreated {
                                 server_error,
                                 ..
                             })) = errored
                             {
+                                tracing::debug!("errored: {:?}", errored);
                                 Err(StartupError::ServerError((*server_error).to_owned()))
                             } else {
+                                actor.accept_watchables(&input_clone);
                                 Ok(DidStart::Started(resp))
                             }
                         }
@@ -324,6 +332,35 @@ impl Handler<Start> for BsSystem {
                 Box::pin(f)
             }
         }
+    }
+}
+
+#[derive(Debug, actix::Message)]
+#[rtype(result = "Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>")]
+pub struct OverrideInput {
+    pub input: Input,
+}
+
+impl actix::Handler<OverrideInput> for BsSystem {
+    type Result =
+        ResponseActFuture<Self, Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>>;
+
+    fn handle(&mut self, msg: OverrideInput, ctx: &mut Self::Context) -> Self::Result {
+        let input_clone = msg.input.clone();
+        let f = ctx
+            .address()
+            .send(ResolveServers { input: msg.input })
+            .into_actor(self)
+            .map(move |res, actor, _ctx| {
+                let output = match res {
+                    Ok(Ok(res)) => Ok(res),
+                    Ok(Err(s_e)) => Err(s_e),
+                    Err(err) => Err(ServerError::Unknown(err.to_string())),
+                };
+                actor.accept_watchables(&input_clone);
+                output
+            });
+        Box::pin(f)
     }
 }
 
@@ -380,8 +417,8 @@ impl actix::Handler<ResolveServers> for BsSystem {
                             tracing::error!("missing actor addr where it was needed")
                         }
                     }
-                    ChildResult::Patched(_p) => {
-                        todo!("not implemented yet")
+                    ChildResult::Patched(p) => {
+                        tracing::debug!("ChildResult::Patched {:?}", p);
                     }
                     ChildResult::PatchErr(e) => {
                         tracing::debug!("ChildResult::PatchErr {:?}", e);
@@ -431,7 +468,7 @@ impl actix::Handler<ReadActiveServers> for BsSystem {
 
     fn handle(&mut self, _msg: ReadActiveServers, _ctx: &mut Self::Context) -> Self::Result {
         let Some(addr) = self.servers_addr.as_ref() else {
-            todo!("handle this?");
+            unreachable!("This cannot occur?");
         };
         let cloned_address = addr.clone();
 

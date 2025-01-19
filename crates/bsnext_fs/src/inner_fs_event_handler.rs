@@ -22,7 +22,7 @@ impl Handler<InnerChangeEvent> for FsWatcher {
         let relative = match msg.absolute_path.strip_prefix(&self.cwd) {
             Ok(stripped) => stripped.to_path_buf(),
             Err(e) => {
-                tracing::debug!(?e, "could not extract the CWD from a path");
+                tracing::trace!(?e, "could not extract the CWD from a path");
                 msg.absolute_path.clone()
             }
         };

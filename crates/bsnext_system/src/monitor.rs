@@ -1,4 +1,4 @@
-use crate::{BsSystem, InputMonitor, ResolveServers};
+use crate::{BsSystem, InputMonitor, OverrideInput};
 use actix::{Actor, Addr, AsyncContext};
 use std::hash::Hash;
 
@@ -46,7 +46,7 @@ impl actix::Handler<MonitorInput> for BsSystem {
             duration: Duration::from_millis(300),
         });
 
-        tracing::trace!("[main.rs] starting input monitor");
+        tracing::debug!("[main.rs] starting input monitor");
 
         let input_watcher_addr = input_watcher.start();
         let input_monitor = InputMonitor {
@@ -85,55 +85,15 @@ impl BsSystem {
             bsnext_dto::FilesChangedDTO { paths: as_strings },
         )))
     }
-    fn handle_change(
+    fn handle_any_change(
         &mut self,
         msg: &FsEvent,
         inner: &ChangeEvent,
     ) -> Option<(AnyEvent, Option<Input>)> {
         match msg.ctx.id() {
-            0 => {
-                tracing::info!("InputFile file changed {:?}", inner);
-
-                let ctx = self
-                    .input_monitors
-                    .as_ref()
-                    .map(|x| x.ctx.clone())
-                    .unwrap_or_default();
-
-                let input = from_input_path(&inner.absolute_path, &ctx);
-
-                let Ok(input) = input else {
-                    let err = input.unwrap_err();
-                    return Some((AnyEvent::Internal(InternalEvents::InputError(*err)), None));
-                };
-
-                if let Some(mon) = self.input_monitors.as_mut() {
-                    let next = input
-                        .servers
-                        .iter()
-                        .map(|s| s.identity.clone())
-                        .collect::<Vec<_>>();
-                    let ctx = InputCtx::new(&next, None);
-                    tracing::debug!(?ctx);
-                    if !next.is_empty() {
-                        tracing::info!(
-                            "updating stored server identities following a file change {:?}",
-                            next
-                        );
-                        mon.ctx = ctx
-                    }
-                }
-
-                Some((
-                    AnyEvent::External(ExternalEventsDTO::InputFileChanged(
-                        bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
-                    )),
-                    Some(input),
-                ))
-            }
-            _id => {
+            0 => self.handle_input_change(inner),
+            _ => {
                 tracing::trace!(?inner, "Other file changed");
-                // todo: tie these changed to an input identity?
                 if let Some(servers) = &self.servers_addr {
                     servers.do_send(FileChanged {
                         path: inner.absolute_path.clone(),
@@ -148,6 +108,46 @@ impl BsSystem {
                 ))
             }
         }
+    }
+    fn handle_input_change(&mut self, inner: &ChangeEvent) -> Option<(AnyEvent, Option<Input>)> {
+        tracing::info!("InputFile file changed {:?}", inner);
+
+        let ctx = self
+            .input_monitors
+            .as_ref()
+            .map(|x| x.ctx.clone())
+            .unwrap_or_default();
+
+        let input = from_input_path(&inner.absolute_path, &ctx);
+
+        let Ok(input) = input else {
+            let err = input.unwrap_err();
+            return Some((AnyEvent::Internal(InternalEvents::InputError(*err)), None));
+        };
+
+        if let Some(mon) = self.input_monitors.as_mut() {
+            let next = input
+                .servers
+                .iter()
+                .map(|s| s.identity.clone())
+                .collect::<Vec<_>>();
+            let ctx = InputCtx::new(&next, None);
+            tracing::debug!(?ctx);
+            if !next.is_empty() {
+                tracing::info!(
+                    "updating stored server identities following a file change {:?}",
+                    next
+                );
+                mon.ctx = ctx
+            }
+        }
+
+        Some((
+            AnyEvent::External(ExternalEventsDTO::InputFileChanged(
+                bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
+            )),
+            Some(input),
+        ))
     }
     fn handle_path_added(&mut self, path: &PathAddedEvent) -> Option<AnyEvent> {
         Some(AnyEvent::External(ExternalEventsDTO::Watching(
@@ -177,39 +177,21 @@ impl BsSystem {
     }
 }
 
-#[derive(actix::Message)]
-#[rtype(result = "()")]
-pub struct OverrideInput {
-    pub input: Input,
-}
-
-impl actix::Handler<OverrideInput> for BsSystem {
-    type Result = ();
-
-    fn handle(&mut self, msg: OverrideInput, _ctx: &mut Self::Context) -> Self::Result {
-        self.accept_watchables(&msg.input);
-        todo!("implement resolve servers")
-        // self.resolve_servers(msg.input);
-    }
-}
-
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
     fn handle(&mut self, msg: FsEvent, ctx: &mut Self::Context) -> Self::Result {
         let next = match &msg.kind {
             FsEventKind::ChangeBuffered(buffer_change) => self.handle_buffered(&msg, buffer_change),
-            FsEventKind::Change(inner) => {
-                if let Some((evt, input)) = self.handle_change(&msg, inner) {
-                    if let Some(input) = input {
-                        // todo: add a test to ensure this is not removed
-                        self.accept_watchables(&input);
-                        ctx.address().do_send(ResolveServers { input });
-                    }
+            FsEventKind::Change(inner) => match self.handle_any_change(&msg, inner) {
+                Some((evt, Some(input))) => {
+                    tracing::info!("will override input");
+                    // todo: where to queue these side-effects
+                    ctx.notify(OverrideInput { input });
                     Some(evt)
-                } else {
-                    None
                 }
-            }
+                Some((evt, None)) => Some(evt),
+                None => None,
+            },
             FsEventKind::PathAdded(path) => self.handle_path_added(path),
             FsEventKind::PathRemoved(path) => self.handle_path_removed(path),
             FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),

@@ -15,7 +15,13 @@ pub enum Change {
 #[derive(actix::Message, Clone, Debug)]
 #[rtype(result = "()")]
 pub struct ChangeWithSpan {
-    pub evt: Change,
+    evt: Change,
+}
+
+impl ChangeWithSpan {
+    pub fn new(change: Change) -> Self {
+        Self { evt: change }
+    }
 }
 
 impl Change {
