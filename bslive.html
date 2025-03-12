@@ -12,12 +12,7 @@
 <abc-element></abc-element>
 
 <script type="module">
-    class BSlive extends HTMLElement {
-        connectedCallback() {
-            this.innerHTML = "Hello worlds";
-        }
-    }
-
-    customElements.define("abc-element", BSlive);
-
+    fetch("http://127.0.0.1:4000/trackerblocking/config/test/macos-config.json")
+        .then(x => x.json())
+        .then(console.log);
 </script>
