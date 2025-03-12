@@ -8,6 +8,9 @@ pub struct StartCommand {
     #[arg(short, long)]
     pub port: Option<u16>,
 
+    #[arg(long = "proxy")]
+    pub proxies: Vec<String>,
+
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub trailing: Vec<String>,
 }

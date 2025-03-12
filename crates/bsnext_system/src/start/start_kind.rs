@@ -4,7 +4,8 @@ use crate::start::start_kind::start_from_inputs::{StartFromInput, StartFromInput
 use crate::start::start_kind::start_from_paths::StartFromTrailingArgs;
 use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_fs_helpers::{fs_write_str, FsWriteError, WriteMode};
-use bsnext_input::route::{CorsOpts, Opts};
+use bsnext_input::route::{CorsOpts, Opts, Route};
+use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::target::TargetKind;
 use bsnext_input::InputWriter;
@@ -43,7 +44,26 @@ impl StartKind {
         //     });
         // }
 
-        if !cmd.trailing.is_empty() {
+        // todo: make the addition of a proxy + route opts easier?
+        if cmd.trailing.is_empty() {
+            tracing::debug!("0 trailing, {} inputs", input_opts.input.len());
+            if input_opts.input.is_empty() && !cmd.proxies.is_empty() {
+                let first_proxy = cmd.proxies.first().expect("guarded first proxy");
+                let r = Route::proxy(first_proxy);
+                let id = ServerIdentity::from_port_or_named(cmd.port).unwrap_or_else(|_e| {
+                    tracing::error!("A problem occurred with the port?");
+                    ServerIdentity::named()
+                });
+                let ser = ServerConfig::from_route(r, id);
+                let input = Input::from_server(ser);
+                StartKind::FromInput(StartFromInput { input })
+            } else {
+                StartKind::FromInputPaths(StartFromInputPaths {
+                    input_paths: input_opts.input.clone(),
+                    port: cmd.port,
+                })
+            }
+        } else {
             StartKind::FromTrailingArgs(StartFromTrailingArgs {
                 paths: cmd.trailing.clone(),
                 write_input: fs_opts.write,
@@ -53,11 +73,6 @@ impl StartKind {
                     cors: cmd.cors.then_some(CorsOpts::Cors(true)),
                     ..Default::default()
                 },
-            })
-        } else {
-            StartKind::FromInputPaths(StartFromInputPaths {
-                input_paths: input_opts.input.clone(),
-                port: cmd.port,
             })
         }
     }

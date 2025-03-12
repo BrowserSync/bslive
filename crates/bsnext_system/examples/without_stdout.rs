@@ -19,6 +19,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
         cors: false,
         port: None,
         trailing: vec![as_str],
+        proxies: vec![],
     };
 
     let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);

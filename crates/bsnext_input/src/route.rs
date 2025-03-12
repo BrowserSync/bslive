@@ -101,6 +101,19 @@ impl Route {
         let cli = RouteCli::try_from_cli_str(a)?;
         cli.try_into()
     }
+
+    pub fn proxy<A: AsRef<str>>(a: A) -> Self {
+        let mut p = Self::default();
+        p.path = PathDef::root();
+        p.opts = Opts {
+            cors: Some(CorsOpts::Cors(true)),
+            ..Default::default()
+        };
+        p.kind = RouteKind::Proxy(ProxyRoute {
+            proxy: a.as_ref().to_string(),
+        });
+        p
+    }
 }
 
 #[derive(Debug, Hash, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
