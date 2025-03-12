@@ -40,9 +40,10 @@ impl ServerConfig {
         &self.routes
     }
 
-    pub fn from_route(r: Route) -> Self {
+    pub fn from_route(r: Route, id: ServerIdentity) -> Self {
         Self {
             routes: vec![r],
+            identity: id,
             ..std::default::Default::default()
         }
     }
