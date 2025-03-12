@@ -36,6 +36,7 @@ servers:
     let start = StartCommand {
         cors: false,
         port: None,
+        proxies: vec![],
         trailing: vec![],
     };
 

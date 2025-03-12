@@ -34,6 +34,7 @@ servers:
         cors: false,
         port: None,
         trailing: vec![],
+        proxies: vec![],
     };
 
     let (events_sender, _) = mpsc::channel::<AnyEvent>(1);

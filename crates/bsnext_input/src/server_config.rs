@@ -39,6 +39,13 @@ impl ServerConfig {
     pub fn raw_routes(&self) -> &[Route] {
         &self.routes
     }
+
+    pub fn from_route(r: Route) -> Self {
+        Self {
+            routes: vec![r],
+            ..std::default::Default::default()
+        }
+    }
 }
 
 #[derive(

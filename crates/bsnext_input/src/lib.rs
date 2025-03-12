@@ -1,4 +1,4 @@
-use crate::server_config::ServerIdentity;
+use crate::server_config::{ServerConfig, ServerIdentity};
 use crate::yml::YamlError;
 use bsnext_fs_helpers::{DirError, FsWriteError};
 use miette::JSONReportHandler;
@@ -27,6 +27,12 @@ pub mod yml;
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Input {
     pub servers: Vec<server_config::ServerConfig>,
+}
+
+impl Input {
+    pub fn from_server(s: ServerConfig) -> Self {
+        Self { servers: vec![s] }
+    }
 }
 
 impl FromStr for Input {

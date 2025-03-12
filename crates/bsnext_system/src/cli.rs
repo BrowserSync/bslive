@@ -43,35 +43,33 @@ where
     tracing::debug!("writer: {}", writer);
 
     // create a channel onto which commands can publish events
-    let cmd_clone = args.command.clone();
-    match cmd_clone {
-        None => {
+    let command = args.command.unwrap_or_else(|| {
+        SubCommands::Start(StartCommand {
+            cors: false,
+            port: args.port,
+            trailing: args.trailing.clone(),
+            proxies: vec![],
+        })
+    });
+
+    match command {
+        SubCommands::Export(cmd) => {
             let start_cmd = StartCommand {
                 cors: false,
-                port: args.port,
-                trailing: args.trailing.clone(),
+                port: None,
+                trailing: cmd.trailing.clone(),
+                proxies: vec![],
             };
-            stdout_wrapper(start_cmd, args.fs_opts, args.input_opts, cwd, writer).await
+            let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
+            let result = export_cmd(&cwd, &args.fs_opts, &args.input_opts, &cmd, &start_cmd).await;
+            bsnext_output::stdout::completion_writer(writer, result)
         }
-        Some(command) => match command {
-            SubCommands::Export(cmd) => {
-                let start_cmd = StartCommand {
-                    cors: false,
-                    port: None,
-                    trailing: cmd.trailing.clone(),
-                };
-                let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
-                let result =
-                    export_cmd(&cwd, &args.fs_opts, &args.input_opts, &cmd, &start_cmd).await;
-                bsnext_output::stdout::completion_writer(writer, result)
-            }
-            SubCommands::Example(example) => {
-                todo!("{:?}", example);
-            }
-            SubCommands::Start(start) => {
-                stdout_wrapper(start, args.fs_opts, args.input_opts, cwd, writer).await
-            }
-        },
+        SubCommands::Example(example) => {
+            todo!("{:?}", example);
+        }
+        SubCommands::Start(start) => {
+            stdout_wrapper(start, args.fs_opts, args.input_opts, cwd, writer).await
+        }
     }
 }
 
