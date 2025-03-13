@@ -128,7 +128,8 @@ impl TestCase {
     }
 }
 
-async fn test_single_file_impl() -> Result<(), Box<dyn std::error::Error>> {
+#[actix_rt::test]
+async fn test_single_file() -> Result<(), Box<dyn std::error::Error>> {
     let tc = TestCase::new(Debounce::trailing_ms(10), None);
     tc.watch().await;
     tc.write_file("test_file.txt").await;
@@ -146,11 +147,7 @@ async fn test_single_file_impl() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[actix_rt::test]
-async fn test_single_file() -> Result<(), Box<dyn std::error::Error>> {
-    test_single_file_impl().await
-}
-
-async fn test_trailing_drops_impl() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_trailing_drops() -> Result<(), Box<dyn std::error::Error>> {
     let tc = TestCase::new(Debounce::trailing_ms(10), None);
     tc.watch().await;
     tc.write_file("test_file.txt").await;
@@ -162,11 +159,7 @@ async fn test_trailing_drops_impl() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[actix_rt::test]
-async fn test_trailing_drops() -> Result<(), Box<dyn std::error::Error>> {
-    test_trailing_drops_impl().await
-}
-
-async fn test_buffer_impl() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_buffer() -> Result<(), Box<dyn std::error::Error>> {
     let tc = TestCase::new(Debounce::buffered_ms(10), None);
     tc.watch().await;
     tc.write_file("test_file.txt").await;
@@ -183,11 +176,7 @@ async fn test_buffer_impl() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[actix_rt::test]
-async fn test_buffer() -> Result<(), Box<dyn std::error::Error>> {
-    test_buffer_impl().await
-}
-
-async fn test_buffer_filter_impl() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_buffer_filter() -> Result<(), Box<dyn std::error::Error>> {
     let tc = TestCase::new(
         Debounce::buffered_ms(10),
         Some(Filter::Extension {
@@ -206,9 +195,4 @@ async fn test_buffer_filter_impl() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(names.len(), 1);
     assert!(names.contains(&"test_file.css".to_string()));
     Ok(())
-}
-
-#[actix_rt::test]
-async fn test_buffer_filter() -> Result<(), Box<dyn std::error::Error>> {
-    test_buffer_filter_impl().await
 }
