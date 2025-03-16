@@ -19,3 +19,8 @@ futures-util = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }
+
+[dev-dependencies]
+bsnext_tracing = { path = "../bsnext_tracing" }
+tracing = { workspace = true }
+kill_tree = { workspace = true }

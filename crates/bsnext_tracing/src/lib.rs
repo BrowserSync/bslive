@@ -1,4 +1,4 @@
-mod raw_tracing;
+pub mod raw_tracing;
 
 use std::fmt::{Display, Formatter};
 
