@@ -6,14 +6,17 @@ use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
     BufferedChangeEvent, Debounce, FsEvent, FsEventContext, FsEventKind, PathDescriptionOwned,
 };
+use std::convert::Infallible;
+use std::ffi::OsString;
 use std::fs;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::process::Command;
 
 #[actix_rt::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let str = bsnext_tracing::level(Some(bsnext_tracing::LogLevel::Trace));
     let with = format!("{str},watch_cmd=trace");
     bsnext_tracing::raw_tracing::init_tracing_subscriber(
@@ -24,22 +27,58 @@ async fn main() {
     let (File(file), Dir(dir)) = mock_path("mocks/01.txt");
     let mut fs = FsWatcher::new(&dir, FsEventContext::default());
     fs.with_debounce(Debounce::Trailing {
-        duration: Duration::from_millis(300),
+        duration: Duration::from_millis(500),
     });
     let addr = fs.start();
-    let ex = Example::default();
+    let ex = Example::from_str("echo 'hello world!' && printenv")?;
     let recip = ex.start();
     addr.do_send(RequestWatchPath {
         path: file,
         recipients: vec![recip.recipient()],
     });
     tokio::time::sleep(Duration::from_secs(1000)).await;
+    Ok(())
 }
 
 #[derive(Default)]
 struct Example {
     run_count: usize,
     running: bool,
+    cmd: Cmd,
+}
+
+impl Example {
+    pub fn new<A: AsRef<OsString>>(cmd: A) -> Self {
+        Self {
+            running: false,
+            run_count: 0,
+            cmd: Cmd(cmd.as_ref().to_os_string()),
+        }
+    }
+    pub fn from_str<A: AsRef<str>>(cmd: A) -> anyhow::Result<Self> {
+        Ok(Self {
+            running: false,
+            run_count: 0,
+            cmd: Cmd(OsString::try_from(cmd.as_ref())?),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Cmd(pub OsString);
+
+impl Deref for Cmd {
+    type Target = OsString;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Default for Cmd {
+    fn default() -> Self {
+        Self("echo 'default command - did you forget to give a command?'".into())
+    }
 }
 
 impl Actor for Example {
@@ -51,6 +90,7 @@ impl actix::Handler<FsEvent> for Example {
 
     fn handle(&mut self, msg: FsEvent, ctx: &mut Self::Context) -> Self::Result {
         tracing::info!(running = self.running, " ++ incoming");
+        tracing::info!(cmd = self.cmd.0.to_str());
         let FsEvent { kind, .. } = msg else {
             todo!("Can this ever happen?")
         };
@@ -91,33 +131,34 @@ impl actix::Handler<FsEvent> for Example {
                 .into_actor(self),
             );
         };
-        self.running = true;
         let index = self.run_count + 1;
+        let cmd = self.cmd.to_os_string();
+        self.running = true;
         tracing::debug!(index, "✍️ running = true");
         self.run_count = index;
         let fut = async move {
             tracing::debug!(index = index, "Will run...");
-            let mut f1 = Command::new("bash")
-                .arg("tree.sh")
+            let mut f1 = Command::new("sh")
                 .kill_on_drop(true)
+                .arg("-c")
+                .arg(cmd)
                 .env("TERM", "xterm-256color") // Set terminal type
                 .env("CLICOLOR_FORCE", "1") // Force colors in many Unix tools
                 .env("CLICOLOR", "1") // Enable colors
                 .env("COLORTERM", "truecolor") // Indicate full color support
-                .stdout(Stdio::inherit())
                 .spawn()
                 .expect("ls command failed to start");
             let pid = f1.id();
-            let sleep = tokio::time::sleep(Duration::from_secs(1));
+            let sleep = tokio::time::sleep(Duration::from_secs(10));
             tokio::pin!(sleep);
             loop {
                 tokio::select! {
                     _ = &mut sleep => {
-                        println!("operation timed out");
+                        println!("⌛️ operation timed out");
                         break;
                     }
                     _ = f1.wait() => {
-                        println!("operation completed");
+                        println!("✅ operation completed");
                         break;
                     }
                 }
@@ -137,38 +178,6 @@ impl actix::Handler<FsEvent> for Example {
                     ()
                 }),
         )
-    }
-}
-
-#[derive(actix::Message, Debug)]
-#[rtype(result = "()")]
-struct Exec {
-    cmd: Command,
-    events: Vec<FsEvent>,
-}
-
-impl actix::Handler<Exec> for Example {
-    type Result = ();
-
-    fn handle(&mut self, msg: Exec, ctx: &mut Self::Context) -> Self::Result {
-        tracing::debug!("will handle?");
-        Arbiter::current().spawn(async move {
-            tracing::debug!("Will run...");
-            Command::new("sleep")
-                .arg("5")
-                .spawn()
-                .expect("ls command failed to start")
-                .wait()
-                .await
-                .expect("ls command failed to run");
-            Command::new("echo")
-                .arg("after")
-                .spawn()
-                .expect("echo command failed to start")
-                .wait()
-                .await
-                .expect("echo command failed to run");
-        });
     }
 }
 

@@ -24,3 +24,4 @@ tempfile = { workspace = true }
 bsnext_tracing = { path = "../bsnext_tracing" }
 tracing = { workspace = true }
 kill_tree = { workspace = true }
+anyhow = { workspace = true }
