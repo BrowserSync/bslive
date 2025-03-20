@@ -1,6 +1,4 @@
-use crate::monitor::{
-    to_route_watchables, to_server_watchables, AnyWatchable, Monitor, MonitorInput,
-};
+use crate::any_monitor::{AnyMonitor, AnyWatchable};
 use actix::{
     Actor, ActorContext, Addr, AsyncContext, Handler, ResponseActFuture, ResponseFuture, Running,
     WrapFuture,
@@ -10,7 +8,6 @@ use actix::ActorFutureExt;
 use actix_rt::Arbiter;
 use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
-use bsnext_fs::actor::FsWatcher;
 use bsnext_input::{Input, InputCtx};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -25,16 +22,25 @@ use bsnext_dto::internal::{AnyEvent, ChildNotCreated, ChildResult, InternalEvent
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
 use bsnext_fs::FsEvent;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
+use input_monitor::{InputMonitor, MonitorInput};
+use route_watchable::to_route_watchables;
+use server_watchable::to_server_watchables;
 use start::start_kind::StartKind;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
+pub mod any_monitor;
 pub mod args;
 pub mod cli;
 pub mod export;
+mod handle_fs_event;
 pub mod input_fs;
-pub mod monitor;
+mod input_monitor;
+mod input_watchable;
 mod monitor_any_watchables;
+mod path_monitor;
+mod route_watchable;
+mod server_watchable;
 pub mod start;
 
 #[derive(Debug)]
@@ -43,7 +49,7 @@ pub(crate) struct BsSystem {
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
-    any_monitors: HashMap<AnyWatchable, Monitor>,
+    any_monitors: HashMap<AnyWatchable, AnyMonitor>,
     cwd: Option<PathBuf>,
 }
 
@@ -88,12 +94,6 @@ impl BsSystemApi {
             }
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct InputMonitor {
-    pub addr: Addr<FsWatcher>,
-    pub ctx: InputCtx,
 }
 
 #[derive(Debug)]

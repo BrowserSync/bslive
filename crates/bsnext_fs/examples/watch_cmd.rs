@@ -1,17 +1,10 @@
 use actix::{Actor, ActorFutureExt, AsyncContext, ResponseActFuture, WrapFuture};
-use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
-use bsnext_fs::filter::Filter;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
-use bsnext_fs::{
-    BufferedChangeEvent, Debounce, FsEvent, FsEventContext, FsEventKind, PathDescriptionOwned,
-};
-use std::convert::Infallible;
+use bsnext_fs::{BufferedChangeEvent, Debounce, FsEvent, FsEventContext, FsEventKind};
 use std::ffi::OsString;
-use std::fs;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::process::Stdio;
 use std::time::Duration;
 use tokio::process::Command;
 

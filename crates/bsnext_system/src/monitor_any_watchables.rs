@@ -1,4 +1,4 @@
-use crate::monitor::{AnyWatchable, Monitor};
+use crate::any_monitor::{AnyMonitor, AnyWatchable};
 use crate::BsSystem;
 use actix::{Actor, AsyncContext};
 use bsnext_fs::actor::FsWatcher;
@@ -8,6 +8,7 @@ use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::{DebounceDuration, FilterKind, SpecOpts};
 use std::collections::BTreeSet;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -44,15 +45,19 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
 
         tracing::debug!("adding {} new watchables", to_add.len());
         for any_watchable in to_add {
-            let mut input_watcher = match any_watchable {
+            let mut hasher = DefaultHasher::new();
+            any_watchable.hash(&mut hasher);
+            let h = hasher.finish();
+
+            let mut watcher = match any_watchable {
                 AnyWatchable::Server(server_watchable) => {
                     let id = server_watchable.server_identity.as_id();
-                    let ctx = FsEventContext { id };
+                    let ctx = FsEventContext { id, origin_id: h };
                     FsWatcher::new(&msg.cwd, ctx)
                 }
                 AnyWatchable::Route(route_watchable) => {
                     let id = route_watchable.server_identity.as_id();
-                    let ctx = FsEventContext { id };
+                    let ctx = FsEventContext { id, origin_id: h };
                     FsWatcher::new(&msg.cwd, ctx)
                 }
                 AnyWatchable::Input(input) => {
@@ -64,7 +69,7 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
                 if let Some(filter_kind) = &opts.filter {
                     let filters = convert(filter_kind);
                     for filter in filters {
-                        input_watcher.with_filter(filter);
+                        watcher.with_filter(filter);
                     }
                 }
             }
@@ -77,11 +82,11 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
                 _ => Duration::from_millis(300),
             };
 
-            input_watcher.with_debounce(Debounce::Buffered { duration });
+            watcher.with_debounce(Debounce::Buffered { duration });
 
-            let input_watcher_addr = input_watcher.start();
+            let input_watcher_addr = watcher.start();
 
-            let monitor = Monitor {
+            let monitor = AnyMonitor {
                 addr: input_watcher_addr.clone(),
                 path: any_watchable.watch_path().to_path_buf(),
             };
@@ -127,7 +132,7 @@ impl actix::Handler<DropMonitor> for BsSystem {
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
-struct InsertMonitor(AnyWatchable, Monitor);
+struct InsertMonitor(AnyWatchable, AnyMonitor);
 
 impl actix::Handler<InsertMonitor> for BsSystem {
     type Result = ();

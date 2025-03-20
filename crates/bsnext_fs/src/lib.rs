@@ -54,6 +54,7 @@ impl Debounce {
 #[derive(Debug, Clone)]
 pub struct FsEventContext {
     pub id: u64,
+    pub origin_id: u64,
 }
 
 impl FsEventContext {
@@ -64,7 +65,10 @@ impl FsEventContext {
 
 impl Default for FsEventContext {
     fn default() -> Self {
-        Self { id: 1 }
+        Self {
+            id: 1,
+            origin_id: 1,
+        }
     }
 }
 
@@ -82,7 +86,10 @@ impl FsEvent {
                 absolute_path: PathBuf::from(abs.as_ref()),
                 path: PathBuf::from(path.as_ref()),
             }),
-            ctx: FsEventContext { id: ctx_id },
+            ctx: FsEventContext {
+                id: ctx_id,
+                origin_id: ctx_id,
+            },
         }
     }
 }

@@ -40,7 +40,7 @@ impl FsWatcher {
     }
 
     pub fn for_input(cwd: &Path, id: u64) -> Self {
-        let ctx = FsEventContext { id };
+        let ctx = FsEventContext { id, origin_id: id };
         Self::new(cwd, ctx)
     }
 

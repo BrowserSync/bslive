@@ -56,7 +56,13 @@ struct TestCase {
 impl TestCase {
     pub fn new(debounce: Debounce, filter: Option<Filter>) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
-        let mut fs = FsWatcher::new(tmp_dir.path(), FsEventContext { id: 0 });
+        let mut fs = FsWatcher::new(
+            tmp_dir.path(),
+            FsEventContext {
+                id: 0,
+                origin_id: 0,
+            },
+        );
         fs.with_debounce(debounce);
         if let Some(filter) = filter {
             fs.with_filter(filter);
