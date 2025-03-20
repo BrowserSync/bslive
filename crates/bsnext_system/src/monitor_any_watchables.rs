@@ -1,4 +1,5 @@
-use crate::any_monitor::{AnyMonitor, AnyWatchable};
+use crate::any_monitor::{AnyMonitor, PathWatchable};
+use crate::path_monitor::PathMonitor;
 use crate::BsSystem;
 use actix::{Actor, AsyncContext};
 use bsnext_fs::actor::FsWatcher;
@@ -14,15 +15,15 @@ use std::time::Duration;
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
-pub struct MonitorAnyWatchables {
-    pub watchables: Vec<AnyWatchable>,
+pub struct MonitorPathWatchables {
+    pub watchables: Vec<PathWatchable>,
     pub cwd: PathBuf,
 }
 
-impl actix::Handler<MonitorAnyWatchables> for BsSystem {
+impl actix::Handler<MonitorPathWatchables> for BsSystem {
     type Result = ();
 
-    fn handle(&mut self, msg: MonitorAnyWatchables, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: MonitorPathWatchables, ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("MonitorAnyWatchables {:?}", msg.watchables);
         tracing::trace!("MonitorAnyWatchables {:#?}", msg.watchables);
 
@@ -38,7 +39,7 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
 
         for any_watchable in to_remove {
             if let Some(mon) = self.any_monitors.get(any_watchable) {
-                mon.addr.do_send(StopWatcher);
+                mon.fs_addr().do_send(StopWatcher);
                 ctx.notify(DropMonitor((*any_watchable).clone()))
             }
         }
@@ -50,18 +51,15 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
             let h = hasher.finish();
 
             let mut watcher = match any_watchable {
-                AnyWatchable::Server(server_watchable) => {
+                PathWatchable::Server(server_watchable) => {
                     let id = server_watchable.server_identity.as_id();
                     let ctx = FsEventContext { id, origin_id: h };
                     FsWatcher::new(&msg.cwd, ctx)
                 }
-                AnyWatchable::Route(route_watchable) => {
+                PathWatchable::Route(route_watchable) => {
                     let id = route_watchable.server_identity.as_id();
                     let ctx = FsEventContext { id, origin_id: h };
                     FsWatcher::new(&msg.cwd, ctx)
-                }
-                AnyWatchable::Input(input) => {
-                    todo!("implement input watcher {:?}", input)
                 }
             };
 
@@ -86,7 +84,7 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
 
             let input_watcher_addr = watcher.start();
 
-            let monitor = AnyMonitor {
+            let monitor = PathMonitor {
                 addr: input_watcher_addr.clone(),
                 path: any_watchable.watch_path().to_path_buf(),
             };
@@ -96,7 +94,9 @@ impl actix::Handler<MonitorAnyWatchables> for BsSystem {
                 path: monitor.path.clone(),
             });
 
-            ctx.notify(InsertMonitor((*any_watchable).clone(), monitor))
+            let any = AnyMonitor::Path(monitor);
+
+            ctx.notify(InsertMonitor((*any_watchable).clone(), any))
         }
     }
 }
@@ -118,7 +118,7 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
-struct DropMonitor(AnyWatchable);
+struct DropMonitor(PathWatchable);
 
 impl actix::Handler<DropMonitor> for BsSystem {
     type Result = ();
@@ -132,7 +132,7 @@ impl actix::Handler<DropMonitor> for BsSystem {
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
-struct InsertMonitor(AnyWatchable, AnyMonitor);
+struct InsertMonitor(PathWatchable, AnyMonitor);
 
 impl actix::Handler<InsertMonitor> for BsSystem {
     type Result = ();

@@ -1,4 +1,4 @@
-use crate::any_monitor::{AnyMonitor, AnyWatchable};
+use crate::any_monitor::{AnyMonitor, PathWatchable};
 use actix::{
     Actor, ActorContext, Addr, AsyncContext, Handler, ResponseActFuture, ResponseFuture, Running,
     WrapFuture,
@@ -12,7 +12,7 @@ use bsnext_input::{Input, InputCtx};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::monitor_any_watchables::MonitorAnyWatchables;
+use crate::monitor_any_watchables::MonitorPathWatchables;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
@@ -49,7 +49,7 @@ pub(crate) struct BsSystem {
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
-    any_monitors: HashMap<AnyWatchable, AnyMonitor>,
+    any_monitors: HashMap<PathWatchable, AnyMonitor>,
     cwd: Option<PathBuf>,
 }
 
@@ -140,12 +140,12 @@ impl BsSystem {
         // todo: clean up this merging
         let mut all_watchables = route_watchables
             .iter()
-            .map(|r| AnyWatchable::Route(r.to_owned()))
+            .map(|r| PathWatchable::Route(r.to_owned()))
             .collect::<Vec<_>>();
 
         let servers = server_watchables
             .iter()
-            .map(|w| AnyWatchable::Server(w.to_owned()))
+            .map(|w| PathWatchable::Server(w.to_owned()))
             .collect::<Vec<_>>();
 
         all_watchables.extend(servers);
@@ -154,7 +154,7 @@ impl BsSystem {
 
         Arbiter::current().spawn(async move {
             match addr
-                .send(MonitorAnyWatchables {
+                .send(MonitorPathWatchables {
                     watchables: all_watchables,
                     cwd,
                 })
@@ -164,6 +164,33 @@ impl BsSystem {
                 Err(e) => tracing::debug!(%e),
             };
         });
+    }
+
+    fn update_ctx(&mut self, input: &Input) {
+        let next = input
+            .servers
+            .iter()
+            .map(|s| s.identity.clone())
+            .collect::<Vec<_>>();
+
+        let ctx = InputCtx::new(&next, None);
+
+        if let Some(mon) = self.input_monitors.as_mut() {
+            if !next.is_empty() {
+                if ctx == mon.ctx {
+                    tracing::info!(
+                        " - server identities were equal, not updating ctx {:?}",
+                        ctx
+                    );
+                } else {
+                    tracing::info!(
+                        " + updating stored server identities following a file change {:?}",
+                        next
+                    );
+                    mon.ctx = ctx
+                }
+            }
+        }
     }
 
     fn publish_any_event(&mut self, evt: AnyEvent) {
@@ -339,6 +366,7 @@ impl Handler<Start> for BsSystem {
 #[rtype(result = "Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>")]
 pub struct OverrideInput {
     pub input: Input,
+    pub original_event: AnyEvent,
 }
 
 impl actix::Handler<OverrideInput> for BsSystem {
@@ -352,12 +380,14 @@ impl actix::Handler<OverrideInput> for BsSystem {
             .send(ResolveServers { input: msg.input })
             .into_actor(self)
             .map(move |res, actor, _ctx| {
+                tracing::debug!(" + did override input");
                 let output = match res {
                     Ok(Ok(res)) => Ok(res),
                     Ok(Err(s_e)) => Err(s_e),
                     Err(err) => Err(ServerError::Unknown(err.to_string())),
                 };
                 actor.accept_watchables(&input_clone);
+                actor.update_ctx(&input_clone);
                 output
             });
         Box::pin(f)
@@ -382,6 +412,7 @@ impl actix::Handler<ResolveServers> for BsSystem {
         let addr = servers_addr.clone();
 
         let f = async move {
+            tracing::debug!("will mark input as changed");
             let results = addr.send(InputChanged { input: msg.input }).await;
 
             let Ok(result_set) = results else {
@@ -389,7 +420,12 @@ impl actix::Handler<ResolveServers> for BsSystem {
                 unreachable!("?1 {:?}", e);
             };
 
-            for (maybe_addr, x) in &result_set {
+            tracing::debug!(
+                "result_set from resolve servers {}",
+                result_set.changes.len()
+            );
+
+            for (maybe_addr, x) in &result_set.changes {
                 match x {
                     ChildResult::Stopped(id) => addr.do_send(ChildStopped {
                         identity: id.clone(),
@@ -429,27 +465,26 @@ impl actix::Handler<ResolveServers> for BsSystem {
                 }
             }
 
-            let res = result_set
+            let child_results = result_set
+                .changes
                 .into_iter()
                 .map(|(_, child_result)| child_result)
                 .collect::<Vec<_>>();
 
             match addr.send(GetActiveServers).await {
-                Ok(resp) => {
-                    Arbiter::current().spawn({
-                        let evt = InternalEvents::ServersChanged {
-                            server_resp: resp.clone(),
-                            child_results: res.clone(),
-                        };
-                        tracing::debug!("will emit {:?}", evt);
-                        async move {
-                            match external_event_sender.send(AnyEvent::Internal(evt)).await {
-                                Ok(_) => {}
-                                Err(e) => tracing::debug!(?e),
-                            };
+                Ok(active_servers_resp) => {
+                    let evt = InternalEvents::ServersChanged {
+                        server_resp: active_servers_resp.clone(),
+                        child_results: child_results.clone(),
+                    };
+                    tracing::debug!("will emit {:?}", evt);
+                    match external_event_sender.send(AnyEvent::Internal(evt)).await {
+                        Ok(_) => {
+                            tracing::trace!(" + sent")
                         }
-                    });
-                    Ok((resp, res))
+                        Err(e) => tracing::debug!(?e),
+                    };
+                    Ok((active_servers_resp, child_results))
                 }
                 Err(e) => Err(ServerError::Unknown(e.to_string())),
             }

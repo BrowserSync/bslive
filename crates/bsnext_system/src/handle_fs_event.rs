@@ -8,7 +8,7 @@ use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventKind, PathAddedEvent, PathEvent,
 };
-use bsnext_input::{Input, InputCtx, InputError, PathDefinition, PathDefs, PathError};
+use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
@@ -19,9 +19,11 @@ impl actix::Handler<FsEvent> for BsSystem {
                 // if the change included a new Input, use it
                 Some((evt, Some(input))) => {
                     tracing::info!("will override input");
-                    // todo: where to queue these side-effects
-                    ctx.notify(OverrideInput { input });
-                    Some(evt)
+                    ctx.notify(OverrideInput {
+                        input,
+                        original_event: evt,
+                    });
+                    None
                 }
                 // otherwise just publish the change as usual
                 Some((evt, None)) => Some(evt),
@@ -32,6 +34,7 @@ impl actix::Handler<FsEvent> for BsSystem {
             FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),
         };
         if let Some(ext) = next {
+            tracing::debug!("will publish any_event");
             self.publish_any_event(ext)
         }
     }
@@ -99,23 +102,6 @@ impl BsSystem {
             let err = input.unwrap_err();
             return Some((AnyEvent::Internal(InternalEvents::InputError(*err)), None));
         };
-
-        if let Some(mon) = self.input_monitors.as_mut() {
-            let next = input
-                .servers
-                .iter()
-                .map(|s| s.identity.clone())
-                .collect::<Vec<_>>();
-            let ctx = InputCtx::new(&next, None);
-            tracing::debug!(?ctx);
-            if !next.is_empty() {
-                tracing::info!(
-                    "updating stored server identities following a file change {:?}",
-                    next
-                );
-                mon.ctx = ctx
-            }
-        }
 
         Some((
             AnyEvent::External(ExternalEventsDTO::InputFileChanged(

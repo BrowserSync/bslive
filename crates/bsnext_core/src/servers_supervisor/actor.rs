@@ -11,6 +11,7 @@ use std::net::SocketAddr;
 use crate::runtime_ctx::RuntimeCtx;
 use crate::server::handler_listen::Listen;
 use crate::server::handler_patch::Patch;
+use crate::servers_supervisor::input_changed_handler::InputChangedResponse;
 use bsnext_dto::internal::{
     ChildCreated, ChildHandlerMinimal, ChildNotCreated, ChildNotPatched, ChildPatched, ChildResult,
     PatchError,
@@ -54,7 +55,7 @@ impl ServersSupervisor {
         &mut self,
         self_addr: Addr<ServersSupervisor>,
         input: Input,
-    ) -> ResponseFuture<Vec<(Option<Addr<ServerActor>>, ChildResult)>> {
+    ) -> ResponseFuture<InputChangedResponse> {
         let span = span!(Level::TRACE, "input_changed");
         let _guard = span.enter();
 
@@ -174,10 +175,12 @@ impl ServersSupervisor {
                     Err(_) => unreachable!("mailbox error on patch"),
                 });
 
-                shutdown_child_results
+                let changes = shutdown_child_results
                     .chain(start_child_results)
                     .chain(patch_child_results)
-                    .collect()
+                    .collect::<Vec<_>>();
+
+                InputChangedResponse::from_changes(changes)
             }
             .instrument(span.clone()),
         )

@@ -1,39 +1,43 @@
-use actix::Addr;
 use std::hash::Hash;
 
-use crate::input_watchable::InputWatchable;
+use crate::path_monitor::PathMonitor;
 use crate::route_watchable::RouteWatchable;
 use crate::server_watchable::ServerWatchable;
+use actix::Addr;
 use bsnext_fs::actor::FsWatcher;
 use bsnext_input::route::SpecOpts;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Debug, Clone)]
-pub struct AnyMonitor {
-    pub(crate) addr: Addr<FsWatcher>,
-    pub(crate) path: PathBuf,
+pub enum AnyMonitor {
+    Path(PathMonitor),
+}
+
+impl AnyMonitor {
+    pub fn fs_addr(&self) -> &Addr<FsWatcher> {
+        match self {
+            AnyMonitor::Path(path) => &path.addr,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub enum AnyWatchable {
+pub enum PathWatchable {
     Server(ServerWatchable),
-    Input(InputWatchable),
     Route(RouteWatchable),
 }
 
-impl AnyWatchable {
+impl PathWatchable {
     pub fn spec_opts(&self) -> Option<&SpecOpts> {
         match self {
-            AnyWatchable::Server(server) => server.spec.opts.as_ref(),
-            AnyWatchable::Route(route) => route.spec.opts.as_ref(),
-            AnyWatchable::Input(_) => todo!("implement input spec opts"),
+            PathWatchable::Server(server) => server.spec.opts.as_ref(),
+            PathWatchable::Route(route) => route.spec.opts.as_ref(),
         }
     }
     pub fn watch_path(&self) -> &Path {
         match self {
-            AnyWatchable::Server(server) => &server.dir,
-            AnyWatchable::Route(route) => &route.dir,
-            AnyWatchable::Input(input) => &input.path,
+            PathWatchable::Server(server) => &server.dir,
+            PathWatchable::Route(route) => &route.dir,
         }
     }
 }
