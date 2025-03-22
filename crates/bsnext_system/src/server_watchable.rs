@@ -1,4 +1,4 @@
-use bsnext_input::route::{DebounceDuration, Spec, SpecOpts};
+use bsnext_input::route::Spec;
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::Input;
 use std::path::PathBuf;
@@ -21,10 +21,7 @@ pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
                     server_identity: server_config.identity.clone(),
                     dir: PathBuf::from(&watcher.dir),
                     spec: Spec {
-                        opts: Some(SpecOpts {
-                            debounce: watcher.debounce_ms.map(DebounceDuration::Ms),
-                            filter: watcher.filter.clone(),
-                        }),
+                        opts: watcher.opts.clone(),
                     },
                 }
             })

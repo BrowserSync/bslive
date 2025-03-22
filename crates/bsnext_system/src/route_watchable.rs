@@ -48,6 +48,7 @@ fn to_spec(wo: &WatchOpts) -> Spec {
                 filter: Some(FilterKind::Glob {
                     glob: glob.to_string(),
                 }),
+                run: None,
             }),
         },
         WatchOpts::Spec(spec) => spec.to_owned(),

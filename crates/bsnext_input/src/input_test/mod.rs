@@ -217,6 +217,7 @@ fn test_deserialize_watch() {
             opts: Some(SpecOpts {
                 debounce: Some(DebounceDuration::Ms(2000)),
                 filter: None,
+                run: None,
             })
         })
     );
@@ -230,26 +231,28 @@ servers:
   watchers:
     - dir: ./
     - dir: ./other
-      debounce_ms: 2000
+      debounce:
+        ms: 2000
       filter:
         ext: "**/*.css"
 "#;
     let c: Input = serde_yaml::from_str(input).unwrap();
-    dbg!(&c);
     assert_eq!(
         c.servers.get(0).unwrap().watchers,
         vec![
             Watcher {
                 dir: "./".to_string(),
-                debounce_ms: None,
-                filter: None,
+                opts: Some(SpecOpts::default())
             },
             Watcher {
                 dir: "./other".to_string(),
-                debounce_ms: Some(2000),
-                filter: Some(FilterKind::Extension {
-                    ext: "**/*.css".to_string()
-                }),
+                opts: Some(SpecOpts {
+                    debounce: Some(DebounceDuration::Ms(2000)),
+                    filter: Some(FilterKind::Extension {
+                        ext: "**/*.css".to_string()
+                    }),
+                    ..Default::default()
+                })
             }
         ]
     )

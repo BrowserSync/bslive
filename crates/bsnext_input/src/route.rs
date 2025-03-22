@@ -260,11 +260,21 @@ pub struct Spec {
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+    Debug,
+    Ord,
+    PartialOrd,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    serde::Deserialize,
+    serde::Serialize,
+    Default,
 )]
 pub struct SpecOpts {
     pub debounce: Option<DebounceDuration>,
     pub filter: Option<FilterKind>,
+    pub run: Option<String>,
 }
 
 #[derive(
@@ -272,6 +282,6 @@ pub struct SpecOpts {
 )]
 pub struct Watcher {
     pub dir: String,
-    pub debounce_ms: Option<u64>,
-    pub filter: Option<FilterKind>,
+    #[serde(flatten)]
+    pub opts: Option<SpecOpts>,
 }

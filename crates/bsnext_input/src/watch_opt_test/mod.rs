@@ -12,6 +12,7 @@ fn test_watch_opts_debounce() {
         opts: Some(SpecOpts {
             debounce: Some(DebounceDuration::Ms(200)),
             filter: Some(FilterKind::StringGlob("**/*.css".into())),
+            run: None,
         }),
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
@@ -27,6 +28,7 @@ fn test_watch_opts_inline_filter() {
         opts: Some(SpecOpts {
             debounce: None,
             filter: Some(FilterKind::StringGlob("**/*.css".into())),
+            run: None,
         }),
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
@@ -45,6 +47,7 @@ fn test_watch_opts_explicit_filter_ext() {
             filter: Some(FilterKind::Extension {
                 ext: "css".to_string(),
             }),
+            run: None,
         }),
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
@@ -62,6 +65,7 @@ fn test_watch_opts_explicit_filter_glob() {
             filter: Some(FilterKind::Glob {
                 glob: "**/*.css".into(),
             }),
+            run: None,
         }),
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
