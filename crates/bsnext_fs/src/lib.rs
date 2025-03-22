@@ -12,7 +12,6 @@ mod watcher;
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-
 // use tokio_stream::StreamExt;
 
 #[derive(Debug, Copy, Clone)]
@@ -51,7 +50,7 @@ impl Debounce {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FsEventContext {
     pub id: u64,
     pub origin_id: u64,

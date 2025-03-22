@@ -274,7 +274,25 @@ pub struct Spec {
 pub struct SpecOpts {
     pub debounce: Option<DebounceDuration>,
     pub filter: Option<FilterKind>,
-    pub run: Option<String>,
+    pub run: Option<Vec<Runner>>,
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+#[serde(untagged)]
+pub enum Runner {
+    BsLive { bslive: BsLiveRunner },
+    Sh { sh: String },
+    ShImplicit(String),
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub enum BsLiveRunner {
+    #[serde(rename = "notify-server")]
+    NotifyServer,
 }
 
 #[derive(

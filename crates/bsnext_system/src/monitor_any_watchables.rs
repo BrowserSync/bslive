@@ -48,17 +48,23 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
         for any_watchable in to_add {
             let mut hasher = DefaultHasher::new();
             any_watchable.hash(&mut hasher);
-            let h = hasher.finish();
+            let watchable_hash = hasher.finish();
 
             let mut watcher = match any_watchable {
                 PathWatchable::Server(server_watchable) => {
                     let id = server_watchable.server_identity.as_id();
-                    let ctx = FsEventContext { id, origin_id: h };
+                    let ctx = FsEventContext {
+                        id,
+                        origin_id: watchable_hash,
+                    };
                     FsWatcher::new(&msg.cwd, ctx)
                 }
                 PathWatchable::Route(route_watchable) => {
                     let id = route_watchable.server_identity.as_id();
-                    let ctx = FsEventContext { id, origin_id: h };
+                    let ctx = FsEventContext {
+                        id,
+                        origin_id: watchable_hash,
+                    };
                     FsWatcher::new(&msg.cwd, ctx)
                 }
             };
@@ -87,6 +93,7 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             let monitor = PathMonitor {
                 addr: input_watcher_addr.clone(),
                 path: any_watchable.watch_path().to_path_buf(),
+                watchable_hash,
             };
 
             monitor.addr.do_send(RequestWatchPath {

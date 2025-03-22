@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::path_monitor::PathMonitor;
 use crate::route_watchable::RouteWatchable;
@@ -17,6 +17,12 @@ impl AnyMonitor {
     pub fn fs_addr(&self) -> &Addr<FsWatcher> {
         match self {
             AnyMonitor::Path(path) => &path.addr,
+        }
+    }
+
+    pub fn watchable_hash(&self) -> u64 {
+        match self {
+            AnyMonitor::Path(path) => path.watchable_hash,
         }
     }
 }
@@ -39,5 +45,12 @@ impl PathWatchable {
             PathWatchable::Server(server) => &server.dir,
             PathWatchable::Route(route) => &route.dir,
         }
+    }
+
+    pub fn as_id(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        let watchable_hash = hasher.finish();
+        watchable_hash
     }
 }
