@@ -1,10 +1,7 @@
 use crate::input_fs::from_input_path;
-use crate::task::{Task, TaskCommand, TaskGroup, TaskManager};
-use crate::tasks::notify_servers::NotifyServers;
+use crate::task::{Task, TaskCommand, TaskComms, TaskGroup};
 use crate::{BsSystem, OverrideInput};
-use actix::{
-    Actor, ActorFutureExt, AsyncContext, Handler, MailboxError, ResponseActFuture, WrapFuture,
-};
+use actix::{ActorFutureExt, AsyncContext, AtomicResponse, Handler, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
@@ -13,7 +10,7 @@ use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathEvent,
 };
-use bsnext_input::route::{BsLiveRunner, Runner, SpecOpts};
+use bsnext_input::route::{BsLiveRunner, Runner};
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 
 impl actix::Handler<FsEvent> for BsSystem {
@@ -68,7 +65,7 @@ impl Trigger {
 }
 
 impl Handler<Trigger> for BsSystem {
-    type Result = ResponseActFuture<Self, ()>;
+    type Result = AtomicResponse<Self, ()>;
 
     fn handle(&mut self, msg: Trigger, ctx: &mut Self::Context) -> Self::Result {
         // let fs_ctx = msg.ctx;
@@ -95,22 +92,16 @@ impl Handler<Trigger> for BsSystem {
         //     Box::pin(future)
         // } else {
         // }
-        let Some(servers_addr) = self.servers_addr.as_ref() else {
-            todo!("cannot reach here")
-        };
-        let servers_addr = servers_addr.clone();
-        let cloned = msg.cmd();
+        // let Some(servers_addr) = self.servers_addr.as_ref() else {
+        //     todo!("cannot reach here")
+        // };
 
-        let future = async move {
-            let actor = msg.task.into_actor(servers_addr);
-            match actor.send(cloned).await {
-                Ok(_) => tracing::trace!("did send"),
-                Err(err) => tracing::error!("{err}"),
-            };
-            ()
-        };
+        let cmd = msg.cmd();
+        let cmd_recip = msg.task.into_actor();
 
-        Box::pin(future.into_actor(self))
+        AtomicResponse::new(Box::pin(
+            cmd_recip.send(cmd).into_actor(self).map(|_, _, _| ()),
+        ))
     }
 }
 
@@ -122,22 +113,16 @@ impl BsSystem {
             .iter()
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
-        let as_strings = paths
-            .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect::<Vec<String>>();
-
-        let external_event = AnyEvent::External(ExternalEventsDTO::FilesChanged(
-            bsnext_dto::FilesChangedDTO {
-                paths: as_strings.clone(),
-            },
-        ));
 
         let mut tasks = self.as_task(&msg.fs_event_ctx);
-        tasks.push(Task::AnyEvent(external_event));
+        tasks.push(Task::AnyEvent);
         let cmd = TaskCommand::Changes {
             changes: paths,
             fs_event_context: msg.fs_event_ctx.clone(),
+            task_comms: TaskComms::new(
+                self.any_event_sender.clone().unwrap(),
+                self.servers_addr.clone().unwrap(),
+            ),
         };
 
         (Task::Group(TaskGroup::new(tasks)), cmd)

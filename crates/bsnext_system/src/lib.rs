@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::monitor_any_watchables::MonitorPathWatchables;
-use crate::task::TaskManager;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
@@ -21,7 +20,7 @@ use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, ChildNotCreated, ChildResult, InternalEvents, ServerError};
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
-use bsnext_fs::{FsEvent, FsEventContext};
+use bsnext_fs::FsEvent;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use input_monitor::{InputMonitor, MonitorInput};
 use route_watchable::to_route_watchables;
@@ -54,7 +53,6 @@ pub(crate) struct BsSystem {
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<PathWatchable, AnyMonitor>,
     cwd: Option<PathBuf>,
-    tasks: HashMap<FsEventContext, TaskManager>,
 }
 
 #[derive(Debug)]
@@ -120,7 +118,6 @@ impl BsSystem {
             input_monitors: None,
             any_monitors: Default::default(),
             cwd: None,
-            tasks: Default::default(),
         }
     }
 

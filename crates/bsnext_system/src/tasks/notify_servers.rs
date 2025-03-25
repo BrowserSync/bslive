@@ -1,16 +1,12 @@
 use crate::task::TaskCommand;
-use actix::{Actor, Addr, Handler, ResponseFuture};
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
+use actix::{Actor, Handler, ResponseFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
-use bsnext_fs::FsEventContext;
 
-pub struct NotifyServers {
-    addr: Addr<ServersSupervisor>,
-}
+pub struct NotifyServers {}
 
 impl NotifyServers {
-    pub fn new(addr: Addr<ServersSupervisor>) -> Self {
-        Self { addr }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -22,7 +18,7 @@ impl Actor for NotifyServers {
     }
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
-        tracing::debug!("stopped");
+        tracing::debug!(" x stopped NotifyServers")
     }
 }
 
@@ -31,11 +27,14 @@ impl Handler<TaskCommand> for NotifyServers {
 
     fn handle(&mut self, msg: TaskCommand, ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("NotifyServers::TaskCommand");
+        let comms = msg.comms();
+        let sender = comms.servers_addr.clone();
         match msg {
             TaskCommand::Changes {
                 changes,
                 fs_event_context,
-            } => self.addr.do_send(FilesChanged {
+                ..
+            } => sender.do_send(FilesChanged {
                 paths: changes,
                 ctx: fs_event_context,
             }),
