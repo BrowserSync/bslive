@@ -18,11 +18,12 @@ impl actix::Handler<FsEvent> for BsSystem {
     fn handle(&mut self, msg: FsEvent, ctx: &mut Self::Context) -> Self::Result {
         let next = match &msg.kind {
             FsEventKind::ChangeBuffered(buffer_change) => {
-                self.handle_buffered(&msg, buffer_change, ctx)
+                let evt = self.handle_buffered(&msg, buffer_change, ctx);
+                Some(evt)
             }
             FsEventKind::Change(inner) => match self.handle_any_change(&msg, inner) {
                 // if the change included a new Input, use it
-                Some((evt, Some(input))) => {
+                (evt, Some(input)) => {
                     tracing::info!("will override input");
                     ctx.notify(OverrideInput {
                         input,
@@ -32,8 +33,7 @@ impl actix::Handler<FsEvent> for BsSystem {
                     None
                 }
                 // otherwise just publish the change as usual
-                Some((evt, None)) => Some(evt),
-                None => None,
+                (evt, None) => Some(evt),
             },
             FsEventKind::PathAdded(path) => self.handle_path_added(path),
             FsEventKind::PathRemoved(path) => self.handle_path_removed(path),
@@ -96,7 +96,7 @@ impl BsSystem {
         msg: &FsEvent,
         buf: &BufferedChangeEvent,
         ctx: &mut <BsSystem as Actor>::Context,
-    ) -> Option<AnyEvent> {
+    ) -> AnyEvent {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?msg.ctx, ?buf, "handle_buffered");
         let paths = buf
             .events
@@ -120,7 +120,7 @@ impl BsSystem {
                 any_monitor.watchable_hash() == msg.ctx.origin_id
             });
         if let Some((a, b)) = matching_monitor {
-            println!("Use path_watchable here {:?}", a.spec_opts()?.run);
+            println!("Use path_watchable here {:?}", a);
         }
 
         ///
@@ -138,15 +138,15 @@ impl BsSystem {
         }
 
         // todo(alpha): need to exclude changes to the input file if this event has captured it
-        Some(AnyEvent::External(ExternalEventsDTO::FilesChanged(
+        AnyEvent::External(ExternalEventsDTO::FilesChanged(
             bsnext_dto::FilesChangedDTO { paths: as_strings },
-        )))
+        ))
     }
     fn handle_any_change(
         &mut self,
         msg: &FsEvent,
         inner: &ChangeEvent,
-    ) -> Option<(AnyEvent, Option<Input>)> {
+    ) -> (AnyEvent, Option<Input>) {
         match msg.ctx.id() {
             0 => self.handle_input_change(inner),
             _ => {
@@ -157,16 +157,16 @@ impl BsSystem {
                         ctx: msg.ctx.clone(),
                     })
                 }
-                Some((
+                (
                     AnyEvent::External(ExternalEventsDTO::FileChanged(
                         bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
                     )),
                     None,
-                ))
+                )
             }
         }
     }
-    fn handle_input_change(&mut self, inner: &ChangeEvent) -> Option<(AnyEvent, Option<Input>)> {
+    fn handle_input_change(&mut self, inner: &ChangeEvent) -> (AnyEvent, Option<Input>) {
         tracing::info!("InputFile file changed {:?}", inner);
 
         let ctx = self
@@ -179,15 +179,15 @@ impl BsSystem {
 
         let Ok(input) = input else {
             let err = input.unwrap_err();
-            return Some((AnyEvent::Internal(InternalEvents::InputError(*err)), None));
+            return (AnyEvent::Internal(InternalEvents::InputError(*err)), None);
         };
 
-        Some((
+        (
             AnyEvent::External(ExternalEventsDTO::InputFileChanged(
                 bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
             )),
             Some(input),
-        ))
+        )
     }
     fn handle_path_added(&mut self, path: &PathAddedEvent) -> Option<AnyEvent> {
         Some(AnyEvent::External(ExternalEventsDTO::Watching(

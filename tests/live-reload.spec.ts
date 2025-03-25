@@ -9,7 +9,7 @@ test.describe(
     {
         annotation: {
             type: cli({
-                args: "-i examples/basic/live-reload.yml -l trace".split(" "),
+                args: "-i examples/basic/live-reload.yml".split(" "),
             }),
             description: "",
         },
