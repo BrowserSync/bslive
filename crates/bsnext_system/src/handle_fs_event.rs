@@ -2,11 +2,8 @@ use crate::input_fs::from_input_path;
 use crate::task::{TaskCommand, TaskManager};
 use crate::tasks::notify_servers::NotifyServers;
 use crate::{BsSystem, OverrideInput};
-use actix::{
-    Actor, ActorFutureExt, AsyncContext, Handler, MailboxError, ResponseActFuture, WrapFuture,
-};
-use actix_rt::Arbiter;
-use bsnext_core::servers_supervisor::file_changed_handler::{FileChanged, FilesChanged};
+use actix::{Actor, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
+use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
@@ -15,9 +12,6 @@ use bsnext_fs::{
     PathEvent,
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use std::future::IntoFuture;
-use std::path::PathBuf;
-use std::time::Duration;
 
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
@@ -45,9 +39,9 @@ impl actix::Handler<FsEvent> for BsSystem {
             FsEventKind::PathRemoved(path) => self.handle_path_removed(path),
             FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),
         };
-        if let Some(ext) = next {
-            tracing::debug!("will publish any_event");
-            self.publish_any_event(ext)
+        if let Some(any_event) = next {
+            tracing::debug!("will publish any_event {:?}", any_event);
+            self.publish_any_event(any_event)
         }
     }
 }

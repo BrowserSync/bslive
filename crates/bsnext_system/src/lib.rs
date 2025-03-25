@@ -1,7 +1,7 @@
 use crate::any_monitor::{AnyMonitor, PathWatchable};
 use actix::{
-    Actor, ActorContext, Addr, AsyncContext, Handler, Recipient, ResponseActFuture, ResponseFuture,
-    Running, WrapFuture,
+    Actor, ActorContext, Addr, AsyncContext, Handler, ResponseActFuture, ResponseFuture, Running,
+    WrapFuture,
 };
 
 use actix::ActorFutureExt;
@@ -13,8 +13,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::monitor_any_watchables::MonitorPathWatchables;
-use crate::task::{TaskCommand, TaskManager};
-use crate::tasks::notify_servers::NotifyServers;
+use crate::task::TaskManager;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
@@ -301,7 +300,7 @@ impl Handler<Start> for BsSystem {
                             ctx.notify(MonitorInput {
                                 path: path.clone(),
                                 cwd: actor.cwd.clone().unwrap(),
-                                input_ctx: input_ctx,
+                                input_ctx,
                             });
                             // todo: where to better sequence these side-effects
                             actor.accept_watchables(&input_clone);
@@ -471,26 +470,28 @@ impl actix::Handler<ResolveServers> for BsSystem {
                 }
             }
 
-            let child_results = result_set
+            let res = result_set
                 .changes
                 .into_iter()
                 .map(|(_, child_result)| child_result)
                 .collect::<Vec<_>>();
 
             match addr.send(GetActiveServers).await {
-                Ok(active_servers_resp) => {
-                    let evt = InternalEvents::ServersChanged {
-                        server_resp: active_servers_resp.clone(),
-                        child_results: child_results.clone(),
-                    };
-                    tracing::debug!("will emit {:?}", evt);
-                    match external_event_sender.send(AnyEvent::Internal(evt)).await {
-                        Ok(_) => {
-                            tracing::trace!(" + sent")
+                Ok(resp) => {
+                    Arbiter::current().spawn({
+                        let evt = InternalEvents::ServersChanged {
+                            server_resp: resp.clone(),
+                            child_results: res.clone(),
+                        };
+                        tracing::debug!("will emit {:?}", evt);
+                        async move {
+                            match external_event_sender.send(AnyEvent::Internal(evt)).await {
+                                Ok(_) => {}
+                                Err(e) => tracing::debug!(?e),
+                            };
                         }
-                        Err(e) => tracing::debug!(?e),
-                    };
-                    Ok((active_servers_resp, child_results))
+                    });
+                    Ok((resp, res))
                 }
                 Err(e) => Err(ServerError::Unknown(e.to_string())),
             }
