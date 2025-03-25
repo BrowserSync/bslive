@@ -156,19 +156,12 @@ impl BsSystem {
         all_watchables.extend(servers);
         let cwd = cwd.clone();
         let addr = self_address.clone();
+        let msg = MonitorPathWatchables {
+            watchables: all_watchables,
+            cwd,
+        };
 
-        Arbiter::current().spawn(async move {
-            match addr
-                .send(MonitorPathWatchables {
-                    watchables: all_watchables,
-                    cwd,
-                })
-                .await
-            {
-                Ok(_) => {}
-                Err(e) => tracing::debug!(%e),
-            };
-        });
+        addr.do_send(msg);
     }
 
     fn update_ctx(&mut self, input: &Input) {

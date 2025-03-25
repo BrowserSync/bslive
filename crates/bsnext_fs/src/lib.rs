@@ -75,7 +75,7 @@ impl Default for FsEventContext {
 #[rtype(result = "()")]
 pub struct FsEvent {
     pub kind: FsEventKind,
-    pub ctx: FsEventContext,
+    pub fs_event_ctx: FsEventContext,
 }
 
 impl FsEvent {
@@ -85,7 +85,7 @@ impl FsEvent {
                 absolute_path: PathBuf::from(abs.as_ref()),
                 path: PathBuf::from(path.as_ref()),
             }),
-            ctx: FsEventContext {
+            fs_event_ctx: FsEventContext {
                 id: ctx_id,
                 origin_id: ctx_id,
             },

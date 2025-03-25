@@ -52,7 +52,7 @@ impl Handler<RequestWatchPath> for FsWatcher {
                     });
                     recip.do_send(FsEvent {
                         kind: evt,
-                        ctx: self.ctx.clone(),
+                        fs_event_ctx: self.ctx.clone(),
                     })
                 }
             }
@@ -64,7 +64,7 @@ impl Handler<RequestWatchPath> for FsWatcher {
                     });
                     recip.do_send(FsEvent {
                         kind: evt,
-                        ctx: self.ctx.clone(),
+                        fs_event_ctx: self.ctx.clone(),
                     })
                 }
                 _ctx.stop();

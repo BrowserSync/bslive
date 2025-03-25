@@ -32,7 +32,7 @@ impl Handler<InnerChangeEvent> for FsWatcher {
                     absolute_path: msg.absolute_path.clone(),
                     path: relative.clone(),
                 }),
-                ctx: self.ctx.clone(),
+                fs_event_ctx: self.ctx.clone(),
             })
         }
     }
@@ -87,7 +87,7 @@ impl Handler<MultipleInnerChangeEvent> for FsWatcher {
             });
             recipient.do_send(FsEvent {
                 kind: evt,
-                ctx: self.ctx.clone(),
+                fs_event_ctx: self.ctx.clone(),
             })
         }
     }

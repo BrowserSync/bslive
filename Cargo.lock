@@ -707,6 +707,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bsnext_task"
+version = "0.1.0"
+
+[[package]]
 name = "bsnext_tracing"
 version = "0.12.0"
 dependencies = [

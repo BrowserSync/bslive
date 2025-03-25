@@ -6,15 +6,11 @@ use bsnext_fs::FsEventContext;
 
 pub struct NotifyServers {
     addr: Addr<ServersSupervisor>,
-    ctx: FsEventContext,
 }
 
 impl NotifyServers {
-    pub fn new(addr: &Addr<ServersSupervisor>, ctx: FsEventContext) -> Self {
-        Self {
-            addr: addr.clone(),
-            ctx,
-        }
+    pub fn new(addr: Addr<ServersSupervisor>) -> Self {
+        Self { addr }
     }
 }
 
@@ -34,14 +30,16 @@ impl Handler<TaskCommand> for NotifyServers {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: TaskCommand, ctx: &mut Self::Context) -> Self::Result {
+        tracing::debug!("NotifyServers::TaskCommand");
         match msg {
-            TaskCommand::Changes(paths) => self.addr.do_send(FilesChanged {
-                paths,
-                ctx: self.ctx.clone(),
+            TaskCommand::Changes {
+                changes,
+                fs_event_context,
+            } => self.addr.do_send(FilesChanged {
+                paths: changes,
+                ctx: fs_event_context,
             }),
         }
         Box::pin(async {})
     }
 }
-
-pub struct Chain {}
