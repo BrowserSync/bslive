@@ -1,0 +1,7 @@
+[package]
+name = "bsnext_js"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bsnext_input = { path = "../bsnext_input" }

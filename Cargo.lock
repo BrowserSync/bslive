@@ -602,6 +602,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bsnext_js"
+version = "0.1.0"
+dependencies = [
+ "bsnext_input",
+]
+
+[[package]]
 name = "bsnext_md"
 version = "0.11.0"
 dependencies = [
@@ -656,6 +663,7 @@ dependencies = [
  "bsnext_fs_helpers",
  "bsnext_html",
  "bsnext_input",
+ "bsnext_js",
  "bsnext_md",
  "bsnext_output",
  "bsnext_tracing",
