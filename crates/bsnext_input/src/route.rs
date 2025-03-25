@@ -103,16 +103,17 @@ impl Route {
     }
 
     pub fn proxy<A: AsRef<str>>(a: A) -> Self {
-        let mut p = Self::default();
-        p.path = PathDef::root();
-        p.opts = Opts {
-            cors: Some(CorsOpts::Cors(true)),
+        Self {
+            path: PathDef::root(),
+            opts: Opts {
+                cors: Some(CorsOpts::Cors(true)),
+                ..Default::default()
+            },
+            kind: RouteKind::Proxy(ProxyRoute {
+                proxy: a.as_ref().to_string(),
+            }),
             ..Default::default()
-        };
-        p.kind = RouteKind::Proxy(ProxyRoute {
-            proxy: a.as_ref().to_string(),
-        });
-        p
+        }
     }
 }
 

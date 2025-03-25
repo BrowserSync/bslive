@@ -13,11 +13,11 @@ impl NotifyServers {
 impl Actor for NotifyServers {
     type Context = actix::Context<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, _ctx: &mut Self::Context) {
         tracing::debug!("started");
     }
 
-    fn stopped(&mut self, ctx: &mut Self::Context) {
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::debug!(" x stopped NotifyServers")
     }
 }
@@ -25,7 +25,7 @@ impl Actor for NotifyServers {
 impl Handler<TaskCommand> for NotifyServers {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, msg: TaskCommand, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("NotifyServers::TaskCommand");
         let comms = msg.comms();
         let sender = comms.servers_addr.clone();

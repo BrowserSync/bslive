@@ -67,38 +67,9 @@ impl Trigger {
 impl Handler<Trigger> for BsSystem {
     type Result = AtomicResponse<Self, ()>;
 
-    fn handle(&mut self, msg: Trigger, ctx: &mut Self::Context) -> Self::Result {
-        // let fs_ctx = msg.ctx;
-        // let fs_ctx_c = fs_ctx.clone();
-        // let add = self.tasks.get(&fs_ctx);
-        // if let Some(tm) = add {
-        //     let cloned = tm.clone();
-        //     let addr = cloned.addr().clone();
-        //     let future = async move {
-        //
-        //         // let r = addr.send(msg.task).await;
-        //         // match r {
-        //         //     Ok(_) => tracing::trace!("did send"),
-        //         //     Err(_) => tracing::trace!("did error"),
-        //         // }
-        //         ()
-        //     }
-        //     .into_actor(self)
-        //     .map(move |_, actor, ctx| {
-        //         actor.tasks.remove(&fs_ctx_c);
-        //         tracing::debug!("remaining tasks after removal {}", &actor.tasks.len());
-        //         ()
-        //     });
-        //     Box::pin(future)
-        // } else {
-        // }
-        // let Some(servers_addr) = self.servers_addr.as_ref() else {
-        //     todo!("cannot reach here")
-        // };
-
+    fn handle(&mut self, msg: Trigger, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
         let cmd_recip = msg.task.into_actor();
-
         AtomicResponse::new(Box::pin(
             cmd_recip.send(cmd).into_actor(self).map(|_, _, _| ()),
         ))
@@ -203,20 +174,12 @@ impl BsSystem {
     }
 
     fn as_task(&self, fs_event_ctx: &FsEventContext) -> Vec<Task> {
-        ///
-        ///
-        /// Try to find the matching 'watchable' so that we can decide which tasks to run
-        ///
-        ///
         let matching_monitor = self
             .any_monitors
             .iter()
             .find(|(_, any_monitor)| any_monitor.watchable_hash() == fs_event_ctx.origin_id);
 
-        ///
-        ///
-        ///
-        if let Some((a, b)) = matching_monitor {
+        if let Some((a, _any_monitor)) = matching_monitor {
             let things_to_run = a.spec_opts().map_or_else(
                 || {
                     vec![Runner::BsLive {
@@ -229,25 +192,9 @@ impl BsSystem {
                 },
             );
             tracing::info!("Use path_watchable here {:?}", things_to_run);
-            return things_to_run.into_iter().map(|r| Task::Runner(r)).collect();
+            return things_to_run.into_iter().map(Task::Runner).collect();
         }
 
-        ///
-        ///
-        /// An example of creating a 'NotifyServers' task from the current state of BsSystem
-        ///
-        ///
-        /// if let Some(servers) = &self.servers_addr {
-        ///     self.tasks.entry(msg.ctx.clone()).or_insert_with(|| {
-        ///         let d = NotifyServers::new(servers, msg.ctx.clone());
-        ///         let addr = d.start().recipient();
-        ///         TaskManager::new(addr)
-        ///     });
-        /// }
-        // ctx.notify(Trigger::new(
-        //     msg.fs_event_ctx.clone(),
-        //     TaskCommand::Changes(paths),
-        // ));
         vec![]
     }
 }

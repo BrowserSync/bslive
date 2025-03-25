@@ -81,12 +81,10 @@ impl Actor for Example {
 impl actix::Handler<FsEvent> for Example {
     type Result = ResponseActFuture<Self, ()>;
 
-    fn handle(&mut self, msg: FsEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) -> Self::Result {
         tracing::info!(running = self.running, " ++ incoming");
         tracing::info!(cmd = self.cmd.0.to_str());
-        let FsEvent { kind, .. } = msg else {
-            todo!("Can this ever happen?")
-        };
+        let FsEvent { kind, .. } = msg;
         let running = self.running;
         let valid_trigger = match kind {
             FsEventKind::Change(ch) => {

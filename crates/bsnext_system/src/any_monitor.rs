@@ -50,7 +50,6 @@ impl PathWatchable {
     pub fn as_id(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
-        let watchable_hash = hasher.finish();
-        watchable_hash
+        hasher.finish()
     }
 }

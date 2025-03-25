@@ -8,7 +8,6 @@ use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_fs::FsEventContext;
 use bsnext_input::route::{BsLiveRunner, Runner};
-use futures_util::FutureExt;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 
@@ -88,9 +87,9 @@ impl TaskGroup {
         Self { tasks }
     }
 
-    pub fn len(&self) -> usize {
-        self.tasks.len()
-    }
+    // pub fn len(&self) -> usize {
+    //     self.tasks.len()
+    // }
 }
 
 pub struct TaskGroupRunner {
@@ -110,11 +109,11 @@ impl TaskGroupRunner {
 impl actix::Actor for TaskGroupRunner {
     type Context = actix::Context<Self>;
 
-    fn stopped(&mut self, ctx: &mut Self::Context) {
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(" x stopped TaskGroupRunner")
     }
 
-    fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
+    fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
         tracing::trace!(" ⏰ stopping TaskGroupRunner {}", self.done);
         Running::Stop
     }
@@ -123,7 +122,7 @@ impl actix::Actor for TaskGroupRunner {
 impl Handler<TaskCommand> for TaskGroupRunner {
     type Result = ResponseActFuture<Self, ()>;
 
-    fn handle(&mut self, msg: TaskCommand, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!(done = self.done, "TaskGroupRunner::TaskCommand");
         let Some(group) = self.task_group.take() else {
             todo!("how to handle a concurrent request here?");
@@ -138,7 +137,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
             }
         };
         // let self_addr = ctx.address();
-        Box::pin(future.into_actor(self).map(|res, actor, ctx| {
+        Box::pin(future.into_actor(self).map(|_res, actor, _ctx| {
             actor.done = true;
         }))
     }
@@ -155,12 +154,12 @@ impl AnyEventSender {
 impl actix::Actor for AnyEventSender {
     type Context = actix::Context<Self>;
 
-    fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
+    fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
         tracing::trace!(" ⏰ stopping AnyEventSender");
         Running::Stop
     }
 
-    fn stopped(&mut self, ctx: &mut Self::Context) {
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(" x stopped AnyEventSender");
     }
 }

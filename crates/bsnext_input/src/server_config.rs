@@ -81,7 +81,7 @@ where
 {
     struct PortVisitor;
 
-    impl<'de> de::Visitor<'de> for PortVisitor {
+    impl de::Visitor<'_> for PortVisitor {
         type Value = u16;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
