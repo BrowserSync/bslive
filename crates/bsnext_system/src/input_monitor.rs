@@ -10,7 +10,7 @@ use std::time::Duration;
 #[derive(Debug, Clone)]
 pub struct InputMonitor {
     pub addr: Addr<FsWatcher>,
-    pub ctx: InputCtx,
+    pub input_ctx: InputCtx,
 }
 
 #[derive(actix::Message)]
@@ -18,7 +18,7 @@ pub struct InputMonitor {
 pub struct MonitorInput {
     pub path: PathBuf,
     pub cwd: PathBuf,
-    pub ctx: InputCtx,
+    pub input_ctx: InputCtx,
 }
 
 impl actix::Handler<MonitorInput> for BsSystem {
@@ -37,7 +37,7 @@ impl actix::Handler<MonitorInput> for BsSystem {
         let input_watcher_addr = input_watcher.start();
         let input_monitor = InputMonitor {
             addr: input_watcher_addr.clone(),
-            ctx: msg.ctx.clone(),
+            input_ctx: msg.input_ctx.clone(),
         };
         self.input_monitors = Some(input_monitor);
 

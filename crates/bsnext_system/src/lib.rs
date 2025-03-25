@@ -179,21 +179,21 @@ impl BsSystem {
             .map(|s| s.identity.clone())
             .collect::<Vec<_>>();
 
-        let ctx = InputCtx::new(&next, None);
+        let next_input_ctx = InputCtx::new(&next, None);
 
         if let Some(mon) = self.input_monitors.as_mut() {
             if !next.is_empty() {
-                if ctx == mon.ctx {
+                if next_input_ctx == mon.input_ctx {
                     tracing::info!(
                         " - server identities were equal, not updating ctx {:?}",
-                        ctx
+                        next_input_ctx
                     );
                 } else {
                     tracing::info!(
                         " + updating stored server identities following a file change {:?}",
                         next
                     );
-                    mon.ctx = ctx
+                    mon.input_ctx = next_input_ctx
                 }
             }
         }
@@ -301,7 +301,7 @@ impl Handler<Start> for BsSystem {
                             ctx.notify(MonitorInput {
                                 path: path.clone(),
                                 cwd: actor.cwd.clone().unwrap(),
-                                ctx: input_ctx,
+                                input_ctx: input_ctx,
                             });
                             // todo: where to better sequence these side-effects
                             actor.accept_watchables(&input_clone);
@@ -354,7 +354,7 @@ impl Handler<Start> for BsSystem {
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
-                    ctx: InputCtx::default(),
+                    input_ctx: InputCtx::default(),
                 });
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
                 let f = async move { Ok(DidStart::Started(Default::default())) }.into_actor(self);
