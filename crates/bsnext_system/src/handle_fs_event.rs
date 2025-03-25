@@ -87,13 +87,17 @@ impl BsSystem {
 
         let mut tasks = self.as_task(&msg.fs_event_ctx);
         tasks.push(Task::AnyEvent);
+
+        let (Some(any_event_sender), Some(servers_addr)) =
+            (&self.any_event_sender, &self.servers_addr)
+        else {
+            todo!("must have these senders...?");
+        };
+
         let cmd = TaskCommand::Changes {
             changes: paths,
             fs_event_context: msg.fs_event_ctx.clone(),
-            task_comms: TaskComms::new(
-                self.any_event_sender.clone().unwrap(),
-                self.servers_addr.clone().unwrap(),
-            ),
+            task_comms: TaskComms::new(any_event_sender.clone(), servers_addr.clone()),
         };
 
         (Task::Group(TaskGroup::new(tasks)), cmd)
