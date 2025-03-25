@@ -63,3 +63,23 @@ test.describe(
         });
     },
 );
+
+test.describe(
+    "examples/html/js-playground.js",
+    {
+        annotation: {
+            type: cli({
+                args: ["-i", "examples/html/js-playground.js"],
+            }),
+            description: "",
+        },
+    },
+    () => {
+        test("js playground", async ({ page, bs }) => {
+            await page.goto(bs.path("/"), { waitUntil: "networkidle" });
+            await expect(
+                page.getByText("did load from js-playground"),
+            ).toBeVisible();
+        });
+    },
+);
