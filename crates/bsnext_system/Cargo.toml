@@ -9,6 +9,7 @@ edition = "2021"
 bsnext_input = { path = "../bsnext_input" }
 bsnext_md = { path = "../bsnext_md" }
 bsnext_html = { path = "../bsnext_html" }
+bsnext_js = { path = "../bsnext_js" }
 bsnext_yaml = { path = "../bsnext_yaml" }
 bsnext_tracing = { path = "../bsnext_tracing" }
 bsnext_core = { path = "../bsnext_core" }
