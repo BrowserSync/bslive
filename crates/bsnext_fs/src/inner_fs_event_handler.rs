@@ -1,5 +1,5 @@
 use crate::actor::FsWatcher;
-use crate::filter::{Filter, PathFilter};
+use crate::filter::PathFilter;
 use crate::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventKind, PathDescription, PathDescriptionOwned,
 };

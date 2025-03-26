@@ -77,7 +77,6 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                     }
                 }
                 if let Some(ignore_filter_kind) = &opts.ignore {
-                    println!("{:?}", ignore_filter_kind);
                     let ignores = convert(ignore_filter_kind);
                     for ignore in ignores {
                         watcher.with_ignore(ignore);

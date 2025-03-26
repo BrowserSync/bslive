@@ -1,0 +1,18 @@
+servers:
+  - name: npm-watcher
+    watchers:
+      - dir: examples/watcher
+        filter:
+          - examples/watcher/package.json
+        run:
+          - sh: echo '--> changed' $BSLIVE_FILES
+          - sh: cd examples/watcher && npm install
+          - sh: echo 'after'
+    routes:
+      - path: /
+        dir: examples/watcher
+        watch:
+          ignore:
+            - package.json
+            - node_modules
+            - package-lock.json
