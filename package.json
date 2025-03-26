@@ -29,7 +29,8 @@
     "inject",
     "generated",
     "./examples/openai",
-    "./examples/react-router"
+    "./examples/react-router",
+    "./examples/watcher"
   ],
   "scripts": {
     "artifacts": "napi artifacts",
