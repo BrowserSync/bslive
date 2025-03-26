@@ -75,7 +75,10 @@ async fn post_events(
             match recv
                 .send(IncomingEvents::FilesChanged(FilesChanged {
                     paths,
-                    ctx: FsEventContext { id: app.id },
+                    ctx: FsEventContext {
+                        id: app.id,
+                        origin_id: app.id,
+                    },
                 }))
                 .await
             {

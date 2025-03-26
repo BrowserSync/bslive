@@ -47,7 +47,10 @@ impl InputCreation for JsFs {
         Ok(input)
     }
 
-    fn from_input_str<P: AsRef<str>>(content: P, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
+    fn from_input_str<P: AsRef<str>>(
+        _content: P,
+        _ctx: &InputCtx,
+    ) -> Result<Input, Box<InputError>> {
         todo!()
     }
 }

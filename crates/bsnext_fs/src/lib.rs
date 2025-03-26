@@ -12,7 +12,6 @@ mod watcher;
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-
 // use tokio_stream::StreamExt;
 
 #[derive(Debug, Copy, Clone)]
@@ -51,9 +50,10 @@ impl Debounce {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FsEventContext {
     pub id: u64,
+    pub origin_id: u64,
 }
 
 impl FsEventContext {
@@ -64,7 +64,10 @@ impl FsEventContext {
 
 impl Default for FsEventContext {
     fn default() -> Self {
-        Self { id: 1 }
+        Self {
+            id: 1,
+            origin_id: 1,
+        }
     }
 }
 
@@ -72,7 +75,7 @@ impl Default for FsEventContext {
 #[rtype(result = "()")]
 pub struct FsEvent {
     pub kind: FsEventKind,
-    pub ctx: FsEventContext,
+    pub fs_event_ctx: FsEventContext,
 }
 
 impl FsEvent {
@@ -82,7 +85,10 @@ impl FsEvent {
                 absolute_path: PathBuf::from(abs.as_ref()),
                 path: PathBuf::from(path.as_ref()),
             }),
-            ctx: FsEventContext { id: ctx_id },
+            fs_event_ctx: FsEventContext {
+                id: ctx_id,
+                origin_id: ctx_id,
+            },
         }
     }
 }

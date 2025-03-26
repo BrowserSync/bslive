@@ -1,6 +1,4 @@
-use crate::monitor::{
-    to_route_watchables, to_server_watchables, AnyWatchable, Monitor, MonitorInput,
-};
+use crate::any_monitor::{AnyMonitor, PathWatchable};
 use actix::{
     Actor, ActorContext, Addr, AsyncContext, Handler, ResponseActFuture, ResponseFuture, Running,
     WrapFuture,
@@ -10,12 +8,11 @@ use actix::ActorFutureExt;
 use actix_rt::Arbiter;
 use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
-use bsnext_fs::actor::FsWatcher;
 use bsnext_input::{Input, InputCtx};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::monitor_any_watchables::MonitorAnyWatchables;
+use crate::monitor_any_watchables::MonitorPathWatchables;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
@@ -23,19 +20,31 @@ use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, ChildNotCreated, ChildResult, InternalEvents, ServerError};
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
-use bsnext_fs::FsEvent;
+use bsnext_fs::{FsEvent, FsEventContext};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
+use input_monitor::{InputMonitor, MonitorInput};
+use route_watchable::to_route_watchables;
+use server_watchable::to_server_watchables;
 use start::start_kind::StartKind;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
+pub mod any_monitor;
 pub mod args;
 pub mod cli;
+mod cmd;
 pub mod export;
+mod handle_fs_event;
 pub mod input_fs;
-pub mod monitor;
+mod input_monitor;
+mod input_watchable;
 mod monitor_any_watchables;
+mod path_monitor;
+mod route_watchable;
+mod server_watchable;
 pub mod start;
+mod task;
+mod tasks;
 
 #[derive(Debug)]
 pub(crate) struct BsSystem {
@@ -43,7 +52,8 @@ pub(crate) struct BsSystem {
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
-    any_monitors: HashMap<AnyWatchable, Monitor>,
+    any_monitors: HashMap<PathWatchable, AnyMonitor>,
+    tasks: HashMap<FsEventContext, usize>,
     cwd: Option<PathBuf>,
 }
 
@@ -90,12 +100,6 @@ impl BsSystemApi {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct InputMonitor {
-    pub addr: Addr<FsWatcher>,
-    pub ctx: InputCtx,
-}
-
 #[derive(Debug)]
 pub struct EventWithSpan {
     pub evt: ExternalEventsDTO,
@@ -115,6 +119,7 @@ impl BsSystem {
             any_event_sender: None,
             input_monitors: None,
             any_monitors: Default::default(),
+            tasks: Default::default(),
             cwd: None,
         }
     }
@@ -140,30 +145,50 @@ impl BsSystem {
         // todo: clean up this merging
         let mut all_watchables = route_watchables
             .iter()
-            .map(|r| AnyWatchable::Route(r.to_owned()))
+            .map(|r| PathWatchable::Route(r.to_owned()))
             .collect::<Vec<_>>();
 
         let servers = server_watchables
             .iter()
-            .map(|w| AnyWatchable::Server(w.to_owned()))
+            .map(|w| PathWatchable::Server(w.to_owned()))
             .collect::<Vec<_>>();
 
         all_watchables.extend(servers);
         let cwd = cwd.clone();
         let addr = self_address.clone();
+        let msg = MonitorPathWatchables {
+            watchables: all_watchables,
+            cwd,
+        };
 
-        Arbiter::current().spawn(async move {
-            match addr
-                .send(MonitorAnyWatchables {
-                    watchables: all_watchables,
-                    cwd,
-                })
-                .await
-            {
-                Ok(_) => {}
-                Err(e) => tracing::debug!(%e),
-            };
-        });
+        addr.do_send(msg);
+    }
+
+    fn update_ctx(&mut self, input: &Input) {
+        let next = input
+            .servers
+            .iter()
+            .map(|s| s.identity.clone())
+            .collect::<Vec<_>>();
+
+        let next_input_ctx = InputCtx::new(&next, None);
+
+        if let Some(mon) = self.input_monitors.as_mut() {
+            if !next.is_empty() {
+                if next_input_ctx == mon.input_ctx {
+                    tracing::info!(
+                        " - server identities were equal, not updating ctx {:?}",
+                        next_input_ctx
+                    );
+                } else {
+                    tracing::info!(
+                        " + updating stored server identities following a file change {:?}",
+                        next
+                    );
+                    mon.input_ctx = next_input_ctx
+                }
+            }
+        }
     }
 
     fn publish_any_event(&mut self, evt: AnyEvent) {
@@ -268,7 +293,7 @@ impl Handler<Start> for BsSystem {
                             ctx.notify(MonitorInput {
                                 path: path.clone(),
                                 cwd: actor.cwd.clone().unwrap(),
-                                ctx: input_ctx,
+                                input_ctx,
                             });
                             // todo: where to better sequence these side-effects
                             actor.accept_watchables(&input_clone);
@@ -321,7 +346,7 @@ impl Handler<Start> for BsSystem {
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
-                    ctx: InputCtx::default(),
+                    input_ctx: InputCtx::default(),
                 });
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
                 let f = async move { Ok(DidStart::Started(Default::default())) }.into_actor(self);
@@ -339,6 +364,7 @@ impl Handler<Start> for BsSystem {
 #[rtype(result = "Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>")]
 pub struct OverrideInput {
     pub input: Input,
+    pub original_event: AnyEvent,
 }
 
 impl actix::Handler<OverrideInput> for BsSystem {
@@ -352,12 +378,14 @@ impl actix::Handler<OverrideInput> for BsSystem {
             .send(ResolveServers { input: msg.input })
             .into_actor(self)
             .map(move |res, actor, _ctx| {
+                tracing::debug!(" + did override input");
                 let output = match res {
                     Ok(Ok(res)) => Ok(res),
                     Ok(Err(s_e)) => Err(s_e),
                     Err(err) => Err(ServerError::Unknown(err.to_string())),
                 };
                 actor.accept_watchables(&input_clone);
+                actor.update_ctx(&input_clone);
                 output
             });
         Box::pin(f)
@@ -382,6 +410,7 @@ impl actix::Handler<ResolveServers> for BsSystem {
         let addr = servers_addr.clone();
 
         let f = async move {
+            tracing::debug!("will mark input as changed");
             let results = addr.send(InputChanged { input: msg.input }).await;
 
             let Ok(result_set) = results else {
@@ -389,7 +418,12 @@ impl actix::Handler<ResolveServers> for BsSystem {
                 unreachable!("?1 {:?}", e);
             };
 
-            for (maybe_addr, x) in &result_set {
+            tracing::debug!(
+                "result_set from resolve servers {}",
+                result_set.changes.len()
+            );
+
+            for (maybe_addr, x) in &result_set.changes {
                 match x {
                     ChildResult::Stopped(id) => addr.do_send(ChildStopped {
                         identity: id.clone(),
@@ -430,6 +464,7 @@ impl actix::Handler<ResolveServers> for BsSystem {
             }
 
             let res = result_set
+                .changes
                 .into_iter()
                 .map(|(_, child_result)| child_result)
                 .collect::<Vec<_>>();

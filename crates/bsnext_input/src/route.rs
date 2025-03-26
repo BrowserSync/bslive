@@ -103,16 +103,17 @@ impl Route {
     }
 
     pub fn proxy<A: AsRef<str>>(a: A) -> Self {
-        let mut p = Self::default();
-        p.path = PathDef::root();
-        p.opts = Opts {
-            cors: Some(CorsOpts::Cors(true)),
+        Self {
+            path: PathDef::root(),
+            opts: Opts {
+                cors: Some(CorsOpts::Cors(true)),
+                ..Default::default()
+            },
+            kind: RouteKind::Proxy(ProxyRoute {
+                proxy: a.as_ref().to_string(),
+            }),
             ..Default::default()
-        };
-        p.kind = RouteKind::Proxy(ProxyRoute {
-            proxy: a.as_ref().to_string(),
-        });
-        p
+        }
     }
 }
 
@@ -260,11 +261,39 @@ pub struct Spec {
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+    Debug,
+    Ord,
+    PartialOrd,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    serde::Deserialize,
+    serde::Serialize,
+    Default,
 )]
 pub struct SpecOpts {
     pub debounce: Option<DebounceDuration>,
     pub filter: Option<FilterKind>,
+    pub run: Option<Vec<Runner>>,
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+#[serde(untagged)]
+pub enum Runner {
+    BsLive { bslive: BsLiveRunner },
+    Sh { sh: String },
+    ShImplicit(String),
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub enum BsLiveRunner {
+    #[serde(rename = "notify-server")]
+    NotifyServer,
 }
 
 #[derive(
@@ -272,6 +301,6 @@ pub struct SpecOpts {
 )]
 pub struct Watcher {
     pub dir: String,
-    pub debounce_ms: Option<u64>,
-    pub filter: Option<FilterKind>,
+    #[serde(flatten)]
+    pub opts: Option<SpecOpts>,
 }

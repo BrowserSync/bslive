@@ -8,13 +8,24 @@ use bsnext_dto::internal::ChildResult;
 use std::pin::Pin;
 
 #[derive(actix::Message)]
-#[rtype(result = "Vec<(Option<Addr<ServerActor>>, ChildResult)>")]
+#[rtype(result = "InputChangedResponse")]
 pub struct InputChanged {
     pub input: Input,
 }
 
+#[derive(Debug)]
+pub struct InputChangedResponse {
+    pub changes: Vec<(Option<Addr<ServerActor>>, ChildResult)>,
+}
+
+impl InputChangedResponse {
+    pub fn from_changes(changes: Vec<(Option<Addr<ServerActor>>, ChildResult)>) -> Self {
+        Self { changes }
+    }
+}
+
 impl actix::Handler<InputChanged> for ServersSupervisor {
-    type Result = Pin<Box<dyn Future<Output = Vec<(Option<Addr<ServerActor>>, ChildResult)>>>>;
+    type Result = Pin<Box<dyn Future<Output = InputChangedResponse>>>;
 
     fn handle(&mut self, msg: InputChanged, ctx: &mut Self::Context) -> Self::Result {
         self.input_changed(ctx.address(), msg.input)

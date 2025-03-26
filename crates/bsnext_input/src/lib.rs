@@ -98,12 +98,12 @@ pub trait InputSource {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct InputArgs {
     pub port: Option<u16>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct InputCtx {
     prev_server_ids: Option<Vec<ServerIdentity>>,
     args: Option<InputArgs>,

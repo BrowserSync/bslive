@@ -32,7 +32,7 @@ impl Handler<RemoveWatchPath> for FsWatcher {
                         });
                         recip.do_send(FsEvent {
                             kind: evt,
-                            ctx: self.ctx.clone(),
+                            fs_event_ctx: self.ctx.clone(),
                         })
                     }
                 }
