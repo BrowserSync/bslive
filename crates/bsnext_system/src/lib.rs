@@ -20,7 +20,7 @@ use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, ChildNotCreated, ChildResult, InternalEvents, ServerError};
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
-use bsnext_fs::FsEvent;
+use bsnext_fs::{FsEvent, FsEventContext};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use input_monitor::{InputMonitor, MonitorInput};
 use route_watchable::to_route_watchables;
@@ -32,6 +32,7 @@ use tokio::sync::oneshot;
 pub mod any_monitor;
 pub mod args;
 pub mod cli;
+mod cmd;
 pub mod export;
 mod handle_fs_event;
 pub mod input_fs;
@@ -52,6 +53,7 @@ pub(crate) struct BsSystem {
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<PathWatchable, AnyMonitor>,
+    tasks: HashMap<FsEventContext, usize>,
     cwd: Option<PathBuf>,
 }
 
@@ -117,6 +119,7 @@ impl BsSystem {
             any_event_sender: None,
             input_monitors: None,
             any_monitors: Default::default(),
+            tasks: Default::default(),
             cwd: None,
         }
     }

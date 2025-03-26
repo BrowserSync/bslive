@@ -698,6 +698,7 @@ dependencies = [
  "futures",
  "futures-util",
  "insta",
+ "kill_tree",
  "rand",
  "reqwest",
  "tempfile",

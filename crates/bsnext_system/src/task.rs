@@ -1,3 +1,4 @@
+use crate::cmd::ShCmd;
 use crate::tasks::notify_servers::NotifyServers;
 use actix::{
     Actor, ActorFutureExt, Addr, Handler, Recipient, ResponseActFuture, ResponseFuture, Running,
@@ -71,7 +72,11 @@ impl Task {
                 let s = group_runner.start();
                 s.recipient()
             }
-            Task::Runner(Runner::Sh { .. }) => todo!("Task::Runner::Runner::Sh"),
+            Task::Runner(Runner::Sh { sh }) => {
+                let cmd = ShCmd::new(sh.into());
+                let s = cmd.start();
+                s.recipient()
+            }
             Task::Runner(Runner::ShImplicit(_)) => todo!("Task::Runner::Runner::ShImplicit"),
         }
     }
@@ -86,10 +91,6 @@ impl TaskGroup {
     pub fn new(tasks: Vec<Task>) -> Self {
         Self { tasks }
     }
-
-    // pub fn len(&self) -> usize {
-    //     self.tasks.len()
-    // }
 }
 
 pub struct TaskGroupRunner {
@@ -109,12 +110,15 @@ impl TaskGroupRunner {
 impl actix::Actor for TaskGroupRunner {
     type Context = actix::Context<Self>;
 
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        tracing::info!(" + started TaskGroupRunner")
+    }
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!(" x stopped TaskGroupRunner")
+        tracing::info!(" x stopped TaskGroupRunner")
     }
 
     fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        tracing::trace!(" ⏰ stopping TaskGroupRunner {}", self.done);
+        tracing::info!(" ⏰ stopping TaskGroupRunner {}", self.done);
         Running::Stop
     }
 }
