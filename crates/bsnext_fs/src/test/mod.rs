@@ -54,7 +54,7 @@ struct TestCase {
 }
 
 impl TestCase {
-    pub fn new(debounce: Debounce, filter: Option<Filter>) -> Self {
+    pub fn new(debounce: Debounce, filter: Option<Filter>, ignore: Option<Filter>) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
         let mut fs = FsWatcher::new(
             tmp_dir.path(),
@@ -66,6 +66,9 @@ impl TestCase {
         fs.with_debounce(debounce);
         if let Some(filter) = filter {
             fs.with_filter(filter);
+        }
+        if let Some(ignore) = ignore {
+            fs.with_ignore(ignore);
         }
         let addr = fs.start();
         let a = A { events: vec![] };
@@ -136,7 +139,7 @@ impl TestCase {
 
 #[actix_rt::test]
 async fn test_single_file() -> Result<(), Box<dyn std::error::Error>> {
-    let tc = TestCase::new(Debounce::trailing_ms(10), None);
+    let tc = TestCase::new(Debounce::trailing_ms(10), None, None);
     tc.watch().await;
     tc.write_file("test_file.txt").await;
     let events = tc.get_events_after(Duration::from_millis(500)).await;
@@ -154,7 +157,7 @@ async fn test_single_file() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_rt::test]
 async fn test_trailing_drops() -> Result<(), Box<dyn std::error::Error>> {
-    let tc = TestCase::new(Debounce::trailing_ms(10), None);
+    let tc = TestCase::new(Debounce::trailing_ms(10), None, None);
     tc.watch().await;
     tc.write_file("test_file.txt").await;
     tc.write_file("test_file.css").await;
@@ -166,7 +169,7 @@ async fn test_trailing_drops() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_rt::test]
 async fn test_buffer() -> Result<(), Box<dyn std::error::Error>> {
-    let tc = TestCase::new(Debounce::buffered_ms(10), None);
+    let tc = TestCase::new(Debounce::buffered_ms(10), None, None);
     tc.watch().await;
     tc.write_file("test_file.txt").await;
     tc.write_file("test_file.css").await;
@@ -188,6 +191,7 @@ async fn test_buffer_filter() -> Result<(), Box<dyn std::error::Error>> {
         Some(Filter::Extension {
             ext: "css".to_string(),
         }),
+        None,
     );
     tc.watch().await;
     tc.write_file("test_file.txt").await;
@@ -200,5 +204,29 @@ async fn test_buffer_filter() -> Result<(), Box<dyn std::error::Error>> {
     let names = TestCase::file_names(change);
     assert_eq!(names.len(), 1);
     assert!(names.contains(&"test_file.css".to_string()));
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn test_buffer_any_include() -> Result<(), Box<dyn std::error::Error>> {
+    let tc = TestCase::new(
+        Debounce::buffered_ms(10),
+        None,
+        Some(Filter::Any {
+            any: "test_file.css".to_string(),
+        }),
+    );
+    tc.watch().await;
+    tc.write_file("test_file.txt").await;
+    tc.write_file("test_file.css").await;
+
+    let (change, other, total_count) = tc.buffered_change_after(Duration::from_millis(500)).await;
+    assert_eq!(change.len(), 1, "Should be 1 change event (buffered)");
+    assert_eq!(other.len(), 1, "Should be 1 other event (path added)");
+    assert_eq!(total_count, 2, "Should be 2 in total");
+
+    let names = TestCase::file_names(change);
+    assert_eq!(names.len(), 1);
+    assert!(names.contains(&"test_file.txt".to_string()));
     Ok(())
 }

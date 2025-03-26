@@ -6,6 +6,7 @@ pub enum Filter {
     None,
     Extension { ext: String },
     Glob { glob: String },
+    Any { any: String },
 }
 
 impl PathFilter for Filter {
@@ -30,6 +31,7 @@ impl PathFilter for Filter {
                 );
                 did_match
             }
+            Filter::Any { any } => pd.absolute.to_string_lossy().contains(any),
         }
     }
 }

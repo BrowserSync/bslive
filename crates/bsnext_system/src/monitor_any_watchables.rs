@@ -76,6 +76,13 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                         watcher.with_filter(filter);
                     }
                 }
+                if let Some(ignore_filter_kind) = &opts.ignore {
+                    println!("{:?}", ignore_filter_kind);
+                    let ignores = convert(ignore_filter_kind);
+                    for ignore in ignores {
+                        watcher.with_ignore(ignore);
+                    }
+                }
             }
 
             let duration = match &any_watchable.spec_opts() {
@@ -110,9 +117,17 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
 
 fn convert(fk: &FilterKind) -> Vec<Filter> {
     match fk {
-        FilterKind::StringGlob(sg) => vec![Filter::Glob {
-            glob: sg.to_string(),
-        }],
+        FilterKind::StringDefault(string_default) => {
+            if string_default.contains("*") {
+                vec![Filter::Glob {
+                    glob: string_default.to_string(),
+                }]
+            } else {
+                vec![Filter::Any {
+                    any: string_default.to_string(),
+                }]
+            }
+        }
         FilterKind::Extension { ext } => vec![Filter::Extension {
             ext: ext.to_string(),
         }],
@@ -120,6 +135,9 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
             glob: glob.to_string(),
         }],
         FilterKind::List(items) => items.iter().flat_map(convert).collect::<Vec<_>>(),
+        FilterKind::Any { any } => vec![Filter::Any {
+            any: any.to_string(),
+        }],
     }
 }
 
