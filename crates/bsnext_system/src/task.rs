@@ -91,6 +91,10 @@ impl TaskGroup {
     pub fn new(tasks: Vec<Task>) -> Self {
         Self { tasks }
     }
+
+    pub fn len(&self) -> usize {
+        self.tasks.len()
+    }
 }
 
 pub struct TaskGroupRunner {
@@ -111,7 +115,7 @@ impl actix::Actor for TaskGroupRunner {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(" + started TaskGroupRunner")
+        tracing::info!(actor.lifecycle = "started", "TaskGroupRunner")
     }
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::info!(" x stopped TaskGroupRunner")
@@ -131,6 +135,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
         let Some(group) = self.task_group.take() else {
             todo!("how to handle a concurrent request here?");
         };
+        tracing::debug!("  └── {} tasks in group", group.len());
         let future = async move {
             for x in group.tasks {
                 let a = x.into_actor();

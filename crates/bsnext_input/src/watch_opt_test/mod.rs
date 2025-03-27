@@ -11,7 +11,8 @@ fn test_watch_opts_debounce() {
     let expected = WatchOpts::Spec(Spec {
         opts: Some(SpecOpts {
             debounce: Some(DebounceDuration::Ms(200)),
-            filter: Some(FilterKind::StringGlob("**/*.css".into())),
+            filter: Some(FilterKind::StringDefault("**/*.css".into())),
+            ignore: None,
             run: None,
         }),
     });
@@ -27,7 +28,8 @@ fn test_watch_opts_inline_filter() {
     let expected = WatchOpts::Spec(Spec {
         opts: Some(SpecOpts {
             debounce: None,
-            filter: Some(FilterKind::StringGlob("**/*.css".into())),
+            filter: Some(FilterKind::StringDefault("**/*.css".into())),
+            ignore: None,
             run: None,
         }),
     });
@@ -47,6 +49,7 @@ fn test_watch_opts_explicit_filter_ext() {
             filter: Some(FilterKind::Extension {
                 ext: "css".to_string(),
             }),
+            ignore: None,
             run: None,
         }),
     });
@@ -65,6 +68,7 @@ fn test_watch_opts_explicit_filter_glob() {
             filter: Some(FilterKind::Glob {
                 glob: "**/*.css".into(),
             }),
+            ignore: None,
             run: None,
         }),
     });

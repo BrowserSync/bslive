@@ -20,6 +20,7 @@ pub struct FsWatcher {
     pub ctx: FsEventContext,
     pub debounce: Debounce,
     pub filters: Vec<Filter>,
+    pub ignore: Vec<Filter>,
     pub cwd: PathBuf,
 }
 
@@ -35,6 +36,7 @@ impl FsWatcher {
             ctx,
             cwd: cwd.to_path_buf(),
             filters: vec![],
+            ignore: vec![],
             debounce: Default::default(),
         }
     }
@@ -51,6 +53,10 @@ impl FsWatcher {
     pub fn with_filter(&mut self, f: Filter) {
         tracing::debug!("adding filter {:?}", f);
         self.filters.push(f)
+    }
+    pub fn with_ignore(&mut self, f: Filter) {
+        tracing::debug!("adding ignore {:?}", f);
+        self.ignore.push(f)
     }
 
     fn setup_fs_streams(&mut self, a: Addr<FsWatcher>) {

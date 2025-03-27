@@ -217,6 +217,7 @@ fn test_deserialize_watch() {
             opts: Some(SpecOpts {
                 debounce: Some(DebounceDuration::Ms(2000)),
                 filter: None,
+                ignore: None,
                 run: None,
             })
         })

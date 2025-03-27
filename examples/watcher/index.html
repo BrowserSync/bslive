@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Document</title>
+</head>
+<body>
+<main></main>
+<script type=module>
+    import { h, render } from "./node_modules/preact/dist/preact.mjs";
+
+    function App() {
+        return h("div", {}, h("ul", {}, h("li", {}, "a"), h("li", {}, "b")));
+    }
+    
+    render(App(), document.querySelector("main"));
+</script>
+</body>
+</html>

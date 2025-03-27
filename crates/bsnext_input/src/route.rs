@@ -246,9 +246,10 @@ pub enum DebounceDuration {
 )]
 #[serde(untagged)]
 pub enum FilterKind {
-    StringGlob(String),
+    StringDefault(String),
     Extension { ext: String },
     Glob { glob: String },
+    Any { any: String },
     List(Vec<FilterKind>),
 }
 
@@ -275,6 +276,7 @@ pub struct Spec {
 pub struct SpecOpts {
     pub debounce: Option<DebounceDuration>,
     pub filter: Option<FilterKind>,
+    pub ignore: Option<FilterKind>,
     pub run: Option<Vec<Runner>>,
 }
 

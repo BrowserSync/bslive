@@ -61,8 +61,8 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 .env("CLICOLOR_FORCE", "1")
                 .env("CLICOLOR", "1")
                 .env("COLORTERM", "truecolor")
-                // .env("BSLIVE_REASON", reason)
-                // .env("BSLIVE_FILES", files)
+                .env("BSLIVE_REASON", reason)
+                .env("BSLIVE_FILES", files)
                 .spawn()
                 .expect("command failed to spawn?");
             let pid = f1.id();

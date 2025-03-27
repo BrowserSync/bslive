@@ -14,11 +14,11 @@ impl Actor for NotifyServers {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::debug!("started");
+        tracing::debug!(actor.lifecycle = "started", "NotifyServers");
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::debug!(" x stopped NotifyServers")
+        tracing::debug!(actor.lifecycle = "stopped", "NotifyServers");
     }
 }
 

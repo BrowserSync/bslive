@@ -86,7 +86,6 @@ async fn print_request_response(
                 .map(|x| std::str::from_utf8(&x).expect("bytes").to_owned())
                 .collect::<Vec<_>>();
             let yml = serde_yaml::to_string(&to_str).expect("to yaml");
-            println!("yml={}", yml);
             let _r = file.write(yml.as_bytes());
 
             match file.flush().await {
