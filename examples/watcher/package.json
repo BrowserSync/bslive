@@ -1,0 +1,15 @@
+{
+  "name": "watcher",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"no test specified yet\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "preact": "^10.26.4"
+  }
+}

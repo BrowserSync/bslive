@@ -49,11 +49,17 @@ impl Handler<MultipleInnerChangeEvent> for FsWatcher {
     fn handle(&mut self, msg: MultipleInnerChangeEvent, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!(?self.ctx, "MultipleInnerChangeEvent for FsWatcher");
         tracing::debug!("  └ got {} events to process", msg.events.len());
+        tracing::debug!(
+            "  └ will apply {} filter & {} ignore",
+            self.filters.len(),
+            self.ignore.len()
+        );
         let now = Instant::now();
         let unique = msg.events.iter().collect::<BTreeSet<_>>();
         let original_len = msg.events.len();
         let unique_len = unique.len();
-        tracing::debug!("  └ {} unique", unique.len());
+        tracing::debug!("  └ {} unique event after converting to set", unique.len());
+        tracing::debug!("  └ {:?}", unique);
 
         let filtered = unique
             .iter()
@@ -66,6 +72,19 @@ impl Handler<MultipleInnerChangeEvent> for FsWatcher {
                     true
                 } else {
                     self.filters.iter().any(|filter| filter.filter(pd))
+                }
+            })
+            .filter(|pd| {
+                if self.ignore.is_empty() {
+                    true
+                } else {
+                    let path_matched_ignore_filter =
+                        self.ignore.iter().any(|filter| filter.filter(pd));
+                    if path_matched_ignore_filter {
+                        false
+                    } else {
+                        true
+                    }
                 }
             })
             .collect::<Vec<PathDescription>>();
