@@ -182,7 +182,6 @@ impl Handler<TaskCommand> for TaskGroupRunner {
         };
         // let self_addr = ctx.address();
         Box::pin(future.into_actor(self).map(|_res, actor, _ctx| {
-            println!("all done!");
             actor.done = true;
         }))
     }

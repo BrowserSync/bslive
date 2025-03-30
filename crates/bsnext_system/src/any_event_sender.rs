@@ -22,11 +22,9 @@ impl actix::Actor for AnyEventSender {
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(" x stopped AnyEventSender");
-        println!(" x stopped AnyEventSender");
     }
     fn started(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(" started AnyEventSender");
-        println!(" started AnyEventSender");
     }
 }
 
@@ -42,7 +40,6 @@ impl Handler<TaskCommand> for AnyEventSender {
                 Ok(_) => tracing::trace!("sent"),
                 Err(e) => tracing::error!("{e}"),
             }
-            println!("done 1");
         })
     }
 }
