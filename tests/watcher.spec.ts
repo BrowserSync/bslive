@@ -24,7 +24,8 @@ test.describe(
             // Navigate to the page and wait until network is idle
             await page.goto(bs.path("/"), { waitUntil: "networkidle" });
 
-            await expect(page.getByRole("list")).toContainText("ab");
+            await expect(page.getByRole("list")).toContainText("a");
+            await expect(page.getByRole("list")).toContainText("b");
         });
     },
 );
