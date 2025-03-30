@@ -28,7 +28,7 @@ impl Handler<TaskCommand> for NotifyServers {
     fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("NotifyServers::TaskCommand");
         let comms = msg.comms();
-        let sender = comms.servers_addr.clone();
+        let sender = comms.servers_recip.clone();
         match msg {
             TaskCommand::Changes {
                 changes,

@@ -13,6 +13,7 @@ impl ShCmd {
     pub fn new(cmd: OsString) -> Self {
         Self { sh: Cmd(cmd) }
     }
+    #[allow(dead_code)]
     pub fn from_str<A: AsRef<str>>(cmd: A) -> anyhow::Result<Self> {
         Ok(Self {
             sh: Cmd(OsString::try_from(cmd.as_ref())?),
@@ -38,7 +39,7 @@ impl actix::Actor for ShCmd {
 impl actix::Handler<TaskCommand> for ShCmd {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, msg: TaskCommand, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = self.sh.clone();
         let cmd = cmd.to_os_string();
         tracing::debug!("ShCmd: Will run... {:?}", cmd);

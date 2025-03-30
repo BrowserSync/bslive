@@ -110,7 +110,18 @@ impl BsSystem {
             .collect::<Vec<_>>();
 
         let mut tasks = self.as_task(&msg.fs_event_ctx);
-        tasks.push(Task::AnyEvent);
+        let as_strings = paths
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect::<Vec<String>>();
+
+        let evt = AnyEvent::External(ExternalEventsDTO::FilesChanged(
+            bsnext_dto::FilesChangedDTO {
+                paths: as_strings.clone(),
+            },
+        ));
+
+        tasks.push(Task::AnyEvent(evt));
 
         let (Some(any_event_sender), Some(servers_addr)) =
             (&self.any_event_sender, &self.servers_addr)
@@ -121,7 +132,7 @@ impl BsSystem {
         let cmd = TaskCommand::Changes {
             changes: paths,
             fs_event_context: msg.fs_event_ctx.clone(),
-            task_comms: TaskComms::new(any_event_sender.clone(), servers_addr.clone()),
+            task_comms: TaskComms::new(any_event_sender.clone(), servers_addr.clone().recipient()),
         };
 
         (Task::Group(TaskGroup::new(tasks)), cmd)
