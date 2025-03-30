@@ -1,19 +1,11 @@
 use crate::any_event_sender::AnyEventSender;
 use crate::cmd::ShCmd;
 use crate::tasks::notify_servers::NotifyServers;
-use actix::{
-    Actor, ActorFutureExt, Addr, Handler, Recipient, ResponseActFuture, ResponseFuture, Running,
-    WrapFuture,
-};
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
+use actix::{Actor, ActorFutureExt, Handler, Recipient, ResponseActFuture, Running, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
-use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
-use bsnext_dto::FilesChangedDTO;
 use bsnext_fs::FsEventContext;
 use bsnext_input::route::{BsLiveRunner, Runner};
-use kill_tree::Output;
-use std::future::Future;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 
@@ -123,25 +115,10 @@ pub trait AsActor: std::fmt::Debug {
 
 #[derive(Debug)]
 pub struct TaskGroup {
-    tasks: Vec<Task>,
-}
-
-#[derive(Debug)]
-pub struct TaskGroup2 {
     tasks: Vec<Box<dyn AsActor>>,
 }
 
 impl TaskGroup {
-    pub fn new(tasks: Vec<Task>) -> Self {
-        Self { tasks }
-    }
-
-    pub fn len(&self) -> usize {
-        self.tasks.len()
-    }
-}
-
-impl TaskGroup2 {
     pub fn new(tasks: Vec<Box<dyn AsActor>>) -> Self {
         Self { tasks }
     }
@@ -156,13 +133,8 @@ pub struct TaskGroupRunner {
     task_group: Option<TaskGroup>,
 }
 
-pub struct TaskGroupRunner2 {
-    done: bool,
-    task_group: Option<TaskGroup2>,
-}
-
-impl TaskGroupRunner2 {
-    fn new(p0: TaskGroup2) -> Self {
+impl TaskGroupRunner {
+    fn new(p0: TaskGroup) -> Self {
         Self {
             task_group: Some(p0),
             done: false,
@@ -170,32 +142,7 @@ impl TaskGroupRunner2 {
     }
 }
 
-impl TaskGroupRunner {
-    fn new(task_group: TaskGroup) -> Self {
-        Self {
-            done: false,
-            task_group: Some(task_group),
-        }
-    }
-}
-
 impl actix::Actor for TaskGroupRunner {
-    type Context = actix::Context<Self>;
-
-    fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(actor.lifecycle = "started", "TaskGroupRunner")
-    }
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(" x stopped TaskGroupRunner")
-    }
-
-    fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        tracing::info!(" ⏰ stopping TaskGroupRunner {}", self.done);
-        Running::Stop
-    }
-}
-
-impl actix::Actor for TaskGroupRunner2 {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
@@ -220,38 +167,10 @@ impl Handler<TaskCommand> for TaskGroupRunner {
             todo!("how to handle a concurrent request here?");
         };
         tracing::debug!("  └── {} tasks in group", group.len());
-        let future = async move {
-            for x in group.tasks {
-                let a = x.into_actor();
-                match a.send(msg.clone()).await {
-                    Ok(_) => tracing::trace!("did send"),
-                    Err(e) => tracing::error!("{e}"),
-                }
-            }
-        };
-        // let self_addr = ctx.address();
-        Box::pin(future.into_actor(self).map(|_res, actor, _ctx| {
-            actor.done = true;
-        }))
-    }
-}
-
-impl Handler<TaskCommand> for TaskGroupRunner2 {
-    type Result = ResponseActFuture<Self, ()>;
-
-    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
-        tracing::debug!(done = self.done, "TaskGroupRunner::TaskCommand");
-        let Some(group) = self.task_group.take() else {
-            todo!("how to handle a concurrent request here?");
-        };
-        tracing::debug!("  └── {} tasks in group", group.len());
         let actors = group
             .tasks
             .into_iter()
-            .map(|x| {
-                let a = x.into_actor2();
-                a
-            })
+            .map(|x| x.into_actor2())
             .collect::<Vec<_>>();
         let future = async move {
             for x in actors {
@@ -269,84 +188,105 @@ impl Handler<TaskCommand> for TaskGroupRunner2 {
     }
 }
 
-#[actix_rt::test]
-async fn test_task_group_runner() -> anyhow::Result<()> {
-    let evt = AnyEvent::External(ExternalEventsDTO::FilesChanged(FilesChangedDTO {
-        paths: vec!["abc.jpg".to_string()],
-    }));
-    let v1 = Box::new(Task::AnyEvent(evt));
-    let tasks: Vec<Box<dyn AsActor>> = vec![mock_item(), mock_item(), mock_item(), v1];
-    let task_group = TaskGroup2 { tasks };
-    let task_group_runner = TaskGroupRunner2::new(task_group);
-    let addr = task_group_runner.start();
-    let mock_server = create_mock_server();
+#[cfg(test)]
+mod test {
+    use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup, TaskGroupRunner};
+    use actix::{Actor, Recipient, ResponseActFuture, WrapFuture};
+    use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
+    use bsnext_dto::external_events::ExternalEventsDTO;
+    use bsnext_dto::internal::AnyEvent;
+    use bsnext_dto::FilesChangedDTO;
+    use std::time::Duration;
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
+    #[actix_rt::test]
+    async fn test_task_group_runner() -> anyhow::Result<()> {
+        let evt = AnyEvent::External(ExternalEventsDTO::FilesChanged(FilesChangedDTO {
+            paths: vec!["abc.jpg".to_string()],
+        }));
+        let v1 = Box::new(Task::AnyEvent(evt));
+        let tasks: Vec<Box<dyn AsActor>> = vec![
+            mock_item(Duration::from_millis(20)),
+            mock_item(Duration::from_millis(20)),
+            mock_item(Duration::from_millis(20)),
+            v1,
+        ];
+        let task_group = TaskGroup { tasks };
+        let task_group_runner = TaskGroupRunner::new(task_group);
+        let addr = task_group_runner.start();
+        let mock_server = create_mock_server();
 
-    let r = addr
-        .send(TaskCommand::Changes {
-            changes: vec![],
-            fs_event_context: Default::default(),
-            task_comms: TaskComms {
-                servers_recip: mock_server,
-                any_event_sender: tx,
-            },
-        })
-        .await;
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
 
-    let evt1 = rx.recv().await;
-    match evt1 {
-        Some(AnyEvent::External(ExternalEventsDTO::FilesChanged(FilesChangedDTO {
-            paths,
-            ..
-        }))) => {
-            assert_eq!(vec!["abc.jpg".to_string()], paths);
+        let r = addr
+            .send(TaskCommand::Changes {
+                changes: vec![],
+                fs_event_context: Default::default(),
+                task_comms: TaskComms {
+                    servers_recip: mock_server,
+                    any_event_sender: tx,
+                },
+            })
+            .await;
+
+        let evt1 = rx.recv().await;
+        match evt1 {
+            Some(AnyEvent::External(ExternalEventsDTO::FilesChanged(FilesChangedDTO {
+                paths,
+                ..
+            }))) => {
+                assert_eq!(vec!["abc.jpg".to_string()], paths);
+            }
+            _ => unreachable!("here?"),
+        };
+        dbg!(&r);
+
+        Ok(())
+    }
+
+    fn mock_item(duration: Duration) -> Box<dyn AsActor> {
+        #[derive(Debug)]
+        struct F {
+            pub duration: Duration,
         }
-        _ => unreachable!("here?"),
-    };
-
-    Ok(())
-}
-
-fn mock_item() -> Box<dyn AsActor> {
-    #[derive(Debug)]
-    struct F;
-    impl Actor for F {
-        type Context = actix::Context<Self>;
-    }
-    impl actix::Handler<TaskCommand> for F {
-        type Result = ResponseActFuture<Self, ()>;
-
-        fn handle(&mut self, msg: TaskCommand, ctx: &mut Self::Context) -> Self::Result {
-            let a1 = async move {
-                println!("hey! - this will run!");
-            };
-            Box::pin(a1.into_actor(self))
+        impl Actor for F {
+            type Context = actix::Context<Self>;
         }
-    }
-    impl AsActor for F {
-        fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
-            let a = self.start();
-            a.recipient()
-        }
-    }
-    let wrapper = F;
-    Box::new(wrapper)
-}
+        impl actix::Handler<TaskCommand> for F {
+            type Result = ResponseActFuture<Self, ()>;
 
-fn create_mock_server() -> Recipient<FilesChanged> {
-    struct A;
-    impl Actor for A {
-        type Context = actix::Context<Self>;
-    }
-    impl actix::Handler<FilesChanged> for A {
-        type Result = ();
-
-        fn handle(&mut self, msg: FilesChanged, ctx: &mut Self::Context) -> Self::Result {
-            todo!()
+            fn handle(&mut self, msg: TaskCommand, ctx: &mut Self::Context) -> Self::Result {
+                let d = self.duration;
+                let a1 = async move {
+                    println!("will wait for {:?}", d);
+                    tokio::time::sleep(d).await;
+                };
+                Box::pin(a1.into_actor(self))
+            }
         }
+        impl AsActor for F {
+            fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
+                let a = self.start();
+                a.recipient()
+            }
+        }
+        let wrapper = F { duration };
+        Box::new(wrapper)
     }
-    let s = A;
-    let addr = s.start();
-    addr.recipient()
+
+    fn create_mock_server() -> Recipient<FilesChanged> {
+        struct A;
+        impl Actor for A {
+            type Context = actix::Context<Self>;
+        }
+        impl actix::Handler<FilesChanged> for A {
+            type Result = ();
+
+            fn handle(&mut self, msg: FilesChanged, ctx: &mut Self::Context) -> Self::Result {
+                todo!()
+            }
+        }
+        let s = A;
+        let addr = s.start();
+        addr.recipient()
+    }
 }

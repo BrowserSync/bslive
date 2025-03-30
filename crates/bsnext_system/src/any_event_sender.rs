@@ -1,6 +1,5 @@
 use crate::task::TaskCommand;
 use actix::{Handler, ResponseFuture, Running};
-use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 
 pub struct AnyEventSender {

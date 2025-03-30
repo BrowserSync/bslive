@@ -80,11 +80,7 @@ impl Handler<MultipleInnerChangeEvent> for FsWatcher {
                 } else {
                     let path_matched_ignore_filter =
                         self.ignore.iter().any(|filter| filter.filter(pd));
-                    if path_matched_ignore_filter {
-                        false
-                    } else {
-                        true
-                    }
+                    !path_matched_ignore_filter
                 }
             })
             .collect::<Vec<PathDescription>>();

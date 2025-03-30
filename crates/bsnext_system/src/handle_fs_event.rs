@@ -1,5 +1,5 @@
 use crate::input_fs::from_input_path;
-use crate::task::{Task, TaskCommand, TaskComms, TaskGroup};
+use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup};
 use crate::{BsSystem, OverrideInput};
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
@@ -78,7 +78,7 @@ impl Handler<Trigger> for BsSystem {
     fn handle(&mut self, msg: Trigger, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
         let ctx = msg.fs_ctx();
-        let entry = self.tasks.get(&ctx);
+        let entry = self.tasks.get(ctx);
         let cloned_id = ctx.clone();
 
         if let Some(entry) = entry {
@@ -109,7 +109,7 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let mut tasks = self.as_task(&msg.fs_event_ctx);
+        let mut tasks: Vec<Box<dyn AsActor>> = self.as_task(&msg.fs_event_ctx);
         let as_strings = paths
             .iter()
             .map(|p| p.to_string_lossy().to_string())
@@ -121,7 +121,7 @@ impl BsSystem {
             },
         ));
 
-        tasks.push(Task::AnyEvent(evt));
+        tasks.push(Box::new(Task::AnyEvent(evt)));
 
         let (Some(any_event_sender), Some(servers_addr)) =
             (&self.any_event_sender, &self.servers_addr)
@@ -212,7 +212,7 @@ impl BsSystem {
         Some(AnyEvent::Internal(InternalEvents::InputError(e)))
     }
 
-    fn as_task(&self, fs_event_ctx: &FsEventContext) -> Vec<Task> {
+    fn as_task(&self, fs_event_ctx: &FsEventContext) -> Vec<Box<dyn AsActor>> {
         let matching_monitor = self
             .any_monitors
             .iter()
@@ -231,7 +231,13 @@ impl BsSystem {
             };
 
             tracing::info!("Use path_watchable here {:?}", run);
-            return run.into_iter().map(Task::Runner).collect();
+            return run
+                .into_iter()
+                .map(|r| {
+                    let out: Box<dyn AsActor> = Box::new(Task::Runner(r));
+                    out
+                })
+                .collect();
         }
 
         vec![]
