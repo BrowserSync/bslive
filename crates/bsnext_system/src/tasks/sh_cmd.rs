@@ -1,4 +1,4 @@
-use crate::task::TaskCommand;
+use crate::task::{TaskCommand, TaskResult};
 use actix::ResponseFuture;
 use std::ffi::OsString;
 use std::ops::Deref;
@@ -13,12 +13,6 @@ pub struct ShCmd {
 impl ShCmd {
     pub fn new(cmd: OsString) -> Self {
         Self { sh: Cmd(cmd) }
-    }
-    #[allow(dead_code)]
-    pub fn from_str<A: AsRef<str>>(cmd: A) -> anyhow::Result<Self> {
-        Ok(Self {
-            sh: Cmd(OsString::try_from(cmd.as_ref())?),
-        })
     }
 }
 
@@ -38,7 +32,7 @@ impl actix::Actor for ShCmd {
 }
 
 impl actix::Handler<TaskCommand> for ShCmd {
-    type Result = ResponseFuture<()>;
+    type Result = ResponseFuture<TaskResult>;
 
     fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = self.sh.clone();
@@ -84,6 +78,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 tracing::trace!("child tree killed");
             }
             tracing::debug!("✅ Run complete");
+            TaskResult::ok(0)
         };
         Box::pin(fut)
     }

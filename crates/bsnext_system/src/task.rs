@@ -1,21 +1,20 @@
 use crate::any_event_sender::AnyEventSender;
-use crate::cmd::ShCmd;
 use crate::runner::{RunKind, Runnable, Runner};
 use actix::{Actor, ActorFutureExt, Handler, Recipient, ResponseActFuture, Running, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_fs::FsEventContext;
-use bsnext_input::route::BsLiveRunner;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 
 #[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "()")]
+#[rtype(result = "TaskResult")]
 pub enum TaskCommand {
     Changes {
         changes: Vec<PathBuf>,
         fs_event_context: FsEventContext,
         task_comms: TaskComms,
+        invocation_id: u64,
     },
 }
 
@@ -25,16 +24,60 @@ impl TaskCommand {
             TaskCommand::Changes { task_comms, .. } => task_comms,
         }
     }
+    pub fn id(&self) -> u64 {
+        match self {
+            TaskCommand::Changes { invocation_id, .. } => *invocation_id,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TaskResult {
+    status: TaskStatus,
+    invocation_id: u64,
+    task_results: Vec<TaskResult>,
+}
+
+impl TaskResult {
+    pub fn ok(id: u64) -> Self {
+        Self {
+            status: TaskStatus::Ok(TaskOk),
+            invocation_id: id,
+            task_results: vec![],
+        }
+    }
+    pub fn ok_tasks(id: u64, tasks: Vec<TaskResult>) -> Self {
+        Self {
+            status: TaskStatus::Ok(TaskOk),
+            invocation_id: id,
+            task_results: tasks,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum TaskStatus {
+    Ok(TaskOk),
+    Err(TaskError),
+}
+
+#[derive(Debug)]
+pub struct TaskOk;
+
+#[derive(Debug, thiserror::Error)]
+pub enum TaskError {
+    #[error("lol")]
+    FailedMsg(String),
 }
 
 #[derive(Debug, Clone)]
 pub struct TaskComms {
     pub any_event_sender: Sender<AnyEvent>,
-    pub servers_recip: Recipient<FilesChanged>,
+    pub servers_recip: Option<Recipient<FilesChanged>>,
 }
 
 impl TaskComms {
-    pub(crate) fn new(p0: Sender<AnyEvent>, p1: Recipient<FilesChanged>) -> TaskComms {
+    pub(crate) fn new(p0: Sender<AnyEvent>, p1: Option<Recipient<FilesChanged>>) -> TaskComms {
         Self {
             any_event_sender: p0,
             servers_recip: p1,
@@ -92,7 +135,7 @@ impl From<Runner> for TaskGroup {
             .collect::<Vec<Box<dyn AsActor>>>();
         match value.kind {
             RunKind::Sequence => Self::seq(boxed_tasks),
-            RunKind::Overlapping => Self::seq(boxed_tasks),
+            RunKind::Overlapping => Self::all(boxed_tasks),
         }
     }
 }
@@ -105,6 +148,12 @@ impl From<&Runner> for TaskGroup {
 
 impl TaskGroup {
     pub fn seq(tasks: Vec<Box<dyn AsActor>>) -> Self {
+        Self {
+            run_kind: RunKind::Sequence,
+            tasks,
+        }
+    }
+    pub fn all(tasks: Vec<Box<dyn AsActor>>) -> Self {
         Self {
             run_kind: RunKind::Sequence,
             tasks,
@@ -147,7 +196,7 @@ impl actix::Actor for TaskGroupRunner {
 }
 
 impl Handler<TaskCommand> for TaskGroupRunner {
-    type Result = ResponseActFuture<Self, ()>;
+    type Result = ResponseActFuture<Self, TaskResult>;
 
     fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!(done = self.done, "TaskGroupRunner::TaskCommand");
@@ -161,16 +210,22 @@ impl Handler<TaskCommand> for TaskGroupRunner {
             .map(|x| x.into_actor2())
             .collect::<Vec<_>>();
         let future = async move {
-            for x in actors {
+            let mut done = vec![];
+            for (index, x) in actors.iter().enumerate() {
                 match x.send(msg.clone()).await {
-                    Ok(_) => tracing::trace!("did send"),
+                    Ok(_) => {
+                        tracing::trace!("did send");
+                        done.push(index)
+                    }
                     Err(e) => tracing::error!("{e}"),
                 }
             }
+            done
         };
         // let self_addr = ctx.address();
-        Box::pin(future.into_actor(self).map(|_res, actor, _ctx| {
+        Box::pin(future.into_actor(self).map(|res, actor, _ctx| {
             actor.done = true;
+            TaskResult::ok(0)
         }))
     }
 }

@@ -33,7 +33,6 @@ mod any_event_sender;
 pub mod any_monitor;
 pub mod args;
 pub mod cli;
-mod cmd;
 pub mod export;
 mod handle_fs_event;
 pub mod input_fs;

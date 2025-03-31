@@ -1,4 +1,4 @@
-use crate::task::TaskCommand;
+use crate::task::{TaskCommand, TaskOk, TaskResult, TaskStatus};
 use actix::{Handler, ResponseFuture, Running};
 use bsnext_dto::internal::AnyEvent;
 
@@ -29,7 +29,7 @@ impl actix::Actor for AnyEventSender {
 }
 
 impl Handler<TaskCommand> for AnyEventSender {
-    type Result = ResponseFuture<()>;
+    type Result = ResponseFuture<TaskResult>;
 
     fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         let evt = self.evt.take().expect("must have an event here");
@@ -39,7 +39,8 @@ impl Handler<TaskCommand> for AnyEventSender {
             match sender.send(evt).await {
                 Ok(_) => tracing::trace!("sent"),
                 Err(e) => tracing::error!("{e}"),
-            }
+            };
+            TaskResult::ok(0)
         })
     }
 }

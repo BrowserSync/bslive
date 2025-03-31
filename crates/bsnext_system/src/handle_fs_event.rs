@@ -1,5 +1,5 @@
 use crate::input_fs::from_input_path;
-use crate::runner::{Runnable, Runner};
+use crate::runner::Runnable;
 use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup};
 use crate::{BsSystem, OverrideInput};
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
@@ -11,7 +11,7 @@ use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathEvent,
 };
-use bsnext_input::route::{BsLiveRunner, RunOpt, RunOptItem};
+use bsnext_input::route::BsLiveRunner;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 
 impl actix::Handler<FsEvent> for BsSystem {
@@ -78,17 +78,17 @@ impl Handler<Trigger> for BsSystem {
 
     fn handle(&mut self, msg: Trigger, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
-        let ctx = msg.fs_ctx();
-        let entry = self.tasks.get(ctx);
-        let cloned_id = ctx.clone();
+        let fs_ctx = msg.fs_ctx();
+        let entry = self.tasks.get(fs_ctx);
+        let cloned_id = fs_ctx.clone();
 
         if let Some(entry) = entry {
             tracing::info!("ignoring concurrent task triggering: prev: {}", entry);
             return Box::pin(async {}.into_actor(self));
         }
 
-        self.tasks.insert(ctx.clone(), 0);
-        let cmd_recip = msg.task.into_actor();
+        self.tasks.insert(fs_ctx.clone(), 0);
+        let cmd_recip = Box::new(msg.task).into_actor2();
 
         Box::pin(
             cmd_recip
@@ -133,7 +133,11 @@ impl BsSystem {
         let cmd = TaskCommand::Changes {
             changes: paths,
             fs_event_context: msg.fs_event_ctx.clone(),
-            task_comms: TaskComms::new(any_event_sender.clone(), servers_addr.clone().recipient()),
+            task_comms: TaskComms::new(
+                any_event_sender.clone(),
+                Some(servers_addr.clone().recipient()),
+            ),
+            invocation_id: 0,
         };
 
         (Task::Group(TaskGroup::seq(tasks)), cmd)
