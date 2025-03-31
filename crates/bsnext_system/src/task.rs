@@ -1,11 +1,15 @@
 use crate::any_event_sender::AnyEventSender;
 use crate::runner::{RunKind, Runnable, Runner};
-use actix::{Actor, ActorFutureExt, Handler, Recipient, ResponseActFuture, Running, WrapFuture};
+use actix::{
+    Actor, ActorFutureExt, Handler, MailboxError, Recipient, ResponseActFuture, Running, WrapFuture,
+};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_fs::FsEventContext;
+use futures_util::future::FutureExt;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
+use tokio::task::{JoinError, JoinSet};
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "TaskResult")]
@@ -164,7 +168,7 @@ impl TaskGroup {
     }
     pub fn all(tasks: Vec<Box<dyn AsActor>>) -> Self {
         Self {
-            run_kind: RunKind::Sequence,
+            run_kind: RunKind::Overlapping,
             tasks,
         }
     }
@@ -213,22 +217,41 @@ impl Handler<TaskCommand> for TaskGroupRunner {
             todo!("how to handle a concurrent request here?");
         };
         tracing::debug!("  └── {} tasks in group", group.len());
-        let actors = group
-            .tasks
-            .into_iter()
-            .map(|x| x.into_actor2())
-            .collect::<Vec<_>>();
+        tracing::debug!("  └── {:?} group run_kind", group.run_kind);
+
         let future = async move {
+            let actors = group
+                .tasks
+                .into_iter()
+                .map(|x| x.into_actor2())
+                .collect::<Vec<_>>();
             let mut done = vec![];
-            for (index, x) in actors.iter().enumerate() {
-                match x.send(msg.clone()).await {
-                    Ok(_) => {
-                        tracing::trace!("did send");
-                        done.push(index)
+            match group.run_kind {
+                RunKind::Sequence => {
+                    for (index, x) in actors.iter().enumerate() {
+                        match x.send(msg.clone()).await {
+                            Ok(_) => {
+                                tracing::trace!("did send");
+                                done.push(index)
+                            }
+                            Err(e) => tracing::error!("{e}"),
+                        }
                     }
-                    Err(e) => tracing::error!("{e}"),
                 }
-            }
+                RunKind::Overlapping => {
+                    let futs = actors
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, a)| a.send(msg.clone()).map(move |r| (index, r)));
+                    let mut set = JoinSet::from_iter(futs);
+                    while let Some(res) = set.join_next().await {
+                        match res {
+                            Ok((index, result)) => done.push(index),
+                            Err(_) => {}
+                        }
+                    }
+                }
+            };
             done
         };
         // let self_addr = ctx.address();

@@ -46,7 +46,7 @@ pub fn to_runner(spec: &Spec) -> Option<Runner> {
     let run = spec.opts.as_ref()?.run.as_ref()?;
     match &run {
         RunOpt::All { all } if !all.is_empty() => Some(Runner::all_from(all)),
-        RunOpt::Seq(seq) if !seq.is_empty() => Some(Runner::all_from(&seq)),
+        RunOpt::Seq(seq) if !seq.is_empty() => Some(Runner::seq_from(&seq)),
         _ => None,
     }
 }
