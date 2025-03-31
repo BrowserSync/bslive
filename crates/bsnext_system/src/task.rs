@@ -88,24 +88,24 @@ impl TaskComms {
 #[derive(Debug)]
 pub enum Task {
     Runnable(Runnable),
-    AnyEvent(AnyEvent),
     Group(TaskGroup),
 }
 
 impl AsActor for Task {
     fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
         match *self {
-            Task::AnyEvent(evt) => {
-                let a = AnyEventSender::new(evt);
-                let a = a.start();
-                a.recipient()
-            }
             Task::Group(group) => {
                 let group_runner = TaskGroupRunner::new(group);
                 let s = group_runner.start();
                 s.recipient()
             }
-            Task::Runnable(runnable) => Box::new(runnable).into_actor2(),
+            Task::Runnable(Runnable::Many(runner)) => {
+                let group = TaskGroup::from(runner);
+                let group_runner = TaskGroupRunner::new(group);
+                let s = group_runner.start();
+                s.recipient()
+            }
+            Task::Runnable(other_runnable) => Box::new(other_runnable).into_actor2(),
         }
     }
 }
@@ -120,6 +120,10 @@ pub trait AsActor: std::fmt::Debug {
     fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand>;
 }
 
+pub trait TreePath {
+    fn append(&self, parents: &mut Vec<u64>);
+}
+
 #[derive(Debug)]
 pub struct TaskGroup {
     run_kind: RunKind,
@@ -131,7 +135,12 @@ impl From<Runner> for TaskGroup {
         let boxed_tasks = value
             .tasks
             .into_iter()
-            .map(|x| -> Box<dyn AsActor> { Box::new(x) })
+            .map(|x| -> Box<dyn AsActor> {
+                match x {
+                    Runnable::Many(runner) => Box::new(Task::Group(TaskGroup::from(runner))),
+                    _ => Box::new(x),
+                }
+            })
             .collect::<Vec<Box<dyn AsActor>>>();
         match value.kind {
             RunKind::Sequence => Self::seq(boxed_tasks),
@@ -225,7 +234,11 @@ impl Handler<TaskCommand> for TaskGroupRunner {
         // let self_addr = ctx.address();
         Box::pin(future.into_actor(self).map(|res, actor, _ctx| {
             actor.done = true;
-            TaskResult::ok(0)
+            let child_results = res
+                .into_iter()
+                .map(|index| TaskResult::ok(index as u64))
+                .collect::<Vec<_>>();
+            TaskResult::ok_tasks(0, child_results)
         }))
     }
 }

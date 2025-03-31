@@ -1,6 +1,7 @@
 use crate::input_fs::from_input_path;
-use crate::runner::Runnable;
-use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup};
+use crate::runner::Runnable::BsLive;
+use crate::runner::{Runnable, Runner};
+use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup, TreePath};
 use crate::{BsSystem, OverrideInput};
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
@@ -94,7 +95,7 @@ impl Handler<Trigger> for BsSystem {
             cmd_recip
                 .send(cmd)
                 .into_actor(self)
-                .map(move |_, actor, _| {
+                .map(move |resp, actor, _| {
                     actor.tasks.remove(&cloned_id);
                 }),
         )
@@ -110,19 +111,24 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let mut tasks: Vec<Box<dyn AsActor>> = self.as_tasks(&msg.fs_event_ctx);
+        let mut tree_paths = vec![msg.fs_event_ctx.id()];
+        let mut runner = self.as_runner(&msg.fs_event_ctx);
+        runner.append(&mut tree_paths);
+
         let as_strings = paths
             .iter()
             .map(|p| p.to_string_lossy().to_string())
             .collect::<Vec<String>>();
 
-        let evt = AnyEvent::External(ExternalEventsDTO::FilesChanged(
-            bsnext_dto::FilesChangedDTO {
-                paths: as_strings.clone(),
-            },
-        ));
+        // let evt = AnyEvent::External(ExternalEventsDTO::FilesChanged(
+        //     bsnext_dto::FilesChangedDTO {
+        //         paths: as_strings.clone(),
+        //     },
+        // ));
+        //
+        // runner.add();
 
-        tasks.push(Box::new(Task::AnyEvent(evt)));
+        // dbg!(&tree_paths);
 
         let (Some(any_event_sender), Some(servers_addr)) =
             (&self.any_event_sender, &self.servers_addr)
@@ -140,7 +146,9 @@ impl BsSystem {
             invocation_id: 0,
         };
 
-        (Task::Group(TaskGroup::seq(tasks)), cmd)
+        let task_group = TaskGroup::from(runner);
+
+        (Task::Group(task_group), cmd)
     }
 
     fn handle_any_change(
@@ -217,7 +225,7 @@ impl BsSystem {
         Some(AnyEvent::Internal(InternalEvents::InputError(e)))
     }
 
-    fn as_tasks(&self, fs_event_ctx: &FsEventContext) -> Vec<Box<dyn AsActor>> {
+    fn as_runner(&self, fs_event_ctx: &FsEventContext) -> Runner {
         let matching_monitor = self
             .any_monitors
             .iter()
@@ -225,15 +233,15 @@ impl BsSystem {
 
         if let Some((path_watchable, _any_monitor)) = matching_monitor {
             tracing::info!("path_watchable {:?}", path_watchable);
-            let default_task = Task::Runnable(Runnable::BsLive(BsLiveRunner::NotifyServer));
+            let default_task = Runner::seq(&vec![Runnable::BsLive(BsLiveRunner::NotifyServer)]);
             let run = path_watchable
                 .runner()
-                .map(|runner| Task::Group(TaskGroup::from(runner)))
+                .map(ToOwned::to_owned)
                 .unwrap_or(default_task);
 
-            return vec![Box::new(run)];
+            return run;
         }
 
-        vec![]
+        Runner::seq(&vec![])
     }
 }

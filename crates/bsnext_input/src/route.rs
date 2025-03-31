@@ -296,6 +296,8 @@ pub enum RunOpt {
 pub enum RunOptItem {
     BsLive { bslive: BsLiveRunner },
     Sh { sh: String },
+    All { all: Vec<RunOptItem> },
+    Seq { seq: Vec<RunOptItem> },
     ShImplicit(String),
 }
 

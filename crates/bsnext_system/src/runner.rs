@@ -1,13 +1,23 @@
-use crate::task::{AsActor, TaskCommand};
+use crate::task::{AsActor, TaskCommand, TreePath};
 use crate::tasks::notify_servers::NotifyServers;
 use crate::tasks::sh_cmd::ShCmd;
 use actix::{Actor, Recipient};
 use bsnext_input::route::{BsLiveRunner, RunOptItem};
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct Runner {
     pub kind: RunKind,
     pub tasks: Vec<Runnable>,
+}
+
+impl TreePath for Runner {
+    fn append(&self, parents: &mut Vec<u64>) {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        let h = hasher.finish();
+        parents.push(h);
+    }
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
@@ -41,6 +51,10 @@ impl Runner {
             tasks: p0.into_iter().map(|opt| Runnable::from(opt)).collect(),
         }
     }
+
+    pub fn add(&mut self, r: Runnable) {
+        self.tasks.push(r);
+    }
 }
 
 impl AsActor for Runnable {
@@ -55,6 +69,7 @@ impl AsActor for Runnable {
                 let s = sh.start();
                 s.recipient()
             }
+            Runnable::Many(_) => unreachable!("The conversion to Task happens elsewhere"),
         }
     }
 }
@@ -63,6 +78,16 @@ impl AsActor for Runnable {
 pub enum Runnable {
     BsLive(BsLiveRunner),
     Sh(ShCmd),
+    Many(Runner),
+}
+
+impl TreePath for Runnable {
+    fn append(&self, parents: &mut Vec<u64>) {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        let h = hasher.finish();
+        parents.push(h);
+    }
 }
 
 impl From<&RunOptItem> for Runnable {
@@ -70,6 +95,14 @@ impl From<&RunOptItem> for Runnable {
         match value {
             RunOptItem::BsLive { bslive } => Self::BsLive(bslive.clone()),
             RunOptItem::Sh { sh } | RunOptItem::ShImplicit(sh) => Self::Sh(ShCmd::new(sh.into())),
+            RunOptItem::All { all } => {
+                let items: Vec<_> = all.iter().map(|x| Runnable::from(x)).collect();
+                Self::Many(Runner::all(&items))
+            }
+            RunOptItem::Seq { seq } => {
+                let items: Vec<_> = seq.iter().map(|x| Runnable::from(x)).collect();
+                Self::Many(Runner::seq(&items))
+            }
         }
     }
 }
