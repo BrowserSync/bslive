@@ -5,6 +5,7 @@ use std::ops::Deref;
 use std::time::Duration;
 use tokio::process::Command;
 
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct ShCmd {
     sh: Cmd,
 }
@@ -21,7 +22,7 @@ impl ShCmd {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 struct Cmd(pub OsString);
 
 impl Deref for Cmd {

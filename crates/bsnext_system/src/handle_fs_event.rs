@@ -1,4 +1,5 @@
 use crate::input_fs::from_input_path;
+use crate::runner::{Runnable, Runner};
 use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup};
 use crate::{BsSystem, OverrideInput};
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
@@ -10,7 +11,7 @@ use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathEvent,
 };
-use bsnext_input::route::{BsLiveRunner, Runner};
+use bsnext_input::route::{BsLiveRunner, RunOpt, RunOptItem};
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 
 impl actix::Handler<FsEvent> for BsSystem {
@@ -109,7 +110,7 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let mut tasks: Vec<Box<dyn AsActor>> = self.as_task(&msg.fs_event_ctx);
+        let mut tasks: Vec<Box<dyn AsActor>> = self.as_tasks(&msg.fs_event_ctx);
         let as_strings = paths
             .iter()
             .map(|p| p.to_string_lossy().to_string())
@@ -135,7 +136,7 @@ impl BsSystem {
             task_comms: TaskComms::new(any_event_sender.clone(), servers_addr.clone().recipient()),
         };
 
-        (Task::Group(TaskGroup::new(tasks)), cmd)
+        (Task::Group(TaskGroup::seq(tasks)), cmd)
     }
 
     fn handle_any_change(
@@ -212,32 +213,21 @@ impl BsSystem {
         Some(AnyEvent::Internal(InternalEvents::InputError(e)))
     }
 
-    fn as_task(&self, fs_event_ctx: &FsEventContext) -> Vec<Box<dyn AsActor>> {
+    fn as_tasks(&self, fs_event_ctx: &FsEventContext) -> Vec<Box<dyn AsActor>> {
         let matching_monitor = self
             .any_monitors
             .iter()
             .find(|(_, any_monitor)| any_monitor.watchable_hash() == fs_event_ctx.origin_id);
 
-        if let Some((a, _any_monitor)) = matching_monitor {
-            tracing::info!("path_watchable {:?}", a);
+        if let Some((path_watchable, _any_monitor)) = matching_monitor {
+            tracing::info!("path_watchable {:?}", path_watchable);
+            let default_task = Task::Runnable(Runnable::BsLive(BsLiveRunner::NotifyServer));
+            let run = path_watchable
+                .runner()
+                .map(|runner| Task::Group(TaskGroup::from(runner)))
+                .unwrap_or(default_task);
 
-            let default = vec![Runner::BsLive {
-                bslive: BsLiveRunner::NotifyServer,
-            }];
-
-            let run = match a.spec_opts() {
-                None => default,
-                Some(opts) => opts.run.clone().unwrap_or(default),
-            };
-
-            tracing::info!("Use path_watchable here {:?}", run);
-            return run
-                .into_iter()
-                .map(|r| {
-                    let out: Box<dyn AsActor> = Box::new(Task::Runner(r));
-                    out
-                })
-                .collect();
+            return vec![Box::new(run)];
         }
 
         vec![]
