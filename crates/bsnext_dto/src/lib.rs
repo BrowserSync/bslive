@@ -128,6 +128,36 @@ pub struct InputAcceptedDTO {
 
 #[typeshare]
 #[derive(Debug, serde::Serialize, Clone)]
+#[serde(tag = "kind", content = "payload")]
+pub enum OutputLineDTO {
+    Stdout(StdoutLineDTO),
+    Stderr(StderrLineDTO),
+}
+
+#[derive(Debug, serde::Serialize, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+pub struct ShCmdOpt {
+    pub sh: String,
+    pub name: Option<String>,
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct StdoutLineDTO {
+    pub line: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct StderrLineDTO {
+    pub line: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize, Clone)]
 pub struct FileChangedDTO {
     pub path: String,
 }

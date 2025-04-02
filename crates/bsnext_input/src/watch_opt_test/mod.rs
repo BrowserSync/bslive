@@ -1,4 +1,6 @@
-use crate::route::{DebounceDuration, FilterKind, RunOpt, RunOptItem, Spec, SpecOpts};
+use crate::route::{
+    DebounceDuration, FilterKind, RunOpt, RunOptItem, ShRunOptItem, Spec, SpecOpts,
+};
 use crate::watch_opts::WatchOpts;
 
 #[test]
@@ -73,8 +75,7 @@ fn test_watch_opts_explicit_filter_glob() {
         }),
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
-    dbg!(&actual);
-    // assert_eq!(actual, expected);
+    assert_eq!(expected, actual);
 }
 
 #[test]
@@ -87,15 +88,9 @@ fn test_watch_opts_run_seq() {
     "#;
     let expected = SpecOpts {
         run: Some(RunOpt::Seq(vec![
-            RunOptItem::Sh {
-                sh: "echo 1".to_string(),
-            },
-            RunOptItem::Sh {
-                sh: "echo 2".to_string(),
-            },
-            RunOptItem::Sh {
-                sh: "echo 3".to_string(),
-            },
+            RunOptItem::Sh(ShRunOptItem::new("echo 1")),
+            RunOptItem::Sh(ShRunOptItem::new("echo 2")),
+            RunOptItem::Sh(ShRunOptItem::new("echo 3")),
         ])),
         ..Default::default()
     };
@@ -115,15 +110,9 @@ fn test_watch_opts_run_all() {
     let expected = SpecOpts {
         run: Some(RunOpt::All {
             all: vec![
-                RunOptItem::Sh {
-                    sh: "echo 1".to_string(),
-                },
-                RunOptItem::Sh {
-                    sh: "echo 2".to_string(),
-                },
-                RunOptItem::Sh {
-                    sh: "echo 3".to_string(),
-                },
+                RunOptItem::Sh(ShRunOptItem::new("echo 1")),
+                RunOptItem::Sh(ShRunOptItem::new("echo 2")),
+                RunOptItem::Sh(ShRunOptItem::new("echo 3")),
             ],
         }),
         ..Default::default()
@@ -144,20 +133,12 @@ fn test_watch_opts_run_all_nested() {
     "#;
     let expected = SpecOpts {
         run: Some(RunOpt::Seq(vec![
-            RunOptItem::Sh {
-                sh: "echo 1".to_string(),
-            },
+            RunOptItem::Sh(ShRunOptItem::new("echo 1")),
             RunOptItem::All {
                 all: vec![
-                    RunOptItem::Sh {
-                        sh: "echo 2".to_string(),
-                    },
-                    RunOptItem::Sh {
-                        sh: "echo 3".to_string(),
-                    },
-                    RunOptItem::Sh {
-                        sh: "echo 4".to_string(),
-                    },
+                    RunOptItem::Sh(ShRunOptItem::new("echo 2")),
+                    RunOptItem::Sh(ShRunOptItem::new("echo 3")),
+                    RunOptItem::Sh(ShRunOptItem::new("echo 4")),
                 ],
             },
         ])),

@@ -3,14 +3,14 @@ import { execSync, fork } from "node:child_process";
 import { join } from "node:path";
 import * as z from "zod";
 import {
-    externalEventsSchema,
-    getServersMessageResponseSchema,
+    externalEventsDTOSchema,
+    getActiveServersResponseDTOSchema,
     internalEventsDTOSchema,
-} from "../generated/schema.mjs";
-import { existsSync } from "node:fs";
+    outputLineDTOSchema,
+} from "../generated/schema.js";
 import { clearInterval } from "node:timers";
 
-const either = z.union([internalEventsDTOSchema, externalEventsSchema]);
+const either = z.union([internalEventsDTOSchema, externalEventsDTOSchema]);
 
 declare global {
     interface Window {
@@ -47,7 +47,7 @@ interface NextArgs {
     stdout: { lines: { count: number; after: number } };
 }
 
-type TServersResp = z.infer<typeof getServersMessageResponseSchema>;
+type TServersResp = z.infer<typeof getActiveServersResponseDTOSchema>;
 
 export const test = base.extend<{
     bs: {
@@ -62,6 +62,10 @@ export const test = base.extend<{
         touch: (path: string) => void;
         messages: z.infer<typeof either>[];
         didOutput: (kind: z.infer<typeof either>["kind"]) => Promise<boolean>;
+        waitForOutput: (
+            kind: z.infer<typeof either>["kind"],
+            count?: number,
+        ) => Promise<z.infer<typeof either>[]>;
         api: (kind: "events") => string;
         // next: (args: NextArgs) => Promise<string[]>;
     };
@@ -99,6 +103,22 @@ export const test = base.extend<{
                     const parsed = either.safeParse(json);
                     if (parsed.error) {
                         failedMessages.push(line);
+                        const loose = z.object({
+                            kind: z.string(),
+                            payload: z.record(z.any()),
+                        });
+                        const parsed = loose.safeParse(json);
+                        if (parsed.error) {
+                            console.log("cannot continue0");
+                        } else {
+                            if (parsed.data.kind === "OutputLine") {
+                                const tryOutput = outputLineDTOSchema.safeParse(
+                                    parsed.data.payload,
+                                );
+                                console.log(tryOutput.error);
+                            }
+                        }
+                        // console.log(parsed.error);
                     } else {
                         parsedMessages.push(parsed.data);
                     }
@@ -165,6 +185,30 @@ export const test = base.extend<{
                         if (parsedMessages.find((x) => x.kind === kind)) {
                             resolve(true);
                             clearInterval(int);
+                        }
+                    }, 50);
+                });
+            },
+            waitForOutput(
+                kind: z.infer<typeof either>["kind"],
+                count = 1,
+            ): Promise<z.infer<typeof either>[]> {
+                return new Promise((resolve, reject) => {
+                    let start = Date.now();
+                    let max = 5000;
+                    let int = setInterval(() => {
+                        if (Date.now() - start > max) {
+                            reject(new Error(`timed out waiting for ${kind}`));
+                            clearInterval(int);
+                            return;
+                        }
+                        const matched = parsedMessages.filter(
+                            (x) => x.kind === kind,
+                        );
+                        if (matched.length >= count) {
+                            resolve(matched);
+                            clearInterval(int);
+                            return;
                         }
                     }, 50);
                 });

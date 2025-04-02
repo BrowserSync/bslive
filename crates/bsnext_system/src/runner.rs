@@ -34,13 +34,13 @@ impl Runner {
     pub fn all_from(p0: &[RunOptItem]) -> Self {
         Self {
             kind: RunKind::Overlapping,
-            tasks: p0.into_iter().map(|opt| Runnable::from(opt)).collect(),
+            tasks: p0.iter().map(Runnable::from).collect(),
         }
     }
     pub fn seq_from(p0: &[RunOptItem]) -> Self {
         Self {
             kind: RunKind::Sequence,
-            tasks: p0.into_iter().map(|opt| Runnable::from(opt)).collect(),
+            tasks: p0.iter().map(Runnable::from).collect(),
         }
     }
 
@@ -82,13 +82,14 @@ impl From<&RunOptItem> for Runnable {
     fn from(value: &RunOptItem) -> Self {
         match value {
             RunOptItem::BsLive { bslive } => Self::BsLive(bslive.clone()),
-            RunOptItem::Sh { sh } | RunOptItem::ShImplicit(sh) => Self::Sh(ShCmd::new(sh.into())),
+            RunOptItem::Sh(sh) => Self::Sh(ShCmd::from(sh)),
+            RunOptItem::ShImplicit(sh) => Self::Sh(ShCmd::new(sh.into())),
             RunOptItem::All { all } => {
-                let items: Vec<_> = all.iter().map(|x| Runnable::from(x)).collect();
+                let items: Vec<_> = all.iter().map(Runnable::from).collect();
                 Self::Many(Runner::all(&items))
             }
             RunOptItem::Seq { seq } => {
-                let items: Vec<_> = seq.iter().map(|x| Runnable::from(x)).collect();
+                let items: Vec<_> = seq.iter().map(Runnable::from).collect();
                 Self::Many(Runner::seq(&items))
             }
         }

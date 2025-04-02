@@ -80,3 +80,96 @@ test.describe(
         });
     },
 );
+
+test.describe(
+    "examples/watch/watch-output.yml",
+    {
+        annotation: {
+            type: cli({
+                args: "-i examples/watch/watch-output.yml".split(" "),
+            }),
+            description: "",
+        },
+    },
+    () => {
+        test("custom output for index.html", async ({ page, bs, request }) => {
+            await page.goto(bs.path("/"), { waitUntil: "networkidle" });
+
+            const o = await bs.waitForOutput("ServersChanged");
+            await page.waitForTimeout(50);
+            bs.touch("examples/watch/src/index.html");
+            const output = await bs.waitForOutput("OutputLine");
+            expect(output).toStrictEqual([
+                {
+                    kind: "OutputLine",
+                    payload: {
+                        kind: "Stdout",
+                        payload: {
+                            line: "examples/watch/src/index.html changed",
+                            prefix: "[run]",
+                        },
+                    },
+                },
+            ]);
+        });
+        test("custom output for 01.txt", async ({ page, bs, request }) => {
+            await page.goto(bs.path("/"), { waitUntil: "networkidle" });
+
+            const o = await bs.waitForOutput("ServersChanged");
+            await page.waitForTimeout(50);
+            bs.touch("examples/watch/src/01.txt");
+            const output = await bs.waitForOutput("OutputLine");
+            expect(output).toStrictEqual([
+                {
+                    kind: "OutputLine",
+                    payload: {
+                        kind: "Stdout",
+                        payload: {
+                            line: "01.txt changed",
+                            prefix: "[my-custom-prefix]",
+                        },
+                    },
+                },
+            ]);
+        });
+        test("custom output for 02.txt", async ({ page, bs, request }) => {
+            await page.goto(bs.path("/"), { waitUntil: "networkidle" });
+
+            const o = await bs.waitForOutput("ServersChanged");
+            await page.waitForTimeout(50);
+            bs.touch("examples/watch/src/02.txt");
+            const output = await bs.waitForOutput("OutputLine");
+            expect(output).toStrictEqual([
+                {
+                    kind: "OutputLine",
+                    payload: {
+                        kind: "Stdout",
+                        payload: {
+                            line: "02.txt changed",
+                            prefix: "custom-name",
+                        },
+                    },
+                },
+            ]);
+        });
+        test("without prefix", async ({ page, bs, request }) => {
+            await page.goto(bs.path("/"), { waitUntil: "networkidle" });
+
+            const o = await bs.waitForOutput("ServersChanged");
+            bs.touch("examples/watch/src/03.txt");
+            await page.waitForTimeout(50);
+            const output = await bs.waitForOutput("OutputLine");
+            expect(output).toStrictEqual([
+                {
+                    kind: "OutputLine",
+                    payload: {
+                        kind: "Stdout",
+                        payload: {
+                            line: "03.txt changed",
+                        },
+                    },
+                },
+            ]);
+        });
+    },
+);

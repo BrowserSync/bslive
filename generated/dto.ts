@@ -123,6 +123,16 @@ export interface ServersChangedDTO {
 	servers_resp: GetActiveServersResponseDTO;
 }
 
+export interface StderrLineDTO {
+	line: string;
+	prefix?: string;
+}
+
+export interface StdoutLineDTO {
+	line: string;
+	prefix?: string;
+}
+
 export interface StoppedWatchingDTO {
 	paths: string[];
 }
@@ -161,7 +171,8 @@ export type ExternalEventsDTO =
 	| { kind: "FileChanged", payload: FileChangedDTO }
 	| { kind: "FilesChanged", payload: FilesChangedDTO }
 	| { kind: "InputFileChanged", payload: FileChangedDTO }
-	| { kind: "InputAccepted", payload: InputAcceptedDTO };
+	| { kind: "InputAccepted", payload: InputAcceptedDTO }
+	| { kind: "OutputLine", payload: OutputLineDTO };
 
 export type InputErrorDTO = 
 	| { kind: "MissingInputs", payload: string }
@@ -182,6 +193,10 @@ export type InputErrorDTO =
 
 export type InternalEventsDTO = 
 	| { kind: "ServersChanged", payload: GetActiveServersResponseDTO };
+
+export type OutputLineDTO = 
+	| { kind: "Stdout", payload: StdoutLineDTO }
+	| { kind: "Stderr", payload: StderrLineDTO };
 
 export type StartupEventDTO = 
 	| { kind: "Started", payload?: undefined }
