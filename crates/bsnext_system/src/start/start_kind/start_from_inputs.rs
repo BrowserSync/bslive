@@ -12,7 +12,7 @@ pub struct StartFromInputPaths {
 
 impl SystemStart for StartFromInputPaths {
     fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        from_input_paths(&ctx.cwd, &self.input_paths, &self.port)
+        from_input_paths(&ctx, &self.input_paths, &self.port)
     }
 }
 
@@ -30,10 +30,11 @@ impl SystemStart for StartFromInput {
 }
 
 fn from_input_paths<T: AsRef<str>>(
-    cwd: &Path,
+    ctx: &StartupContext,
     inputs: &[T],
     port: &Option<u16>,
 ) -> Result<SystemStartArgs, Box<InputError>> {
+    let cwd = &ctx.cwd;
     let input_candidates = inputs
         .iter()
         .map(|path| cwd.join(path.as_ref()))
@@ -80,7 +81,8 @@ fn from_input_paths<T: AsRef<str>>(
     let input_args = InputArgs {
         port: port.to_owned(),
     };
-    let initial_ctx = InputCtx::new(&[], Some(input_args));
+
+    let initial_ctx = InputCtx::new(&[], Some(input_args), &ctx, Some(input_path));
     let result = from_input_path(input_path, &initial_ctx);
     match result {
         Ok(input) => Ok(SystemStartArgs::PathWithInput {

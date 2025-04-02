@@ -1,4 +1,5 @@
 use crate::server_config::{ServerConfig, ServerIdentity};
+use crate::startup::StartupContext;
 use crate::yml::YamlError;
 use bsnext_fs_helpers::{DirError, FsWriteError};
 use miette::JSONReportHandler;
@@ -107,10 +108,18 @@ pub struct InputArgs {
 pub struct InputCtx {
     prev_server_ids: Option<Vec<ServerIdentity>>,
     args: Option<InputArgs>,
+    startup: StartupContext,
+    file_path: Option<PathBuf>,
 }
 
 impl InputCtx {
-    pub fn new(servers: &[ServerIdentity], args: Option<InputArgs>) -> Self {
+    pub fn new(
+        servers: &[ServerIdentity],
+        args: Option<InputArgs>,
+        startup: &StartupContext,
+        file_path: Option<&PathBuf>,
+    ) -> Self {
+        println!("file_path {:?}", file_path);
         let prev = if servers.is_empty() {
             None
         } else {
@@ -119,11 +128,19 @@ impl InputCtx {
         Self {
             prev_server_ids: prev,
             args: args.to_owned(),
+            startup: startup.clone(),
+            file_path: file_path.map(ToOwned::to_owned),
         }
     }
 
     pub fn server_ids(&self) -> Option<&[ServerIdentity]> {
         self.prev_server_ids.as_deref()
+    }
+    pub fn startup_ctx(&self) -> &StartupContext {
+        &self.startup
+    }
+    pub fn file_path(&self) -> Option<&PathBuf> {
+        self.file_path.as_ref()
     }
 
     pub fn first_id_or_named(&self) -> ServerIdentity {

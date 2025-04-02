@@ -1,5 +1,5 @@
 use bsnext_input::playground::Playground;
-use bsnext_input::route::Route;
+use bsnext_input::route::{DirRoute, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::{Input, InputCreation, InputCtx, InputError};
 use std::fs::read_to_string;
@@ -113,12 +113,25 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
         .unwrap_or_default();
 
     // Create the server
-    let server = ServerConfig {
+    let mut server = ServerConfig {
         identity: iden,
         playground: Some(playground),
         routes,
         ..Default::default()
     };
+
+    // if no routes were manually added, append the current dir
+    if server.routes.is_empty() {
+        let mut route: Route = Route::default();
+        let mut dir_route = DirRoute::default();
+        // todo: make this use the CWD of the input file
+        // dir_route.diri = ctx.startup_ctx().cwd.to_string_lossy().to_string();
+        if let Some(parent) = ctx.file_path().and_then(|x| x.parent()) {
+            dir_route.dir = parent.to_string_lossy().to_string()
+        }
+        route.kind = RouteKind::Dir(dir_route);
+        server.routes.push(route)
+    }
 
     // Add it to the input
     input.servers.push(server);

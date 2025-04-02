@@ -6,7 +6,7 @@ pub struct Startup {
     pub tasks: Vec<StartupTask>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct StartupContext {
     pub cwd: PathBuf,
 }

@@ -56,6 +56,7 @@ pub(crate) struct BsSystem {
     any_monitors: HashMap<PathWatchable, AnyMonitor>,
     tasks: HashMap<FsEventContext, usize>,
     cwd: Option<PathBuf>,
+    start_context: Option<StartupContext>,
 }
 
 #[derive(Debug)]
@@ -122,6 +123,7 @@ impl BsSystem {
             any_monitors: Default::default(),
             tasks: Default::default(),
             cwd: None,
+            start_context: None,
         }
     }
 
@@ -165,16 +167,15 @@ impl BsSystem {
         addr.do_send(msg);
     }
 
-    fn update_ctx(&mut self, input: &Input) {
+    fn update_ctx(&mut self, input: &Input, ctx: &StartupContext) {
         let next = input
             .servers
             .iter()
             .map(|s| s.identity.clone())
             .collect::<Vec<_>>();
 
-        let next_input_ctx = InputCtx::new(&next, None);
-
         if let Some(mon) = self.input_monitors.as_mut() {
+            let next_input_ctx = InputCtx::new(&next, None, ctx, mon.input_ctx.file_path());
             if !next.is_empty() {
                 if next_input_ctx == mon.input_ctx {
                     tracing::info!(
@@ -270,6 +271,7 @@ impl Handler<Start> for BsSystem {
         self.servers_addr = Some(servers.start());
 
         let start_context = StartupContext::from_cwd(self.cwd.as_ref());
+        self.start_context = Some(start_context.clone());
 
         tracing::debug!(?start_context);
 
@@ -282,7 +284,7 @@ impl Handler<Start> for BsSystem {
                     .map(|x| x.identity.clone())
                     .collect::<Vec<_>>();
 
-                let input_ctx = InputCtx::new(&ids, None);
+                let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
                 let input_clone = input.clone();
 
                 let f = ctx
@@ -374,6 +376,11 @@ impl actix::Handler<OverrideInput> for BsSystem {
 
     fn handle(&mut self, msg: OverrideInput, ctx: &mut Self::Context) -> Self::Result {
         let input_clone = msg.input.clone();
+        let start_ctx_clone = self
+            .start_context
+            .clone()
+            .expect("If we get here, it's a big problem");
+        // let ctx_clone = self.st
         let f = ctx
             .address()
             .send(ResolveServers { input: msg.input })
@@ -386,7 +393,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
                     Err(err) => Err(ServerError::Unknown(err.to_string())),
                 };
                 actor.accept_watchables(&input_clone);
-                actor.update_ctx(&input_clone);
+                actor.update_ctx(&input_clone, &start_ctx_clone);
                 output
             });
         Box::pin(f)

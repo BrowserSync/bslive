@@ -3,16 +3,12 @@
         color: red;
     }
 
-    abc-element {
-        color: green;
-    }
-
 </style>
-
+<p>Hello there...</p>
 <abc-element></abc-element>
 
-<script type="module">
-    fetch("http://127.0.0.1:4000/trackerblocking/config/test/macos-config.json")
-        .then(x => x.json())
+<script>
+    fetch("bin.js").then(x => x.text())
+        .then(console.log)
         .then(console.log);
 </script>
