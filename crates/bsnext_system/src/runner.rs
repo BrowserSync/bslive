@@ -1,23 +1,15 @@
-use crate::task::{AsActor, TaskCommand, TreePath};
+use crate::ext_event_sender::ExtEventSender;
+use crate::task::{AsActor, TaskCommand};
 use crate::tasks::notify_servers::NotifyServers;
 use crate::tasks::sh_cmd::ShCmd;
 use actix::{Actor, Recipient};
 use bsnext_input::route::{BsLiveRunner, RunOptItem};
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::Hash;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct Runner {
     pub kind: RunKind,
     pub tasks: Vec<Runnable>,
-}
-
-impl TreePath for Runner {
-    fn append(&self, parents: &mut Vec<u64>) {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        let h = hasher.finish();
-        parents.push(h);
-    }
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
@@ -65,6 +57,11 @@ impl AsActor for Runnable {
                 let s = s.start();
                 s.recipient()
             }
+            Runnable::BsLive(BsLiveRunner::ExtEvent) => {
+                let actor = ExtEventSender::new();
+                let addr = actor.start();
+                addr.recipient()
+            }
             Runnable::Sh(sh) => {
                 let s = sh.start();
                 s.recipient()
@@ -79,15 +76,6 @@ pub enum Runnable {
     BsLive(BsLiveRunner),
     Sh(ShCmd),
     Many(Runner),
-}
-
-impl TreePath for Runnable {
-    fn append(&self, parents: &mut Vec<u64>) {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        let h = hasher.finish();
-        parents.push(h);
-    }
 }
 
 impl From<&RunOptItem> for Runnable {

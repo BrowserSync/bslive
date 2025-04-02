@@ -307,6 +307,8 @@ pub enum RunOptItem {
 pub enum BsLiveRunner {
     #[serde(rename = "notify-server")]
     NotifyServer,
+    #[serde(rename = "ext-event")]
+    ExtEvent,
 }
 
 #[derive(

@@ -1,15 +1,12 @@
-use crate::any_event_sender::AnyEventSender;
 use crate::runner::{RunKind, Runnable, Runner};
-use actix::{
-    Actor, ActorFutureExt, Handler, MailboxError, Recipient, ResponseActFuture, Running, WrapFuture,
-};
+use actix::{Actor, ActorFutureExt, Handler, Recipient, ResponseActFuture, Running, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_fs::FsEventContext;
 use futures_util::future::FutureExt;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
-use tokio::task::{JoinError, JoinSet};
+use tokio::task::JoinSet;
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "TaskResult")]
@@ -124,10 +121,6 @@ pub trait AsActor: std::fmt::Debug {
     fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand>;
 }
 
-pub trait TreePath {
-    fn append(&self, parents: &mut Vec<u64>);
-}
-
 #[derive(Debug)]
 pub struct TaskGroup {
     run_kind: RunKind,
@@ -135,8 +128,8 @@ pub struct TaskGroup {
 }
 
 impl From<Runner> for TaskGroup {
-    fn from(value: Runner) -> Self {
-        let boxed_tasks = value
+    fn from(runner: Runner) -> Self {
+        let boxed_tasks = runner
             .tasks
             .into_iter()
             .map(|x| -> Box<dyn AsActor> {
@@ -146,7 +139,7 @@ impl From<Runner> for TaskGroup {
                 }
             })
             .collect::<Vec<Box<dyn AsActor>>>();
-        match value.kind {
+        match runner.kind {
             RunKind::Sequence => Self::seq(boxed_tasks),
             RunKind::Overlapping => Self::all(boxed_tasks),
         }
@@ -246,7 +239,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                     let mut set = JoinSet::from_iter(futs);
                     while let Some(res) = set.join_next().await {
                         match res {
-                            Ok((index, result)) => done.push(index),
+                            Ok((index, _result)) => done.push(index),
                             Err(_) => {}
                         }
                     }

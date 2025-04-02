@@ -1,6 +1,7 @@
 use crate::task::{TaskCommand, TaskResult};
 use actix::ResponseFuture;
 use std::ffi::OsString;
+use std::hash::Hash;
 use std::ops::Deref;
 use std::time::Duration;
 use tokio::process::Command;

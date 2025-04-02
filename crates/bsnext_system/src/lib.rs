@@ -29,11 +29,11 @@ use start::start_kind::StartKind;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-mod any_event_sender;
 pub mod any_monitor;
 pub mod args;
 pub mod cli;
 pub mod export;
+mod ext_event_sender;
 mod handle_fs_event;
 pub mod input_fs;
 mod input_monitor;

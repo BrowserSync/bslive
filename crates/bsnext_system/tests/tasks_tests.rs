@@ -4,7 +4,7 @@ use bsnext_dto::internal::AnyEvent;
 use bsnext_system::task::{
     AsActor, TaskCommand, TaskComms, TaskGroup, TaskGroupRunner, TaskResult,
 };
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::time::Duration;
@@ -51,54 +51,6 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
     dbg!(&evt1);
     dbg!(&r);
     Ok(())
-}
-
-fn mock_item(duration: Duration) -> Box<dyn AsActor> {
-    #[derive(Debug)]
-    struct F {
-        pub duration: Duration,
-    }
-    impl Actor for F {
-        type Context = actix::Context<Self>;
-    }
-    impl actix::Handler<TaskCommand> for F {
-        type Result = ResponseActFuture<Self, TaskResult>;
-
-        fn handle(&mut self, _msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
-            let d = self.duration;
-            let a1 = async move {
-                println!("will wait for {:?}", d);
-                tokio::time::sleep(d).await;
-                TaskResult::ok(0)
-            };
-            Box::pin(a1.into_actor(self))
-        }
-    }
-    impl AsActor for F {
-        fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
-            let a = self.start();
-            a.recipient()
-        }
-    }
-    let wrapper = F { duration };
-    Box::new(wrapper)
-}
-
-fn create_mock_server() -> Recipient<FilesChanged> {
-    struct A;
-    impl Actor for A {
-        type Context = actix::Context<Self>;
-    }
-    impl actix::Handler<FilesChanged> for A {
-        type Result = ();
-
-        fn handle(&mut self, _msg: FilesChanged, _ctx: &mut Self::Context) -> Self::Result {
-            todo!()
-        }
-    }
-    let s = A;
-    let addr = s.start();
-    addr.recipient()
 }
 
 fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {

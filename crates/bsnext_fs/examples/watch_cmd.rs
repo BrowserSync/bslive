@@ -163,7 +163,7 @@ impl actix::Handler<FsEvent> for Example {
 
         Box::pin(
             fut.into_actor(self) // converts future to ActorFuture
-                .map(|res, act, _ctx| {
+                .map(|_res, act, _ctx| {
                     tracing::debug!(index = act.run_count, "✍️ running = false");
                     act.running = false;
                     ()

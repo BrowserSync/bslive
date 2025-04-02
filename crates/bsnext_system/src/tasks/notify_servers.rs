@@ -2,6 +2,7 @@ use crate::task::{TaskCommand, TaskResult};
 use actix::{Actor, Handler, ResponseFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 
+#[derive(Default)]
 pub struct NotifyServers {}
 
 impl NotifyServers {
@@ -28,7 +29,6 @@ impl Handler<TaskCommand> for NotifyServers {
     fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("NotifyServers::TaskCommand");
         let comms = msg.comms();
-        let invocation_id = msg.id();
         let Some(sender) = comms.servers_recip.clone() else {
             todo!("cannot get here?")
         };

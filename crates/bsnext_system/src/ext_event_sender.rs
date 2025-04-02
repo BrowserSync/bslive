@@ -1,18 +1,18 @@
-use crate::task::{TaskCommand, TaskOk, TaskResult, TaskStatus};
+use crate::task::{TaskCommand, TaskResult};
 use actix::{Handler, ResponseFuture, Running};
+use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 
-pub struct AnyEventSender {
-    evt: Option<AnyEvent>,
-}
+#[derive(Default, Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+pub struct ExtEventSender;
 
-impl AnyEventSender {
-    pub fn new(evt: AnyEvent) -> Self {
-        Self { evt: Some(evt) }
+impl ExtEventSender {
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
-impl actix::Actor for AnyEventSender {
+impl actix::Actor for ExtEventSender {
     type Context = actix::Context<Self>;
 
     fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
@@ -28,12 +28,25 @@ impl actix::Actor for AnyEventSender {
     }
 }
 
-impl Handler<TaskCommand> for AnyEventSender {
+impl Handler<TaskCommand> for ExtEventSender {
     type Result = ResponseFuture<TaskResult>;
 
     fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
-        let evt = self.evt.take().expect("must have an event here");
         let comms = msg.comms();
+        let evt = match &msg {
+            TaskCommand::Changes { changes, .. } => {
+                let as_strings = changes
+                    .iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect::<Vec<String>>();
+
+                AnyEvent::External(ExternalEventsDTO::FilesChanged(
+                    bsnext_dto::FilesChangedDTO {
+                        paths: as_strings.clone(),
+                    },
+                ))
+            }
+        };
         let sender = comms.any_event_sender.clone();
         Box::pin(async move {
             match sender.send(evt).await {

@@ -1,7 +1,7 @@
+use crate::ext_event_sender::ExtEventSender;
 use crate::input_fs::from_input_path;
-use crate::runner::Runnable::BsLive;
 use crate::runner::{Runnable, Runner};
-use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup, TreePath};
+use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup};
 use crate::{BsSystem, OverrideInput};
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
@@ -95,7 +95,7 @@ impl Handler<Trigger> for BsSystem {
             cmd_recip
                 .send(cmd)
                 .into_actor(self)
-                .map(move |resp, actor, _| {
+                .map(move |_resp, actor, _| {
                     actor.tasks.remove(&cloned_id);
                 }),
         )
@@ -111,24 +111,7 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let mut tree_paths = vec![msg.fs_event_ctx.id()];
-        let mut runner = self.as_runner(&msg.fs_event_ctx);
-        runner.append(&mut tree_paths);
-
-        let as_strings = paths
-            .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect::<Vec<String>>();
-
-        // let evt = AnyEvent::External(ExternalEventsDTO::FilesChanged(
-        //     bsnext_dto::FilesChangedDTO {
-        //         paths: as_strings.clone(),
-        //     },
-        // ));
-        //
-        // runner.add();
-
-        // dbg!(&tree_paths);
+        let runner = self.as_runner(&msg.fs_event_ctx);
 
         let (Some(any_event_sender), Some(servers_addr)) =
             (&self.any_event_sender, &self.servers_addr)
@@ -226,6 +209,7 @@ impl BsSystem {
     }
 
     fn as_runner(&self, fs_event_ctx: &FsEventContext) -> Runner {
+        tracing::info!("as_runner {:?}", fs_event_ctx);
         let matching_monitor = self
             .any_monitors
             .iter()
@@ -233,7 +217,10 @@ impl BsSystem {
 
         if let Some((path_watchable, _any_monitor)) = matching_monitor {
             tracing::info!("path_watchable {:?}", path_watchable);
-            let default_task = Runner::seq(&vec![Runnable::BsLive(BsLiveRunner::NotifyServer)]);
+            let default_task = Runner::seq(&[
+                Runnable::BsLive(BsLiveRunner::NotifyServer),
+                Runnable::BsLive(BsLiveRunner::ExtEvent),
+            ]);
             let run = path_watchable
                 .runner()
                 .map(ToOwned::to_owned)
@@ -242,6 +229,6 @@ impl BsSystem {
             return run;
         }
 
-        Runner::seq(&vec![])
+        Runner::seq(&[])
     }
 }
