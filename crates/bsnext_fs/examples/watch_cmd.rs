@@ -41,13 +41,6 @@ struct Example {
 }
 
 impl Example {
-    pub fn new<A: AsRef<OsString>>(cmd: A) -> Self {
-        Self {
-            running: false,
-            run_count: 0,
-            cmd: Cmd(cmd.as_ref().to_os_string()),
-        }
-    }
     pub fn from_str<A: AsRef<str>>(cmd: A) -> anyhow::Result<Self> {
         Ok(Self {
             running: false,
