@@ -290,15 +290,57 @@ pub enum RunOpt {
 }
 
 #[derive(
+    Debug,
+    Default,
+    Ord,
+    PartialOrd,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    serde::Deserialize,
+    serde::Serialize,
+)]
+pub struct ShRunOptItem {
+    pub sh: String,
+    pub name: Option<String>,
+    pub prefix: Option<PrefixOpt>,
+}
+
+impl ShRunOptItem {
+    pub fn new(str: &str) -> Self {
+        ShRunOptItem {
+            sh: str.to_string(),
+            ..std::default::Default::default()
+        }
+    }
+}
+
+#[derive(
     Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
 #[serde(untagged)]
 pub enum RunOptItem {
     BsLive { bslive: BsLiveRunner },
-    Sh { sh: String },
+    Sh(ShRunOptItem),
     All { all: Vec<RunOptItem> },
     Seq { seq: Vec<RunOptItem> },
     ShImplicit(String),
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+#[serde(untagged)]
+pub enum PrefixOpt {
+    Bool(bool),
+    Named(String),
+}
+
+impl Default for PrefixOpt {
+    fn default() -> Self {
+        Self::Bool(true)
+    }
 }
 
 #[derive(

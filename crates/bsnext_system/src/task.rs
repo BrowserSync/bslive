@@ -34,8 +34,11 @@ impl TaskCommand {
 
 #[derive(Debug)]
 pub struct TaskResult {
+    #[allow(dead_code)]
     status: TaskStatus,
+    #[allow(dead_code)]
     invocation_id: u64,
+    #[allow(dead_code)]
     task_results: Vec<TaskResult>,
 }
 
@@ -169,6 +172,9 @@ impl TaskGroup {
     pub fn len(&self) -> usize {
         self.tasks.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.tasks.is_empty()
+    }
 }
 
 pub struct TaskGroupRunner {
@@ -240,7 +246,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                     while let Some(res) = set.join_next().await {
                         match res {
                             Ok((index, _result)) => done.push(index),
-                            Err(_) => {}
+                            Err(_) => tracing::error!("could not push index"),
                         }
                     }
                 }

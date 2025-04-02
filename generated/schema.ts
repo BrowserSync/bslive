@@ -166,6 +166,16 @@ export const serversChangedDTOSchema = z.object({
     servers_resp: getActiveServersResponseDTOSchema,
 });
 
+export const stderrLineDTOSchema = z.object({
+    line: z.string(),
+    prefix: z.string().optional(),
+});
+
+export const stdoutLineDTOSchema = z.object({
+    line: z.string(),
+    prefix: z.string().optional(),
+});
+
 export const stoppedWatchingDTOSchema = z.object({
     paths: z.array(z.string()),
 });
@@ -210,34 +220,14 @@ export const clientEventSchema = z.union([
 
 export const eventLevelSchema = z.nativeEnum(EventLevel);
 
-export const externalEventsDTOSchema = z.union([
+export const outputLineDTOSchema = z.union([
     z.object({
-        kind: z.literal("ServersChanged"),
-        payload: serversChangedDTOSchema,
+        kind: z.literal("Stdout"),
+        payload: stdoutLineDTOSchema,
     }),
     z.object({
-        kind: z.literal("Watching"),
-        payload: watchingDTOSchema,
-    }),
-    z.object({
-        kind: z.literal("WatchingStopped"),
-        payload: stoppedWatchingDTOSchema,
-    }),
-    z.object({
-        kind: z.literal("FileChanged"),
-        payload: fileChangedDTOSchema,
-    }),
-    z.object({
-        kind: z.literal("FilesChanged"),
-        payload: filesChangedDTOSchema,
-    }),
-    z.object({
-        kind: z.literal("InputFileChanged"),
-        payload: fileChangedDTOSchema,
-    }),
-    z.object({
-        kind: z.literal("InputAccepted"),
-        payload: inputAcceptedDTOSchema,
+        kind: z.literal("Stderr"),
+        payload: stderrLineDTOSchema,
     }),
 ]);
 
@@ -317,5 +307,40 @@ export const startupEventDTOSchema = z.union([
     z.object({
         kind: z.literal("FailedStartup"),
         payload: z.string(),
+    }),
+]);
+
+export const externalEventsDTOSchema = z.union([
+    z.object({
+        kind: z.literal("ServersChanged"),
+        payload: serversChangedDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("Watching"),
+        payload: watchingDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("WatchingStopped"),
+        payload: stoppedWatchingDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("FileChanged"),
+        payload: fileChangedDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("FilesChanged"),
+        payload: filesChangedDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("InputFileChanged"),
+        payload: fileChangedDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("InputAccepted"),
+        payload: inputAcceptedDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("OutputLine"),
+        payload: outputLineDTOSchema,
     }),
 ]);

@@ -1,6 +1,6 @@
 use crate::{
-    FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, ServerIdentityDTO, ServersChangedDTO,
-    StoppedWatchingDTO, WatchingDTO,
+    FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, OutputLineDTO, ServerIdentityDTO,
+    ServersChangedDTO, StderrLineDTO, StdoutLineDTO, StoppedWatchingDTO, WatchingDTO,
 };
 use bsnext_output::OutputWriterTrait;
 use std::io::Write;
@@ -18,6 +18,16 @@ pub enum ExternalEventsDTO {
     FilesChanged(FilesChangedDTO),
     InputFileChanged(FileChangedDTO),
     InputAccepted(InputAcceptedDTO),
+    OutputLine(OutputLineDTO),
+}
+
+impl ExternalEventsDTO {
+    pub fn stdout_line(line: String, prefix: Option<String>) -> Self {
+        Self::OutputLine(crate::OutputLineDTO::Stdout(StdoutLineDTO { line, prefix }))
+    }
+    pub fn stderr_line(line: String, prefix: Option<String>) -> Self {
+        Self::OutputLine(crate::OutputLineDTO::Stderr(StderrLineDTO { line, prefix }))
+    }
 }
 
 impl OutputWriterTrait for ExternalEventsDTO {
@@ -42,6 +52,12 @@ impl OutputWriterTrait for ExternalEventsDTO {
             }
             ExternalEventsDTO::InputFileChanged(file_changed) => {
                 print_input_file_changed(sink, file_changed)
+            }
+            ExternalEventsDTO::OutputLine(OutputLineDTO::Stdout(stdout)) => {
+                print_stdout_line(sink, stdout)
+            }
+            ExternalEventsDTO::OutputLine(OutputLineDTO::Stderr(stderr)) => {
+                print_stderr_line(sink, stderr)
             }
         }
     }
@@ -119,6 +135,22 @@ pub fn print_files_changed<W: Write>(w: &mut W, evt: &FilesChangedDTO) -> anyhow
 
 pub fn print_input_file_changed<W: Write>(w: &mut W, evt: &FileChangedDTO) -> anyhow::Result<()> {
     writeln!(w, "[change:input] {}", evt.path)?;
+    Ok(())
+}
+
+pub fn print_stdout_line<W: Write>(w: &mut W, line: &StdoutLineDTO) -> anyhow::Result<()> {
+    match &line.prefix {
+        None => writeln!(w, "{}", line.line)?,
+        Some(prefix) => writeln!(w, "\x1b[2m{}\x1b[0m {}", prefix, line.line)?,
+    }
+    Ok(())
+}
+
+pub fn print_stderr_line<W: Write>(w: &mut W, line: &StderrLineDTO) -> anyhow::Result<()> {
+    match &line.prefix {
+        None => writeln!(w, "{}", line.line)?,
+        Some(prefix) => writeln!(w, "\x1b[1;31m{}\x1b[0m {}", prefix, line.line)?,
+    }
     Ok(())
 }
 
