@@ -1,0 +1,9 @@
+servers:
+  - name: 'watch'
+    routes:
+      - path: /
+        dir: examples/watch/src
+        watch:
+          debounce:
+            ms: 0
+

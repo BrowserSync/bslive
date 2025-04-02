@@ -9,6 +9,7 @@ servers:
           debounce:
             ms: 300
           run:
+            - sh: echo 'will notify after 2 secs'
             - sh: sleep 2
             - bslive: notify-server
 #      - path: /

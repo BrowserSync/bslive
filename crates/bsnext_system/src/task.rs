@@ -1,24 +1,21 @@
-use crate::cmd::ShCmd;
-use crate::tasks::notify_servers::NotifyServers;
-use actix::{
-    Actor, ActorFutureExt, Addr, Handler, Recipient, ResponseActFuture, ResponseFuture, Running,
-    WrapFuture,
-};
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
-use bsnext_dto::external_events::ExternalEventsDTO;
+use crate::runner::{RunKind, Runnable, Runner};
+use actix::{Actor, ActorFutureExt, Handler, Recipient, ResponseActFuture, Running, WrapFuture};
+use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_fs::FsEventContext;
-use bsnext_input::route::{BsLiveRunner, Runner};
+use futures_util::future::FutureExt;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
+use tokio::task::JoinSet;
 
 #[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "()")]
+#[rtype(result = "TaskResult")]
 pub enum TaskCommand {
     Changes {
         changes: Vec<PathBuf>,
         fs_event_context: FsEventContext,
         task_comms: TaskComms,
+        invocation_id: u64,
     },
 }
 
@@ -28,68 +25,145 @@ impl TaskCommand {
             TaskCommand::Changes { task_comms, .. } => task_comms,
         }
     }
+    pub fn id(&self) -> u64 {
+        match self {
+            TaskCommand::Changes { invocation_id, .. } => *invocation_id,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TaskResult {
+    status: TaskStatus,
+    invocation_id: u64,
+    task_results: Vec<TaskResult>,
+}
+
+impl TaskResult {
+    pub fn ok(id: u64) -> Self {
+        Self {
+            status: TaskStatus::Ok(TaskOk),
+            invocation_id: id,
+            task_results: vec![],
+        }
+    }
+    pub fn ok_tasks(id: u64, tasks: Vec<TaskResult>) -> Self {
+        Self {
+            status: TaskStatus::Ok(TaskOk),
+            invocation_id: id,
+            task_results: tasks,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum TaskStatus {
+    Ok(TaskOk),
+    Err(TaskError),
+}
+
+#[derive(Debug)]
+pub struct TaskOk;
+
+#[derive(Debug, thiserror::Error)]
+pub enum TaskError {
+    #[error("lol")]
+    FailedMsg(String),
 }
 
 #[derive(Debug, Clone)]
 pub struct TaskComms {
     pub any_event_sender: Sender<AnyEvent>,
-    pub servers_addr: Addr<ServersSupervisor>,
+    pub servers_recip: Option<Recipient<FilesChanged>>,
 }
 
 impl TaskComms {
-    pub(crate) fn new(p0: Sender<AnyEvent>, p1: Addr<ServersSupervisor>) -> TaskComms {
+    pub(crate) fn new(p0: Sender<AnyEvent>, p1: Option<Recipient<FilesChanged>>) -> TaskComms {
         Self {
             any_event_sender: p0,
-            servers_addr: p1,
+            servers_recip: p1,
         }
     }
 }
 
 #[derive(Debug)]
 pub enum Task {
-    Runner(Runner),
-    AnyEvent,
+    Runnable(Runnable),
     Group(TaskGroup),
 }
 
-impl Task {
-    pub fn into_actor(self) -> Recipient<TaskCommand> {
-        match self {
-            Task::Runner(Runner::BsLive {
-                bslive: BsLiveRunner::NotifyServer,
-            }) => {
-                let s = NotifyServers::new();
-                let s = s.start();
-                s.recipient()
-            }
-            Task::AnyEvent => {
-                let a = AnyEventSender::new();
-                let a = a.start();
-                a.recipient()
-            }
+impl AsActor for Task {
+    fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
+        match *self {
             Task::Group(group) => {
                 let group_runner = TaskGroupRunner::new(group);
                 let s = group_runner.start();
                 s.recipient()
             }
-            Task::Runner(Runner::Sh { sh }) => {
-                let cmd = ShCmd::new(sh.into());
-                let s = cmd.start();
+            Task::Runnable(Runnable::Many(runner)) => {
+                let group = TaskGroup::from(runner);
+                let group_runner = TaskGroupRunner::new(group);
+                let s = group_runner.start();
                 s.recipient()
             }
-            Task::Runner(Runner::ShImplicit(_)) => todo!("Task::Runner::Runner::ShImplicit"),
+            Task::Runnable(other_runnable) => Box::new(other_runnable).into_actor2(),
         }
     }
 }
 
+impl Task {
+    pub fn into_actor(self) -> Recipient<TaskCommand> {
+        Box::new(self).into_actor2()
+    }
+}
+
+pub trait AsActor: std::fmt::Debug {
+    fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand>;
+}
+
 #[derive(Debug)]
 pub struct TaskGroup {
-    tasks: Vec<Task>,
+    run_kind: RunKind,
+    tasks: Vec<Box<dyn AsActor>>,
+}
+
+impl From<Runner> for TaskGroup {
+    fn from(runner: Runner) -> Self {
+        let boxed_tasks = runner
+            .tasks
+            .into_iter()
+            .map(|x| -> Box<dyn AsActor> {
+                match x {
+                    Runnable::Many(runner) => Box::new(Task::Group(TaskGroup::from(runner))),
+                    _ => Box::new(x),
+                }
+            })
+            .collect::<Vec<Box<dyn AsActor>>>();
+        match runner.kind {
+            RunKind::Sequence => Self::seq(boxed_tasks),
+            RunKind::Overlapping => Self::all(boxed_tasks),
+        }
+    }
+}
+
+impl From<&Runner> for TaskGroup {
+    fn from(value: &Runner) -> Self {
+        TaskGroup::from(value.clone())
+    }
 }
 
 impl TaskGroup {
-    pub fn new(tasks: Vec<Task>) -> Self {
-        Self { tasks }
+    pub fn seq(tasks: Vec<Box<dyn AsActor>>) -> Self {
+        Self {
+            run_kind: RunKind::Sequence,
+            tasks,
+        }
+    }
+    pub fn all(tasks: Vec<Box<dyn AsActor>>) -> Self {
+        Self {
+            run_kind: RunKind::Overlapping,
+            tasks,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -103,10 +177,10 @@ pub struct TaskGroupRunner {
 }
 
 impl TaskGroupRunner {
-    fn new(task_group: TaskGroup) -> Self {
+    pub fn new(p0: TaskGroup) -> Self {
         Self {
+            task_group: Some(p0),
             done: false,
-            task_group: Some(task_group),
         }
     }
 }
@@ -115,20 +189,20 @@ impl actix::Actor for TaskGroupRunner {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(actor.lifecycle = "started", "TaskGroupRunner")
+        tracing::info!(actor.lifecycle = "started", "TaskGroupRunner2")
     }
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(" x stopped TaskGroupRunner")
+        tracing::info!(" x stopped TaskGroupRunner2")
     }
 
     fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        tracing::info!(" ⏰ stopping TaskGroupRunner {}", self.done);
+        tracing::info!(" ⏰ stopping TaskGroupRunner2 {}", self.done);
         Running::Stop
     }
 }
 
 impl Handler<TaskCommand> for TaskGroupRunner {
-    type Result = ResponseActFuture<Self, ()>;
+    type Result = ResponseActFuture<Self, TaskResult>;
 
     fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!(done = self.done, "TaskGroupRunner::TaskCommand");
@@ -136,67 +210,51 @@ impl Handler<TaskCommand> for TaskGroupRunner {
             todo!("how to handle a concurrent request here?");
         };
         tracing::debug!("  └── {} tasks in group", group.len());
+        tracing::debug!("  └── {:?} group run_kind", group.run_kind);
+
         let future = async move {
-            for x in group.tasks {
-                let a = x.into_actor();
-                match a.send(msg.clone()).await {
-                    Ok(_) => tracing::trace!("did send"),
-                    Err(e) => tracing::error!("{e}"),
+            let actors = group
+                .tasks
+                .into_iter()
+                .map(|x| x.into_actor2())
+                .collect::<Vec<_>>();
+            let mut done = vec![];
+            match group.run_kind {
+                RunKind::Sequence => {
+                    for (index, x) in actors.iter().enumerate() {
+                        match x.send(msg.clone()).await {
+                            Ok(_) => {
+                                tracing::trace!("did send");
+                                done.push(index)
+                            }
+                            Err(e) => tracing::error!("{e}"),
+                        }
+                    }
                 }
-            }
+                RunKind::Overlapping => {
+                    let futs = actors
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, a)| a.send(msg.clone()).map(move |r| (index, r)));
+                    let mut set = JoinSet::from_iter(futs);
+                    while let Some(res) = set.join_next().await {
+                        match res {
+                            Ok((index, _result)) => done.push(index),
+                            Err(_) => {}
+                        }
+                    }
+                }
+            };
+            done
         };
         // let self_addr = ctx.address();
-        Box::pin(future.into_actor(self).map(|_res, actor, _ctx| {
+        Box::pin(future.into_actor(self).map(|res, actor, _ctx| {
             actor.done = true;
+            let child_results = res
+                .into_iter()
+                .map(|index| TaskResult::ok(index as u64))
+                .collect::<Vec<_>>();
+            TaskResult::ok_tasks(0, child_results)
         }))
-    }
-}
-
-struct AnyEventSender {}
-
-impl AnyEventSender {
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-impl actix::Actor for AnyEventSender {
-    type Context = actix::Context<Self>;
-
-    fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        tracing::trace!(" ⏰ stopping AnyEventSender");
-        Running::Stop
-    }
-
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!(" x stopped AnyEventSender");
-    }
-}
-impl Handler<TaskCommand> for AnyEventSender {
-    type Result = ResponseFuture<()>;
-
-    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
-        let evt = match &msg {
-            TaskCommand::Changes { changes, .. } => {
-                let as_strings = changes
-                    .iter()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .collect::<Vec<String>>();
-
-                AnyEvent::External(ExternalEventsDTO::FilesChanged(
-                    bsnext_dto::FilesChangedDTO {
-                        paths: as_strings.clone(),
-                    },
-                ))
-            }
-        };
-        let comms = msg.comms();
-        let sender = comms.any_event_sender.clone();
-        Box::pin(async move {
-            match sender.send(evt).await {
-                Ok(_) => tracing::trace!("sent"),
-                Err(e) => tracing::error!("{e}"),
-            }
-        })
     }
 }

@@ -277,16 +277,27 @@ pub struct SpecOpts {
     pub debounce: Option<DebounceDuration>,
     pub filter: Option<FilterKind>,
     pub ignore: Option<FilterKind>,
-    pub run: Option<Vec<Runner>>,
+    pub run: Option<RunOpt>,
 }
 
 #[derive(
     Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
 #[serde(untagged)]
-pub enum Runner {
+pub enum RunOpt {
+    All { all: Vec<RunOptItem> },
+    Seq(Vec<RunOptItem>),
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+#[serde(untagged)]
+pub enum RunOptItem {
     BsLive { bslive: BsLiveRunner },
     Sh { sh: String },
+    All { all: Vec<RunOptItem> },
+    Seq { seq: Vec<RunOptItem> },
     ShImplicit(String),
 }
 
@@ -296,6 +307,8 @@ pub enum Runner {
 pub enum BsLiveRunner {
     #[serde(rename = "notify-server")]
     NotifyServer,
+    #[serde(rename = "ext-event")]
+    ExtEvent,
 }
 
 #[derive(

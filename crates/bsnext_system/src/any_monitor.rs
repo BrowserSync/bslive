@@ -2,6 +2,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::path_monitor::PathMonitor;
 use crate::route_watchable::RouteWatchable;
+use crate::runner::Runner;
 use crate::server_watchable::ServerWatchable;
 use actix::Addr;
 use bsnext_fs::actor::FsWatcher;
@@ -51,5 +52,12 @@ impl PathWatchable {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
         hasher.finish()
+    }
+
+    pub fn runner(&self) -> Option<&Runner> {
+        match self {
+            PathWatchable::Server(server) => server.runner.as_ref(),
+            PathWatchable::Route(route) => route.runner.as_ref(),
+        }
     }
 }

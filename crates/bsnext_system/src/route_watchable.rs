@@ -1,3 +1,5 @@
+use crate::runner::Runner;
+use crate::server_watchable::to_runner;
 use bsnext_input::route::{DirRoute, FilterKind, RouteKind, Spec, SpecOpts};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::watch_opts::WatchOpts;
@@ -10,6 +12,7 @@ pub struct RouteWatchable {
     pub route_path: String,
     pub dir: PathBuf,
     pub spec: Spec,
+    pub runner: Option<Runner>,
 }
 
 pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
@@ -26,11 +29,13 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                     RouteKind::Proxy(_) => None,
                     RouteKind::Dir(DirRoute { dir, .. }) => {
                         let spec = to_spec(&r.opts.watch);
+                        let run = to_runner(&spec);
                         Some(RouteWatchable {
                             server_identity: server_config.identity.clone(),
                             route_path: r.path.as_str().to_owned(),
                             dir: PathBuf::from(dir),
                             spec,
+                            runner: run,
                         })
                     }
                 })
@@ -38,7 +43,7 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
         .collect()
 }
 
-fn to_spec(wo: &WatchOpts) -> Spec {
+pub fn to_spec(wo: &WatchOpts) -> Spec {
     match wo {
         WatchOpts::Bool(enabled) if !*enabled => unreachable!("should be handled..."),
         WatchOpts::Bool(enabled) if *enabled => Spec { opts: None },

@@ -1,5 +1,6 @@
 use crate::input_fs::from_input_path;
-use crate::task::{Task, TaskCommand, TaskComms, TaskGroup};
+use crate::runner::{Runnable, Runner};
+use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup};
 use crate::{BsSystem, OverrideInput};
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
@@ -10,7 +11,7 @@ use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathEvent,
 };
-use bsnext_input::route::{BsLiveRunner, Runner};
+use bsnext_input::route::BsLiveRunner;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 
 impl actix::Handler<FsEvent> for BsSystem {
@@ -77,23 +78,23 @@ impl Handler<Trigger> for BsSystem {
 
     fn handle(&mut self, msg: Trigger, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
-        let ctx = msg.fs_ctx();
-        let entry = self.tasks.get(&ctx);
-        let cloned_id = ctx.clone();
+        let fs_ctx = msg.fs_ctx();
+        let entry = self.tasks.get(fs_ctx);
+        let cloned_id = fs_ctx.clone();
 
         if let Some(entry) = entry {
             tracing::info!("ignoring concurrent task triggering: prev: {}", entry);
             return Box::pin(async {}.into_actor(self));
         }
 
-        self.tasks.insert(ctx.clone(), 0);
-        let cmd_recip = msg.task.into_actor();
+        self.tasks.insert(fs_ctx.clone(), 0);
+        let cmd_recip = Box::new(msg.task).into_actor2();
 
         Box::pin(
             cmd_recip
                 .send(cmd)
                 .into_actor(self)
-                .map(move |_, actor, _| {
+                .map(move |_resp, actor, _| {
                     actor.tasks.remove(&cloned_id);
                 }),
         )
@@ -109,8 +110,7 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let mut tasks = self.as_task(&msg.fs_event_ctx);
-        tasks.push(Task::AnyEvent);
+        let runner = self.as_runner(&msg.fs_event_ctx);
 
         let (Some(any_event_sender), Some(servers_addr)) =
             (&self.any_event_sender, &self.servers_addr)
@@ -121,10 +121,16 @@ impl BsSystem {
         let cmd = TaskCommand::Changes {
             changes: paths,
             fs_event_context: msg.fs_event_ctx.clone(),
-            task_comms: TaskComms::new(any_event_sender.clone(), servers_addr.clone()),
+            task_comms: TaskComms::new(
+                any_event_sender.clone(),
+                Some(servers_addr.clone().recipient()),
+            ),
+            invocation_id: 0,
         };
 
-        (Task::Group(TaskGroup::new(tasks)), cmd)
+        let task_group = TaskGroup::from(runner);
+
+        (Task::Group(task_group), cmd)
     }
 
     fn handle_any_change(
@@ -201,28 +207,27 @@ impl BsSystem {
         Some(AnyEvent::Internal(InternalEvents::InputError(e)))
     }
 
-    fn as_task(&self, fs_event_ctx: &FsEventContext) -> Vec<Task> {
+    fn as_runner(&self, fs_event_ctx: &FsEventContext) -> Runner {
+        tracing::info!("as_runner {:?}", fs_event_ctx);
         let matching_monitor = self
             .any_monitors
             .iter()
             .find(|(_, any_monitor)| any_monitor.watchable_hash() == fs_event_ctx.origin_id);
 
-        if let Some((a, _any_monitor)) = matching_monitor {
-            tracing::info!("path_watchable {:?}", a);
+        if let Some((path_watchable, _any_monitor)) = matching_monitor {
+            tracing::info!("path_watchable {:?}", path_watchable);
+            let default_task = Runner::seq(&[
+                Runnable::BsLive(BsLiveRunner::NotifyServer),
+                Runnable::BsLive(BsLiveRunner::ExtEvent),
+            ]);
+            let run = path_watchable
+                .runner()
+                .map(ToOwned::to_owned)
+                .unwrap_or(default_task);
 
-            let default = vec![Runner::BsLive {
-                bslive: BsLiveRunner::NotifyServer,
-            }];
-
-            let run = match a.spec_opts() {
-                None => default,
-                Some(opts) => opts.run.clone().unwrap_or(default),
-            };
-
-            tracing::info!("Use path_watchable here {:?}", run);
-            return run.into_iter().map(Task::Runner).collect();
+            return run;
         }
 
-        vec![]
+        Runner::seq(&[])
     }
 }

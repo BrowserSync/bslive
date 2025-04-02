@@ -3,7 +3,7 @@
   "version": "0.14.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"no test specified yet\""
+    "test": "echo \"no test specified yet\".."
   },
   "keywords": [],
   "author": "",

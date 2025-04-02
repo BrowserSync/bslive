@@ -1,0 +1,13 @@
+servers:
+  - name: 'watch-runner'
+    routes:
+      - path: /
+        dir: examples/watch/src
+        watch:
+          debounce:
+            ms: 0
+          run:
+            # proving that an overriden 'run' stops the second event
+            - bslive: notify-server
+#            - bslive: ext-event
+

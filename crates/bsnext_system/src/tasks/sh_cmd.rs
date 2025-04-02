@@ -1,10 +1,12 @@
-use crate::task::TaskCommand;
+use crate::task::{TaskCommand, TaskResult};
 use actix::ResponseFuture;
 use std::ffi::OsString;
+use std::hash::Hash;
 use std::ops::Deref;
 use std::time::Duration;
 use tokio::process::Command;
 
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct ShCmd {
     sh: Cmd,
 }
@@ -13,14 +15,9 @@ impl ShCmd {
     pub fn new(cmd: OsString) -> Self {
         Self { sh: Cmd(cmd) }
     }
-    pub fn from_str<A: AsRef<str>>(cmd: A) -> anyhow::Result<Self> {
-        Ok(Self {
-            sh: Cmd(OsString::try_from(cmd.as_ref())?),
-        })
-    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 struct Cmd(pub OsString);
 
 impl Deref for Cmd {
@@ -36,9 +33,9 @@ impl actix::Actor for ShCmd {
 }
 
 impl actix::Handler<TaskCommand> for ShCmd {
-    type Result = ResponseFuture<()>;
+    type Result = ResponseFuture<TaskResult>;
 
-    fn handle(&mut self, msg: TaskCommand, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = self.sh.clone();
         let cmd = cmd.to_os_string();
         tracing::debug!("ShCmd: Will run... {:?}", cmd);
@@ -82,6 +79,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 tracing::trace!("child tree killed");
             }
             tracing::debug!("✅ Run complete");
+            TaskResult::ok(0)
         };
         Box::pin(fut)
     }
