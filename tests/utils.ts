@@ -8,6 +8,7 @@ import {
     internalEventsDTOSchema,
 } from "../generated/schema.mjs";
 import { existsSync } from "node:fs";
+import { clearInterval } from "node:timers";
 
 const either = z.union([internalEventsDTOSchema, externalEventsSchema]);
 
@@ -59,6 +60,8 @@ export const test = base.extend<{
         named: (name: string, path: string) => string;
         stdout: string[];
         touch: (path: string) => void;
+        messages: z.infer<typeof either>[];
+        didOutput: (kind: z.infer<typeof either>["kind"]) => Promise<boolean>;
         api: (kind: "events") => string;
         // next: (args: NextArgs) => Promise<string[]>;
     };
@@ -84,29 +87,28 @@ export const test = base.extend<{
         });
 
         const lines: string[] = [];
-        const servers_changed_msg: Promise<TServersResp> = new Promise(
-            (res, rej) => {
-                const handler = (chunk: Buffer) => {
-                    for (let line of chunk.toString().split("\n")) {
-                        if (line.trim() === "") continue;
-                        lines.push(line);
-                        console.log("--", line);
-                        const json = JSON.parse(line);
-                        const parsed = either.safeParse(json);
-                        if (parsed.error) {
-                            // console.log(parsed.error.message)
-                            // rej(parsed.error)
-                        } else {
-                            if (parsed.data.kind === "ServersChanged") {
-                                res(parsed.data.payload as TServersResp);
-                                child.stdout?.off("data", handler);
-                            }
-                        }
+        const parsedMessages: z.infer<typeof either>[] = [];
+        const failedMessages: string[] = [];
+        const handler = (chunk: Buffer) => {
+            for (let line of chunk.toString().split("\n")) {
+                if (line.trim() === "") continue;
+                lines.push(line);
+                console.log("-->", line);
+                try {
+                    const json = JSON.parse(line);
+                    const parsed = either.safeParse(json);
+                    if (parsed.error) {
+                        failedMessages.push(line);
+                    } else {
+                        parsedMessages.push(parsed.data);
                     }
-                };
-                child.stdout?.on("data", handler);
-            },
-        );
+                } catch (e) {
+                    // something went REALLY wrong?
+                    console.error("JSON not accepted");
+                }
+            }
+        };
+        child.stdout?.on("data", handler);
         child.stderr?.on("data", (d) => console.error(d.toString()));
         const closed = new Promise((res, rej) => {
             child.on("disconnect", (...args) => {
@@ -130,17 +132,43 @@ export const test = base.extend<{
                 console.error("did error", err);
             });
         });
-        const data = await servers_changed_msg;
+        const data: TServersResp = await new Promise((resolve, reject) => {
+            let int = setInterval(() => {
+                for (let line of parsedMessages) {
+                    if (line.kind === "ServersChanged") {
+                        resolve(line.payload as TServersResp);
+                        clearInterval(int);
+                        break;
+                    }
+                }
+            }, 100);
+        });
         const servers = data.servers.map((s) => {
             return { url: "http://" + s.socket_addr, identity: s.identity };
         });
-
         await use({
             url: "msg.urls.local",
             cwd: "msg.cwd",
             child,
             data,
             servers,
+            messages: parsedMessages,
+            didOutput: (kind: z.infer<typeof either>["kind"]) => {
+                return new Promise((resolve, reject) => {
+                    let start = Date.now();
+                    let max = 5000;
+                    let int = setInterval(() => {
+                        if (Date.now() - start > max) {
+                            reject(new Error(`timed out waiting for ${kind}`));
+                            clearInterval(int);
+                        }
+                        if (parsedMessages.find((x) => x.kind === kind)) {
+                            resolve(true);
+                            clearInterval(int);
+                        }
+                    }, 50);
+                });
+            },
             path(path: string) {
                 const url = new URL(path, servers[0].url);
                 return url.toString();

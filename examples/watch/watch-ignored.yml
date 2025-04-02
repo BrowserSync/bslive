@@ -1,0 +1,10 @@
+servers:
+  - name: 'watch-ignored'
+    routes:
+      - path: /
+        dir: examples/watch/src
+        watch:
+          ignore: index.html
+          debounce:
+            ms: 0
+

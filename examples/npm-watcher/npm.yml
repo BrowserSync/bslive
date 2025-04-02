@@ -6,7 +6,6 @@ servers:
           - examples/watcher/package.json
         run:
           - sh: echo '--> changed' $BSLIVE_FILES
-          - sh: cd examples/watcher && npm install
           - sh: echo 'after'
     routes:
       - path: /

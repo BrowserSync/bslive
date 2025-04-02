@@ -1,4 +1,3 @@
-use crate::ext_event_sender::ExtEventSender;
 use crate::input_fs::from_input_path;
 use crate::runner::{Runnable, Runner};
 use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup};
