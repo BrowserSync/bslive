@@ -39,7 +39,7 @@ var fileChangedDTOSchema = z.object({
 var filesChangedDTOSchema = z.object({
   paths: z.array(z.string())
 });
-var serverIdentityDTOSchema = z.union([
+var serverIdentityDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Both"),
     payload: z.object({
@@ -88,7 +88,7 @@ var injectConfigSchema = z.object({
 var inputAcceptedDTOSchema = z.object({
   path: z.string()
 });
-var routeKindDTOSchema = z.union([
+var routeKindDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Html"),
     payload: z.object({
@@ -131,7 +131,7 @@ var routeDTOSchema = z.object({
   path: z.string(),
   kind: routeKindDTOSchema
 });
-var serverChangeSchema = z.union([
+var serverChangeSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Stopped"),
     payload: z.object({
@@ -184,7 +184,7 @@ var watchingDTOSchema = z.object({
 });
 var changeKindSchema = z.nativeEnum(ChangeKind);
 var changeDTOSchema = z.lazy(
-  () => z.union([
+  () => z.discriminatedUnion("kind", [
     z.object({
       kind: z.literal("Fs"),
       payload: z.object({
@@ -198,7 +198,7 @@ var changeDTOSchema = z.lazy(
     })
   ])
 );
-var clientEventSchema = z.union([
+var clientEventSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Change"),
     payload: changeDTOSchema
@@ -213,7 +213,7 @@ var clientEventSchema = z.union([
   })
 ]);
 var eventLevelSchema = z.nativeEnum(EventLevel);
-var outputLineDTOSchema = z.union([
+var outputLineDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Stdout"),
     payload: stdoutLineDTOSchema
@@ -223,7 +223,7 @@ var outputLineDTOSchema = z.union([
     payload: stderrLineDTOSchema
   })
 ]);
-var inputErrorDTOSchema = z.union([
+var inputErrorDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("MissingInputs"),
     payload: z.string()
@@ -289,7 +289,7 @@ var internalEventsDTOSchema = z.object({
   kind: z.literal("ServersChanged"),
   payload: getActiveServersResponseDTOSchema
 });
-var startupEventDTOSchema = z.union([
+var startupEventDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Started"),
     payload: z.undefined().optional()
@@ -299,7 +299,7 @@ var startupEventDTOSchema = z.union([
     payload: z.string()
   })
 ]);
-var externalEventsDTOSchema = z.union([
+var externalEventsDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("ServersChanged"),
     payload: serversChangedDTOSchema

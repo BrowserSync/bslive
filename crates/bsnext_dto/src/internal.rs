@@ -26,6 +26,7 @@ pub enum StartupEvent {
     FailedStartup(StartupError),
 }
 
+/// @discriminator kind
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
