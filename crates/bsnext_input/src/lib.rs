@@ -119,7 +119,6 @@ impl InputCtx {
         startup: &StartupContext,
         file_path: Option<&PathBuf>,
     ) -> Self {
-        println!("file_path {:?}", file_path);
         let prev = if servers.is_empty() {
             None
         } else {
