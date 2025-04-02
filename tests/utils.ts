@@ -124,7 +124,7 @@ export const test = base.extend<{
                     }
                 } catch (e) {
                     // something went REALLY wrong?
-                    console.error("JSON not accepted");
+                    console.error("JSON not accepted", json);
                 }
             }
         };

@@ -17,13 +17,14 @@ use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
     fn handle(&mut self, msg: FsEvent, ctx: &mut Self::Context) -> Self::Result {
-        let next = match &msg.kind {
+        let next = match msg.kind {
             FsEventKind::ChangeBuffered(buffer_change) => {
-                let (task, cmd) = self.handle_buffered(&msg, buffer_change);
-                ctx.notify(Trigger::new(task, cmd));
+                if let Some((task, cmd)) = self.handle_buffered(&msg.fs_event_ctx, buffer_change) {
+                    ctx.notify(Trigger::new(task, cmd));
+                }
                 None
             }
-            FsEventKind::Change(inner) => match self.handle_any_change(&msg, inner) {
+            FsEventKind::Change(inner) => match self.handle_any_change(&msg.fs_event_ctx, &inner) {
                 // if the change included a new Input, use it
                 (any_event, Some(input)) => {
                     tracing::info!("will override input");
@@ -37,9 +38,9 @@ impl actix::Handler<FsEvent> for BsSystem {
                 // otherwise just publish the change as usual
                 (evt, None) => Some(evt),
             },
-            FsEventKind::PathAdded(path) => self.handle_path_added(path),
-            FsEventKind::PathRemoved(path) => self.handle_path_removed(path),
-            FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),
+            FsEventKind::PathAdded(path) => self.handle_path_added(&path),
+            FsEventKind::PathRemoved(path) => self.handle_path_removed(&path),
+            FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(&pdo),
         };
         if let Some(any_event) = next {
             tracing::debug!("will publish any_event {:?}", any_event);
@@ -102,15 +103,38 @@ impl Handler<Trigger> for BsSystem {
 }
 
 impl BsSystem {
-    fn handle_buffered(&mut self, msg: &FsEvent, buf: &BufferedChangeEvent) -> (Task, TaskCommand) {
-        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?msg.fs_event_ctx, ?buf, "handle_buffered");
-        let paths = buf
+    fn handle_buffered(
+        &mut self,
+        fs_event_ctx: &FsEventContext,
+        buf: BufferedChangeEvent,
+    ) -> Option<(Task, TaskCommand)> {
+        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?fs_event_ctx, ?buf, "handle_buffered");
+
+        let change = if let Some(mon) = &self.input_monitors {
+            if let Some(fp) = mon.input_ctx.file_path() {
+                tracing::debug!("Dropping input crossover");
+                buf.dropping_absolute(fp)
+            } else {
+                buf
+            }
+        } else {
+            buf
+        };
+
+        if change.events.is_empty() {
+            tracing::debug!(
+                "Ignoring handle_buffered events because it was empty after removing input monitor"
+            );
+            return None;
+        }
+
+        let paths = change
             .events
             .iter()
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let runner = self.as_runner(&msg.fs_event_ctx);
+        let runner = self.as_runner(&fs_event_ctx);
 
         let (Some(any_event_sender), Some(servers_addr)) =
             (&self.any_event_sender, &self.servers_addr)
@@ -120,7 +144,7 @@ impl BsSystem {
 
         let cmd = TaskCommand::Changes {
             changes: paths,
-            fs_event_context: msg.fs_event_ctx.clone(),
+            fs_event_context: fs_event_ctx.clone(),
             task_comms: TaskComms::new(
                 any_event_sender.clone(),
                 Some(servers_addr.clone().recipient()),
@@ -130,22 +154,22 @@ impl BsSystem {
 
         let task_group = TaskGroup::from(runner);
 
-        (Task::Group(task_group), cmd)
+        Some((Task::Group(task_group), cmd))
     }
 
     fn handle_any_change(
         &mut self,
-        msg: &FsEvent,
+        fs_event_ctx: &FsEventContext,
         inner: &ChangeEvent,
     ) -> (AnyEvent, Option<Input>) {
-        match msg.fs_event_ctx.id() {
+        match fs_event_ctx.id() {
             0 => self.handle_input_change(inner),
             _ => {
                 tracing::trace!(?inner, "Other file changed");
                 if let Some(servers) = &self.servers_addr {
                     servers.do_send(FileChanged {
                         path: inner.absolute_path.clone(),
-                        ctx: msg.fs_event_ctx.clone(),
+                        ctx: fs_event_ctx.clone(),
                     })
                 }
                 (

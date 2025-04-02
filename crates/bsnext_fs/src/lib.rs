@@ -10,6 +10,7 @@ mod test;
 pub mod watch_path_handler;
 mod watcher;
 
+use notify::event::RenameMode::To;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 // use tokio_stream::StreamExt;
@@ -134,6 +135,25 @@ impl<'a> From<&'a PathDescription<'_>> for PathDescriptionOwned {
 #[rtype(result = "()")]
 pub struct BufferedChangeEvent {
     pub events: Vec<PathDescriptionOwned>,
+}
+
+impl BufferedChangeEvent {
+    pub fn dropping_absolute(self, path: &Path) -> Self {
+        if self.events.iter().any(|x| x.absolute == path) {
+            Self {
+                events: self
+                    .events
+                    .iter()
+                    .filter(|x| x.absolute != path)
+                    .map(ToOwned::to_owned)
+                    .collect(),
+            }
+        } else {
+            Self {
+                events: self.events,
+            }
+        }
+    }
 }
 
 #[derive(actix::Message, Debug, Clone)]

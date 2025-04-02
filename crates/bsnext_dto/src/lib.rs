@@ -48,6 +48,7 @@ impl From<&Route> for RouteDTO {
     }
 }
 
+/// @discriminator kind
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
@@ -93,6 +94,7 @@ pub enum EventLevel {
     External,
 }
 
+/// @discriminator kind
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
@@ -126,6 +128,7 @@ pub struct InputAcceptedDTO {
     pub path: String,
 }
 
+/// @discriminator kind
 #[typeshare]
 #[derive(Debug, serde::Serialize, Clone)]
 #[serde(tag = "kind", content = "payload")]
@@ -240,6 +243,7 @@ impl WatchingDTO {
     }
 }
 
+/// @discriminator kind
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
@@ -334,6 +338,7 @@ pub enum StartupError {
     Other(String),
 }
 
+/// @discriminator kind
 #[typeshare::typeshare]
 #[derive(Debug, PartialEq, Hash, Eq, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
@@ -367,6 +372,7 @@ impl From<&ServerIdentity> for ServerIdentityDTO {
     }
 }
 
+/// @discriminator kind
 #[typeshare::typeshare]
 #[derive(Debug, PartialEq, Hash, Eq, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
@@ -418,6 +424,7 @@ impl From<InputError> for InputErrorDTO {
     }
 }
 
+/// @discriminator kind
 #[typeshare::typeshare]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind", content = "payload")]
@@ -470,6 +477,8 @@ impl From<LogLevel> for LogLevelDTO {
     }
 }
 
+/// An event describing a change
+/// @discriminator kind
 #[typeshare::typeshare]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind", content = "payload")]

@@ -2,6 +2,10 @@ servers:
   - port: 3000
     clients:
       log: trace
+      watchers:
+        - dir: crates
+          run:
+            - sh: cargo build
     routes:
       - path: /
         dir: examples/basic/public
@@ -9,13 +13,4 @@ servers:
           debounce:
             ms: 300
           run:
-            - sh: echo 'will notify after 2 secs'
-            - sh: sleep 2
-            - bslive: notify-server
-#      - path: /
-##        cors: true
-##        dir: examples/kitchen-sink
-##      - path: /
-##        proxy: https://shaneddg.ngrok.io
-##      - path: /raw
-##        raw: '1234'
+            - sh: 'npm ls --color=always'

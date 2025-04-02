@@ -31,6 +31,7 @@ export interface FilesChangedDTO {
 	paths: string[];
 }
 
+/** @discriminator kind */
 export type ServerIdentityDTO = 
 	| { kind: "Both", payload: {
 	name: string;
@@ -69,6 +70,7 @@ export interface InputAcceptedDTO {
 	path: string;
 }
 
+/** @discriminator kind */
 export type RouteKindDTO = 
 	| { kind: "Html", payload: {
 	html: string;
@@ -95,6 +97,7 @@ export interface RouteDTO {
 	kind: RouteKindDTO;
 }
 
+/** @discriminator kind */
 export type ServerChange = 
 	| { kind: "Stopped", payload: {
 	bind_address: string;
@@ -142,6 +145,10 @@ export interface WatchingDTO {
 	debounce: DebounceDTO;
 }
 
+/**
+ * An event describing a change
+ * @discriminator kind
+ */
 export type ChangeDTO = 
 	| { kind: "Fs", payload: {
 	path: string;
@@ -155,6 +162,7 @@ export enum ChangeKind {
 	Removed = "Removed",
 }
 
+/** @discriminator kind */
 export type ClientEvent = 
 	| { kind: "Change", payload: ChangeDTO }
 	| { kind: "WsConnection", payload: ClientConfigDTO }
@@ -164,6 +172,7 @@ export enum EventLevel {
 	External = "BSLIVE_EXTERNAL",
 }
 
+/** @discriminator kind */
 export type ExternalEventsDTO = 
 	| { kind: "ServersChanged", payload: ServersChangedDTO }
 	| { kind: "Watching", payload: WatchingDTO }
@@ -174,6 +183,7 @@ export type ExternalEventsDTO =
 	| { kind: "InputAccepted", payload: InputAcceptedDTO }
 	| { kind: "OutputLine", payload: OutputLineDTO };
 
+/** @discriminator kind */
 export type InputErrorDTO = 
 	| { kind: "MissingInputs", payload: string }
 	| { kind: "InvalidInput", payload: string }
@@ -191,13 +201,16 @@ export type InputErrorDTO =
 	| { kind: "EmptyInput", payload: string }
 	| { kind: "BsLiveRules", payload: string };
 
+/** @discriminator kind */
 export type InternalEventsDTO = 
 	| { kind: "ServersChanged", payload: GetActiveServersResponseDTO };
 
+/** @discriminator kind */
 export type OutputLineDTO = 
 	| { kind: "Stdout", payload: StdoutLineDTO }
 	| { kind: "Stderr", payload: StderrLineDTO };
 
+/** @discriminator kind */
 export type StartupEventDTO = 
 	| { kind: "Started", payload?: undefined }
 	| { kind: "FailedStartup", payload: string };

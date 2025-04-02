@@ -7,6 +7,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use typeshare::typeshare;
 
+/// @discriminator kind
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]

@@ -83,14 +83,13 @@ fn test_html_playground_with_port() -> anyhow::Result<()> {
 }
 
 const INPUT_WITH_META: &str = r#"
-<meta name="bslive serve-dir" content="--path=/ --dir=examples/basic/public" />
 <main>
     <h1>Test!</h1>
     <abc-shane></abc-shane>
 </main>"#;
 
 #[test]
-fn test_html_playground_with_meta() -> anyhow::Result<()> {
+fn test_html_playground_with_serve() -> anyhow::Result<()> {
     let ident = ServerIdentity::Address {
         bind_address: String::from("0.0.0.0:8080"),
     };
