@@ -10,7 +10,6 @@ mod test;
 pub mod watch_path_handler;
 mod watcher;
 
-use notify::event::RenameMode::To;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 // use tokio_stream::StreamExt;

@@ -134,7 +134,7 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let runner = self.as_runner(&fs_event_ctx);
+        let runner = self.as_runner(fs_event_ctx);
 
         let (Some(any_event_sender), Some(servers_addr)) =
             (&self.any_event_sender, &self.servers_addr)

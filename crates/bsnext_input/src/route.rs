@@ -254,15 +254,8 @@ pub enum FilterKind {
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
-)]
-pub struct Spec {
-    #[serde(flatten)]
-    pub opts: Option<SpecOpts>,
-}
-
-#[derive(
     Debug,
+    Default,
     Ord,
     PartialOrd,
     PartialEq,
@@ -271,9 +264,8 @@ pub struct Spec {
     Clone,
     serde::Deserialize,
     serde::Serialize,
-    Default,
 )]
-pub struct SpecOpts {
+pub struct Spec {
     pub debounce: Option<DebounceDuration>,
     pub filter: Option<FilterKind>,
     pub ignore: Option<FilterKind>,
@@ -359,5 +351,5 @@ pub enum BsLiveRunner {
 pub struct Watcher {
     pub dir: String,
     #[serde(flatten)]
-    pub opts: Option<SpecOpts>,
+    pub opts: Option<Spec>,
 }

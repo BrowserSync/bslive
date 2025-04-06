@@ -12,6 +12,9 @@ pub struct StartupContext {
 }
 
 impl StartupContext {
+    pub fn new(cwd: impl Into<PathBuf>) -> Self {
+        Self { cwd: cwd.into() }
+    }
     pub fn from_cwd(cwd: Option<&PathBuf>) -> Self {
         StartupContext {
             cwd: cwd.map(ToOwned::to_owned).unwrap_or_else(|| {

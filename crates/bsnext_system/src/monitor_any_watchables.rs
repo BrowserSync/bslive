@@ -7,7 +7,7 @@ use bsnext_fs::filter::Filter;
 use bsnext_fs::stop_handler::StopWatcher;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{Debounce, FsEventContext};
-use bsnext_input::route::{DebounceDuration, FilterKind, SpecOpts};
+use bsnext_input::route::{DebounceDuration, FilterKind, Spec};
 use std::collections::BTreeSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
@@ -69,26 +69,27 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                 }
             };
 
-            if let Some(opts) = &any_watchable.spec_opts() {
-                if let Some(filter_kind) = &opts.filter {
-                    let filters = convert(filter_kind);
-                    for filter in filters {
-                        watcher.with_filter(filter);
-                    }
+            let opts = any_watchable.spec_opts();
+
+            if let Some(filter_kind) = &opts.filter {
+                let filters = convert(filter_kind);
+                for filter in filters {
+                    watcher.with_filter(filter);
                 }
-                if let Some(ignore_filter_kind) = &opts.ignore {
-                    let ignores = convert(ignore_filter_kind);
-                    for ignore in ignores {
-                        watcher.with_ignore(ignore);
-                    }
+            }
+            if let Some(ignore_filter_kind) = &opts.ignore {
+                let ignores = convert(ignore_filter_kind);
+                for ignore in ignores {
+                    watcher.with_ignore(ignore);
                 }
             }
 
-            let duration = match &any_watchable.spec_opts() {
-                Some(SpecOpts {
+            let spec = any_watchable.spec_opts();
+            let duration = match spec {
+                Spec {
                     debounce: Some(DebounceDuration::Ms(ms)),
                     ..
-                }) => Duration::from_millis(*ms),
+                } => Duration::from_millis(*ms),
                 _ => Duration::from_millis(300),
             };
 

@@ -12,7 +12,7 @@ pub struct StartFromInputPaths {
 
 impl SystemStart for StartFromInputPaths {
     fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        from_input_paths(&ctx, &self.input_paths, &self.port)
+        from_input_paths(ctx, &self.input_paths, &self.port)
     }
 }
 
@@ -82,22 +82,31 @@ fn from_input_paths<T: AsRef<str>>(
         port: port.to_owned(),
     };
 
-    let initial_ctx = InputCtx::new(&[], Some(input_args), &ctx, Some(input_path));
+    let initial_ctx = InputCtx::new(&[], Some(input_args), ctx, Some(input_path));
     let result = from_input_path(input_path, &initial_ctx);
     match result {
         Ok(input) => Ok(SystemStartArgs::PathWithInput {
             path: input_path.to_path_buf(),
             input,
         }),
-        Err(e) => match *e {
-            InputError::YamlError(yaml_error) => Ok(SystemStartArgs::PathWithInvalidInput {
-                path: input_path.to_path_buf(),
-                input_error: InputError::YamlError(yaml_error),
-            }),
-            _ => {
-                tracing::error!("cannot continue");
-                Err(e)
+        Err(e) => {
+            tracing::trace!("cannot continue {:?}", e);
+            match *e {
+                InputError::YamlError(yaml_error) => Ok(SystemStartArgs::PathWithInvalidInput {
+                    path: input_path.to_path_buf(),
+                    input_error: InputError::YamlError(yaml_error),
+                }),
+                InputError::BsLiveRules(bs_live_rules) => {
+                    Ok(SystemStartArgs::PathWithInvalidInput {
+                        path: input_path.to_path_buf(),
+                        input_error: InputError::BsLiveRules(bs_live_rules),
+                    })
+                }
+                _ => {
+                    tracing::trace!("cannot continue");
+                    Err(e)
+                }
             }
-        },
+        }
     }
 }

@@ -1,6 +1,4 @@
-use crate::route::{
-    DebounceDuration, FilterKind, RunOpt, RunOptItem, ShRunOptItem, Spec, SpecOpts,
-};
+use crate::route::{DebounceDuration, FilterKind, RunOpt, RunOptItem, ShRunOptItem, Spec};
 use crate::watch_opts::WatchOpts;
 
 #[test]
@@ -11,12 +9,10 @@ fn test_watch_opts_debounce() {
     filter: "**/*.css"
     "#;
     let expected = WatchOpts::Spec(Spec {
-        opts: Some(SpecOpts {
-            debounce: Some(DebounceDuration::Ms(200)),
-            filter: Some(FilterKind::StringDefault("**/*.css".into())),
-            ignore: None,
-            run: None,
-        }),
+        debounce: Some(DebounceDuration::Ms(200)),
+        filter: Some(FilterKind::StringDefault("**/*.css".into())),
+        ignore: None,
+        run: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
@@ -28,12 +24,10 @@ fn test_watch_opts_inline_filter() {
     filter: "**/*.css"
     "#;
     let expected = WatchOpts::Spec(Spec {
-        opts: Some(SpecOpts {
-            debounce: None,
-            filter: Some(FilterKind::StringDefault("**/*.css".into())),
-            ignore: None,
-            run: None,
-        }),
+        debounce: None,
+        filter: Some(FilterKind::StringDefault("**/*.css".into())),
+        ignore: None,
+        run: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
@@ -46,14 +40,12 @@ fn test_watch_opts_explicit_filter_ext() {
       ext: "css"
     "#;
     let expected = WatchOpts::Spec(Spec {
-        opts: Some(SpecOpts {
-            debounce: None,
-            filter: Some(FilterKind::Extension {
-                ext: "css".to_string(),
-            }),
-            ignore: None,
-            run: None,
+        debounce: None,
+        filter: Some(FilterKind::Extension {
+            ext: "css".to_string(),
         }),
+        ignore: None,
+        run: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
@@ -65,14 +57,12 @@ fn test_watch_opts_explicit_filter_glob() {
       glob: "**/*.css"
     "#;
     let expected = WatchOpts::Spec(Spec {
-        opts: Some(SpecOpts {
-            debounce: None,
-            filter: Some(FilterKind::Glob {
-                glob: "**/*.css".into(),
-            }),
-            ignore: None,
-            run: None,
+        debounce: None,
+        filter: Some(FilterKind::Glob {
+            glob: "**/*.css".into(),
         }),
+        ignore: None,
+        run: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(expected, actual);
@@ -86,7 +76,7 @@ fn test_watch_opts_run_seq() {
       - sh: echo 2
       - sh: echo 3
     "#;
-    let expected = SpecOpts {
+    let expected = Spec {
         run: Some(RunOpt::Seq(vec![
             RunOptItem::Sh(ShRunOptItem::new("echo 1")),
             RunOptItem::Sh(ShRunOptItem::new("echo 2")),
@@ -94,7 +84,7 @@ fn test_watch_opts_run_seq() {
         ])),
         ..Default::default()
     };
-    let actual: SpecOpts = serde_yaml::from_str(input).unwrap();
+    let actual: Spec = serde_yaml::from_str(input).unwrap();
     assert_eq!(expected, actual);
 }
 
@@ -107,7 +97,7 @@ fn test_watch_opts_run_all() {
         - sh: echo 2
         - sh: echo 3
     "#;
-    let expected = SpecOpts {
+    let expected = Spec {
         run: Some(RunOpt::All {
             all: vec![
                 RunOptItem::Sh(ShRunOptItem::new("echo 1")),
@@ -117,7 +107,7 @@ fn test_watch_opts_run_all() {
         }),
         ..Default::default()
     };
-    let actual: SpecOpts = serde_yaml::from_str(input).unwrap();
+    let actual: Spec = serde_yaml::from_str(input).unwrap();
     assert_eq!(expected, actual);
 }
 
@@ -131,7 +121,7 @@ fn test_watch_opts_run_all_nested() {
         - sh: echo 3
         - sh: echo 4
     "#;
-    let expected = SpecOpts {
+    let expected = Spec {
         run: Some(RunOpt::Seq(vec![
             RunOptItem::Sh(ShRunOptItem::new("echo 1")),
             RunOptItem::All {
@@ -144,6 +134,17 @@ fn test_watch_opts_run_all_nested() {
         ])),
         ..Default::default()
     };
-    let actual: SpecOpts = serde_yaml::from_str(input).unwrap();
+    let actual: Spec = serde_yaml::from_str(input).unwrap();
     assert_eq!(expected, actual);
+}
+
+#[test]
+fn error_handled_with_route() {
+    let input = r#"
+      run:
+        - sh: 'echo 1'
+    "#;
+    let actual: Spec = serde_yaml::from_str(input).unwrap();
+    // assert_eq!(expected, actual);
+    dbg!(&actual);
 }

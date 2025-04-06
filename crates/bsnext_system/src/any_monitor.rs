@@ -6,7 +6,7 @@ use crate::runner::Runner;
 use crate::server_watchable::ServerWatchable;
 use actix::Addr;
 use bsnext_fs::actor::FsWatcher;
-use bsnext_input::route::SpecOpts;
+use bsnext_input::route::Spec;
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -35,10 +35,10 @@ pub enum PathWatchable {
 }
 
 impl PathWatchable {
-    pub fn spec_opts(&self) -> Option<&SpecOpts> {
+    pub fn spec_opts(&self) -> &Spec {
         match self {
-            PathWatchable::Server(server) => server.spec.opts.as_ref(),
-            PathWatchable::Route(route) => route.spec.opts.as_ref(),
+            PathWatchable::Server(server) => &server.spec,
+            PathWatchable::Route(route) => &route.spec,
         }
     }
     pub fn watch_path(&self) -> &Path {
