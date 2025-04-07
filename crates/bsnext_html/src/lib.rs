@@ -127,10 +127,10 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
         // todo: make this use the CWD of the input file
         // dir_route.diri = ctx.startup_ctx().cwd.to_string_lossy().to_string();
         if let Some(parent) = ctx.file_path().and_then(|x| x.parent()) {
-            dir_route.dir = parent.to_string_lossy().to_string()
+            dir_route.dir = parent.to_string_lossy().to_string();
+            route.kind = RouteKind::Dir(dir_route);
+            server.routes.push(route)
         }
-        route.kind = RouteKind::Dir(dir_route);
-        server.routes.push(route)
     }
 
     // Add it to the input

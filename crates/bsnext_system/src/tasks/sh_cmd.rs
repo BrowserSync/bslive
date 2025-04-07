@@ -221,15 +221,13 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 tracing::trace!("child tree killed");
             }
 
-            h.abort();
-            h2.abort();
             match h.await {
                 Ok(_) => tracing::trace!("did wait for stdout"),
-                Err(e) => tracing::error!("failed waiting for stdout {e}"),
+                Err(e) => tracing::trace!("failed waiting for stdout {e}"),
             };
             match h2.await {
                 Ok(_) => tracing::trace!("did wait for stderr"),
-                Err(e) => tracing::error!("failed waiting for stderr {e}"),
+                Err(e) => tracing::trace!("failed waiting for stderr {e}"),
             };
 
             tracing::debug!("✅ Run (+cleanup) complete");

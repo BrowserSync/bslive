@@ -1,0 +1,10 @@
+---
+source: crates/bsnext_html/tests/html_playground.rs
+expression: found.kind
+---
+Dir(
+    DirRoute {
+        dir: "/users/shane",
+        base: None,
+    },
+)

@@ -1,8 +1,10 @@
 use bsnext_html::HtmlFs;
 use bsnext_input::route::RouteKind;
 use bsnext_input::server_config::ServerIdentity;
+use bsnext_input::startup::StartupContext;
 use bsnext_input::{InputArgs, InputCreation, InputCtx};
 use insta::assert_debug_snapshot;
+use std::path::PathBuf;
 
 const INPUT: &str = r#"
 <style>
@@ -31,7 +33,8 @@ const INPUT: &str = r#"
 #[test]
 fn test_html_playground_content() -> anyhow::Result<()> {
     let idens = vec![];
-    let ctx = InputCtx::new(&idens, None);
+    let startup_ctx = StartupContext::default();
+    let ctx = InputCtx::new(&idens, None, &startup_ctx, None);
     let as_input = HtmlFs::from_input_str(INPUT, &ctx)?;
     let Some(server) = as_input.servers.get(0) else {
         return Err(anyhow::anyhow!("no server"));
@@ -48,7 +51,8 @@ fn test_html_playground_content() -> anyhow::Result<()> {
 #[test]
 fn test_html_playground_without_server_id() -> anyhow::Result<()> {
     let idens = vec![];
-    let ctx = InputCtx::new(&idens, None);
+    let startup_ctx = StartupContext::default();
+    let ctx = InputCtx::new(&idens, None, &startup_ctx, None);
     let as_input = HtmlFs::from_input_str(INPUT, &ctx)?;
     assert_eq!(as_input.servers.len(), 1);
     let first = as_input.servers.get(0).unwrap();
@@ -61,7 +65,8 @@ fn test_html_playground_with_server_id() -> anyhow::Result<()> {
     let ident = ServerIdentity::Address {
         bind_address: String::from("127.0.0.1:8080"),
     };
-    let ctx = InputCtx::new(&[ident.clone()], None);
+    let startup_ctx = StartupContext::default();
+    let ctx = InputCtx::new(&[ident.clone()], None, &startup_ctx, None);
     let as_input = HtmlFs::from_input_str(INPUT, &ctx)?;
 
     assert_eq!(as_input.servers.len(), 1);
@@ -75,7 +80,8 @@ fn test_html_playground_with_port() -> anyhow::Result<()> {
         bind_address: String::from("0.0.0.0:8080"),
     };
     let input_args = InputArgs { port: Some(8080) };
-    let ctx = InputCtx::new(&[], Some(input_args));
+    let startup_ctx = StartupContext::default();
+    let ctx = InputCtx::new(&[], Some(input_args), &startup_ctx, None);
     let as_input = HtmlFs::from_input_str(INPUT, &ctx)?;
     let first = as_input.servers.get(0).unwrap();
     assert_eq!(first.identity, ident);
@@ -94,7 +100,9 @@ fn test_html_playground_with_serve() -> anyhow::Result<()> {
         bind_address: String::from("0.0.0.0:8080"),
     };
     let input_args = InputArgs { port: Some(8080) };
-    let ctx = InputCtx::new(&[], Some(input_args));
+    let startup_ctx = StartupContext::new("/users/shane");
+    let file_path = Some(PathBuf::from("/users/shane/bslive.yml"));
+    let ctx = InputCtx::new(&[], Some(input_args), &startup_ctx, file_path.as_ref());
     let as_input = HtmlFs::from_input_str(INPUT_WITH_META, &ctx)?;
     let first = as_input.servers.get(0).unwrap();
     assert_eq!(first.identity, ident);
@@ -122,7 +130,8 @@ fn test_html_playground_with_meta_default() -> anyhow::Result<()> {
         bind_address: String::from("0.0.0.0:8080"),
     };
     let input_args = InputArgs { port: Some(8080) };
-    let ctx = InputCtx::new(&[], Some(input_args));
+    let startup_ctx = StartupContext::default();
+    let ctx = InputCtx::new(&[], Some(input_args), &startup_ctx, None);
     let as_input = HtmlFs::from_input_str(INPUT_WITH_META_DEFAULT, &ctx)?;
     let first = as_input.servers.get(0).unwrap();
     assert_eq!(first.identity, ident);
