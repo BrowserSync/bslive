@@ -1,12 +1,13 @@
 use crate::runner::{RunKind, Runnable, Runner};
-use actix::{Actor, ActorFutureExt, Handler, Recipient, ResponseActFuture, Running, WrapFuture};
+use crate::task_group_runner::TaskGroupRunner;
+use actix::{Actor, Handler, Recipient};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::AnyEvent;
+use bsnext_dto::OutputLineDTO;
 use bsnext_fs::FsEventContext;
-use futures_util::future::FutureExt;
+use std::fmt::Debug;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
-use tokio::task::JoinSet;
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "TaskResult")]
@@ -17,61 +18,143 @@ pub enum TaskCommand {
         task_comms: TaskComms,
         invocation_id: u64,
     },
+    Log {
+        fs_event_context: FsEventContext,
+        task_comms: TaskComms,
+        invocation_id: u64,
+        output: OutputLineDTO,
+    },
 }
 
 impl TaskCommand {
     pub fn comms(&self) -> &TaskComms {
         match self {
             TaskCommand::Changes { task_comms, .. } => task_comms,
+            TaskCommand::Log { task_comms, .. } => task_comms,
         }
     }
     pub fn id(&self) -> u64 {
         match self {
             TaskCommand::Changes { invocation_id, .. } => *invocation_id,
+            TaskCommand::Log { invocation_id, .. } => *invocation_id,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TaskResult {
     #[allow(dead_code)]
     status: TaskStatus,
     #[allow(dead_code)]
-    invocation_id: u64,
+    invocation_id: InvocationId,
     #[allow(dead_code)]
     task_results: Vec<TaskResult>,
 }
 
+#[derive(Debug, Clone)]
+pub struct InvocationId(pub(crate) u64);
+
+#[derive(Debug, Clone)]
+pub struct ExitCode(pub(crate) i32);
+
 impl TaskResult {
-    pub fn ok(id: u64) -> Self {
+    pub fn ok(id: InvocationId) -> Self {
         Self {
             status: TaskStatus::Ok(TaskOk),
             invocation_id: id,
             task_results: vec![],
         }
     }
-    pub fn ok_tasks(id: u64, tasks: Vec<TaskResult>) -> Self {
+    pub fn err(&self) -> Option<&TaskError> {
+        match &self.status {
+            TaskStatus::Ok(_) => None,
+            TaskStatus::Err(e) => Some(&e),
+        }
+    }
+    pub fn is_ok(&self) -> bool {
+        matches!(self.status, TaskStatus::Ok(..))
+    }
+    pub fn err_code(id: InvocationId, code: ExitCode) -> Self {
+        Self {
+            status: TaskStatus::Err(TaskError::FailedCode { code }),
+            invocation_id: id,
+            task_results: vec![],
+        }
+    }
+    pub fn err_message(id: InvocationId, message: &str) -> Self {
+        Self {
+            status: TaskStatus::Err(TaskError::FailedMsg(message.to_string())),
+            invocation_id: id,
+            task_results: vec![],
+        }
+    }
+    pub fn timeout(id: InvocationId) -> Self {
+        Self {
+            status: TaskStatus::Err(TaskError::FailedTimeout),
+            invocation_id: id,
+            task_results: vec![],
+        }
+    }
+    pub fn ok_tasks(id: InvocationId, tasks: Vec<TaskResult>) -> Self {
         Self {
             status: TaskStatus::Ok(TaskOk),
             invocation_id: id,
             task_results: tasks,
         }
     }
+    pub fn err_tasks(id: InvocationId, tasks: Vec<TaskResult>) -> Self {
+        Self {
+            status: TaskStatus::Err(TaskError::GroupFailed {
+                task_results: tasks.clone(),
+            }),
+            invocation_id: id,
+            task_results: tasks,
+        }
+    }
+    pub fn err_partial_tasks(
+        id: InvocationId,
+        tasks: Vec<TaskResult>,
+        expected: ExpectedLen,
+    ) -> Self {
+        Self {
+            status: TaskStatus::Err(TaskError::GroupPartial {
+                actual: ActualLen(tasks.len()),
+                expected,
+            }),
+            invocation_id: id,
+            task_results: tasks,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TaskStatus {
     Ok(TaskOk),
     Err(TaskError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TaskOk;
+#[derive(Debug, Clone)]
+pub struct ActualLen(pub(crate) usize);
+#[derive(Debug, Clone)]
+pub struct ExpectedLen(pub(crate) usize);
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum TaskError {
-    #[error("lol")]
+    #[error("{0}")]
     FailedMsg(String),
+    #[error("failed with code: {0}", code.0)]
+    FailedCode { code: ExitCode },
+    #[error("timed out")]
+    FailedTimeout,
+    #[error("{0} failed in group", task_results.len())]
+    GroupFailed { task_results: Vec<TaskResult> },
+    #[error("expected {} task results, only seen {}", expected.0, actual.0)]
+    GroupPartial {
+        expected: ExpectedLen,
+        actual: ActualLen,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -126,8 +209,8 @@ pub trait AsActor: std::fmt::Debug {
 
 #[derive(Debug)]
 pub struct TaskGroup {
-    run_kind: RunKind,
-    tasks: Vec<Box<dyn AsActor>>,
+    pub run_kind: RunKind,
+    pub tasks: Vec<Box<dyn AsActor>>,
 }
 
 impl From<Runner> for TaskGroup {
@@ -174,93 +257,5 @@ impl TaskGroup {
     }
     pub fn is_empty(&self) -> bool {
         self.tasks.is_empty()
-    }
-}
-
-pub struct TaskGroupRunner {
-    done: bool,
-    task_group: Option<TaskGroup>,
-}
-
-impl TaskGroupRunner {
-    pub fn new(p0: TaskGroup) -> Self {
-        Self {
-            task_group: Some(p0),
-            done: false,
-        }
-    }
-}
-
-impl actix::Actor for TaskGroupRunner {
-    type Context = actix::Context<Self>;
-
-    fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(actor.lifecycle = "started", "TaskGroupRunner2")
-    }
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(" x stopped TaskGroupRunner2")
-    }
-
-    fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        tracing::info!(" ⏰ stopping TaskGroupRunner2 {}", self.done);
-        Running::Stop
-    }
-}
-
-impl Handler<TaskCommand> for TaskGroupRunner {
-    type Result = ResponseActFuture<Self, TaskResult>;
-
-    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
-        tracing::debug!(done = self.done, "TaskGroupRunner::TaskCommand");
-        let Some(group) = self.task_group.take() else {
-            todo!("how to handle a concurrent request here?");
-        };
-        tracing::debug!("  └── {} tasks in group", group.len());
-        tracing::debug!("  └── {:?} group run_kind", group.run_kind);
-
-        let future = async move {
-            let actors = group
-                .tasks
-                .into_iter()
-                .map(|x| x.into_actor2())
-                .collect::<Vec<_>>();
-            let mut done = vec![];
-            match group.run_kind {
-                RunKind::Sequence => {
-                    for (index, x) in actors.iter().enumerate() {
-                        match x.send(msg.clone()).await {
-                            Ok(_) => {
-                                tracing::trace!("did send");
-                                done.push(index)
-                            }
-                            Err(e) => tracing::error!("{e}"),
-                        }
-                    }
-                }
-                RunKind::Overlapping => {
-                    let futs = actors
-                        .into_iter()
-                        .enumerate()
-                        .map(|(index, a)| a.send(msg.clone()).map(move |r| (index, r)));
-                    let mut set = JoinSet::from_iter(futs);
-                    while let Some(res) = set.join_next().await {
-                        match res {
-                            Ok((index, _result)) => done.push(index),
-                            Err(_) => tracing::error!("could not push index"),
-                        }
-                    }
-                }
-            };
-            done
-        };
-        // let self_addr = ctx.address();
-        Box::pin(future.into_actor(self).map(|res, actor, _ctx| {
-            actor.done = true;
-            let child_results = res
-                .into_iter()
-                .map(|index| TaskResult::ok(index as u64))
-                .collect::<Vec<_>>();
-            TaskResult::ok_tasks(0, child_results)
-        }))
     }
 }

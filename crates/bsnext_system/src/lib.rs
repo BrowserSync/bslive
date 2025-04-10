@@ -45,6 +45,7 @@ pub mod runner;
 pub mod server_watchable;
 pub mod start;
 pub mod task;
+mod task_group_runner;
 pub mod tasks;
 
 #[derive(Debug)]

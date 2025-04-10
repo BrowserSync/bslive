@@ -1,12 +1,12 @@
 use crate::input_fs::from_input_path;
 use crate::runner::{Runnable, Runner};
-use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup};
+use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskGroup, TaskResult};
 use crate::{BsSystem, OverrideInput};
-use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
+use actix::{ActorFutureExt, AsyncContext, Handler, MailboxError, ResponseActFuture, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
-use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
+use bsnext_dto::{OutputLineDTO, StderrLineDTO, StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathEvent,
@@ -70,6 +70,9 @@ impl Trigger {
             TaskCommand::Changes {
                 fs_event_context, ..
             } => fs_event_context,
+            TaskCommand::Log {
+                fs_event_context, ..
+            } => fs_event_context,
         }
     }
 }
@@ -80,6 +83,7 @@ impl Handler<Trigger> for BsSystem {
     fn handle(&mut self, msg: Trigger, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
         let fs_ctx = msg.fs_ctx();
+        let fs_ctx_clone = fs_ctx.clone();
         let entry = self.tasks.get(fs_ctx);
         let cloned_id = fs_ctx.clone();
 
@@ -89,13 +93,39 @@ impl Handler<Trigger> for BsSystem {
         }
 
         self.tasks.insert(fs_ctx.clone(), 0);
-        let cmd_recip = Box::new(msg.task).into_actor2();
+        let cmd_recipient = Box::new(msg.task).into_actor2();
 
         Box::pin(
-            cmd_recip
+            cmd_recipient
                 .send(cmd)
                 .into_actor(self)
-                .map(move |_resp, actor, _| {
+                .map(move |resp, actor, ctx| {
+                    match resp {
+                        Ok(result) if !result.is_ok() => {
+                            tracing::trace!("will handle !result.is_ok()");
+                            let task = Task::Runnable(Runnable::BsLive(BsLiveRunner::ExtEvent));
+                            let Some(sender) = actor.any_event_sender.as_ref() else {
+                                todo!("cannot get here?");
+                            };
+                            let err = result.err().expect("guarded check");
+                            let cmd = TaskCommand::Log {
+                                output: OutputLineDTO::Stderr(StderrLineDTO {
+                                    line: err.to_string(),
+                                    prefix: Some("[run:error]".into()),
+                                }),
+                                task_comms: TaskComms::new(sender.clone(), None),
+                                invocation_id: 0,
+                                fs_event_context: fs_ctx_clone,
+                            };
+                            ctx.notify(Trigger::new(task, cmd))
+                        }
+                        Ok(_) => {
+                            tracing::trace!("a triggered command completed");
+                        }
+                        Err(err) => {
+                            tracing::error!("something prevented message handling. {:?}", err);
+                        }
+                    }
                     actor.tasks.remove(&cloned_id);
                 }),
         )

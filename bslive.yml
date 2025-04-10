@@ -13,4 +13,7 @@ servers:
           debounce:
             ms: 300
           run:
-            - sh: 'npm ls --color=always'
+            - sh: echo 'before'
+            - sh: echo 'before 2'
+            - sh: echo 'hello 2' && false
+            - sh: echo 'after'

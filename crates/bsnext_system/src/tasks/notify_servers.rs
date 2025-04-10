@@ -1,4 +1,4 @@
-use crate::task::{TaskCommand, TaskResult};
+use crate::task::{InvocationId, TaskCommand, TaskResult};
 use actix::{Actor, Handler, ResponseFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 
@@ -41,7 +41,8 @@ impl Handler<TaskCommand> for NotifyServers {
                 paths: changes.clone(),
                 ctx: fs_event_context.clone(),
             }),
+            TaskCommand::Log { .. } => todo!("not handled"),
         }
-        Box::pin(async { TaskResult::ok(0) })
+        Box::pin(async { TaskResult::ok(InvocationId(0)) })
     }
 }

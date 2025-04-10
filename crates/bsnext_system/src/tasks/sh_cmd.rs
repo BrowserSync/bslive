@@ -1,4 +1,4 @@
-use crate::task::{TaskCommand, TaskResult};
+use crate::task::{ExitCode, InvocationId, TaskCommand, TaskError, TaskResult};
 use actix::ResponseFuture;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
@@ -131,6 +131,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
         let any_event_sender2 = msg.comms().any_event_sender.clone();
         let reason = match &msg {
             TaskCommand::Changes { changes, .. } => format!("{} files changed", changes.len()),
+            TaskCommand::Log { .. } => todo!("cannot get here?"),
         };
         let files = match &msg {
             TaskCommand::Changes { changes, .. } => changes
@@ -138,6 +139,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
+            TaskCommand::Log { .. } => todo!("cannot get here?"),
         };
 
         let sh_prefix = Arc::new(self.prefix());
@@ -207,15 +209,28 @@ impl actix::Handler<TaskCommand> for ShCmd {
             let sleep = tokio::time::sleep(Duration::from_secs(10));
 
             tokio::pin!(sleep);
+            let invocation_id = 0;
 
-            tokio::select! {
+            let result: TaskResult = tokio::select! {
                 _ = &mut sleep => {
                     tracing::info!("⌛️ operation timed out");
+                    TaskResult::timeout(InvocationId(invocation_id))
                 }
-                _ = child.wait() => {
-                    tracing::info!("✅ operation completed");
+                out = child.wait() => {
+                    tracing::info!("✅ operation ended");
+                    match out {
+                        Ok(exit) => match exit.code() {
+                           Some(0) => TaskResult::ok(InvocationId(invocation_id)),
+                           Some(code) => {
+                                tracing::debug!("did exit with code {}", code);
+                                TaskResult::err_code(InvocationId(invocation_id), ExitCode(code))
+                            },
+                           None => TaskResult::err_message(InvocationId(invocation_id), "unknown error!")
+                        },
+                        Err(err) => TaskResult::err_message(InvocationId(invocation_id), &err.to_string())
+                    }
                 }
-            }
+            };
             if let Some(pid) = pid {
                 let _ = kill_tree::tokio::kill_tree(pid).await;
                 tracing::trace!("child tree killed");
@@ -232,7 +247,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
 
             tracing::debug!("✅ Run (+cleanup) complete");
 
-            TaskResult::ok(0)
+            result
         };
         Box::pin(fut)
     }

@@ -1,4 +1,4 @@
-use crate::task::{TaskCommand, TaskResult};
+use crate::task::{InvocationId, TaskCommand, TaskResult};
 use actix::{Handler, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
@@ -46,6 +46,9 @@ impl Handler<TaskCommand> for ExtEventSender {
                     },
                 ))
             }
+            TaskCommand::Log { output, .. } => {
+                AnyEvent::External(ExternalEventsDTO::OutputLine(output.clone()))
+            }
         };
         let sender = comms.any_event_sender.clone();
         Box::pin(async move {
@@ -53,7 +56,7 @@ impl Handler<TaskCommand> for ExtEventSender {
                 Ok(_) => tracing::trace!("sent"),
                 Err(e) => tracing::error!("{e}"),
             };
-            TaskResult::ok(0)
+            TaskResult::ok(InvocationId(0))
         })
     }
 }
