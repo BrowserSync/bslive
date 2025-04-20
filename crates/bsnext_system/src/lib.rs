@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::monitor_any_watchables::MonitorPathWatchables;
+use crate::runner::Runner;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
@@ -30,6 +31,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 pub mod any_monitor;
+pub mod archy;
 pub mod args;
 pub mod cli;
 pub mod export;
@@ -45,6 +47,7 @@ pub mod runner;
 pub mod server_watchable;
 pub mod start;
 pub mod task;
+pub mod task_group;
 mod task_group_runner;
 pub mod tasks;
 
@@ -55,7 +58,7 @@ pub(crate) struct BsSystem {
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<PathWatchable, AnyMonitor>,
-    tasks: HashMap<FsEventContext, usize>,
+    tasks: HashMap<FsEventContext, Runner>,
     cwd: Option<PathBuf>,
     start_context: Option<StartupContext>,
 }

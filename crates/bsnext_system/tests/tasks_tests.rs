@@ -1,6 +1,7 @@
 use actix::{Actor, ActorFutureExt, Recipient, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::AnyEvent;
-use bsnext_system::task::{AsActor, TaskCommand, TaskComms, TaskGroup, TaskResult};
+use bsnext_system::task::{AsActor, TaskCommand, TaskComms, TaskResult};
+use bsnext_system::task_group::TaskGroup;
 use bsnext_system::task_group_runner::TaskGroupRunner;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;

@@ -345,6 +345,15 @@ pub enum BsLiveRunner {
     ExtEvent,
 }
 
+impl Display for BsLiveRunner {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BsLiveRunner::NotifyServer => write!(f, "BsLiveRunner::NotifyServer"),
+            BsLiveRunner::ExtEvent => write!(f, "BsLiveRunner::ExtEvent"),
+        }
+    }
+}
+
 #[derive(
     Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]

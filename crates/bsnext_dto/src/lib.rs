@@ -137,6 +137,15 @@ pub enum OutputLineDTO {
     Stderr(StderrLineDTO),
 }
 
+impl OutputLineDTO {
+    pub fn stdout(line: String, prefix: Option<String>) -> Self {
+        Self::Stdout(StdoutLineDTO { line, prefix })
+    }
+    pub fn stderr(line: String, prefix: Option<String>) -> Self {
+        Self::Stderr(StderrLineDTO { line, prefix })
+    }
+}
+
 #[derive(Debug, serde::Serialize, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct ShCmdOpt {
     pub sh: String,

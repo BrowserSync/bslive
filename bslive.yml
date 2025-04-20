@@ -13,7 +13,6 @@ servers:
           debounce:
             ms: 300
           run:
-            - sh: echo 'before'
-            - sh: echo 'before 2'
-            - sh: echo 'hello 2' && false
-            - sh: echo 'after'
+            - seq:
+                - sh: echo 2
+                - sh: exit 0

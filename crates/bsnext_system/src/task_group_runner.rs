@@ -1,9 +1,11 @@
 use crate::runner::RunKind;
 use crate::task::{
-    AsActor, ExpectedLen, InvocationId, TaskCommand, TaskGroup, TaskResult, TaskStatus,
+    AsActor, ExpectedLen, InvocationId, TaskCommand, TaskReport, TaskResult, TaskStatus,
 };
+use crate::task_group::TaskGroup;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use futures_util::FutureExt;
+use std::collections::HashMap;
 use tokio::task::JoinSet;
 
 pub struct TaskGroupRunner {
@@ -12,9 +14,9 @@ pub struct TaskGroupRunner {
 }
 
 impl TaskGroupRunner {
-    pub fn new(p0: TaskGroup) -> Self {
+    pub fn new(task_group: TaskGroup) -> Self {
         Self {
-            task_group: Some(p0),
+            task_group: Some(task_group),
             done: false,
         }
     }
@@ -26,13 +28,12 @@ impl actix::Actor for TaskGroupRunner {
     fn started(&mut self, _ctx: &mut Self::Context) {
         tracing::info!(actor.lifecycle = "started", "TaskGroupRunner2")
     }
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(" x stopped TaskGroupRunner2")
-    }
-
     fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
         tracing::info!(" ⏰ stopping TaskGroupRunner2 {}", self.done);
         Running::Stop
+    }
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        tracing::info!(" x stopped TaskGroupRunner2")
     }
 }
 
@@ -45,29 +46,26 @@ impl Handler<TaskCommand> for TaskGroupRunner {
             todo!("how to handle a concurrent request here?");
         };
         tracing::debug!("  └── {} tasks in group", group.len());
-        tracing::debug!("  └── {:?} group run_kind", group.run_kind);
+        tracing::debug!("  └── {:?} group run_kind", group.run_kind());
         let expected_len = group.len();
 
         let future = async move {
-            let actors = group
-                .tasks
-                .into_iter()
-                .map(|x| x.into_actor2())
-                .collect::<Vec<_>>();
-            let mut done: Vec<(usize, TaskResult)> = vec![];
-            match group.run_kind {
+            let mut done: Vec<(usize, TaskReport)> = vec![];
+            match group.run_kind() {
                 RunKind::Sequence => {
-                    for (index, x) in actors.iter().enumerate() {
+                    for (index, group_item) in group.tasks().into_iter().enumerate() {
+                        let id = group_item.id();
+                        let x = Box::new(group_item).into_actor2();
                         match x.send(msg.clone()).await {
                             Ok(result) => {
                                 let is_ok = result.is_ok();
-                                done.push((index, result));
+                                done.push((index, result.to_report(id)));
                                 if is_ok {
                                     tracing::debug!(
                                         "index {index} completed, will move to next text in seq"
                                     );
                                 } else {
-                                    tracing::debug!("stopping after index {index} ran, because it did not complete successfully.");
+                                    tracing::debug!("stopping after index {index} id: {id} ran, because it did not complete successfully.");
                                     break;
                                 }
                             }
@@ -76,15 +74,23 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                     }
                 }
                 RunKind::Overlapping => {
-                    let futs = actors
+                    let futures = group
+                        .tasks()
                         .into_iter()
                         .enumerate()
-                        .map(|(index, a)| a.send(msg.clone()).map(move |r| (index, r)));
-                    let mut set = JoinSet::from_iter(futs);
+                        .map(|(index, as_actor)| {
+                            let id = as_actor.id();
+                            let a = Box::new(as_actor).into_actor2();
+                            a.send(msg.clone())
+                                .map(move |task_result| (index, id, task_result))
+                        });
+                    let mut set = JoinSet::from_iter(futures);
                     while let Some(res) = set.join_next().await {
                         match res {
-                            Ok((index, Ok(result))) => done.push((index, result)),
-                            Ok((index, Err(mailbox_error))) => {
+                            Ok((index, id, Ok(result))) => {
+                                done.push((index, result.to_report(id)));
+                            }
+                            Ok((index, _, Err(mailbox_error))) => {
                                 tracing::error!(
                                     "could not send index: {}, {:?}",
                                     index,
@@ -104,18 +110,24 @@ impl Handler<TaskCommand> for TaskGroupRunner {
             tracing::info!("actual len: {}", res.len());
             tracing::info!("expected len: {}", expected_len);
 
-            let all_good = res.iter().all(|(_index, result)| result.is_ok());
+            let all_good = res.iter().all(|(_index, report)| report.result().is_ok());
             let all_ran = res.len() == expected_len;
-            let results = res.into_iter().map(|(i, x)| x).collect();
+            let reports: Vec<_> = res.into_iter().map(|(_, report)| report).collect();
 
-            tracing::debug!("all_good={all_good}, all_ran={all_ran}");
+            let failed_only = reports
+                .iter()
+                .filter(|x| !x.result().is_ok())
+                .map(Clone::clone)
+                .collect::<Vec<_>>();
+
+            tracing::debug!(result.all_good = all_good, result.all_ran = all_ran);
 
             match (all_ran, all_good) {
-                (true, true) => TaskResult::ok_tasks(InvocationId(0), results),
-                (true, false) => TaskResult::err_tasks(InvocationId(0), results),
+                (true, true) => TaskResult::ok_tasks(InvocationId(0), reports),
+                (true, false) => TaskResult::err_tasks(InvocationId(0), failed_only, reports),
                 (false, _) => TaskResult::err_partial_tasks(
                     InvocationId(0),
-                    results,
+                    reports,
                     ExpectedLen(expected_len),
                 ),
             }

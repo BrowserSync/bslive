@@ -1,11 +1,13 @@
-use crate::runner::{RunKind, Runnable, Runner};
+use crate::runner::{Runnable, TreeDisplay};
+use crate::task_group::TaskGroup;
 use crate::task_group_runner::TaskGroupRunner;
 use actix::{Actor, Handler, Recipient};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_dto::OutputLineDTO;
 use bsnext_fs::FsEventContext;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 
@@ -22,7 +24,7 @@ pub enum TaskCommand {
         fs_event_context: FsEventContext,
         task_comms: TaskComms,
         invocation_id: u64,
-        output: OutputLineDTO,
+        output: Vec<OutputLineDTO>,
     },
 }
 
@@ -44,11 +46,44 @@ impl TaskCommand {
 #[derive(Debug, Clone)]
 pub struct TaskResult {
     #[allow(dead_code)]
-    status: TaskStatus,
+    pub(crate) status: TaskStatus,
     #[allow(dead_code)]
     invocation_id: InvocationId,
     #[allow(dead_code)]
-    task_results: Vec<TaskResult>,
+    pub(crate) task_reports: Vec<TaskReport>,
+}
+
+impl Display for TaskResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self.status {
+            TaskStatus::Ok(s) => write!(f, "✅"),
+            TaskStatus::Err(err) => write!(f, "❌, {}", err),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskReport {
+    result: TaskResult,
+    id: u64,
+}
+
+impl TaskReport {
+    pub fn new(result: TaskResult, id: u64) -> Self {
+        Self { id, result }
+    }
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+    pub fn result(&self) -> &TaskResult {
+        &self.result
+    }
+    pub fn reports(&self) -> &[TaskReport] {
+        &self.result.reports()
+    }
+    pub fn is_ok(&self) -> bool {
+        self.result.is_ok()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -62,7 +97,7 @@ impl TaskResult {
         Self {
             status: TaskStatus::Ok(TaskOk),
             invocation_id: id,
-            task_results: vec![],
+            task_reports: vec![],
         }
     }
     pub fn err(&self) -> Option<&TaskError> {
@@ -78,52 +113,63 @@ impl TaskResult {
         Self {
             status: TaskStatus::Err(TaskError::FailedCode { code }),
             invocation_id: id,
-            task_results: vec![],
+            task_reports: vec![],
         }
     }
     pub fn err_message(id: InvocationId, message: &str) -> Self {
         Self {
             status: TaskStatus::Err(TaskError::FailedMsg(message.to_string())),
             invocation_id: id,
-            task_results: vec![],
+            task_reports: vec![],
         }
     }
     pub fn timeout(id: InvocationId) -> Self {
         Self {
             status: TaskStatus::Err(TaskError::FailedTimeout),
             invocation_id: id,
-            task_results: vec![],
+            task_reports: vec![],
         }
     }
-    pub fn ok_tasks(id: InvocationId, tasks: Vec<TaskResult>) -> Self {
+    pub fn ok_tasks(id: InvocationId, tasks: Vec<TaskReport>) -> Self {
         Self {
             status: TaskStatus::Ok(TaskOk),
             invocation_id: id,
-            task_results: tasks,
+            task_reports: tasks,
         }
     }
-    pub fn err_tasks(id: InvocationId, tasks: Vec<TaskResult>) -> Self {
+    pub fn err_tasks(
+        id: InvocationId,
+        failed_only: Vec<TaskReport>,
+        results: Vec<TaskReport>,
+    ) -> Self {
         Self {
             status: TaskStatus::Err(TaskError::GroupFailed {
-                task_results: tasks.clone(),
+                failed_tasks: failed_only.clone(),
             }),
             invocation_id: id,
-            task_results: tasks,
+            task_reports: results,
         }
     }
     pub fn err_partial_tasks(
         id: InvocationId,
-        tasks: Vec<TaskResult>,
+        tasks: Vec<TaskReport>,
         expected: ExpectedLen,
     ) -> Self {
         Self {
             status: TaskStatus::Err(TaskError::GroupPartial {
                 actual: ActualLen(tasks.len()),
                 expected,
+                failed_tasks: tasks.clone(),
             }),
             invocation_id: id,
-            task_results: tasks,
+            task_reports: tasks,
         }
+    }
+    pub fn to_report(self, id: u64) -> TaskReport {
+        TaskReport { id, result: self }
+    }
+    pub fn reports(&self) -> &[TaskReport] {
+        &self.task_reports
     }
 }
 
@@ -148,12 +194,13 @@ pub enum TaskError {
     FailedCode { code: ExitCode },
     #[error("timed out")]
     FailedTimeout,
-    #[error("{0} failed in group", task_results.len())]
-    GroupFailed { task_results: Vec<TaskResult> },
+    #[error("group failed")]
+    GroupFailed { failed_tasks: Vec<TaskReport> },
     #[error("expected {} task results, only seen {}", expected.0, actual.0)]
     GroupPartial {
         expected: ExpectedLen,
         actual: ActualLen,
+        failed_tasks: Vec<TaskReport>,
     },
 }
 
@@ -178,6 +225,16 @@ pub enum Task {
     Group(TaskGroup),
 }
 
+impl Display for Task {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Task::Runnable(_) => write!(f, "Task::Runnable"),
+            Task::Group(_) => write!(f, "Task::Group"),
+        }
+    }
+}
+
+impl TreeDisplay for Task {}
 impl AsActor for Task {
     fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
         match *self {
@@ -201,61 +258,16 @@ impl Task {
     pub fn into_actor(self) -> Recipient<TaskCommand> {
         Box::new(self).into_actor2()
     }
+    // fn as_id(self: Box<Self>) -> u64 {
+    //     let mut hasher = DefaultHasher::new();
+    //     match *self {
+    //         Task::Runnable(r) => r.hash(&mut hasher),
+    //         Task::Group(g) => g.hash(&mut hasher),
+    //     }
+    //     hasher.finish()
+    // }
 }
 
-pub trait AsActor: std::fmt::Debug {
+pub trait AsActor: std::fmt::Debug + TreeDisplay {
     fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand>;
-}
-
-#[derive(Debug)]
-pub struct TaskGroup {
-    pub run_kind: RunKind,
-    pub tasks: Vec<Box<dyn AsActor>>,
-}
-
-impl From<Runner> for TaskGroup {
-    fn from(runner: Runner) -> Self {
-        let boxed_tasks = runner
-            .tasks
-            .into_iter()
-            .map(|x| -> Box<dyn AsActor> {
-                match x {
-                    Runnable::Many(runner) => Box::new(Task::Group(TaskGroup::from(runner))),
-                    _ => Box::new(x),
-                }
-            })
-            .collect::<Vec<Box<dyn AsActor>>>();
-        match runner.kind {
-            RunKind::Sequence => Self::seq(boxed_tasks),
-            RunKind::Overlapping => Self::all(boxed_tasks),
-        }
-    }
-}
-
-impl From<&Runner> for TaskGroup {
-    fn from(value: &Runner) -> Self {
-        TaskGroup::from(value.clone())
-    }
-}
-
-impl TaskGroup {
-    pub fn seq(tasks: Vec<Box<dyn AsActor>>) -> Self {
-        Self {
-            run_kind: RunKind::Sequence,
-            tasks,
-        }
-    }
-    pub fn all(tasks: Vec<Box<dyn AsActor>>) -> Self {
-        Self {
-            run_kind: RunKind::Overlapping,
-            tasks,
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.tasks.len()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.tasks.is_empty()
-    }
 }

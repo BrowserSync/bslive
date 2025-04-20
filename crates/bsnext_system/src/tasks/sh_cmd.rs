@@ -4,6 +4,7 @@ use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
 use std::ffi::OsString;
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::ops::Deref;
 use std::process::Stdio;
@@ -19,6 +20,12 @@ pub struct ShCmd {
     sh: Cmd,
     name: Option<String>,
     output: ShCmdOutput,
+}
+
+impl Display for ShCmd {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", (*self.sh).to_string_lossy())
+    }
 }
 
 #[derive(Debug, Default, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
