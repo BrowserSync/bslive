@@ -1,4 +1,4 @@
-use crate::task::{ExitCode, InvocationId, TaskCommand, TaskError, TaskResult};
+use crate::task::{ExitCode, InvocationId, TaskCommand, TaskResult};
 use actix::ResponseFuture;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;

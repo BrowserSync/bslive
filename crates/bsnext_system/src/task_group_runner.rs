@@ -1,11 +1,8 @@
 use crate::runner::RunKind;
-use crate::task::{
-    AsActor, ExpectedLen, InvocationId, TaskCommand, TaskReport, TaskResult, TaskStatus,
-};
+use crate::task::{AsActor, ExpectedLen, InvocationId, TaskCommand, TaskReport, TaskResult};
 use crate::task_group::TaskGroup;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use futures_util::FutureExt;
-use std::collections::HashMap;
 use tokio::task::JoinSet;
 
 pub struct TaskGroupRunner {
@@ -104,7 +101,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
             };
             done
         };
-        Box::pin(future.into_actor(self).map(move |res, actor, ctx| {
+        Box::pin(future.into_actor(self).map(move |res, actor, _ctx| {
             actor.done = true;
 
             tracing::info!("actual len: {}", res.len());

@@ -13,6 +13,11 @@ servers:
           debounce:
             ms: 300
           run:
-            - seq:
+            - all:
                 - sh: echo 2
-                - sh: exit 0
+                - sh: exit 1
+                - sh: sleep 1 && echo '->hehe'
+                  name: '[another attempt--->]'
+                - seq:
+                    - sleep 1
+                    - echo 'after?'

@@ -1,16 +1,14 @@
 use crate::archy::archy;
 use crate::input_fs::from_input_path;
-use crate::runner::{Runnable, Runner, TreeDisplay};
-use crate::task::{
-    AsActor, Task, TaskCommand, TaskComms, TaskError, TaskReport, TaskResult, TaskStatus,
-};
+use crate::runner::{Runnable, Runner};
+use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskReport};
 use crate::task_group::TaskGroup;
 use crate::{BsSystem, OverrideInput};
-use actix::{ActorFutureExt, AsyncContext, Handler, MailboxError, ResponseActFuture, WrapFuture};
+use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
-use bsnext_dto::{OutputLineDTO, StderrLineDTO, StoppedWatchingDTO, WatchingDTO};
+use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathEvent,
@@ -83,14 +81,6 @@ impl Trigger {
             } => fs_event_context,
         }
     }
-
-    pub fn runner(&self) -> &Runner {
-        &self.runner
-    }
-
-    pub fn id(&self) -> u64 {
-        self.runner.as_id()
-    }
 }
 
 impl Handler<Trigger> for BsSystem {
@@ -99,12 +89,12 @@ impl Handler<Trigger> for BsSystem {
     fn handle(&mut self, msg: Trigger, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
         let fs_ctx = msg.fs_ctx();
-        let fs_ctx_clone = fs_ctx.clone();
+        let _fs_ctx_clone = fs_ctx.clone();
         let entry = self.tasks.get(fs_ctx);
         let cloned_id = fs_ctx.clone();
 
         if let Some(entry) = entry {
-            tracing::info!("ignoring concurrent task triggering: prev: {}", entry);
+            tracing::info!("ignoring concurrent task triggering: prev: {:?}", entry);
             return Box::pin(async {}.into_actor(self));
         }
 
@@ -116,7 +106,7 @@ impl Handler<Trigger> for BsSystem {
             cmd_recipient
                 .send(cmd)
                 .into_actor(self)
-                .map(move |resp, actor, ctx| {
+                .map(move |resp, actor, _ctx| {
                     let runner = actor.tasks.get(&cloned_id);
                     match (resp, runner) {
                         (Ok(result), Some(runner)) => {
@@ -204,42 +194,7 @@ impl Handler<Trigger> for BsSystem {
 fn every_report(hm: &mut HashMap<u64, TaskReport>, report: &TaskReport) {
     hm.insert(report.id(), report.clone());
     for inner in &report.result().task_reports {
-        every_report(hm, &inner)
-    }
-}
-
-fn output(err: &TaskError, lines: &mut Vec<OutputLineDTO>, depth: u8, prefix: Option<String>) {
-    let next = match err {
-        e @ TaskError::FailedMsg(..) => vec![OutputLineDTO::stderr(e.to_string(), prefix)],
-        e @ TaskError::FailedCode { .. } => vec![OutputLineDTO::stderr(e.to_string(), prefix)],
-        e @ TaskError::FailedTimeout => vec![OutputLineDTO::stderr(e.to_string(), prefix)],
-        e @ TaskError::GroupFailed { failed_tasks }
-        | e @ TaskError::GroupPartial { failed_tasks, .. } => {
-            tracing::debug!("failed_tasks.len={}", failed_tasks.len());
-            let next_depth = depth + 1;
-            let mut inner = vec![OutputLineDTO::Stderr(StderrLineDTO {
-                line: e.to_string(),
-                prefix,
-            })];
-            for x in failed_tasks {
-                if let Some(err) = x.result().err() {
-                    let mut s = String::new();
-                    for _ in 0..next_depth {
-                        s.push(' ');
-                    }
-                    output(
-                        err,
-                        &mut inner,
-                        next_depth,
-                        Some(format!("{space}", space = s)),
-                    );
-                }
-            }
-            inner
-        }
-    };
-    for x in next {
-        lines.push(x);
+        every_report(hm, inner)
     }
 }
 
@@ -293,10 +248,11 @@ impl BsSystem {
             invocation_id: 0,
         };
 
-        let tree = runner.as_tree();
-        let as_str = archy(&tree, None);
-        println!("upcoming-->");
-        println!("{as_str}");
+        // let tree = runner.as_tree();
+        // let as_str = archy(&tree, None);
+        // println!("upcoming-->");
+        // println!("{as_str}");
+        // todo: use this example as a way to display a dry-run scenario
         let task_group = TaskGroup::from(runner.clone());
 
         Some((Task::Group(task_group), cmd, runner))

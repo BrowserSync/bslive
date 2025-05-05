@@ -1,13 +1,12 @@
-use crate::runner::{Runnable, TreeDisplay};
+use crate::runner::Runnable;
 use crate::task_group::TaskGroup;
 use crate::task_group_runner::TaskGroupRunner;
-use actix::{Actor, Handler, Recipient};
+use actix::{Actor, Recipient};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_dto::OutputLineDTO;
 use bsnext_fs::FsEventContext;
 use std::fmt::{Debug, Display, Formatter};
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 
@@ -46,17 +45,17 @@ impl TaskCommand {
 #[derive(Debug, Clone)]
 pub struct TaskResult {
     #[allow(dead_code)]
-    pub(crate) status: TaskStatus,
+    pub status: TaskStatus,
     #[allow(dead_code)]
     invocation_id: InvocationId,
     #[allow(dead_code)]
-    pub(crate) task_reports: Vec<TaskReport>,
+    pub task_reports: Vec<TaskReport>,
 }
 
 impl Display for TaskResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.status {
-            TaskStatus::Ok(s) => write!(f, "✅"),
+            TaskStatus::Ok(_s) => write!(f, "✅"),
             TaskStatus::Err(err) => write!(f, "❌, {}", err),
         }
     }
@@ -79,7 +78,7 @@ impl TaskReport {
         &self.result
     }
     pub fn reports(&self) -> &[TaskReport] {
-        &self.result.reports()
+        self.result.reports()
     }
     pub fn is_ok(&self) -> bool {
         self.result.is_ok()
@@ -87,10 +86,10 @@ impl TaskReport {
 }
 
 #[derive(Debug, Clone)]
-pub struct InvocationId(pub(crate) u64);
+pub struct InvocationId(pub u64);
 
 #[derive(Debug, Clone)]
-pub struct ExitCode(pub(crate) i32);
+pub struct ExitCode(pub i32);
 
 impl TaskResult {
     pub fn ok(id: InvocationId) -> Self {
@@ -103,7 +102,7 @@ impl TaskResult {
     pub fn err(&self) -> Option<&TaskError> {
         match &self.status {
             TaskStatus::Ok(_) => None,
-            TaskStatus::Err(e) => Some(&e),
+            TaskStatus::Err(e) => Some(e),
         }
     }
     pub fn is_ok(&self) -> bool {
@@ -234,7 +233,6 @@ impl Display for Task {
     }
 }
 
-impl TreeDisplay for Task {}
 impl AsActor for Task {
     fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
         match *self {
@@ -268,6 +266,6 @@ impl Task {
     // }
 }
 
-pub trait AsActor: std::fmt::Debug + TreeDisplay {
+pub trait AsActor: std::fmt::Debug {
     fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand>;
 }

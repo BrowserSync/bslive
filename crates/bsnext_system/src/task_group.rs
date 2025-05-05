@@ -1,14 +1,12 @@
-use crate::runner::{RunKind, Runnable, Runner, TreeDisplay};
+use crate::runner::{RunKind, Runnable, Runner};
 use crate::task::{AsActor, Task, TaskCommand};
 use actix::Recipient;
 use std::fmt::{Display, Formatter};
-use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
 pub struct TaskGroup {
     run_kind: RunKind,
     tasks: Vec<DynItem>,
-    id: u64,
 }
 
 #[derive(Debug)]
@@ -17,11 +15,15 @@ pub struct DynItem {
     id: u64,
 }
 
-impl TreeDisplay for DynItem {}
-
 impl Display for DynItem {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "DynItem")
+    }
+}
+
+impl DynItem {
+    pub fn new(t: Box<dyn AsActor>, id: u64) -> Self {
+        Self { id, task: t }
     }
 }
 
@@ -51,8 +53,9 @@ impl From<Runner> for TaskGroup {
         let boxed_tasks = runner
             .tasks
             .into_iter()
-            .map(|x| -> DynItem {
-                let item_id = x.as_id();
+            .enumerate()
+            .map(|(i, x)| -> DynItem {
+                let item_id = x.as_id_with(i as u64);
                 match x {
                     Runnable::Many(runner) => DynItem {
                         task: Box::new(Task::Group(TaskGroup::from(runner))),
@@ -85,18 +88,16 @@ impl TaskGroup {
     pub fn tasks(self) -> Vec<DynItem> {
         self.tasks
     }
-    pub fn seq(tasks: Vec<DynItem>, id: u64) -> Self {
+    pub fn seq(tasks: Vec<DynItem>, _id: u64) -> Self {
         Self {
             run_kind: RunKind::Sequence,
             tasks,
-            id,
         }
     }
-    pub fn all(tasks: Vec<DynItem>, id: u64) -> Self {
+    pub fn all(tasks: Vec<DynItem>, _id: u64) -> Self {
         Self {
             run_kind: RunKind::Overlapping,
             tasks,
-            id,
         }
     }
 

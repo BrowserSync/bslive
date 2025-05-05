@@ -50,9 +50,13 @@ impl Display for Token {
     }
 }
 
+/// This is a port of https://www.npmjs.com/package/archy
+/// Note: absolutely zero attempts at performance optimizations were made here.
+/// This code is not in any kind of hot path
+///
 pub fn archy(obj: &ArchyNode, line_prefix: Option<&str>) -> String {
     type T = Token;
-
+    ///
     let line_prefix = line_prefix.unwrap_or("");
 
     let this_row_prefix = if obj.nodes.is_empty() {
@@ -71,7 +75,7 @@ pub fn archy(obj: &ArchyNode, line_prefix: Option<&str>) -> String {
     let label_lines = obj.label.split('\n').collect::<Vec<_>>();
     let label_lines_joined = label_lines.join(&label_lines_prefix);
 
-    let last_index = obj.nodes.len().checked_sub(1).unwrap_or(0);
+    let last_index = obj.nodes.len().saturating_sub(1);
     let each_node = obj
         .nodes
         .iter()
