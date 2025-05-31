@@ -1,6 +1,6 @@
 use actix::{Actor, ActorFutureExt, Recipient, ResponseActFuture, WrapFuture};
-use bsnext_dto::internal::AnyEvent;
-use bsnext_system::task::{AsActor, InvocationId, TaskCommand, TaskComms, TaskResult};
+use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
+use bsnext_system::task::{AsActor, TaskCommand, TaskComms};
 use bsnext_system::task_group::{DynItem, TaskGroup};
 use bsnext_system::task_group_runner::TaskGroupRunner;
 use std::fmt::{Debug, Formatter};
@@ -31,7 +31,7 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
 
-    let r = addr
+    let task_result = addr
         .send(TaskCommand::Changes {
             changes: vec![],
             fs_event_context: Default::default(),
@@ -44,7 +44,7 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
         .await
         .unwrap();
     let _evt = rx.recv().await;
-    assert_eq!(r.task_reports.len(), 2);
+    assert_eq!(task_result.task_reports.len(), 2);
     Ok(())
 }
 

@@ -1,9 +1,10 @@
-use crate::archy::ArchyNode;
 use crate::ext_event_sender::ExtEventSender;
-use crate::task::{AsActor, TaskCommand, TaskReport};
+use crate::task::{AsActor, TaskCommand};
 use crate::tasks::notify_servers::NotifyServers;
 use crate::tasks::sh_cmd::ShCmd;
 use actix::{Actor, Recipient};
+use bsnext_dto::archy::ArchyNode;
+use bsnext_dto::internal::TaskReport;
 use bsnext_input::route::{BsLiveRunner, RunOptItem};
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};

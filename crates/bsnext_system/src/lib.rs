@@ -31,7 +31,6 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 pub mod any_monitor;
-pub mod archy;
 pub mod args;
 pub mod cli;
 pub mod export;

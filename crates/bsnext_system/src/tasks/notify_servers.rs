@@ -1,6 +1,7 @@
-use crate::task::{InvocationId, TaskCommand, TaskResult};
+use crate::task::TaskCommand;
 use actix::{Actor, Handler, ResponseFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
+use bsnext_dto::internal::{InvocationId, TaskResult};
 
 #[derive(Default)]
 pub struct NotifyServers {}

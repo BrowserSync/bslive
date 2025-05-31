@@ -1,13 +1,12 @@
-use crate::archy::archy;
 use crate::input_fs::from_input_path;
 use crate::runner::{Runnable, Runner};
-use crate::task::{AsActor, Task, TaskCommand, TaskComms, TaskReport};
+use crate::task::{AsActor, Task, TaskCommand, TaskComms};
 use crate::task_group::TaskGroup;
 use crate::{BsSystem, OverrideInput};
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::{AnyEvent, InternalEvents};
+use bsnext_dto::internal::{AnyEvent, InternalEvents, TaskReport};
 use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
@@ -89,7 +88,6 @@ impl Handler<Trigger> for BsSystem {
     fn handle(&mut self, msg: Trigger, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
         let fs_ctx = msg.fs_ctx();
-        let _fs_ctx_clone = fs_ctx.clone();
         let entry = self.tasks.get(fs_ctx);
         let cloned_id = fs_ctx.clone();
 
@@ -111,72 +109,13 @@ impl Handler<Trigger> for BsSystem {
                     match (resp, runner) {
                         (Ok(result), Some(runner)) => {
                             let report = result.to_report(task_id);
-                            tracing::trace!("will handle !result.is_ok()");
-
                             let mut e = HashMap::new();
                             every_report(&mut e, &report);
 
-                            // println!("{:?}", e.keys());
-                            let out = runner.as_tree_with_results(&e);
-                            let s = archy(&out, None);
-
-                            println!("{}", s);
-                            // dbg!(&out);
-
-                            // let hm = report.result()
-                            //     .map(|tr| tr.results())
-                            //     .flatten()
-                            //     .map(ToOwned::to_owned)
-                            //     .map(|item| (item.))
-                            //     .collect::<HashMap<<>>();
-
-                            // let reports = report.reports();
-
-                            // let mut hm = HashMap::new();
-                            // hm.insert(task_id, report.result().clone());
-                            //
-                            // for x in reports {
-                            //     let id = x.id();
-                            //     hm.insert(id, x.result().clone());
-                            // }
-                            //
-                            // let tree = runner.as_tree_with_results(&hm);
-                            // let s = archy(&tree, None);
-                            // println!("{}", s);
-
-                            // println!("{}", s)
-                            // let s = archy();
-                            // match &report.result().status {
-                            //     TaskStatus::Ok(_) => {}
-                            //     TaskStatus::Err(TaskError::GroupPartial {}) => {}
-                            // }
-
-                            // let r = report.result();
-                            // match runner.run_kind {
-                            //
-                            // }
-
-                            // match r.status() {
-                            //     &_ => {}
-                            // }
-                            // dbg!(result);
-                            // dbg!(runner);
-                            // let t = Runnable::BsLive(BsLiveRunner::ExtEvent);
-                            // let task = Task::Runnable(t.clone());
-                            // let runner = Runner::seq(&vec![t]);
-                            // let Some(sender) = actor.any_event_sender.as_ref() else {
-                            //     todo!("cannot get here?");
-                            // };
-                            // let err = result.err().expect("guarded check");
-                            // let mut lines: Vec<OutputLineDTO> = vec![];
-                            // output(&err, &mut lines, 0, Some("[run:error]".into()));
-                            // let cmd = TaskCommand::Log {
-                            //     output: lines,
-                            //     task_comms: TaskComms::new(sender.clone(), None),
-                            //     invocation_id: 0,
-                            //     fs_event_context: fs_ctx_clone,
-                            // };
-                            // ctx.notify(Trigger::new(task, cmd, runner))
+                            let tree = runner.as_tree_with_results(&e);
+                            actor.publish_any_event(AnyEvent::Internal(
+                                InternalEvents::TaskReport { report, tree },
+                            ));
                         }
                         (Ok(_), _) => {
                             tracing::trace!("a triggered command completed");

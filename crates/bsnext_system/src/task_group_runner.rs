@@ -1,7 +1,8 @@
 use crate::runner::RunKind;
-use crate::task::{AsActor, ExpectedLen, InvocationId, TaskCommand, TaskReport, TaskResult};
+use crate::task::{AsActor, TaskCommand};
 use crate::task_group::TaskGroup;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
+use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
 use tokio::task::JoinSet;
 

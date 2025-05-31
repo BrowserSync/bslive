@@ -1,7 +1,7 @@
-use crate::task::{InvocationId, TaskCommand, TaskResult};
+use crate::task::TaskCommand;
 use actix::{Handler, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::AnyEvent;
+use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
 
 #[derive(Default, Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct ExtEventSender;

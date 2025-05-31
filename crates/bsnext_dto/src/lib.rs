@@ -12,6 +12,7 @@ use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
 use bsnext_tracing::LogLevel;
 use typeshare::typeshare;
 
+pub mod archy;
 pub mod external_events;
 pub mod internal;
 pub mod internal_events;
