@@ -310,7 +310,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { startBlocking, start } = nativeBinding
+const { startBlocking, BsSystem } = nativeBinding
 
 module.exports.startBlocking = startBlocking
-module.exports.start = start
+module.exports.BsSystem = BsSystem

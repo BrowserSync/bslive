@@ -56,7 +56,6 @@ impl Display for Token {
 ///
 pub fn archy(obj: &ArchyNode, line_prefix: Option<&str>) -> String {
     type T = Token;
-    ///
     let line_prefix = line_prefix.unwrap_or("");
 
     let this_row_prefix = if obj.nodes.is_empty() {

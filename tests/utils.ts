@@ -109,7 +109,9 @@ export const test = base.extend<{
                         });
                         const parsed = loose.safeParse(json);
                         if (parsed.error) {
-                            console.log("cannot continue0");
+                            console.log(
+                                "cannot continue - probably an unsupported type",
+                            );
                         } else {
                             if (parsed.data.kind === "OutputLine") {
                                 const tryOutput = outputLineDTOSchema.safeParse(

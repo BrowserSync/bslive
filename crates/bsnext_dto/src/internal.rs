@@ -38,6 +38,7 @@ pub enum StartupEvent {
 #[serde(tag = "kind", content = "payload")]
 pub enum InternalEventsDTO {
     ServersChanged(GetActiveServersResponseDTO),
+    TaskReport { id: String },
 }
 
 #[derive(Debug, Clone)]
@@ -146,6 +147,12 @@ pub struct ExitCode(pub i32);
 pub struct TaskReport {
     result: TaskResult,
     id: u64,
+}
+
+impl Display for TaskReport {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "id: {}", self.id)
+    }
 }
 
 #[derive(Debug, Clone)]

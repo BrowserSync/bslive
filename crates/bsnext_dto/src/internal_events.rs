@@ -27,8 +27,13 @@ impl OutputWriterTrait for InternalEvents {
                 writeln!(sink, "{}", serde_json::to_string(&json)?)
                     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             }
-            InternalEvents::TaskReport { report, tree } => {
-                todo!("write task report + tree as json {:?}", report);
+            InternalEvents::TaskReport { report, .. } => {
+                // let tree_str = archy(tree, None);
+                let as_json = InternalEventsDTO::TaskReport {
+                    id: report.id().to_string(),
+                };
+                writeln!(sink, "{}", serde_json::to_string(&as_json)?)
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
                 // let mut e = HashMap::new();
                 // every_report(&mut e, &report);
 

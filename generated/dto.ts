@@ -203,7 +203,10 @@ export type InputErrorDTO =
 
 /** @discriminator kind */
 export type InternalEventsDTO = 
-	| { kind: "ServersChanged", payload: GetActiveServersResponseDTO };
+	| { kind: "ServersChanged", payload: GetActiveServersResponseDTO }
+	| { kind: "TaskReport", payload: {
+	id: string;
+}};
 
 /** @discriminator kind */
 export type OutputLineDTO = 

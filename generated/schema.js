@@ -285,10 +285,18 @@ var inputErrorDTOSchema = z.discriminatedUnion("kind", [
     payload: z.string()
   })
 ]);
-var internalEventsDTOSchema = z.object({
-  kind: z.literal("ServersChanged"),
-  payload: getActiveServersResponseDTOSchema
-});
+var internalEventsDTOSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("ServersChanged"),
+    payload: getActiveServersResponseDTOSchema
+  }),
+  z.object({
+    kind: z.literal("TaskReport"),
+    payload: z.object({
+      id: z.string()
+    })
+  })
+]);
 var startupEventDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Started"),
