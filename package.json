@@ -8,6 +8,7 @@
   },
   "files": [
     "index.js",
+    "entry.mjs",
     "index.d.ts",
     "bin.js"
   ],
@@ -39,7 +40,7 @@
     "build:client": "npm run build:client --workspaces --if-present",
     "build:example": "npm run build:example --workspaces --if-present",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "npm run tsc",
+    "test": "npm run tsc && npm run test:build",
     "posttest": "npm run test --workspaces --if-present",
     "test:build": "ava",
     "universal": "napi universal",

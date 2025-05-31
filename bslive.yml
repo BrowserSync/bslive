@@ -15,7 +15,7 @@ servers:
           run:
             - all:
                 - sh: echo 2
-                - sh: exit 1
+                - sh: exit 0
                 - sh: sleep 1 && echo '->hehe'
                   name: '[another attempt--->]'
                 - seq:

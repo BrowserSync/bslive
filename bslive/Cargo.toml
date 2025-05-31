@@ -13,8 +13,8 @@ tokio = { workspace = true }
 actix-rt = { workspace = true }
 
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
-napi = { version = "2.12.2", default-features = false, features = ["napi4", "tokio_rt", "tokio_full"] }
-napi-derive = "2.12.2"
+napi = { version = "2.16.17", default-features = false, features = ["napi4"] }
+napi-derive = "2.16.13"
 
 [build-dependencies]
-napi-build = "2.0.1"
+napi-build = "2.2.0"

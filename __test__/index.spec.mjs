@@ -1,7 +1,8 @@
-import test from 'ava'
+import test from "ava";
 
-import { start } from '../index.js'
+import { start, startBlocking } from "../index.js";
 
-test('sum from native', (t) => {
-  t.is(typeof start, "function")
-})
+test("start + startBlocking from native", (t) => {
+    t.is(typeof startBlocking, "function");
+    t.is(typeof start, "function");
+});
