@@ -216,7 +216,7 @@ impl BsLive for Node {
 enum Convert {
     None,
     Input(Input),
-    Route(Route),
+    Route(Box<Route>),
     Playground(Playground),
 }
 
@@ -245,7 +245,7 @@ pub fn nodes_to_input(nodes: &[Node], ctx: &InputCtx) -> Result<Input, MarkdownE
             |route_body_pair| {
                 let as_route: Result<Route, _> = pair_to_route(route_body_pair);
                 match as_route {
-                    Ok(route) => Convert::Route(route),
+                    Ok(route) => Convert::Route(Box::new(route)),
                     Err(_e) => {
                         // todo: add error handling here?
                         Convert::None
@@ -315,7 +315,7 @@ pub fn nodes_to_input(nodes: &[Node], ctx: &InputCtx) -> Result<Input, MarkdownE
                         }
                     }
                     Convert::Route(route) => {
-                        routes.push(route);
+                        routes.push(*route);
                     }
                     Convert::Playground(pl) => {
                         if playground.is_none() {

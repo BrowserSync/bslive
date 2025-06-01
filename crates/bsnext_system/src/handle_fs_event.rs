@@ -75,9 +75,6 @@ impl Trigger {
             TaskCommand::Changes {
                 fs_event_context, ..
             } => fs_event_context,
-            TaskCommand::Log {
-                fs_event_context, ..
-            } => fs_event_context,
         }
     }
 }

@@ -54,7 +54,7 @@ impl napi::Task for AsyncStart {
     }
 
     fn resolve(&mut self, env: Env, output: Self::Output) -> napi::Result<Self::JsValue> {
-        Ok(env.create_int32(output)?)
+        env.create_int32(output)
     }
 }
 
@@ -67,6 +67,12 @@ pub struct BsSystem {
     sender: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
+impl Default for BsSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BsSystem {
     pub fn new() -> Self {
         Self { sender: None }
@@ -76,6 +82,7 @@ impl BsSystem {
 #[napi]
 impl JsBsSystem {
     #[napi(constructor)]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         JsBsSystem {
             system: BsSystem::new(),
@@ -88,11 +95,11 @@ impl JsBsSystem {
         AsyncTask::with_signal(AsyncStart { args, rx: Some(rx) }, signal)
     }
     #[napi]
-    pub fn send(&self, arg: serde_json::Value) -> () {
+    pub fn send(&self, arg: serde_json::Value) {
         println!("try to send? {arg:?}");
     }
     #[napi]
-    pub fn stop(&mut self) -> () {
+    pub fn stop(&mut self) {
         if let Some(sender) = self.system.sender.take() {
             sender.send(()).unwrap()
         }

@@ -4,7 +4,6 @@ use crate::task_group_runner::TaskGroupRunner;
 use actix::{Actor, Recipient};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::{AnyEvent, TaskResult};
-use bsnext_dto::OutputLineDTO;
 use bsnext_fs::FsEventContext;
 use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
@@ -19,25 +18,17 @@ pub enum TaskCommand {
         task_comms: TaskComms,
         invocation_id: u64,
     },
-    Log {
-        fs_event_context: FsEventContext,
-        task_comms: TaskComms,
-        invocation_id: u64,
-        output: Vec<OutputLineDTO>,
-    },
 }
 
 impl TaskCommand {
     pub fn comms(&self) -> &TaskComms {
         match self {
             TaskCommand::Changes { task_comms, .. } => task_comms,
-            TaskCommand::Log { task_comms, .. } => task_comms,
         }
     }
     pub fn id(&self) -> u64 {
         match self {
             TaskCommand::Changes { invocation_id, .. } => *invocation_id,
-            TaskCommand::Log { invocation_id, .. } => *invocation_id,
         }
     }
 }

@@ -73,7 +73,7 @@ impl OutputWriterTrait for InternalEvents {
             }
             InternalEvents::TaskReport { report, tree } => {
                 if report.has_errors() {
-                    let s = archy(&tree, None);
+                    let s = archy(tree, None);
                     write!(sink, "{}", s)?;
                 }
             }

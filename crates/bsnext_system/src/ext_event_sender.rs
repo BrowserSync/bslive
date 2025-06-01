@@ -47,10 +47,6 @@ impl Handler<TaskCommand> for ExtEventSender {
                     },
                 ))]
             }
-            TaskCommand::Log { output, .. } => output
-                .into_iter()
-                .map(|x| AnyEvent::External(ExternalEventsDTO::OutputLine(x)))
-                .collect(),
         };
         Box::pin(async move {
             for evt in events {

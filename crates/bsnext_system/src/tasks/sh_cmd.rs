@@ -138,7 +138,6 @@ impl actix::Handler<TaskCommand> for ShCmd {
         let any_event_sender2 = msg.comms().any_event_sender.clone();
         let reason = match &msg {
             TaskCommand::Changes { changes, .. } => format!("{} files changed", changes.len()),
-            TaskCommand::Log { .. } => todo!("cannot get here?"),
         };
         let files = match &msg {
             TaskCommand::Changes { changes, .. } => changes
@@ -146,7 +145,6 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
-            TaskCommand::Log { .. } => todo!("cannot get here?"),
         };
 
         let sh_prefix = Arc::new(self.prefix());

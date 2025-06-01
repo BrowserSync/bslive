@@ -16,6 +16,7 @@ pub mod start_from_example;
 pub mod start_from_inputs;
 pub mod start_from_paths;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum StartKind {
     FromInput(StartFromInput),
