@@ -4,7 +4,8 @@ use crate::task_group::TaskGroup;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
-use tokio::task::JoinSet;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 pub struct TaskGroupRunner {
     done: bool,
@@ -72,19 +73,29 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                     }
                 }
                 RunKind::Overlapping => {
-                    let futures = group
-                        .tasks()
-                        .into_iter()
-                        .enumerate()
-                        .map(|(index, as_actor)| {
-                            let id = as_actor.id();
-                            let a = Box::new(as_actor).into_actor2();
-                            a.send(msg.clone())
-                                .map(move |task_result| (index, id, task_result))
+                    let sem = Arc::new(Semaphore::new(5));
+                    let mut jhs = Vec::new();
+                    for (index, as_actor) in group.tasks().into_iter().enumerate() {
+                        let id = as_actor.id();
+                        let actor = Box::new(as_actor).into_actor2();
+                        let jh = tokio::spawn({
+                            let msg_clon = msg.clone();
+                            let semaphore = sem.clone();
+                            async move {
+                                let _permit = semaphore.acquire().await.unwrap();
+                                let msg_response = actor
+                                    .send(msg_clon)
+                                    .map(move |task_result| (index, id, task_result))
+                                    .await;
+                                drop(_permit);
+                                msg_response
+                            }
                         });
-                    let mut set = JoinSet::from_iter(futures);
-                    while let Some(res) = set.join_next().await {
-                        match res {
+                        jhs.push(jh);
+                    }
+
+                    for jh in jhs {
+                        match jh.await {
                             Ok((index, id, Ok(result))) => {
                                 done.push((index, result.to_report(id)));
                             }
