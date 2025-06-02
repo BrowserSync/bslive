@@ -5,7 +5,7 @@ use crate::tasks::sh_cmd::ShCmd;
 use actix::{Actor, Recipient};
 use bsnext_dto::archy::ArchyNode;
 use bsnext_dto::internal::TaskReport;
-use bsnext_input::route::{BsLiveRunner, RunOptItem};
+use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -20,7 +20,7 @@ impl TreeDisplay for Runner {
         let _id = self.as_id_with(parent);
         match &self.run_kind {
             RunKind::Sequence => format!("Seq: {} task(s)", self.tasks.len()),
-            RunKind::Overlapping => format!("Overlapping {} task(s)", self.tasks.len()),
+            RunKind::Overlapping { .. } => format!("Overlapping {} task(s)", self.tasks.len()),
         }
     }
 }
@@ -28,13 +28,26 @@ impl TreeDisplay for Runner {
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum RunKind {
     Sequence,
-    Overlapping,
+    Overlapping { opts: OverlappingOpts },
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+pub struct OverlappingOpts {
+    pub max_concurrent_items: u8,
+}
+
+impl OverlappingOpts {
+    pub fn new(max_concurrent_items: u8) -> Self {
+        Self {
+            max_concurrent_items,
+        }
+    }
 }
 
 impl Runner {
-    pub fn all(p0: &[Runnable]) -> Self {
+    pub fn all(p0: &[Runnable], opts: OverlappingOpts) -> Self {
         Self {
-            run_kind: RunKind::Overlapping,
+            run_kind: RunKind::Overlapping { opts },
             tasks: p0.to_vec(),
         }
     }
@@ -42,12 +55,6 @@ impl Runner {
         Self {
             run_kind: RunKind::Sequence,
             tasks: p0.to_vec(),
-        }
-    }
-    pub fn all_from(p0: &[RunOptItem]) -> Self {
-        Self {
-            run_kind: RunKind::Overlapping,
-            tasks: p0.iter().map(Runnable::from).collect(),
         }
     }
     pub fn seq_from(p0: &[RunOptItem]) -> Self {
@@ -205,11 +212,14 @@ impl From<&RunOptItem> for Runnable {
             RunOptItem::BsLive { bslive } => Self::BsLive(bslive.clone()),
             RunOptItem::Sh(sh) => Self::Sh(ShCmd::from(sh)),
             RunOptItem::ShImplicit(sh) => Self::Sh(ShCmd::new(sh.into())),
-            RunOptItem::All { all } => {
+            RunOptItem::All(RunAll { all, run_all_opts }) => {
                 let items: Vec<_> = all.iter().map(Runnable::from).collect();
-                Self::Many(Runner::all(&items))
+                let opts = OverlappingOpts {
+                    max_concurrent_items: run_all_opts.max,
+                };
+                Self::Many(Runner::all(&items, opts))
             }
-            RunOptItem::Seq { seq } => {
+            RunOptItem::Seq(RunSeq { seq, .. }) => {
                 let items: Vec<_> = seq.iter().map(Runnable::from).collect();
                 Self::Many(Runner::seq(&items))
             }

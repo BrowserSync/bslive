@@ -7,6 +7,15 @@ use futures_util::FutureExt;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 
+/// Represents a task group runner responsible for managing and executing a set of tasks.
+///
+/// The `TaskGroupRunner` struct is used to handle task groups and their execution lifecycle.
+/// It maintains the state of execution and the associated `TaskGroup`.
+///
+/// # Fields
+///
+/// * `done` - A boolean flag indicating whether the task group has finished execution.
+/// * `task_group` - An `Option` containing the `TaskGroup` instance that this runner manages.
 pub struct TaskGroupRunner {
     done: bool,
     task_group: Option<TaskGroup>,
@@ -54,8 +63,8 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                 RunKind::Sequence => {
                     for (index, group_item) in group.tasks().into_iter().enumerate() {
                         let id = group_item.id();
-                        let x = Box::new(group_item).into_actor2();
-                        match x.send(msg.clone()).await {
+                        let boxed_actor = Box::new(group_item).into_actor2();
+                        match boxed_actor.send(msg.clone()).await {
                             Ok(result) => {
                                 let is_ok = result.is_ok();
                                 done.push((index, result.to_report(id)));
@@ -72,8 +81,8 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                         }
                     }
                 }
-                RunKind::Overlapping => {
-                    let sem = Arc::new(Semaphore::new(5));
+                RunKind::Overlapping { opts } => {
+                    let sem = Arc::new(Semaphore::new(opts.max_concurrent_items as usize));
                     let mut jhs = Vec::new();
                     for (index, as_actor) in group.tasks().into_iter().enumerate() {
                         let id = as_actor.id();
@@ -116,8 +125,8 @@ impl Handler<TaskCommand> for TaskGroupRunner {
         Box::pin(future.into_actor(self).map(move |res, actor, _ctx| {
             actor.done = true;
 
-            tracing::info!("actual len: {}", res.len());
-            tracing::info!("expected len: {}", expected_len);
+            tracing::debug!("actual len: {}", res.len());
+            tracing::debug!("expected len: {}", expected_len);
 
             let all_good = res.iter().all(|(_index, report)| report.result().is_ok());
             let all_ran = res.len() == expected_len;

@@ -1,4 +1,4 @@
-use crate::runner::{RunKind, Runnable, Runner};
+use crate::runner::{OverlappingOpts, RunKind, Runnable, Runner};
 use crate::task::{AsActor, Task, TaskCommand};
 use actix::Recipient;
 use std::fmt::{Display, Formatter};
@@ -70,16 +70,10 @@ impl From<Runner> for TaskGroup {
             .collect::<Vec<DynItem>>();
         match runner.run_kind {
             RunKind::Sequence => Self::seq(boxed_tasks, top_id),
-            RunKind::Overlapping => Self::all(boxed_tasks, top_id),
+            RunKind::Overlapping { opts } => Self::all(boxed_tasks, opts, top_id),
         }
     }
 }
-
-// impl From<Runner> for TaskGroup {
-//     fn from(value: &Runner) -> Self {
-//         TaskGroup::from(value.clone())
-//     }
-// }
 
 impl TaskGroup {
     pub fn run_kind(&self) -> &RunKind {
@@ -94,9 +88,9 @@ impl TaskGroup {
             tasks,
         }
     }
-    pub fn all(tasks: Vec<DynItem>, _id: u64) -> Self {
+    pub fn all(tasks: Vec<DynItem>, opts: OverlappingOpts, _id: u64) -> Self {
         Self {
-            run_kind: RunKind::Overlapping,
+            run_kind: RunKind::Overlapping { opts },
             tasks,
         }
     }

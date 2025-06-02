@@ -269,16 +269,7 @@ pub struct Spec {
     pub debounce: Option<DebounceDuration>,
     pub filter: Option<FilterKind>,
     pub ignore: Option<FilterKind>,
-    pub run: Option<RunOpt>,
-}
-
-#[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
-)]
-#[serde(untagged)]
-pub enum RunOpt {
-    All { all: Vec<RunOptItem> },
-    Seq(Vec<RunOptItem>),
+    pub run: Option<Vec<RunOptItem>>,
 }
 
 #[derive(
@@ -315,9 +306,77 @@ impl ShRunOptItem {
 pub enum RunOptItem {
     BsLive { bslive: BsLiveRunner },
     Sh(ShRunOptItem),
-    All { all: Vec<RunOptItem> },
-    Seq { seq: Vec<RunOptItem> },
+    All(RunAll),
+    Seq(RunSeq),
     ShImplicit(String),
+}
+
+#[derive(
+    Debug,
+    Default,
+    Ord,
+    PartialOrd,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    serde::Deserialize,
+    serde::Serialize,
+)]
+pub struct RunAll {
+    pub all: Vec<RunOptItem>,
+    #[serde(default, rename = "opts")]
+    pub run_all_opts: RunAllOpts,
+}
+
+impl RunAll {
+    pub fn new(items: Vec<RunOptItem>) -> Self {
+        Self {
+            all: items,
+            run_all_opts: Default::default(),
+        }
+    }
+
+    pub fn with_opts(items: Vec<RunOptItem>, opts: RunAllOpts) -> Self {
+        Self {
+            all: items,
+            run_all_opts: opts,
+        }
+    }
+
+    pub fn items(&self) -> &Vec<RunOptItem> {
+        &self.all
+    }
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub struct RunAllOpts {
+    pub max: u8,
+}
+
+impl Default for RunAllOpts {
+    fn default() -> Self {
+        Self { max: 5 }
+    }
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub struct RunSeq {
+    pub seq: Vec<RunOptItem>,
+}
+
+impl RunSeq {
+    pub fn new(items: Vec<RunOptItem>) -> Self {
+        Self { seq: items }
+    }
+
+    pub fn items(&self) -> &Vec<RunOptItem> {
+        &self.seq
+    }
 }
 
 #[derive(
