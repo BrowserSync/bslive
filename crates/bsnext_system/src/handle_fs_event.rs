@@ -24,6 +24,7 @@ impl actix::Handler<FsEvent> for BsSystem {
                 if let Some((task, cmd, runner)) =
                     self.handle_buffered(&msg.fs_event_ctx, buffer_change)
                 {
+                    tracing::debug!("will trigger task runner");
                     ctx.notify(Trigger::new(task, cmd, runner));
                 }
                 None
@@ -39,7 +40,7 @@ impl actix::Handler<FsEvent> for BsSystem {
                     // return None here so that the event is not published yet (the updated Input will do it)
                     None
                 }
-                // otherwise just publish the change as usual
+                // otherwise publish the change as usual
                 (evt, None) => Some(evt),
             },
             FsEventKind::PathAdded(path) => self.handle_path_added(&path),
@@ -184,11 +185,11 @@ impl BsSystem {
             invocation_id: 0,
         };
 
+        // todo: use this example as a way to display a dry-run scenario
         // let tree = runner.as_tree();
         // let as_str = archy(&tree, None);
         // println!("upcoming-->");
         // println!("{as_str}");
-        // todo: use this example as a way to display a dry-run scenario
         let task_group = TaskGroup::from(runner.clone());
 
         Some((Task::Group(task_group), cmd, runner))

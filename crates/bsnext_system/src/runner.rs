@@ -20,7 +20,11 @@ impl TreeDisplay for Runner {
         let _id = self.as_id_with(parent);
         match &self.run_kind {
             RunKind::Sequence => format!("Seq: {} task(s)", self.tasks.len()),
-            RunKind::Overlapping { .. } => format!("Overlapping {} task(s)", self.tasks.len()),
+            RunKind::Overlapping { opts } => format!(
+                "Overlapping {} task(s) (max concurrency: {})",
+                self.tasks.len(),
+                opts.max_concurrent_items
+            ),
         }
     }
 }

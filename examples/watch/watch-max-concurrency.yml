@@ -1,0 +1,19 @@
+servers:
+  - name: 'max-concurrency-2'
+    routes:
+      - path: /
+        dir: examples/watch/src/index.html
+        watch:
+          debounce:
+            ms: 0
+          # This test case proves that the second group of tasks does not wait for the first
+          # this is because `all` is a way of configuring the runner to run in parallel
+          run:
+            - opts:
+                max: 3
+              all:
+                - sh: "echo 'Start A' && sleep 0.3 && echo 'End A'"
+                - sh: "echo 'Start B' && sleep 0.3 && echo 'End B'"
+                - sh: "echo 'Start C' && sleep 0.3 && echo 'End C'"
+                - sh: "echo 'Start D' && sleep 0.3 && echo 'End D'"
+                - sh: "echo 'Start E' && sleep 0.3 && echo 'End E'"
