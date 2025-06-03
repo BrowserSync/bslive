@@ -111,12 +111,18 @@ impl TaskList {
             tasks: p0.to_vec(),
         }
     }
+    pub fn seq_opts(p0: &[Runnable], opts: SequenceOpts) -> Self {
+        Self {
+            run_kind: RunKind::Sequence { opts },
+            tasks: p0.to_vec(),
+        }
+    }
     pub fn seq_from(p0: &[RunOptItem]) -> Self {
         Self {
             run_kind: RunKind::Sequence {
                 opts: SequenceOpts::default(),
             },
-            tasks: p0.iter().map(Runnable::from).collect(),
+            tasks: p0.iter().map(|opt| Runnable::from(opt)).collect(),
         }
     }
 
@@ -293,9 +299,12 @@ impl From<&RunOptItem> for Runnable {
                 };
                 Self::Many(TaskList::all(&items, opts))
             }
-            RunOptItem::Seq(RunSeq { seq, .. }) => {
+            RunOptItem::Seq(RunSeq { seq, seq_opts }) => {
                 let items: Vec<_> = seq.iter().map(Runnable::from).collect();
-                Self::Many(TaskList::seq(&items))
+                let opts = SequenceOpts {
+                    exit_on_failure: seq_opts.exit_on_fail,
+                };
+                Self::Many(TaskList::seq_opts(&items, opts))
             }
         }
     }

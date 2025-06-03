@@ -1,5 +1,6 @@
 use crate::route::{
-    DebounceDuration, FilterKind, RunAll, RunAllOpts, RunOptItem, ShRunOptItem, Spec,
+    DebounceDuration, FilterKind, RunAll, RunAllOpts, RunOptItem, RunSeq, SeqOpts, ShRunOptItem,
+    Spec,
 };
 use crate::watch_opts::WatchOpts;
 
@@ -164,6 +165,34 @@ fn test_watch_opts_run_all_max_concurrency() {
                 RunAllOpts { max: 10 },
             )),
         ]),
+        ..Default::default()
+    };
+    let actual: Spec = serde_yaml::from_str(input).unwrap();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_watch_opts_run_seq_exit() {
+    let input = r#"
+    run:
+      - seq:
+         - sh: echo 2
+         - sh: echo 3
+         - sh: echo 4
+        opts:
+          exit_on_fail: false
+    "#;
+    let expected = Spec {
+        run: Some(vec![RunOptItem::Seq(RunSeq::with_opts(
+            vec![
+                RunOptItem::Sh(ShRunOptItem::new("echo 2")),
+                RunOptItem::Sh(ShRunOptItem::new("echo 3")),
+                RunOptItem::Sh(ShRunOptItem::new("echo 4")),
+            ],
+            SeqOpts {
+                exit_on_fail: false,
+            },
+        ))]),
         ..Default::default()
     };
     let actual: Spec = serde_yaml::from_str(input).unwrap();

@@ -385,13 +385,37 @@ impl Default for RunAllOpts {
 #[derive(
     Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
+pub struct SeqOpts {
+    pub exit_on_fail: bool,
+}
+
+impl Default for SeqOpts {
+    fn default() -> Self {
+        Self { exit_on_fail: true }
+    }
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
 pub struct RunSeq {
     pub seq: Vec<RunOptItem>,
+    #[serde(default, rename = "opts")]
+    pub seq_opts: SeqOpts,
 }
 
 impl RunSeq {
     pub fn new(items: Vec<RunOptItem>) -> Self {
-        Self { seq: items }
+        Self {
+            seq: items,
+            seq_opts: std::default::Default::default(),
+        }
+    }
+    pub fn with_opts(items: Vec<RunOptItem>, seq_opts: SeqOpts) -> Self {
+        Self {
+            seq: items,
+            seq_opts,
+        }
     }
 
     pub fn items(&self) -> &Vec<RunOptItem> {

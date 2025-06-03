@@ -61,6 +61,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
             let mut done: Vec<(usize, TaskReport)> = vec![];
             match group.run_kind() {
                 RunKind::Sequence { opts } => {
+                    let exit_on_failure = opts.exit_on_failure;
                     for (index, group_item) in group.tasks().into_iter().enumerate() {
                         let id = group_item.id();
                         let boxed_actor = Box::new(group_item).into_task_recipient();
@@ -73,8 +74,14 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                                         "index {index} completed, will move to next text in seq"
                                     );
                                 } else {
-                                    tracing::debug!("stopping after index {index} id: {id} ran, because it did not complete successfully.");
-                                    break;
+                                    if exit_on_failure {
+                                        tracing::debug!("stopping after index {index} id: {id} ran, because it did not complete successfully.");
+                                        break;
+                                    } else {
+                                        tracing::debug!(
+                                            "continuing after failure, because of config"
+                                        );
+                                    }
                                 }
                             }
                             Err(e) => tracing::error!("{e}"),
