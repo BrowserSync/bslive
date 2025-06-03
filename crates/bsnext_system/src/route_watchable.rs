@@ -54,6 +54,7 @@ pub fn to_spec(wo: &WatchOpts) -> Spec {
             }),
             ignore: None,
             run: None,
+            before: None,
         },
         WatchOpts::Spec(spec) => spec.to_owned(),
         WatchOpts::Bool(_) => todo!("unreachable"),

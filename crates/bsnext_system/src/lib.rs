@@ -290,6 +290,39 @@ impl Handler<Start> for BsSystem {
                 let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
                 let input_clone = input.clone();
 
+                let startup_server_tasks = input_clone
+                    .servers
+                    .iter()
+                    .flat_map(|server| {
+                        server
+                            .watchers
+                            .iter()
+                            .filter_map(|watcher| {
+                                watcher.opts.as_ref().and_then(|spec| spec.before.clone())
+                            })
+                            .flatten()
+                    })
+                    .collect::<Vec<_>>();
+
+                let route_startup_tasks = input_clone
+                    .servers
+                    .iter()
+                    .flat_map(|server| {
+                        server
+                            .routes
+                            .iter()
+                            .filter_map(|route| {
+                                route.opts.watch.spec().and_then(|spec| spec.before.clone())
+                            })
+                            .flatten()
+                    })
+                    .collect::<Vec<_>>();
+
+                // ctx.notify(Trigger::new(task, cmd, runner));
+                // ctx.notify();
+                dbg!(&startup_server_tasks);
+                dbg!(&route_startup_tasks);
+
                 let f = ctx
                     .address()
                     .send(ResolveServers { input })

@@ -25,6 +25,9 @@ servers:
             <body>
               <link href="/c.css" rel="stylesheet">
             </body>
+          watch:
+            run:
+              - sh: echo 'oops'
         - path: /c.css
           raw: "body { background: cyan }"
     "#;

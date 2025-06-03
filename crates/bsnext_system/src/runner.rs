@@ -7,6 +7,7 @@ use bsnext_dto::archy::ArchyNode;
 use bsnext_dto::internal::TaskReport;
 use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
@@ -109,7 +110,7 @@ fn append(archy: &mut ArchyNode, tasks: &[Runnable]) {
     for (i, x) in tasks.iter().enumerate() {
         let label = x.as_tree_label(i as u64);
         match x {
-            Runnable::BsLive(_) => archy.nodes.push(ArchyNode::new(&label)),
+            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label)),
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label)),
             Runnable::Many(runner) => {
                 let mut next = ArchyNode::new(&label);
@@ -138,7 +139,7 @@ fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u
             }
         };
         match runnable {
-            Runnable::BsLive(_) => archy.nodes.push(ArchyNode::new(&label)),
+            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label)),
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label)),
             Runnable::Many(runner) => {
                 let mut next = ArchyNode::new(&label);
@@ -152,12 +153,12 @@ fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u
 impl AsActor for Runnable {
     fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
         match *self {
-            Runnable::BsLive(BsLiveRunner::NotifyServer) => {
+            Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
                 let s = NotifyServers::new();
                 let s = s.start();
                 s.recipient()
             }
-            Runnable::BsLive(BsLiveRunner::ExtEvent) => {
+            Runnable::BsLiveTask(BsLiveTask::ExtEvent) => {
                 let actor = ExtEventSender::new();
                 let addr = actor.start();
                 addr.recipient()
@@ -173,15 +174,30 @@ impl AsActor for Runnable {
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum Runnable {
-    BsLive(BsLiveRunner),
+    BsLiveTask(BsLiveTask),
     Sh(ShCmd),
     Many(Runner),
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+pub enum BsLiveTask {
+    NotifyServer,
+    ExtEvent,
+}
+
+impl Display for BsLiveTask {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BsLiveTask::NotifyServer => write!(f, "BsLiveTask::NotifyServer"),
+            BsLiveTask::ExtEvent => write!(f, "BsLiveTask::Group"),
+        }
+    }
 }
 
 impl Runnable {
     pub fn is_group(&self) -> bool {
         match self {
-            Runnable::BsLive(_) => false,
+            Runnable::BsLiveTask(_) => false,
             Runnable::Sh(_) => false,
             Runnable::Many(_) => true,
         }
@@ -203,7 +219,7 @@ impl TreeDisplay for Runnable {
     fn as_tree_label(&self, parent: u64) -> String {
         let id = self.as_id_with(parent);
         match self {
-            Runnable::BsLive(item) => format!("{}{}", "Runnable::BsLive::", item),
+            Runnable::BsLiveTask(item) => format!("{}{}", "Runnable::BsLiveTask", item),
             Runnable::Sh(sh) => format!("{} {}", "Runnable::Sh", sh),
             Runnable::Many(runner) => runner.as_tree_label(id),
         }
@@ -212,8 +228,12 @@ impl TreeDisplay for Runnable {
 
 impl From<&RunOptItem> for Runnable {
     fn from(value: &RunOptItem) -> Self {
+        println!("here?");
         match value {
-            RunOptItem::BsLive { bslive } => Self::BsLive(bslive.clone()),
+            RunOptItem::BsLive { bslive } => match bslive {
+                BsLiveRunner::NotifyServer => Self::BsLiveTask(BsLiveTask::NotifyServer),
+                BsLiveRunner::ExtEvent => Self::BsLiveTask(BsLiveTask::ExtEvent),
+            },
             RunOptItem::Sh(sh) => Self::Sh(ShCmd::from(sh)),
             RunOptItem::ShImplicit(sh) => Self::Sh(ShCmd::new(sh.into())),
             RunOptItem::All(RunAll { all, run_all_opts }) => {

@@ -218,6 +218,7 @@ fn test_deserialize_watch() {
             filter: None,
             ignore: None,
             run: None,
+            before: None,
         })
     );
 }

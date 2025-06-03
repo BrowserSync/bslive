@@ -270,6 +270,7 @@ pub struct Spec {
     pub filter: Option<FilterKind>,
     pub ignore: Option<FilterKind>,
     pub run: Option<Vec<RunOptItem>>,
+    pub before: Option<Vec<BeforeRunOptItem>>,
 }
 
 #[derive(
@@ -309,6 +310,15 @@ pub enum RunOptItem {
     All(RunAll),
     Seq(RunSeq),
     ShImplicit(String),
+}
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+#[serde(untagged)]
+pub enum BeforeRunOptItem {
+    Sh(ShRunOptItem),
+    All(RunAll),
+    Seq(RunSeq),
 }
 
 #[derive(

@@ -15,6 +15,7 @@ fn test_watch_opts_debounce() {
         filter: Some(FilterKind::StringDefault("**/*.css".into())),
         ignore: None,
         run: None,
+        before: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
@@ -30,6 +31,7 @@ fn test_watch_opts_inline_filter() {
         filter: Some(FilterKind::StringDefault("**/*.css".into())),
         ignore: None,
         run: None,
+        before: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
@@ -48,6 +50,7 @@ fn test_watch_opts_explicit_filter_ext() {
         }),
         ignore: None,
         run: None,
+        before: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
@@ -65,6 +68,7 @@ fn test_watch_opts_explicit_filter_glob() {
         }),
         ignore: None,
         run: None,
+        before: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(expected, actual);

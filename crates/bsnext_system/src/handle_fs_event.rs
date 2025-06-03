@@ -1,5 +1,5 @@
 use crate::input_fs::from_input_path;
-use crate::runner::{Runnable, Runner};
+use crate::runner::{BsLiveTask, Runnable, Runner};
 use crate::task::{AsActor, Task, TaskCommand, TaskComms};
 use crate::task_group::TaskGroup;
 use crate::{BsSystem, OverrideInput};
@@ -12,7 +12,6 @@ use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathEvent,
 };
-use bsnext_input::route::BsLiveRunner;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 use std::collections::HashMap;
 
@@ -283,8 +282,8 @@ impl BsSystem {
                 .map(ToOwned::to_owned)
                 .unwrap_or_else(|| {
                     Runner::seq(&[
-                        Runnable::BsLive(BsLiveRunner::NotifyServer),
-                        Runnable::BsLive(BsLiveRunner::ExtEvent),
+                        Runnable::BsLiveTask(BsLiveTask::NotifyServer),
+                        Runnable::BsLiveTask(BsLiveTask::ExtEvent),
                     ])
                 });
 
