@@ -1,0 +1,14 @@
+servers:
+  - name: 'watch-ignore-failures'
+    routes:
+      - path: /
+        dir: examples/watch/src/index.html
+        watch:
+          debounce:
+            ms: 0
+          run:
+            - opts:
+                exit_on_fail: false
+              seq:
+                - sh: echo 'start.a' && exit 1
+                - sh: echo 'start.b'
