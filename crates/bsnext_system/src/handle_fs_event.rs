@@ -24,7 +24,7 @@ impl actix::Handler<FsEvent> for BsSystem {
                     self.handle_buffered(&msg.fs_event_ctx, buffer_change)
                 {
                     tracing::debug!("will trigger task runner");
-                    ctx.notify(Trigger::new(task, cmd, runner));
+                    ctx.notify(TriggerFs::new(task, cmd, runner));
                 }
                 None
             }
@@ -55,14 +55,14 @@ impl actix::Handler<FsEvent> for BsSystem {
 
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
-struct Trigger {
+pub struct TriggerFs {
     task: Task,
     cmd: TaskCommand,
     runner: Runner,
 }
 
-impl Trigger {
-    fn new(task: Task, cmd: TaskCommand, runner: Runner) -> Self {
+impl TriggerFs {
+    pub fn new(task: Task, cmd: TaskCommand, runner: Runner) -> Self {
         Self { task, cmd, runner }
     }
 
@@ -75,14 +75,17 @@ impl Trigger {
             TaskCommand::Changes {
                 fs_event_context, ..
             } => fs_event_context,
+            TaskCommand::Exec { .. } => {
+                panic!("unreachable. It's a mistake to access fs_ctx here")
+            }
         }
     }
 }
 
-impl Handler<Trigger> for BsSystem {
+impl Handler<TriggerFs> for BsSystem {
     type Result = ResponseActFuture<Self, ()>;
 
-    fn handle(&mut self, msg: Trigger, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TriggerFs, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
         let fs_ctx = msg.fs_ctx();
         let entry = self.tasks.get(fs_ctx);
@@ -95,7 +98,7 @@ impl Handler<Trigger> for BsSystem {
 
         self.tasks.insert(fs_ctx.clone(), msg.runner.to_owned());
         let task_id = msg.runner.as_id();
-        let cmd_recipient = Box::new(msg.task).into_actor2();
+        let cmd_recipient = Box::new(msg.task).into_task_recipient();
 
         Box::pin(
             cmd_recipient
@@ -134,6 +137,47 @@ fn every_report(hm: &mut HashMap<u64, TaskReport>, report: &TaskReport) {
     }
 }
 
+#[derive(actix::Message, Debug)]
+#[rtype(result = "()")]
+pub struct TriggerInitial {
+    pub task: Task,
+    pub cmd: TaskCommand,
+    pub runner: Runner,
+}
+
+impl TriggerInitial {
+    pub fn new(task: Task, cmd: TaskCommand, runner: Runner) -> Self {
+        Self { task, cmd, runner }
+    }
+}
+
+impl Handler<TriggerInitial> for BsSystem {
+    type Result = ResponseActFuture<Self, ()>;
+
+    fn handle(&mut self, msg: TriggerInitial, ctx: &mut Self::Context) -> Self::Result {
+        let cmd = msg.cmd;
+        let runner = msg.runner;
+        let task_id = runner.as_id();
+        let cmd_recipient = Box::new(msg.task).into_task_recipient();
+        Box::pin(cmd_recipient.send(cmd).into_actor(self).map(
+            move |resp, actor, _ctx| match resp {
+                Ok(result) => {
+                    let report = result.to_report(task_id);
+                    let mut e = HashMap::new();
+                    every_report(&mut e, &report);
+
+                    let tree = runner.as_tree_with_results(&e);
+                    actor.publish_any_event(AnyEvent::Internal(InternalEvents::TaskReport {
+                        report,
+                        tree,
+                    }));
+                }
+                _ => todo!("handle this case..."),
+            },
+        ))
+    }
+}
+
 impl BsSystem {
     fn handle_buffered(
         &mut self,
@@ -168,19 +212,10 @@ impl BsSystem {
 
         let runner = self.as_runner(fs_event_ctx);
 
-        let (Some(any_event_sender), Some(servers_addr)) =
-            (&self.any_event_sender, &self.servers_addr)
-        else {
-            todo!("must have these senders...?");
-        };
-
         let cmd = TaskCommand::Changes {
             changes: paths,
             fs_event_context: fs_event_ctx.clone(),
-            task_comms: TaskComms::new(
-                any_event_sender.clone(),
-                Some(servers_addr.clone().recipient()),
-            ),
+            task_comms: self.task_comms(),
             invocation_id: 0,
         };
 
@@ -192,6 +227,18 @@ impl BsSystem {
         let task_group = TaskGroup::from(runner.clone());
 
         Some((Task::Group(task_group), cmd, runner))
+    }
+
+    pub fn task_comms(&mut self) -> TaskComms {
+        let (Some(any_event_sender), Some(servers_addr)) =
+            (&self.any_event_sender, &self.servers_addr)
+        else {
+            todo!("must have these senders...?");
+        };
+        TaskComms::new(
+            any_event_sender.clone(),
+            Some(servers_addr.clone().recipient()),
+        )
     }
 
     fn handle_any_change(
@@ -269,7 +316,7 @@ impl BsSystem {
     }
 
     fn as_runner(&self, fs_event_ctx: &FsEventContext) -> Runner {
-        tracing::info!("as_runner {:?}", fs_event_ctx);
+        tracing::info!("as_runner with fs_event_ctx {:?}", fs_event_ctx);
         let matching_monitor = self
             .any_monitors
             .iter()

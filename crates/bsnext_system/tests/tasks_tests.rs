@@ -73,7 +73,7 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
         }
     }
     impl AsActor for A {
-        fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
+        fn into_task_recipient(self: Box<Self>) -> Recipient<TaskCommand> {
             let a = self.start();
             a.recipient()
         }

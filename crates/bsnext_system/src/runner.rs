@@ -151,7 +151,7 @@ fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u
 }
 
 impl AsActor for Runnable {
-    fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
+    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskCommand> {
         match *self {
             Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
                 let s = NotifyServers::new();

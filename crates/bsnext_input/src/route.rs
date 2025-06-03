@@ -321,6 +321,16 @@ pub enum BeforeRunOptItem {
     Seq(RunSeq),
 }
 
+impl BeforeRunOptItem {
+    pub fn into_run_opt(self) -> RunOptItem {
+        match self {
+            BeforeRunOptItem::Sh(sh) => RunOptItem::Sh(sh),
+            BeforeRunOptItem::All(run_all) => RunOptItem::All(run_all),
+            BeforeRunOptItem::Seq(run_seq) => RunOptItem::Seq(run_seq),
+        }
+    }
+}
+
 #[derive(
     Debug,
     Default,

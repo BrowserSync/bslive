@@ -63,7 +63,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                 RunKind::Sequence => {
                     for (index, group_item) in group.tasks().into_iter().enumerate() {
                         let id = group_item.id();
-                        let boxed_actor = Box::new(group_item).into_actor2();
+                        let boxed_actor = Box::new(group_item).into_task_recipient();
                         match boxed_actor.send(msg.clone()).await {
                             Ok(result) => {
                                 let is_ok = result.is_ok();
@@ -86,7 +86,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                     let mut jhs = Vec::new();
                     for (index, as_actor) in group.tasks().into_iter().enumerate() {
                         let id = as_actor.id();
-                        let actor = Box::new(as_actor).into_actor2();
+                        let actor = Box::new(as_actor).into_task_recipient();
                         let jh = tokio::spawn({
                             let msg_clon = msg.clone();
                             let semaphore = sem.clone();

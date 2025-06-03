@@ -12,8 +12,11 @@ use bsnext_input::{Input, InputCtx};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::handle_fs_event::{TriggerFs, TriggerInitial};
 use crate::monitor_any_watchables::MonitorPathWatchables;
 use crate::runner::Runner;
+use crate::task::{Task, TaskCommand};
+use crate::task_group::TaskGroup;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
@@ -22,6 +25,7 @@ use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, ChildNotCreated, ChildResult, InternalEvents, ServerError};
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
 use bsnext_fs::{FsEvent, FsEventContext};
+use bsnext_input::route::BeforeRunOptItem;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use input_monitor::{InputMonitor, MonitorInput};
 use route_watchable::to_route_watchables;
@@ -302,6 +306,7 @@ impl Handler<Start> for BsSystem {
                             })
                             .flatten()
                     })
+                    .map(BeforeRunOptItem::into_run_opt)
                     .collect::<Vec<_>>();
 
                 let route_startup_tasks = input_clone
@@ -316,12 +321,19 @@ impl Handler<Start> for BsSystem {
                             })
                             .flatten()
                     })
+                    .map(BeforeRunOptItem::into_run_opt)
                     .collect::<Vec<_>>();
 
-                // ctx.notify(Trigger::new(task, cmd, runner));
-                // ctx.notify();
-                dbg!(&startup_server_tasks);
-                dbg!(&route_startup_tasks);
+                let cmd = TaskCommand::Exec {
+                    invocation_id: 0,
+                    task_comms: self.task_comms(),
+                };
+
+                let runner = Runner::seq_from(&startup_server_tasks);
+                let task_group = TaskGroup::from(runner.clone());
+                let task = Task::Group(task_group);
+
+                ctx.notify(TriggerInitial::new(task, cmd, runner));
 
                 let f = ctx
                     .address()

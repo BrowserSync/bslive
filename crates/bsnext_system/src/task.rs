@@ -18,17 +18,23 @@ pub enum TaskCommand {
         task_comms: TaskComms,
         invocation_id: u64,
     },
+    Exec {
+        task_comms: TaskComms,
+        invocation_id: u64,
+    },
 }
 
 impl TaskCommand {
     pub fn comms(&self) -> &TaskComms {
         match self {
             TaskCommand::Changes { task_comms, .. } => task_comms,
+            TaskCommand::Exec { task_comms, .. } => task_comms,
         }
     }
     pub fn id(&self) -> u64 {
         match self {
             TaskCommand::Changes { invocation_id, .. } => *invocation_id,
+            TaskCommand::Exec { invocation_id, .. } => *invocation_id,
         }
     }
 }
@@ -64,7 +70,7 @@ impl Display for Task {
 }
 
 impl AsActor for Task {
-    fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
+    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskCommand> {
         match *self {
             Task::Group(group) => {
                 let group_runner = TaskGroupRunner::new(group);
@@ -77,14 +83,14 @@ impl AsActor for Task {
                 let s = group_runner.start();
                 s.recipient()
             }
-            Task::Runnable(other_runnable) => Box::new(other_runnable).into_actor2(),
+            Task::Runnable(other_runnable) => Box::new(other_runnable).into_task_recipient(),
         }
     }
 }
 
 impl Task {
     pub fn into_actor(self) -> Recipient<TaskCommand> {
-        Box::new(self).into_actor2()
+        Box::new(self).into_task_recipient()
     }
     // fn as_id(self: Box<Self>) -> u64 {
     //     let mut hasher = DefaultHasher::new();
@@ -97,5 +103,5 @@ impl Task {
 }
 
 pub trait AsActor: std::fmt::Debug {
-    fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand>;
+    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskCommand>;
 }

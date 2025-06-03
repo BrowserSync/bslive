@@ -28,8 +28,8 @@ impl DynItem {
 }
 
 impl AsActor for DynItem {
-    fn into_actor2(self: Box<Self>) -> Recipient<TaskCommand> {
-        self.task.into_actor2()
+    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskCommand> {
+        self.task.into_task_recipient()
     }
 }
 

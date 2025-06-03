@@ -47,6 +47,7 @@ impl Handler<TaskCommand> for ExtEventSender {
                     },
                 ))]
             }
+            TaskCommand::Exec { .. } => vec![],
         };
         Box::pin(async move {
             for evt in events {

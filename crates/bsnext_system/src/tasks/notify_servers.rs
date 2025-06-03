@@ -42,6 +42,9 @@ impl Handler<TaskCommand> for NotifyServers {
                 paths: changes.clone(),
                 ctx: fs_event_context.clone(),
             }),
+            TaskCommand::Exec { .. } => {
+                todo!("I cannot accept this")
+            }
         }
         Box::pin(async { TaskResult::ok(InvocationId(0)) })
     }
