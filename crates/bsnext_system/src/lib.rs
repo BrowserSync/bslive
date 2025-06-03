@@ -1,38 +1,39 @@
 use crate::any_monitor::{AnyMonitor, PathWatchable};
 use actix::{
-    Actor, ActorContext, Addr, AsyncContext, Handler, ResponseActFuture, ResponseFuture, Running,
-    WrapFuture,
+    Actor, ActorContext, ActorFutureExt, Addr, AsyncContext, Handler, ResponseActFuture,
+    ResponseFuture, Running, WrapFuture,
 };
 
-use actix::ActorFutureExt;
-use actix_rt::Arbiter;
-use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
-use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
-use bsnext_input::{Input, InputCtx};
-use std::collections::HashMap;
-use std::path::PathBuf;
-
-use crate::handle_fs_event::{TriggerFs, TriggerInitial};
 use crate::monitor_any_watchables::MonitorPathWatchables;
-use crate::runner::Runner;
 use crate::task::{Task, TaskCommand};
 use crate::task_group::TaskGroup;
+use crate::task_list::TaskList;
+use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
+use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
+use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::{AnyEvent, ChildNotCreated, ChildResult, InternalEvents, ServerError};
+use bsnext_dto::internal::{
+    AnyEvent, ChildResult, InitialTaskError, InternalEvents, ServerError, TaskReportAndTree,
+};
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
 use bsnext_fs::{FsEvent, FsEventContext};
-use bsnext_input::route::BeforeRunOptItem;
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::{Input, InputCtx};
 use input_monitor::{InputMonitor, MonitorInput};
 use route_watchable::to_route_watchables;
 use server_watchable::to_server_watchables;
 use start::start_kind::StartKind;
+use std::collections::HashMap;
+use std::future::ready;
+use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
+use tokio::sync::oneshot::Receiver;
+use trigger_task::TriggerTask;
 
 pub mod any_monitor;
 pub mod args;
@@ -46,13 +47,15 @@ mod input_watchable;
 mod monitor_any_watchables;
 mod path_monitor;
 mod route_watchable;
-pub mod runner;
 pub mod server_watchable;
 pub mod start;
 pub mod task;
 pub mod task_group;
 pub mod task_group_runner;
+pub mod task_list;
 pub mod tasks;
+mod trigger_fs_task;
+mod trigger_task;
 
 #[derive(Debug)]
 pub(crate) struct BsSystem {
@@ -61,7 +64,7 @@ pub(crate) struct BsSystem {
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<PathWatchable, AnyMonitor>,
-    tasks: HashMap<FsEventContext, Runner>,
+    tasks: HashMap<FsEventContext, TaskList>,
     cwd: Option<PathBuf>,
     start_context: Option<StartupContext>,
 }
@@ -215,6 +218,40 @@ impl BsSystem {
             });
         }
     }
+
+    fn before(&mut self, input: &Input) -> (TriggerTask, Receiver<TaskReportAndTree>) {
+        let cmd = TaskCommand::Exec {
+            invocation_id: 0,
+            task_comms: self.task_comms(),
+        };
+
+        let all = input.before_run_opts();
+        let runner = TaskList::seq_from(&all);
+        let task_group = TaskGroup::from(runner.clone());
+        let task = Task::Group(task_group);
+        let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
+        (TriggerTask::new(task, cmd, runner, tx), rx)
+    }
+}
+
+async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<Second> {
+    let clone = input.clone();
+    let clone2 = input.clone();
+    let res = addr.send(ResolveInitialTasks { input: clone }).await??;
+    let next = addr.send(ResolveServers { input: clone2 });
+    let (servers, child_results) = next.await??;
+    Ok(Second {
+        report_and_tree: res,
+        servers,
+        child_results,
+    })
+}
+
+struct Second {
+    servers: GetActiveServersResponse,
+    #[allow(dead_code)]
+    report_and_tree: TaskReportAndTree,
+    child_results: Vec<ChildResult>,
 }
 
 impl Actor for BsSystem {
@@ -285,112 +322,46 @@ impl Handler<Start> for BsSystem {
         match msg.kind.input(&start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
                 tracing::debug!("SystemStartArgs::PathWithInput");
-                let ids = input
-                    .servers
-                    .iter()
-                    .map(|x| x.identity.clone())
-                    .collect::<Vec<_>>();
 
+                let ids = input.ids();
                 let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
-                let input_clone = input.clone();
+                let input_clone2 = input.clone();
+                let addr = ctx.address();
+                let jobs = setup_jobs(addr, input.clone());
 
-                let startup_server_tasks = input_clone
-                    .servers
-                    .iter()
-                    .flat_map(|server| {
-                        server
-                            .watchers
-                            .iter()
-                            .filter_map(|watcher| {
-                                watcher.opts.as_ref().and_then(|spec| spec.before.clone())
-                            })
-                            .flatten()
-                    })
-                    .map(BeforeRunOptItem::into_run_opt)
-                    .collect::<Vec<_>>();
-
-                let route_startup_tasks = input_clone
-                    .servers
-                    .iter()
-                    .flat_map(|server| {
-                        server
-                            .routes
-                            .iter()
-                            .filter_map(|route| {
-                                route.opts.watch.spec().and_then(|spec| spec.before.clone())
-                            })
-                            .flatten()
-                    })
-                    .map(BeforeRunOptItem::into_run_opt)
-                    .collect::<Vec<_>>();
-
-                let cmd = TaskCommand::Exec {
-                    invocation_id: 0,
-                    task_comms: self.task_comms(),
-                };
-
-                let runner = Runner::seq_from(&startup_server_tasks);
-                let task_group = TaskGroup::from(runner.clone());
-                let task = Task::Group(task_group);
-
-                ctx.notify(TriggerInitial::new(task, cmd, runner));
-
-                let f = ctx
-                    .address()
-                    .send(ResolveServers { input })
-                    .into_actor(self)
-                    .map(move |res, actor, ctx| match res {
-                        Ok(Ok((resp, _))) => {
-                            ctx.notify(MonitorInput {
-                                path: path.clone(),
-                                cwd: actor.cwd.clone().unwrap(),
-                                input_ctx,
-                            });
-                            // todo: where to better sequence these side-effects
-                            actor.accept_watchables(&input_clone);
-                            Ok(DidStart::Started(resp))
-                        }
-                        Ok(Err(e)) => Err(StartupError::Other(e.to_string())),
-                        Err(e) => Err(StartupError::Other(e.to_string())),
-                    });
-
-                Box::pin(f)
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<Second, anyhow::Error>, actor, ctx| {
+                        let Second { servers, .. } = res.map_err(StartupError::Any)?;
+                        ctx.notify(MonitorInput {
+                            path: path.clone(),
+                            cwd: actor.cwd.clone().unwrap(),
+                            input_ctx,
+                        });
+                        // todo: where to better sequence these side-effects?
+                        actor.accept_watchables(&input_clone2);
+                        Ok(DidStart::Started(servers))
+                    },
+                ))
             }
             Ok(SystemStartArgs::InputOnly { input }) => {
                 tracing::debug!("SystemStartArgs::InputOnly");
 
-                let input_clone = input.clone();
-                let f = ctx
-                    .address()
-                    .send(ResolveServers { input })
-                    .into_actor(self)
-                    .map(move |res, actor, _ctx| match res {
-                        Ok(Ok((resp, child_results))) => {
-                            let errored = child_results
-                                .iter()
-                                .find(|x| matches!(x, ChildResult::CreateErr(..)));
-                            if let Some(ChildResult::CreateErr(ChildNotCreated {
-                                server_error,
-                                ..
-                            })) = errored
-                            {
-                                tracing::debug!("errored: {:?}", errored);
-                                Err(StartupError::ServerError((*server_error).to_owned()))
-                            } else {
-                                actor.accept_watchables(&input_clone);
-                                Ok(DidStart::Started(resp))
-                            }
+                let addr = ctx.address();
+                let input_clone2 = input.clone();
+                let jobs = setup_jobs(addr, input.clone());
+
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<Second, anyhow::Error>, actor, _ctx| {
+                        let res = res?;
+                        let errored = ChildResult::first_server_error(&res.child_results);
+                        if let Some(server_error) = errored {
+                            tracing::debug!("errored: {:?}", errored);
+                            return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        Ok(Err(e)) => {
-                            tracing::debug!(?e, "server error");
-                            Err(StartupError::Other(e.to_string()))
-                        }
-                        Err(e) => {
-                            tracing::debug!(?e, "other error");
-                            Err(StartupError::Other(e.to_string()))
-                        }
-                    });
-                Box::pin(f)
+                        actor.accept_watchables(&input_clone2);
+                        Ok(DidStart::Started(res.servers))
+                    },
+                ))
             }
             Ok(SystemStartArgs::PathWithInvalidInput { path, input_error }) => {
                 tracing::debug!("SystemStartArgs::PathWithInvalidInput");
@@ -400,11 +371,11 @@ impl Handler<Start> for BsSystem {
                     input_ctx: InputCtx::default(),
                 });
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
-                let f = async move { Ok(DidStart::Started(Default::default())) }.into_actor(self);
+                let f = ready(Ok(DidStart::Started(Default::default()))).into_actor(self);
                 Box::pin(f)
             }
             Err(e) => {
-                let f = async move { Err(StartupError::InputError(*e)) }.into_actor(self);
+                let f = ready(Err(StartupError::InputError(*e))).into_actor(self);
                 Box::pin(f)
             }
         }
@@ -547,6 +518,31 @@ impl actix::Handler<ResolveServers> for BsSystem {
         };
 
         Box::pin(f)
+    }
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "Result<TaskReportAndTree, InitialTaskError>")]
+struct ResolveInitialTasks {
+    input: Input,
+}
+
+impl actix::Handler<ResolveInitialTasks> for BsSystem {
+    type Result = ResponseFuture<Result<TaskReportAndTree, InitialTaskError>>;
+
+    fn handle(&mut self, msg: ResolveInitialTasks, ctx: &mut Self::Context) -> Self::Result {
+        let (next, rx) = self.before(&msg.input);
+        ctx.notify(next);
+
+        Box::pin(async move {
+            match rx.await {
+                Ok(TaskReportAndTree { report, tree }) if report.is_ok() => {
+                    Ok(TaskReportAndTree { report, tree })
+                }
+                Ok(TaskReportAndTree { .. }) => Err(InitialTaskError::FailedReport),
+                Err(_) => Err(InitialTaskError::FailedUnknown),
+            }
+        })
     }
 }
 

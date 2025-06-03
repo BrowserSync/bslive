@@ -1,6 +1,6 @@
-use crate::runner::RunKind;
 use crate::task::{AsActor, TaskCommand};
 use crate::task_group::TaskGroup;
+use crate::task_list::RunKind;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
@@ -60,7 +60,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
         let future = async move {
             let mut done: Vec<(usize, TaskReport)> = vec![];
             match group.run_kind() {
-                RunKind::Sequence => {
+                RunKind::Sequence { opts } => {
                     for (index, group_item) in group.tasks().into_iter().enumerate() {
                         let id = group_item.id();
                         let boxed_actor = Box::new(group_item).into_task_recipient();

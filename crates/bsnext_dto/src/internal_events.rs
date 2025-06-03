@@ -1,5 +1,5 @@
 use crate::archy::archy;
-use crate::internal::{ChildResult, InternalEvents, InternalEventsDTO};
+use crate::internal::{ChildResult, InternalEvents, InternalEventsDTO, TaskReportAndTree};
 use crate::{GetActiveServersResponseDTO, InputErrorDTO, ServerIdentityDTO};
 use bsnext_input::InputError;
 use bsnext_output::OutputWriterTrait;
@@ -27,7 +27,7 @@ impl OutputWriterTrait for InternalEvents {
                 writeln!(sink, "{}", serde_json::to_string(&json)?)
                     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             }
-            InternalEvents::TaskReport { report, .. } => {
+            InternalEvents::TaskReport(TaskReportAndTree { report, .. }) => {
                 // let tree_str = archy(tree, None);
                 let as_json = InternalEventsDTO::TaskReport {
                     id: report.id().to_string(),
@@ -71,7 +71,7 @@ impl OutputWriterTrait for InternalEvents {
             InternalEvents::StartupError(err) => {
                 writeln!(sink, "{}", err)?;
             }
-            InternalEvents::TaskReport { report, tree } => {
+            InternalEvents::TaskReport(TaskReportAndTree { report, tree }) => {
                 if report.has_errors() {
                     let s = archy(tree, None);
                     write!(sink, "{}", s)?;

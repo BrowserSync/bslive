@@ -25,7 +25,7 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
             2,
         ),
     ];
-    let task_group = TaskGroup::seq(tasks, 0);
+    let task_group = TaskGroup::seq(tasks, Default::default(), 0);
     let task_group_runner = TaskGroupRunner::new(task_group);
     let addr = task_group_runner.start();
 

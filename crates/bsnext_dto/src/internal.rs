@@ -20,10 +20,13 @@ pub enum InternalEvents {
     },
     InputError(InputError),
     StartupError(StartupError),
-    TaskReport {
-        report: TaskReport,
-        tree: ArchyNode,
-    },
+    TaskReport(TaskReportAndTree),
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskReportAndTree {
+    pub report: TaskReport,
+    pub tree: ArchyNode,
 }
 
 #[derive(Debug)]
@@ -82,6 +85,24 @@ pub enum ChildResult {
     Stopped(ServerIdentity),
 }
 
+impl ChildResult {
+    pub fn first_server_error(items: &[Self]) -> Option<&ServerError> {
+        items
+            .iter()
+            .find(|x| matches!(x, ChildResult::CreateErr(..)))
+            .and_then(|c| c.not_created_err())
+    }
+    pub fn not_created_err(&self) -> Option<&ServerError> {
+        match self {
+            ChildResult::CreateErr(ChildNotCreated { server_error, .. }) => Some(server_error),
+            ChildResult::Created(_) => None,
+            ChildResult::Patched(_) => None,
+            ChildResult::PatchErr(_) => None,
+            ChildResult::Stopped(_) => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, thiserror::Error)]
 pub enum ServerError {
     // The `#[from]` attribute generates `From<JsonRejection> for ApiError`
@@ -96,6 +117,14 @@ pub enum ServerError {
     Io(String),
     #[error("server was closed")]
     Closed,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, thiserror::Error)]
+pub enum InitialTaskError {
+    #[error("initial tasks did not complete, as determined from report. TODO: access report here for better errors")]
+    FailedReport,
+    #[error("initial tasks did not complete, for an unknown reason")]
+    FailedUnknown,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug, thiserror::Error)]

@@ -10,17 +10,31 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+/// Represents a collection of tasks that can be run, categorized by their execution type (`RunKind`).
+///
+/// This `TaskList` struct provides a way to organize and manage a collection of runnable tasks.
+/// Each task is encapsulated within the `Runnable` type, and the execution behavior of the task list is determined
+/// by the `RunKind`.
+///
+/// # Fields
+///
+/// * `run_kind`:
+///   Specifies the type of execution behavior (defined by the [`RunKind`] enum) for the task list.
+///
+/// * `tasks`:
+///   A vector containing the individual tasks to be executed. Each task is represented as an instance of the `Runnable` struct.
+///
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub struct Runner {
+pub struct TaskList {
     pub run_kind: RunKind,
     pub tasks: Vec<Runnable>,
 }
 
-impl TreeDisplay for Runner {
+impl TreeDisplay for TaskList {
     fn as_tree_label(&self, parent: u64) -> String {
         let _id = self.as_id_with(parent);
         match &self.run_kind {
-            RunKind::Sequence => format!("Seq: {} task(s)", self.tasks.len()),
+            RunKind::Sequence { .. } => format!("Seq: {} task(s)", self.tasks.len()),
             RunKind::Overlapping { opts } => format!(
                 "Overlapping {} task(s) (max concurrency: {})",
                 self.tasks.len(),
@@ -30,9 +44,24 @@ impl TreeDisplay for Runner {
     }
 }
 
+/// The `RunKind` enum represents the type of execution or arrangement of a set of operations or elements.
+/// It provides two distinct variants: `Sequence` and `Overlapping`.
+///
+/// ## Variants
+///
+/// - `Sequence`:
+///   Represents a straightforward sequential arrangement or execution.
+///   Operations or elements will proceed one after another in the specified order.
+///
+/// - `Overlapping`:
+///   Represents an overlapping arrangement where operations or elements can overlap or run concurrently,
+///   based on specific options provided.
+///
+///   - `opts`: A field of type `OverlappingOpts` that contains the configuration or parameters
+///     dictating the behavior of overlapping operations.
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum RunKind {
-    Sequence,
+    Sequence { opts: SequenceOpts },
     Overlapping { opts: OverlappingOpts },
 }
 
@@ -48,8 +77,26 @@ impl OverlappingOpts {
         }
     }
 }
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+pub struct SequenceOpts {
+    pub exit_on_failure: bool,
+}
 
-impl Runner {
+impl Default for SequenceOpts {
+    fn default() -> Self {
+        Self {
+            exit_on_failure: true,
+        }
+    }
+}
+
+impl SequenceOpts {
+    pub fn new(exit_on_failure: bool) -> Self {
+        Self { exit_on_failure }
+    }
+}
+
+impl TaskList {
     pub fn all(p0: &[Runnable], opts: OverlappingOpts) -> Self {
         Self {
             run_kind: RunKind::Overlapping { opts },
@@ -58,13 +105,17 @@ impl Runner {
     }
     pub fn seq(p0: &[Runnable]) -> Self {
         Self {
-            run_kind: RunKind::Sequence,
+            run_kind: RunKind::Sequence {
+                opts: SequenceOpts::default(),
+            },
             tasks: p0.to_vec(),
         }
     }
     pub fn seq_from(p0: &[RunOptItem]) -> Self {
         Self {
-            run_kind: RunKind::Sequence,
+            run_kind: RunKind::Sequence {
+                opts: SequenceOpts::default(),
+            },
             tasks: p0.iter().map(Runnable::from).collect(),
         }
     }
@@ -86,7 +137,7 @@ impl Runner {
     }
 }
 
-impl Runner {
+impl TaskList {
     pub fn as_tree(&self) -> ArchyNode {
         let label = self.as_tree_label(0);
         let mut first = ArchyNode::new(&label);
@@ -176,7 +227,7 @@ impl AsActor for Runnable {
 pub enum Runnable {
     BsLiveTask(BsLiveTask),
     Sh(ShCmd),
-    Many(Runner),
+    Many(TaskList),
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
@@ -228,7 +279,6 @@ impl TreeDisplay for Runnable {
 
 impl From<&RunOptItem> for Runnable {
     fn from(value: &RunOptItem) -> Self {
-        println!("here?");
         match value {
             RunOptItem::BsLive { bslive } => match bslive {
                 BsLiveRunner::NotifyServer => Self::BsLiveTask(BsLiveTask::NotifyServer),
@@ -241,11 +291,11 @@ impl From<&RunOptItem> for Runnable {
                 let opts = OverlappingOpts {
                     max_concurrent_items: run_all_opts.max,
                 };
-                Self::Many(Runner::all(&items, opts))
+                Self::Many(TaskList::all(&items, opts))
             }
             RunOptItem::Seq(RunSeq { seq, .. }) => {
                 let items: Vec<_> = seq.iter().map(Runnable::from).collect();
-                Self::Many(Runner::seq(&items))
+                Self::Many(TaskList::seq(&items))
             }
         }
     }

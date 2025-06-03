@@ -1,5 +1,5 @@
-use crate::runner::Runner;
 use crate::server_watchable::to_runner;
+use crate::task_list::TaskList;
 use bsnext_input::route::{DirRoute, FilterKind, RouteKind, Spec};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::watch_opts::WatchOpts;
@@ -12,7 +12,7 @@ pub struct RouteWatchable {
     pub route_path: String,
     pub dir: PathBuf,
     pub spec: Spec,
-    pub runner: Option<Runner>,
+    pub runner: Option<TaskList>,
 }
 
 pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {

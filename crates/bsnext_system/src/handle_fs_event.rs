@@ -1,19 +1,19 @@
 use crate::input_fs::from_input_path;
-use crate::runner::{BsLiveTask, Runnable, Runner};
-use crate::task::{AsActor, Task, TaskCommand, TaskComms};
+use crate::task::{Task, TaskCommand, TaskComms};
 use crate::task_group::TaskGroup;
+use crate::task_list::{BsLiveTask, Runnable, TaskList};
+use crate::trigger_fs_task::TriggerFsTask;
 use crate::{BsSystem, OverrideInput};
-use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
+use actix::AsyncContext;
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::{AnyEvent, InternalEvents, TaskReport};
+use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
     BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathEvent,
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use std::collections::HashMap;
 
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
@@ -24,7 +24,7 @@ impl actix::Handler<FsEvent> for BsSystem {
                     self.handle_buffered(&msg.fs_event_ctx, buffer_change)
                 {
                     tracing::debug!("will trigger task runner");
-                    ctx.notify(TriggerFs::new(task, cmd, runner));
+                    ctx.notify(TriggerFsTask::new(task, cmd, runner));
                 }
                 None
             }
@@ -53,137 +53,12 @@ impl actix::Handler<FsEvent> for BsSystem {
     }
 }
 
-#[derive(actix::Message, Debug)]
-#[rtype(result = "()")]
-pub struct TriggerFs {
-    task: Task,
-    cmd: TaskCommand,
-    runner: Runner,
-}
-
-impl TriggerFs {
-    pub fn new(task: Task, cmd: TaskCommand, runner: Runner) -> Self {
-        Self { task, cmd, runner }
-    }
-
-    pub fn cmd(&self) -> TaskCommand {
-        self.cmd.clone()
-    }
-
-    pub fn fs_ctx(&self) -> &FsEventContext {
-        match &self.cmd {
-            TaskCommand::Changes {
-                fs_event_context, ..
-            } => fs_event_context,
-            TaskCommand::Exec { .. } => {
-                panic!("unreachable. It's a mistake to access fs_ctx here")
-            }
-        }
-    }
-}
-
-impl Handler<TriggerFs> for BsSystem {
-    type Result = ResponseActFuture<Self, ()>;
-
-    fn handle(&mut self, msg: TriggerFs, _ctx: &mut Self::Context) -> Self::Result {
-        let cmd = msg.cmd();
-        let fs_ctx = msg.fs_ctx();
-        let entry = self.tasks.get(fs_ctx);
-        let cloned_id = fs_ctx.clone();
-
-        if let Some(entry) = entry {
-            tracing::info!("ignoring concurrent task triggering: prev: {:?}", entry);
-            return Box::pin(async {}.into_actor(self));
-        }
-
-        self.tasks.insert(fs_ctx.clone(), msg.runner.to_owned());
-        let task_id = msg.runner.as_id();
-        let cmd_recipient = Box::new(msg.task).into_task_recipient();
-
-        Box::pin(
-            cmd_recipient
-                .send(cmd)
-                .into_actor(self)
-                .map(move |resp, actor, _ctx| {
-                    let runner = actor.tasks.get(&cloned_id);
-                    match (resp, runner) {
-                        (Ok(result), Some(runner)) => {
-                            let report = result.to_report(task_id);
-                            let mut e = HashMap::new();
-                            every_report(&mut e, &report);
-
-                            let tree = runner.as_tree_with_results(&e);
-                            actor.publish_any_event(AnyEvent::Internal(
-                                InternalEvents::TaskReport { report, tree },
-                            ));
-                        }
-                        (Ok(_), _) => {
-                            tracing::trace!("a triggered command completed");
-                        }
-                        (Err(err), _) => {
-                            tracing::error!("something prevented message handling. {:?}", err);
-                        }
-                    }
-                    actor.tasks.remove(&cloned_id);
-                }),
-        )
-    }
-}
-
-fn every_report(hm: &mut HashMap<u64, TaskReport>, report: &TaskReport) {
-    hm.insert(report.id(), report.clone());
-    for inner in &report.result().task_reports {
-        every_report(hm, inner)
-    }
-}
-
-#[derive(actix::Message, Debug)]
-#[rtype(result = "()")]
-pub struct TriggerInitial {
-    pub task: Task,
-    pub cmd: TaskCommand,
-    pub runner: Runner,
-}
-
-impl TriggerInitial {
-    pub fn new(task: Task, cmd: TaskCommand, runner: Runner) -> Self {
-        Self { task, cmd, runner }
-    }
-}
-
-impl Handler<TriggerInitial> for BsSystem {
-    type Result = ResponseActFuture<Self, ()>;
-
-    fn handle(&mut self, msg: TriggerInitial, ctx: &mut Self::Context) -> Self::Result {
-        let cmd = msg.cmd;
-        let runner = msg.runner;
-        let task_id = runner.as_id();
-        let cmd_recipient = Box::new(msg.task).into_task_recipient();
-        Box::pin(cmd_recipient.send(cmd).into_actor(self).map(
-            move |resp, actor, _ctx| match resp {
-                Ok(result) => {
-                    let report = result.to_report(task_id);
-                    let mut e = HashMap::new();
-                    every_report(&mut e, &report);
-
-                    let tree = runner.as_tree_with_results(&e);
-                    actor.publish_any_event(AnyEvent::Internal(InternalEvents::TaskReport {
-                        report,
-                        tree,
-                    }));
-                }
-                _ => todo!("handle this case..."),
-            },
-        ))
-    }
-}
-
 impl BsSystem {
     fn handle_buffered(
         &mut self,
         fs_event_ctx: &FsEventContext,
         buf: BufferedChangeEvent,
-    ) -> Option<(Task, TaskCommand, Runner)> {
+    ) -> Option<(Task, TaskCommand, TaskList)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?fs_event_ctx, ?buf, "handle_buffered");
 
         let change = if let Some(mon) = &self.input_monitors {
@@ -210,7 +85,7 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let runner = self.as_runner(fs_event_ctx);
+        let fs_event_runner = self.as_runner_for_fs_event(fs_event_ctx);
 
         let cmd = TaskCommand::Changes {
             changes: paths,
@@ -224,9 +99,9 @@ impl BsSystem {
         // let as_str = archy(&tree, None);
         // println!("upcoming-->");
         // println!("{as_str}");
-        let task_group = TaskGroup::from(runner.clone());
+        let task_group = TaskGroup::from(fs_event_runner.clone());
 
-        Some((Task::Group(task_group), cmd, runner))
+        Some((Task::Group(task_group), cmd, fs_event_runner))
     }
 
     pub fn task_comms(&mut self) -> TaskComms {
@@ -315,7 +190,7 @@ impl BsSystem {
         Some(AnyEvent::Internal(InternalEvents::InputError(e)))
     }
 
-    fn as_runner(&self, fs_event_ctx: &FsEventContext) -> Runner {
+    fn as_runner_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskList {
         tracing::info!("as_runner with fs_event_ctx {:?}", fs_event_ctx);
         let matching_monitor = self
             .any_monitors
@@ -328,7 +203,7 @@ impl BsSystem {
                 .runner()
                 .map(ToOwned::to_owned)
                 .unwrap_or_else(|| {
-                    Runner::seq(&[
+                    TaskList::seq(&[
                         Runnable::BsLiveTask(BsLiveTask::NotifyServer),
                         Runnable::BsLiveTask(BsLiveTask::ExtEvent),
                     ])
@@ -337,6 +212,6 @@ impl BsSystem {
             return runner;
         }
 
-        Runner::seq(&[])
+        TaskList::seq(&[])
     }
 }

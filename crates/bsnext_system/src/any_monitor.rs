@@ -2,8 +2,8 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::path_monitor::PathMonitor;
 use crate::route_watchable::RouteWatchable;
-use crate::runner::Runner;
 use crate::server_watchable::ServerWatchable;
+use crate::task_list::TaskList;
 use actix::Addr;
 use bsnext_fs::actor::FsWatcher;
 use bsnext_input::route::Spec;
@@ -54,7 +54,7 @@ impl PathWatchable {
         hasher.finish()
     }
 
-    pub fn runner(&self) -> Option<&Runner> {
+    pub fn runner(&self) -> Option<&TaskList> {
         match self {
             PathWatchable::Server(server) => server.runner.as_ref(),
             PathWatchable::Route(route) => route.runner.as_ref(),

@@ -1,3 +1,4 @@
+use crate::route::{BeforeRunOptItem, RunOptItem};
 use crate::server_config::{ServerConfig, ServerIdentity};
 use crate::startup::StartupContext;
 use crate::yml::YamlError;
@@ -33,6 +34,45 @@ pub struct Input {
 impl Input {
     pub fn from_server(s: ServerConfig) -> Self {
         Self { servers: vec![s] }
+    }
+    pub fn before_run_opts(&self) -> Vec<RunOptItem> {
+        let startup_server_tasks = self
+            .servers
+            .iter()
+            .flat_map(|server| {
+                server
+                    .watchers
+                    .iter()
+                    .filter_map(|watcher| {
+                        watcher.opts.as_ref().and_then(|spec| spec.before.clone())
+                    })
+                    .flatten()
+            })
+            .map(BeforeRunOptItem::into_run_opt);
+
+        let route_startup_tasks = self
+            .servers
+            .iter()
+            .flat_map(|server| {
+                server
+                    .routes
+                    .iter()
+                    .filter_map(|route| {
+                        route.opts.watch.spec().and_then(|spec| spec.before.clone())
+                    })
+                    .flatten()
+            })
+            .map(BeforeRunOptItem::into_run_opt);
+
+        startup_server_tasks
+            .chain(route_startup_tasks)
+            .collect::<Vec<_>>()
+    }
+    pub fn ids(&self) -> Vec<ServerIdentity> {
+        self.servers
+            .iter()
+            .map(|x| x.identity.clone())
+            .collect::<Vec<_>>()
     }
 }
 

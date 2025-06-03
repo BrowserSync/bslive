@@ -1,4 +1,4 @@
-use crate::runner::Runner;
+use crate::task_list::TaskList;
 use bsnext_input::route::Spec;
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::Input;
@@ -9,7 +9,7 @@ pub struct ServerWatchable {
     pub server_identity: ServerIdentity,
     pub dir: PathBuf,
     pub spec: Spec,
-    pub runner: Option<Runner>,
+    pub runner: Option<TaskList>,
 }
 
 pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
@@ -36,7 +36,7 @@ pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
 ///  
 /// Creates a runner that executes tasks strictly one after another to match user
 /// expectations when defining task lists in declarative formats (yaml/json).
-pub fn to_runner(spec: &Spec) -> Option<Runner> {
+pub fn to_runner(spec: &Spec) -> Option<TaskList> {
     // if the 'run' key was given, it's a list of steps.
     let run = spec.run.as_ref()?;
 
@@ -46,5 +46,5 @@ pub fn to_runner(spec: &Spec) -> Option<Runner> {
     };
 
     // otherwise, construct a runner
-    Some(Runner::seq_from(run))
+    Some(TaskList::seq_from(run))
 }

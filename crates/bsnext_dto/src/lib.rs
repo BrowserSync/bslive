@@ -119,6 +119,9 @@ impl From<&StartupEvent> for StartupEventDTO {
             StartupEvent::FailedStartup(StartupError::ServerError(err)) => {
                 StartupEventDTO::FailedStartup(err.to_string())
             }
+            StartupEvent::FailedStartup(StartupError::Any(err)) => {
+                StartupEventDTO::FailedStartup(err.to_string())
+            }
         }
     }
 }
@@ -346,6 +349,8 @@ pub enum StartupError {
     ServerError(#[from] ServerError),
     #[error("{0}")]
     Other(String),
+    #[error("{0}")]
+    Any(#[from] anyhow::Error),
 }
 
 /// @discriminator kind

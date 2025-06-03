@@ -1,6 +1,6 @@
-use crate::runner::Runnable;
 use crate::task_group::TaskGroup;
 use crate::task_group_runner::TaskGroupRunner;
+use crate::task_list::Runnable;
 use actix::{Actor, Recipient};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::{AnyEvent, TaskResult};

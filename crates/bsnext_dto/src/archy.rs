@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ArchyNode {
     pub label: String,
     pub nodes: Vec<ArchyNode>,
