@@ -4,6 +4,7 @@ use actix::{
     ResponseFuture, Running, WrapFuture,
 };
 
+use crate::any_watchable::to_any_watchables;
 use crate::monitor_any_watchables::MonitorPathWatchables;
 use crate::task::{Task, TaskCommand};
 use crate::task_group::TaskGroup;
@@ -36,6 +37,7 @@ use tokio::sync::oneshot::Receiver;
 use trigger_task::TriggerTask;
 
 pub mod any_monitor;
+pub mod any_watchable;
 pub mod args;
 pub mod cli;
 pub mod export;
@@ -56,6 +58,7 @@ pub mod task_list;
 pub mod tasks;
 mod trigger_fs_task;
 mod trigger_task;
+pub mod watch;
 
 #[derive(Debug)]
 pub(crate) struct BsSystem {
@@ -140,6 +143,7 @@ impl BsSystem {
     fn accept_watchables(&mut self, input: &Input) {
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
+        let any_watchables = to_any_watchables(input);
 
         tracing::debug!(
             "accepting {} route watchables, and {} server watchables",
@@ -156,23 +160,24 @@ impl BsSystem {
         };
 
         // todo: clean up this merging
-        let mut all_watchables = route_watchables
+        let all_watchables = route_watchables
             .iter()
-            .map(|r| PathWatchable::Route(r.to_owned()))
-            .collect::<Vec<_>>();
+            .map(|r| PathWatchable::Route(r.to_owned()));
 
         let servers = server_watchables
             .iter()
-            .map(|w| PathWatchable::Server(w.to_owned()))
-            .collect::<Vec<_>>();
+            .map(|w| PathWatchable::Server(w.to_owned()));
 
-        all_watchables.extend(servers);
+        let any = any_watchables
+            .iter()
+            .map(|w| PathWatchable::Any(w.to_owned()));
+
+        let watchables = all_watchables.chain(servers).chain(any).collect::<Vec<_>>();
+
+        dbg!(&watchables);
         let cwd = cwd.clone();
         let addr = self_address.clone();
-        let msg = MonitorPathWatchables {
-            watchables: all_watchables,
-            cwd,
-        };
+        let msg = MonitorPathWatchables { watchables, cwd };
 
         addr.do_send(msg);
     }

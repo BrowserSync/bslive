@@ -1,4 +1,4 @@
-use crate::server_watchable::to_runner;
+use crate::server_watchable::to_task_list;
 use crate::task_list::TaskList;
 use bsnext_input::route::{DirRoute, FilterKind, RouteKind, Spec};
 use bsnext_input::server_config::ServerIdentity;
@@ -12,7 +12,7 @@ pub struct RouteWatchable {
     pub route_path: String,
     pub dir: PathBuf,
     pub spec: Spec,
-    pub runner: Option<TaskList>,
+    pub task_list: Option<TaskList>,
 }
 
 pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
@@ -29,13 +29,13 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                     RouteKind::Proxy(_) => None,
                     RouteKind::Dir(DirRoute { dir, .. }) => {
                         let spec = to_spec(&r.opts.watch);
-                        let run = to_runner(&spec);
+                        let run = to_task_list(&spec);
                         Some(RouteWatchable {
                             server_identity: server_config.identity.clone(),
                             route_path: r.path.as_str().to_owned(),
                             dir: PathBuf::from(dir),
                             spec,
-                            runner: run,
+                            task_list: run,
                         })
                     }
                 })

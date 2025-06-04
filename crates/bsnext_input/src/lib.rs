@@ -1,4 +1,4 @@
-use crate::route::{BeforeRunOptItem, RunOptItem};
+use crate::route::{BeforeRunOptItem, RunOptItem, Watcher};
 use crate::server_config::{ServerConfig, ServerIdentity};
 use crate::startup::StartupContext;
 use crate::yml::YamlError;
@@ -29,11 +29,15 @@ pub mod yml;
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Input {
     pub servers: Vec<server_config::ServerConfig>,
+    pub watchers: Vec<Watcher>,
 }
 
 impl Input {
     pub fn from_server(s: ServerConfig) -> Self {
-        Self { servers: vec![s] }
+        Self {
+            servers: vec![s],
+            ..Default::default()
+        }
     }
     pub fn before_run_opts(&self) -> Vec<RunOptItem> {
         let startup_server_tasks = self

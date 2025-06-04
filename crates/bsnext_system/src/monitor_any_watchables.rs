@@ -25,7 +25,6 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
 
     fn handle(&mut self, msg: MonitorPathWatchables, ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("MonitorAnyWatchables {:?}", msg.watchables);
-        tracing::trace!("MonitorAnyWatchables {:#?}", msg.watchables);
 
         let existing = self.any_monitors.keys().collect::<BTreeSet<_>>();
         let incoming = msg.watchables.iter().collect::<BTreeSet<_>>();
@@ -67,6 +66,14 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                     };
                     FsWatcher::new(&msg.cwd, ctx)
                 }
+                PathWatchable::Any(_any_watchable) => {
+                    // any_watchable.
+                    let ctx = FsEventContext {
+                        id: watchable_hash,
+                        origin_id: watchable_hash,
+                    };
+                    FsWatcher::new(&msg.cwd, ctx)
+                }
             };
 
             let opts = any_watchable.spec_opts();
@@ -95,10 +102,10 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
 
             watcher.with_debounce(Debounce::Buffered { duration });
 
-            let input_watcher_addr = watcher.start();
+            let watcher_addr = watcher.start();
 
             let monitor = PathMonitor {
-                addr: input_watcher_addr.clone(),
+                addr: watcher_addr.clone(),
                 path: any_watchable.watch_path().to_path_buf(),
                 watchable_hash,
             };

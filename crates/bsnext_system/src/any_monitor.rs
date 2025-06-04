@@ -1,5 +1,6 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+use crate::any_watchable::AnyWatchable;
 use crate::path_monitor::PathMonitor;
 use crate::route_watchable::RouteWatchable;
 use crate::server_watchable::ServerWatchable;
@@ -32,6 +33,7 @@ impl AnyMonitor {
 pub enum PathWatchable {
     Server(ServerWatchable),
     Route(RouteWatchable),
+    Any(AnyWatchable),
 }
 
 impl PathWatchable {
@@ -39,12 +41,14 @@ impl PathWatchable {
         match self {
             PathWatchable::Server(server) => &server.spec,
             PathWatchable::Route(route) => &route.spec,
+            PathWatchable::Any(any) => &any.spec,
         }
     }
     pub fn watch_path(&self) -> &Path {
         match self {
             PathWatchable::Server(server) => &server.dir,
             PathWatchable::Route(route) => &route.dir,
+            PathWatchable::Any(any) => &any.dir,
         }
     }
 
@@ -54,10 +58,11 @@ impl PathWatchable {
         hasher.finish()
     }
 
-    pub fn runner(&self) -> Option<&TaskList> {
+    pub fn task_list(&self) -> Option<&TaskList> {
         match self {
-            PathWatchable::Server(server) => server.runner.as_ref(),
-            PathWatchable::Route(route) => route.runner.as_ref(),
+            PathWatchable::Server(server) => server.task_list.as_ref(),
+            PathWatchable::Route(route) => route.task_list.as_ref(),
+            PathWatchable::Any(any) => any.task_list.as_ref(),
         }
     }
 }

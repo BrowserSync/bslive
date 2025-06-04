@@ -465,3 +465,11 @@ pub struct Watcher {
     #[serde(flatten)]
     pub opts: Option<Spec>,
 }
+
+impl Watcher {
+    pub fn add_task(&mut self, item: RunOptItem) {
+        let opts = self.opts.get_or_insert_default();
+        let list = opts.run.get_or_insert(vec![]);
+        list.push(item);
+    }
+}

@@ -1,4 +1,6 @@
+use crate::start::start_kind::StartKind;
 use crate::start::start_system::start_system;
+use crate::Start;
 use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_output::stdout::StdoutTarget;
@@ -37,13 +39,12 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
 
 pub async fn with_sender(
     cwd: PathBuf,
-    fs_opts: FsOpts,
-    input_opts: InputOpts,
+    start_kind: StartKind,
     events_sender: Sender<AnyEvent>,
-    start_command: StartCommand,
 ) -> Result<(), anyhow::Error> {
     let ecc = events_sender.clone();
-    let startup = start_system(cwd, fs_opts, input_opts, events_sender, start_command).await;
+
+    let startup = start_system(cwd, start_kind, events_sender).await;
     match startup {
         // If the startup was successful, keep hold of the handle to keep the system running
         Ok(api) => match api.handle.await {

@@ -26,8 +26,6 @@ impl InputSource for LitExample {
             ],
             ..Default::default()
         };
-        InputSourceKind::Type(Input {
-            servers: vec![server],
-        })
+        InputSourceKind::Type(Input::from_server(server))
     }
 }

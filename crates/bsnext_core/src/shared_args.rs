@@ -28,3 +28,10 @@ pub struct InputOpts {
     #[arg(short, long)]
     pub input: Vec<String>,
 }
+
+#[derive(Debug, Default, Clone, clap::Parser)]
+pub struct WatchCliOpts {
+    /// Provide a path to an input file
+    #[arg(short, long)]
+    pub input: Vec<String>,
+}

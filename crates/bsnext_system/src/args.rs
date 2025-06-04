@@ -1,4 +1,5 @@
 use crate::start::start_command::StartCommand;
+use crate::watch::WatchCommand;
 use bsnext_core::export::ExportCommand;
 use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
 use bsnext_example::ExampleCommand;
@@ -39,4 +40,6 @@ pub enum SubCommands {
     Export(ExportCommand),
     /// Run an example project
     Example(ExampleCommand),
+    /// Just use file watching
+    Watch(WatchCommand),
 }

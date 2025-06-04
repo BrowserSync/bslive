@@ -200,7 +200,7 @@ impl BsSystem {
         if let Some((path_watchable, _any_monitor)) = matching_monitor {
             tracing::info!("path_watchable {:?}", path_watchable);
             let runner = path_watchable
-                .runner()
+                .task_list()
                 .map(ToOwned::to_owned)
                 .unwrap_or_else(|| {
                     TaskList::seq(&[

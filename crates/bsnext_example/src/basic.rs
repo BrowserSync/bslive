@@ -44,8 +44,6 @@ impl InputSource for BasicExample {
             ],
             ..Default::default()
         };
-        InputSourceKind::Type(Input {
-            servers: vec![server],
-        })
+        InputSourceKind::Type(Input::from_server(server))
     }
 }
