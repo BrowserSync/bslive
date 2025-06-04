@@ -6,9 +6,7 @@ use crate::start::start_command::StartCommand;
 use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
-use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_input::route::{RunOptItem, ShRunOptItem, Watcher};
-use bsnext_input::startup::{StartupContext, SystemStart};
 use bsnext_input::Input;
 use bsnext_output::OutputWriters;
 use bsnext_tracing::{init_tracing, OutputFormat, WriteOption};
@@ -78,7 +76,7 @@ where
             let start_kind = StartKind::from_args(&args.fs_opts, &args.input_opts, &start);
             start_stdout_wrapper(start_kind, cwd, writer).await
         }
-        SubCommands::Watch(watch) => {
+        SubCommands::Watch(_watch) => {
             let mut input = Input::default();
             let mut watcher = Watcher {
                 dir: ".".to_string(),

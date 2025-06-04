@@ -1,4 +1,4 @@
-use crate::server_watchable::{to_task_list, ServerWatchable};
+use crate::server_watchable::to_task_list;
 use crate::task_list::TaskList;
 use bsnext_input::route::Spec;
 use bsnext_input::Input;

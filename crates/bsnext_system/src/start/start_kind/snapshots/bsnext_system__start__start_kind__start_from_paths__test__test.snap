@@ -42,4 +42,5 @@ Input {
             },
         },
     ],
+    watchers: [],
 }

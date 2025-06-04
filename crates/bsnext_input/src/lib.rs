@@ -28,7 +28,9 @@ pub mod yml;
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Input {
+    #[serde(default)]
     pub servers: Vec<server_config::ServerConfig>,
+    #[serde(default)]
     pub watchers: Vec<Watcher>,
 }
 
