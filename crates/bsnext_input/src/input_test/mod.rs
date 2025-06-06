@@ -241,11 +241,13 @@ servers:
         c.servers.get(0).unwrap().watchers,
         vec![
             Watcher {
-                dir: "./".to_string(),
+                dir: Some("./".to_string()),
+                dirs: None,
                 opts: Some(Spec::default())
             },
             Watcher {
-                dir: "./other".to_string(),
+                dir: Some("./other".to_string()),
+                dirs: None,
                 opts: Some(Spec {
                     debounce: Some(DebounceDuration::Ms(2000)),
                     filter: Some(FilterKind::Extension {
