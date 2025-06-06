@@ -107,7 +107,7 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             let monitor = PathMonitor {
                 addr: watcher_addr.clone(),
                 paths: any_watchable
-                    .watch_path()
+                    .watch_paths()
                     .into_iter()
                     .map(PathBuf::from)
                     .collect(),

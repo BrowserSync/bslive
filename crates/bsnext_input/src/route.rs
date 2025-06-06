@@ -462,12 +462,62 @@ impl Display for BsLiveRunner {
 )]
 pub struct Watcher {
     pub dir: Option<String>,
-    pub dirs: Option<Vec<String>>,
     #[serde(flatten)]
     pub opts: Option<Spec>,
 }
 
+#[derive(
+    Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub struct MultiWatch {
+    pub dirs: WatcherDirs,
+    #[serde(flatten)]
+    pub opts: Option<Spec>,
+}
+
+#[derive(
+    Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+#[serde(untagged)]
+pub enum WatcherDirs {
+    Single(String),
+    Many(Vec<String>),
+}
+
+impl WatcherDirs {
+    pub fn one(path_str: &str) -> Self {
+        Self::Single(path_str.to_string())
+    }
+    pub fn many(path_str: &[&str]) -> Self {
+        Self::Many(path_str.iter().map(ToString::to_string).collect())
+    }
+    pub fn first_as_pathbuf(&self) -> PathBuf {
+        match self {
+            WatcherDirs::Single(item) => PathBuf::from(item),
+            WatcherDirs::Many(item) if !item.is_empty() => {
+                PathBuf::from(item.get(0).expect("guarded"))
+            }
+            WatcherDirs::Many(_) => todo!("cannot get here?"),
+        }
+    }
+    pub fn as_pathbufs(&self) -> Vec<PathBuf> {
+        match self {
+            WatcherDirs::Single(item) => vec![PathBuf::from(item)],
+            WatcherDirs::Many(item) if !item.is_empty() => item.iter().map(PathBuf::from).collect(),
+            WatcherDirs::Many(_) => todo!("cannot get here?"),
+        }
+    }
+}
+
 impl Watcher {
+    pub fn add_task(&mut self, item: RunOptItem) {
+        let opts = self.opts.get_or_insert_default();
+        let list = opts.run.get_or_insert(vec![]);
+        list.push(item);
+    }
+}
+
+impl MultiWatch {
     pub fn add_task(&mut self, item: RunOptItem) {
         let opts = self.opts.get_or_insert_default();
         let list = opts.run.get_or_insert(vec![]);

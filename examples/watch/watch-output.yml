@@ -1,24 +1,24 @@
 servers:
   - name: 'watch-output'
     watchers:
-      - dir: examples/watch/src/index.html
+      - dirs: examples/watch/src/index.html
         debounce:
           ms: 0
         run:
           - sh: echo 'examples/watch/src/index.html changed'
-      - dir: examples/watch/src/01.txt
+      - dirs: examples/watch/src/01.txt
         debounce:
           ms: 0
         run:
           - sh: echo '01.txt changed'
             prefix: '[my-custom-prefix]'
-      - dir: examples/watch/src/02.txt
+      - dirs: examples/watch/src/02.txt
         debounce:
           ms: 0
         run:
           - sh: echo '02.txt changed'
             name: custom-name
-      - dir: examples/watch/src/03.txt
+      - dirs: examples/watch/src/03.txt
         debounce:
           ms: 0
         run:

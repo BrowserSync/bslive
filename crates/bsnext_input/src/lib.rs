@@ -1,4 +1,4 @@
-use crate::route::{BeforeRunOptItem, RunOptItem, Watcher};
+use crate::route::{BeforeRunOptItem, MultiWatch, RunOptItem};
 use crate::server_config::{ServerConfig, ServerIdentity};
 use crate::startup::StartupContext;
 use crate::yml::YamlError;
@@ -31,7 +31,7 @@ pub struct Input {
     #[serde(default)]
     pub servers: Vec<server_config::ServerConfig>,
     #[serde(default)]
-    pub watchers: Vec<Watcher>,
+    pub watchers: Vec<MultiWatch>,
 }
 
 impl Input {

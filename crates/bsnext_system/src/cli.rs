@@ -6,7 +6,7 @@ use crate::start::start_command::StartCommand;
 use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
-use bsnext_input::route::{RunOptItem, ShRunOptItem, Watcher};
+use bsnext_input::route::{MultiWatch, RunOptItem, ShRunOptItem, WatcherDirs};
 use bsnext_input::Input;
 use bsnext_output::OutputWriters;
 use bsnext_tracing::{init_tracing, OutputFormat, WriteOption};
@@ -78,9 +78,8 @@ where
         }
         SubCommands::Watch(_watch) => {
             let mut input = Input::default();
-            let mut watcher = Watcher {
-                dir: Some(".".to_string()),
-                dirs: None,
+            let mut watcher = MultiWatch {
+                dirs: WatcherDirs::Many(vec![]),
                 opts: None,
             };
             watcher.add_task(RunOptItem::Sh(ShRunOptItem::new("echo hello!")));

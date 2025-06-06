@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct ServerWatchable {
     pub server_identity: ServerIdentity,
-    pub dir: PathBuf,
+    pub dirs: Vec<PathBuf>,
     pub spec: Spec,
     pub task_list: Option<TaskList>,
 }
@@ -19,14 +19,11 @@ pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
         .flat_map(|server_config| {
             server_config.watchers.iter().map(|watcher| {
                 let task_list = watcher.opts.as_ref().and_then(to_task_list);
+                let path_bufs = watcher.dirs.as_pathbufs();
 
                 ServerWatchable {
                     server_identity: server_config.identity.clone(),
-                    dir: watcher
-                        .dir
-                        .as_ref()
-                        .map(PathBuf::from)
-                        .expect("missing dir?"),
+                    dirs: path_bufs,
                     spec: watcher.opts.clone().unwrap_or_default(),
                     task_list,
                 }

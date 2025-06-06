@@ -1,7 +1,7 @@
 servers:
   - name: 'watch-before-tasks'
     watchers:
-      - dir: examples/watch/src
+      - dirs: examples/watch/src
         filter:
           ext: 'css'
         before:

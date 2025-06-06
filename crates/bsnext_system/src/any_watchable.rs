@@ -17,19 +17,10 @@ pub fn to_any_watchables(input: &Input) -> Vec<AnyWatchable> {
         .iter()
         .map(|watcher| {
             let runner = watcher.opts.as_ref().and_then(to_task_list);
-            let combined = match (&watcher.dirs, &watcher.dir) {
-                (Some(dirs), Some(dir)) => {
-                    let mut c = dirs.clone();
-                    c.push(dir.to_string());
-                    c
-                }
-                (Some(dirs), None) => dirs.clone(),
-                (None, Some(dir)) => vec![dir.to_string()],
-                _ => vec![],
-            };
+            let path_bufs = watcher.dirs.as_pathbufs();
 
             AnyWatchable {
-                dirs: combined.into_iter().map(PathBuf::from).collect(),
+                dirs: path_bufs,
                 spec: watcher.opts.clone().unwrap_or_default(),
                 task_list: runner,
             }
