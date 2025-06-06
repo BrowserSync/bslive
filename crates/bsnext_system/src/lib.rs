@@ -174,7 +174,6 @@ impl BsSystem {
 
         let watchables = all_watchables.chain(servers).chain(any).collect::<Vec<_>>();
 
-        dbg!(&watchables);
         let cwd = cwd.clone();
         let addr = self_address.clone();
         let msg = MonitorPathWatchables { watchables, cwd };

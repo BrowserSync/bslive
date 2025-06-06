@@ -79,7 +79,8 @@ where
         SubCommands::Watch(_watch) => {
             let mut input = Input::default();
             let mut watcher = Watcher {
-                dir: ".".to_string(),
+                dir: Some(".".to_string()),
+                dirs: None,
                 opts: None,
             };
             watcher.add_task(RunOptItem::Sh(ShRunOptItem::new("echo hello!")));

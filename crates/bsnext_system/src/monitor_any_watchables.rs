@@ -106,14 +106,20 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
 
             let monitor = PathMonitor {
                 addr: watcher_addr.clone(),
-                path: any_watchable.watch_path().to_path_buf(),
+                paths: any_watchable
+                    .watch_path()
+                    .into_iter()
+                    .map(PathBuf::from)
+                    .collect(),
                 watchable_hash,
             };
 
-            monitor.addr.do_send(RequestWatchPath {
-                recipients: vec![ctx.address().recipient()],
-                path: monitor.path.clone(),
-            });
+            for one_path in &monitor.paths {
+                monitor.addr.do_send(RequestWatchPath {
+                    recipients: vec![ctx.address().recipient()],
+                    path: one_path.clone(),
+                });
+            }
 
             let any = AnyMonitor::Path(monitor);
 

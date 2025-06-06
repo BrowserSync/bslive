@@ -22,7 +22,11 @@ pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
 
                 ServerWatchable {
                     server_identity: server_config.identity.clone(),
-                    dir: PathBuf::from(&watcher.dir),
+                    dir: watcher
+                        .dir
+                        .as_ref()
+                        .map(PathBuf::from)
+                        .expect("missing dir?"),
                     spec: watcher.opts.clone().unwrap_or_default(),
                     task_list,
                 }

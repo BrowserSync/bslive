@@ -44,11 +44,11 @@ impl PathWatchable {
             PathWatchable::Any(any) => &any.spec,
         }
     }
-    pub fn watch_path(&self) -> &Path {
+    pub fn watch_path(&self) -> Vec<&Path> {
         match self {
-            PathWatchable::Server(server) => &server.dir,
-            PathWatchable::Route(route) => &route.dir,
-            PathWatchable::Any(any) => &any.dir,
+            PathWatchable::Server(server) => vec![&server.dir],
+            PathWatchable::Route(route) => vec![&route.dir],
+            PathWatchable::Any(any) => any.dirs.iter().map(|x| x.as_path()).collect(),
         }
     }
 

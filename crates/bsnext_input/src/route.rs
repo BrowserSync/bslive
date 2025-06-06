@@ -461,7 +461,8 @@ impl Display for BsLiveRunner {
     Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
 pub struct Watcher {
-    pub dir: String,
+    pub dir: Option<String>,
+    pub dirs: Option<Vec<String>>,
     #[serde(flatten)]
     pub opts: Option<Spec>,
 }

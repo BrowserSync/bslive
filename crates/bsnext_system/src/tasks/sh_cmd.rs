@@ -20,11 +20,27 @@ pub struct ShCmd {
     sh: Cmd,
     name: Option<String>,
     output: ShCmdOutput,
+    timeout: ShDuration,
 }
 
 impl Display for ShCmd {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", (*self.sh).to_string_lossy())
+    }
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+struct ShDuration(pub Duration);
+
+impl ShDuration {
+    pub fn duration(&self) -> &Duration {
+        &self.0
+    }
+}
+
+impl Default for ShDuration {
+    fn default() -> Self {
+        ShDuration(Duration::from_secs(60))
     }
 }
 
@@ -42,6 +58,7 @@ impl ShCmd {
             sh: Cmd(cmd),
             name: None,
             output: Default::default(),
+            timeout: Default::default(),
         }
     }
     pub fn named(cmd: OsString, name: impl Into<String>) -> Self {
@@ -49,6 +66,7 @@ impl ShCmd {
             sh: Cmd(cmd),
             name: Some(name.into()),
             output: Default::default(),
+            timeout: Default::default(),
         }
     }
 
@@ -151,6 +169,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
 
         let sh_prefix = Arc::new(self.prefix());
         let sh_prefix_2 = sh_prefix.clone();
+        let max_duration = self.timeout.duration().clone();
 
         let fut = async move {
             let mut child = Command::new("sh")
@@ -212,8 +231,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 }
             });
 
-            // todo: where to encode things like this timeout?
-            let sleep = tokio::time::sleep(Duration::from_secs(10));
+            let sleep = tokio::time::sleep(max_duration);
 
             tokio::pin!(sleep);
             let invocation_id = 0;
