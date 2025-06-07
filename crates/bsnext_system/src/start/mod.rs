@@ -19,7 +19,7 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
         let stderr = &mut std::io::stderr();
         let mut sink = StdoutTarget::new(stdout, stderr);
         while let Some(evt) = events_receiver.recv().await {
-            tracing::debug!(external_event = ?evt);
+            tracing::trace!(?evt);
             let result = match evt {
                 AnyEvent::Internal(int) => writer.write_evt(&int, &mut sink.output()),
                 AnyEvent::External(ext) => writer.write_evt(&ext, &mut sink.output()),

@@ -9,7 +9,7 @@ use crate::start::stdout_channel;
 use bsnext_input::route::{MultiWatch, RunOptItem, ShRunOptItem, WatcherDirs};
 use bsnext_input::Input;
 use bsnext_output::OutputWriters;
-use bsnext_tracing::{init_tracing, OutputFormat, WriteOption};
+use bsnext_tracing::{init_tracing, LineNumberOption, OutputFormat, WriteOption};
 use clap::Parser;
 use std::env::current_dir;
 use std::ffi::OsString;
@@ -31,7 +31,18 @@ where
         WriteOption::None
     };
 
-    init_tracing(args.logging.log_level, args.format, write_log_opt);
+    let line_opts = if args.logging.filenames {
+        LineNumberOption::FileAndLineNumber
+    } else {
+        LineNumberOption::None
+    };
+
+    init_tracing(
+        args.logging.log_level,
+        args.format,
+        write_log_opt,
+        line_opts,
+    );
 
     tracing::debug!("{:#?}", args);
 

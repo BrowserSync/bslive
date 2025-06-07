@@ -14,6 +14,7 @@ use bsnext_fs::{
     PathEvent,
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
+use tracing::info;
 
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
@@ -47,19 +48,20 @@ impl actix::Handler<FsEvent> for BsSystem {
             FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(&pdo),
         };
         if let Some(any_event) = next {
-            tracing::debug!("will publish any_event {:?}", any_event);
+            tracing::trace!("will publish any_event {:?}", any_event);
             self.publish_any_event(any_event)
         }
     }
 }
 
 impl BsSystem {
+    #[tracing::instrument(skip_all)]
     fn handle_buffered(
         &mut self,
         fs_event_ctx: &FsEventContext,
         buf: BufferedChangeEvent,
     ) -> Option<(Task, TaskCommand, TaskList)> {
-        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?fs_event_ctx, ?buf, "handle_buffered");
+        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?fs_event_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
             if let Some(fp) = mon.input_ctx.file_path() {
@@ -190,15 +192,15 @@ impl BsSystem {
         Some(AnyEvent::Internal(InternalEvents::InputError(e)))
     }
 
+    #[tracing::instrument(skip_all)]
     fn as_runner_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskList {
-        tracing::info!("as_runner with fs_event_ctx {:?}", fs_event_ctx);
         let matching_monitor = self
             .any_monitors
             .iter()
             .find(|(_, any_monitor)| any_monitor.watchable_hash() == fs_event_ctx.origin_id);
 
         if let Some((path_watchable, _any_monitor)) = matching_monitor {
-            tracing::info!("path_watchable {:?}", path_watchable);
+            info!("matching monitor, path_watchable: {}", path_watchable);
             let runner = path_watchable
                 .task_list()
                 .map(ToOwned::to_owned)

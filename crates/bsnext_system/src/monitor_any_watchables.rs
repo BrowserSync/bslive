@@ -12,6 +12,7 @@ use std::collections::BTreeSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use std::time::Duration;
+use tracing::{debug, debug_span};
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
@@ -23,8 +24,9 @@ pub struct MonitorPathWatchables {
 impl actix::Handler<MonitorPathWatchables> for BsSystem {
     type Result = ();
 
+    #[tracing::instrument(skip_all, name = "Handler->MonitorPathWatchables->BsSystem")]
     fn handle(&mut self, msg: MonitorPathWatchables, ctx: &mut Self::Context) -> Self::Result {
-        tracing::debug!("MonitorAnyWatchables {:?}", msg.watchables);
+        debug!("{}", file!());
 
         let existing = self.any_monitors.keys().collect::<BTreeSet<_>>();
         let incoming = msg.watchables.iter().collect::<BTreeSet<_>>();
@@ -33,8 +35,9 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
         let to_add = incoming.difference(&existing).collect::<Vec<_>>();
         let to_remove = existing.difference(&incoming).collect::<Vec<_>>();
 
-        tracing::debug!("{} watchables exist in current + incoming", in_both.len());
-        tracing::debug!("removing {} watchables", to_remove.len());
+        debug!("{} duplicates", in_both.len());
+        debug!("{} monitors to remove", to_remove.len());
+        debug!("{} monitors to add", to_add.len());
 
         for any_watchable in to_remove {
             if let Some(mon) = self.any_monitors.get(any_watchable) {
@@ -43,8 +46,9 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             }
         }
 
-        tracing::debug!("adding {} new watchables", to_add.len());
-        for any_watchable in to_add {
+        for (index, any_watchable) in to_add.into_iter().enumerate() {
+            let span = debug_span!("{}", index);
+            let _guard = span.enter();
             let mut hasher = DefaultHasher::new();
             any_watchable.hash(&mut hasher);
             let watchable_hash = hasher.finish();
@@ -81,12 +85,14 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             if let Some(filter_kind) = &opts.filter {
                 let filters = convert(filter_kind);
                 for filter in filters {
+                    debug!(filter = ?filter, "append filter");
                     watcher.with_filter(filter);
                 }
             }
             if let Some(ignore_filter_kind) = &opts.ignore {
                 let ignores = convert(ignore_filter_kind);
                 for ignore in ignores {
+                    debug!(ignore = ?ignore, "with ignore");
                     watcher.with_ignore(ignore);
                 }
             }
@@ -100,7 +106,10 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                 _ => Duration::from_millis(300),
             };
 
-            watcher.with_debounce(Debounce::Buffered { duration });
+            let debounce = Debounce::Buffered { duration };
+            watcher.with_debounce(debounce);
+
+            debug!("{}", watcher);
 
             let watcher_addr = watcher.start();
 
@@ -114,16 +123,17 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                 watchable_hash,
             };
 
-            for one_path in &monitor.paths {
+            for single_path in &monitor.paths {
+                debug!(path = %single_path.display());
                 monitor.addr.do_send(RequestWatchPath {
                     recipients: vec![ctx.address().recipient()],
-                    path: one_path.clone(),
+                    path: single_path.clone(),
                 });
             }
 
-            let any = AnyMonitor::Path(monitor);
+            let any_monitor = AnyMonitor::Path(monitor);
 
-            ctx.notify(InsertMonitor((*any_watchable).clone(), any))
+            ctx.notify(InsertMonitor((*any_watchable).clone(), any_monitor))
         }
     }
 }
@@ -176,8 +186,10 @@ impl actix::Handler<InsertMonitor> for BsSystem {
     type Result = ();
 
     fn handle(&mut self, msg: InsertMonitor, _ctx: &mut Self::Context) -> Self::Result {
-        tracing::trace!(watchable=?msg.0, "InsertMonitor");
+        let span = debug_span!("InsertMonitor");
+        let _guard = span.enter();
+        debug!("{}", msg.0);
         self.any_monitors.insert(msg.0, msg.1);
-        tracing::trace!("inserted, Monitor count {}", self.any_monitors.len());
+        debug!("+ Monitor count {}", self.any_monitors.len());
     }
 }

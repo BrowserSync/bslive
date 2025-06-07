@@ -24,6 +24,7 @@ pub struct MonitorInput {
 impl actix::Handler<MonitorInput> for BsSystem {
     type Result = ();
 
+    #[tracing::instrument(skip_all, name = "Handler->MonitorInput->BsSystem")]
     fn handle(&mut self, msg: MonitorInput, ctx: &mut Self::Context) -> Self::Result {
         let mut input_watcher = FsWatcher::for_input(&msg.cwd, 0);
 

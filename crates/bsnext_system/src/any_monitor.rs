@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::any_watchable::AnyWatchable;
@@ -34,6 +35,27 @@ pub enum PathWatchable {
     Server(ServerWatchable),
     Route(RouteWatchable),
     Any(AnyWatchable),
+}
+
+impl Display for PathWatchable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            PathWatchable::Server(server) => {
+                for x in &server.dirs {
+                    write!(f, "PathWatchable::Server('{}')", x.display())?;
+                }
+            }
+            PathWatchable::Route(route) => {
+                write!(f, "PathWatchable::Route('{}')", route.dir.display())?;
+            }
+            PathWatchable::Any(any) => {
+                for x in &any.dirs {
+                    write!(f, "PathWatchable::Any('{}')", x.display())?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl PathWatchable {

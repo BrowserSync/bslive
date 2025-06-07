@@ -16,6 +16,7 @@ async fn main() -> anyhow::Result<()> {
         &with,
         bsnext_tracing::OutputFormat::Normal,
         bsnext_tracing::WriteOption::None,
+        bsnext_tracing::LineNumberOption::None,
     );
     let (File(file), Dir(dir)) = mock_path("mocks/01.txt");
     let mut fs = FsWatcher::new(&dir, FsEventContext::default());

@@ -6,6 +6,7 @@ use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
+use tracing::{debug, Span};
 
 /// Represents a task group runner responsible for managing and executing a set of tasks.
 ///
@@ -34,31 +35,39 @@ impl actix::Actor for TaskGroupRunner {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(actor.lifecycle = "started", "TaskGroupRunner2")
+        tracing::trace!(actor.lifecycle = "started", "TaskGroupRunner")
     }
     fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        tracing::info!(" ⏰ stopping TaskGroupRunner2 {}", self.done);
+        tracing::trace!(" ⏰ stopping TaskGroupRunner {}", self.done);
         Running::Stop
     }
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::info!(" x stopped TaskGroupRunner2")
+        tracing::trace!(" x stopped TaskGroupRunner")
     }
 }
 
 impl Handler<TaskCommand> for TaskGroupRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
+    #[tracing::instrument(skip_all, name = "Handler->TaskCommand->TaskGroupRunner")]
     fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
-        tracing::debug!(done = self.done, "TaskGroupRunner::TaskCommand");
+        let span = Span::current();
+        let gg = Arc::new(span.clone());
+        let ggg = gg.clone();
+
+        debug!(done = self.done);
+
         let Some(group) = self.task_group.take() else {
             todo!("how to handle a concurrent request here?");
         };
-        tracing::debug!("  └── {} tasks in group", group.len());
-        tracing::debug!("  └── {:?} group run_kind", group.run_kind());
-        let expected_len = group.len();
 
+        debug!("  └── {} tasks in group", group.len());
+        debug!("  └── {:?} group run_kind", group.run_kind());
+
+        let expected_len = group.len();
         let future = async move {
             let mut done: Vec<(usize, TaskReport)> = vec![];
+            let _e = ggg.enter();
             match group.run_kind() {
                 RunKind::Sequence { opts } => {
                     let exit_on_failure = opts.exit_on_failure;
@@ -131,9 +140,9 @@ impl Handler<TaskCommand> for TaskGroupRunner {
         };
         Box::pin(future.into_actor(self).map(move |res, actor, _ctx| {
             actor.done = true;
-
-            tracing::debug!("actual len: {}", res.len());
-            tracing::debug!("expected len: {}", expected_len);
+            let _e = gg.enter();
+            debug!("actual len: {}", res.len());
+            debug!("expected len: {}", expected_len);
 
             let all_good = res.iter().all(|(_index, report)| report.result().is_ok());
             let all_ran = res.len() == expected_len;
@@ -145,7 +154,7 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                 .map(Clone::clone)
                 .collect::<Vec<_>>();
 
-            tracing::debug!(result.all_good = all_good, result.all_ran = all_ran);
+            debug!(result.all_good = all_good, result.all_ran = all_ran);
 
             match (all_ran, all_good) {
                 (true, true) => TaskResult::ok_tasks(InvocationId(0), reports),

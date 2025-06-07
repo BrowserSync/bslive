@@ -34,6 +34,7 @@ use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Receiver;
+use tracing::debug;
 use trigger_task::TriggerTask;
 
 pub mod any_monitor;
@@ -140,16 +141,15 @@ impl BsSystem {
         }
     }
 
+    #[tracing::instrument(skip_all, name = "BsSystem.accept_watchables")]
     fn accept_watchables(&mut self, input: &Input) {
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
         let any_watchables = to_any_watchables(input);
 
-        tracing::debug!(
-            "accepting {} route watchables, and {} server watchables",
-            route_watchables.len(),
-            server_watchables.len()
-        );
+        debug!("processing {} route watchables", route_watchables.len(),);
+        debug!("processing {} server watchables", server_watchables.len());
+        debug!("processing {} any watchables", any_watchables.len());
 
         let Some(self_address) = &self.self_addr else {
             unreachable!("?")
@@ -176,6 +176,11 @@ impl BsSystem {
 
         let cwd = cwd.clone();
         let addr = self_address.clone();
+        debug!(
+            "{} watchables to add, cwd: {}",
+            watchables.len(),
+            cwd.display()
+        );
         let msg = MonitorPathWatchables { watchables, cwd };
 
         addr.do_send(msg);
@@ -208,7 +213,7 @@ impl BsSystem {
     }
 
     fn publish_any_event(&mut self, evt: AnyEvent) {
-        tracing::debug!(?evt);
+        tracing::trace!(?evt);
 
         if let Some(any_event_sender) = &self.any_event_sender {
             Arbiter::current().spawn({
@@ -238,20 +243,20 @@ impl BsSystem {
     }
 }
 
-async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<Second> {
+async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupOk> {
     let clone = input.clone();
     let clone2 = input.clone();
-    let res = addr.send(ResolveInitialTasks { input: clone }).await??;
-    let next = addr.send(ResolveServers { input: clone2 });
-    let (servers, child_results) = next.await??;
-    Ok(Second {
-        report_and_tree: res,
+    let report_and_tree = addr.send(ResolveInitialTasks { input: clone }).await??;
+    let servers_resp = addr.send(ResolveServers { input: clone2 });
+    let (servers, child_results) = servers_resp.await??;
+    Ok(SetupOk {
+        report_and_tree,
         servers,
         child_results,
     })
 }
 
-struct Second {
+struct SetupOk {
     servers: GetActiveServersResponse,
     #[allow(dead_code)]
     report_and_tree: TaskReportAndTree,
@@ -334,8 +339,8 @@ impl Handler<Start> for BsSystem {
                 let jobs = setup_jobs(addr, input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<Second, anyhow::Error>, actor, ctx| {
-                        let Second { servers, .. } = res.map_err(StartupError::Any)?;
+                    move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
+                        let SetupOk { servers, .. } = res.map_err(StartupError::Any)?;
                         ctx.notify(MonitorInput {
                             path: path.clone(),
                             cwd: actor.cwd.clone().unwrap(),
@@ -355,7 +360,7 @@ impl Handler<Start> for BsSystem {
                 let jobs = setup_jobs(addr, input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<Second, anyhow::Error>, actor, _ctx| {
+                    move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
                         let res = res?;
                         let errored = ChildResult::first_server_error(&res.child_results);
                         if let Some(server_error) = errored {
