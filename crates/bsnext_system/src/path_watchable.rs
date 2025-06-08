@@ -2,33 +2,11 @@ use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::any_watchable::AnyWatchable;
-use crate::path_monitor::PathMonitor;
 use crate::route_watchable::RouteWatchable;
 use crate::server_watchable::ServerWatchable;
 use crate::task_list::TaskList;
-use actix::Addr;
-use bsnext_fs::actor::FsWatcher;
 use bsnext_input::route::Spec;
 use std::path::Path;
-
-#[derive(Debug, Clone)]
-pub enum AnyMonitor {
-    Path(PathMonitor),
-}
-
-impl AnyMonitor {
-    pub fn fs_addr(&self) -> &Addr<FsWatcher> {
-        match self {
-            AnyMonitor::Path(path) => &path.addr,
-        }
-    }
-
-    pub fn watchable_hash(&self) -> u64 {
-        match self {
-            AnyMonitor::Path(path) => path.watchable_hash,
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum PathWatchable {
@@ -41,17 +19,25 @@ impl Display for PathWatchable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             PathWatchable::Server(server) => {
-                for x in &server.dirs {
-                    write!(f, "PathWatchable::Server('{}')", x.display())?;
-                }
+                let lines = server
+                    .dirs
+                    .iter()
+                    .map(|x| format!("'{}'", x.display()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "PathWatchable::Server({})", lines)?;
             }
             PathWatchable::Route(route) => {
                 write!(f, "PathWatchable::Route('{}')", route.dir.display())?;
             }
             PathWatchable::Any(any) => {
-                for x in &any.dirs {
-                    write!(f, "PathWatchable::Any('{}')", x.display())?;
-                }
+                let lines = any
+                    .dirs
+                    .iter()
+                    .map(|x| format!("'{}'", x.display()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "PathWatchable::Any({})", lines)?;
             }
         }
         Ok(())

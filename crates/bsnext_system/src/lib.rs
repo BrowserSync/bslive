@@ -1,4 +1,3 @@
-use crate::any_monitor::{AnyMonitor, PathWatchable};
 use actix::{
     Actor, ActorContext, ActorFutureExt, Addr, AsyncContext, Handler, ResponseActFuture,
     ResponseFuture, Running, WrapFuture,
@@ -6,6 +5,8 @@ use actix::{
 
 use crate::any_watchable::to_any_watchables;
 use crate::monitor_any_watchables::MonitorPathWatchables;
+use crate::path_monitor::PathMonitor;
+use crate::path_watchable::PathWatchable;
 use crate::task::{Task, TaskCommand};
 use crate::task_group::TaskGroup;
 use crate::task_list::TaskList;
@@ -37,7 +38,6 @@ use tokio::sync::oneshot::Receiver;
 use tracing::debug;
 use trigger_task::TriggerTask;
 
-pub mod any_monitor;
 pub mod any_watchable;
 pub mod args;
 pub mod cli;
@@ -49,6 +49,7 @@ mod input_monitor;
 mod input_watchable;
 mod monitor_any_watchables;
 mod path_monitor;
+mod path_watchable;
 mod route_watchable;
 pub mod server_watchable;
 pub mod start;
@@ -67,7 +68,7 @@ pub(crate) struct BsSystem {
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
-    any_monitors: HashMap<PathWatchable, AnyMonitor>,
+    any_monitors: HashMap<PathWatchable, PathMonitor>,
     tasks: HashMap<FsEventContext, TaskList>,
     cwd: Option<PathBuf>,
     start_context: Option<StartupContext>,

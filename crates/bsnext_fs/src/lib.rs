@@ -57,6 +57,12 @@ pub struct FsEventContext {
 }
 
 impl FsEventContext {
+    pub fn new(id: u64, origin_id: u64) -> Self {
+        Self { id, origin_id }
+    }
+}
+
+impl FsEventContext {
     pub fn id(&self) -> u64 {
         self.id
     }

@@ -1,5 +1,5 @@
-use crate::any_monitor::{AnyMonitor, PathWatchable};
 use crate::path_monitor::PathMonitor;
+use crate::path_watchable::PathWatchable;
 use crate::BsSystem;
 use actix::{Actor, AsyncContext};
 use bsnext_fs::actor::FsWatcher;
@@ -9,7 +9,6 @@ use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::{DebounceDuration, FilterKind, Spec};
 use std::collections::BTreeSet;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use std::time::Duration;
 use tracing::{debug, debug_span};
@@ -41,7 +40,7 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
 
         for any_watchable in to_remove {
             if let Some(mon) = self.any_monitors.get(any_watchable) {
-                mon.fs_addr().do_send(StopWatcher);
+                mon.addr.do_send(StopWatcher);
                 ctx.notify(DropMonitor((*any_watchable).clone()))
             }
         }
@@ -49,36 +48,16 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
         for (index, any_watchable) in to_add.into_iter().enumerate() {
             let span = debug_span!("{}", index);
             let _guard = span.enter();
-            let mut hasher = DefaultHasher::new();
-            any_watchable.hash(&mut hasher);
-            let watchable_hash = hasher.finish();
+            let watchable_hash = any_watchable.as_id();
 
-            let mut watcher = match any_watchable {
-                PathWatchable::Server(server_watchable) => {
-                    let id = server_watchable.server_identity.as_id();
-                    let ctx = FsEventContext {
-                        id,
-                        origin_id: watchable_hash,
-                    };
-                    FsWatcher::new(&msg.cwd, ctx)
-                }
-                PathWatchable::Route(route_watchable) => {
-                    let id = route_watchable.server_identity.as_id();
-                    let ctx = FsEventContext {
-                        id,
-                        origin_id: watchable_hash,
-                    };
-                    FsWatcher::new(&msg.cwd, ctx)
-                }
-                PathWatchable::Any(_any_watchable) => {
-                    // any_watchable.
-                    let ctx = FsEventContext {
-                        id: watchable_hash,
-                        origin_id: watchable_hash,
-                    };
-                    FsWatcher::new(&msg.cwd, ctx)
-                }
+            let fs_ctx_id = match any_watchable {
+                PathWatchable::Server(watchable) => watchable.server_identity.as_id(),
+                PathWatchable::Route(watchable) => watchable.server_identity.as_id(),
+                PathWatchable::Any(_) => watchable_hash,
             };
+
+            let fs_ctx = FsEventContext::new(fs_ctx_id, watchable_hash);
+            let mut watcher = FsWatcher::new(&msg.cwd, fs_ctx.clone());
 
             let opts = any_watchable.spec_opts();
 
@@ -97,8 +76,7 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                 }
             }
 
-            let spec = any_watchable.spec_opts();
-            let duration = match spec {
+            let duration = match opts {
                 Spec {
                     debounce: Some(DebounceDuration::Ms(ms)),
                     ..
@@ -112,28 +90,17 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             debug!("{}", watcher);
 
             let watcher_addr = watcher.start();
+            let monitor = PathMonitor::new(watcher_addr, fs_ctx);
 
-            let monitor = PathMonitor {
-                addr: watcher_addr.clone(),
-                paths: any_watchable
-                    .watch_paths()
-                    .into_iter()
-                    .map(PathBuf::from)
-                    .collect(),
-                watchable_hash,
-            };
-
-            for single_path in &monitor.paths {
+            for single_path in &any_watchable.watch_paths() {
                 debug!(path = %single_path.display());
                 monitor.addr.do_send(RequestWatchPath {
                     recipients: vec![ctx.address().recipient()],
-                    path: single_path.clone(),
+                    path: single_path.to_path_buf(),
                 });
             }
 
-            let any_monitor = AnyMonitor::Path(monitor);
-
-            ctx.notify(InsertMonitor((*any_watchable).clone(), any_monitor))
+            ctx.notify(InsertMonitor((*any_watchable).clone(), monitor))
         }
     }
 }
@@ -180,7 +147,7 @@ impl actix::Handler<DropMonitor> for BsSystem {
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
-struct InsertMonitor(PathWatchable, AnyMonitor);
+struct InsertMonitor(PathWatchable, PathMonitor);
 
 impl actix::Handler<InsertMonitor> for BsSystem {
     type Result = ();

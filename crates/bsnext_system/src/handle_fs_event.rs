@@ -195,19 +195,21 @@ impl BsSystem {
         let matching_monitor = self
             .any_monitors
             .iter()
-            .find(|(_, any_monitor)| any_monitor.watchable_hash() == fs_event_ctx.origin_id);
+            .find(|(_, path_monitor)| path_monitor.fs_ctx == (*fs_event_ctx));
 
         if let Some((path_watchable, _any_monitor)) = matching_monitor {
             info!("matching monitor, path_watchable: {}", path_watchable);
-            let runner = path_watchable
-                .task_list()
-                .map(ToOwned::to_owned)
-                .unwrap_or_else(|| {
-                    TaskList::seq(&[
-                        Runnable::BsLiveTask(BsLiveTask::NotifyServer),
-                        Runnable::BsLiveTask(BsLiveTask::ExtEvent),
-                    ])
-                });
+            info!("matching fs_event_ctx: {:?}", fs_event_ctx);
+            let custom_task_list = path_watchable.task_list();
+            if let None = custom_task_list {
+                info!("no custom tasks given, NotifyServer + ExtEvent will be defaults");
+            }
+            let runner = custom_task_list.map(ToOwned::to_owned).unwrap_or_else(|| {
+                TaskList::seq(&[
+                    Runnable::BsLiveTask(BsLiveTask::NotifyServer),
+                    Runnable::BsLiveTask(BsLiveTask::ExtEvent),
+                ])
+            });
 
             return runner;
         }
