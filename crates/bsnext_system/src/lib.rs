@@ -313,7 +313,7 @@ impl Handler<Start> for BsSystem {
         self.any_event_sender = Some(msg.events_sender.clone());
         self.cwd = Some(msg.cwd);
 
-        tracing::debug!("self.cwd {:?}", self.cwd);
+        debug!("self.cwd {:?}", self.cwd);
 
         let Some(cwd) = &self.cwd else {
             unreachable!("?")
@@ -326,11 +326,11 @@ impl Handler<Start> for BsSystem {
         let start_context = StartupContext::from_cwd(self.cwd.as_ref());
         self.start_context = Some(start_context.clone());
 
-        tracing::debug!(?start_context);
+        debug!(?start_context);
 
         match msg.kind.input(&start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
-                tracing::debug!("SystemStartArgs::PathWithInput");
+                debug!("SystemStartArgs::PathWithInput");
 
                 let ids = input.ids();
                 let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
@@ -353,7 +353,7 @@ impl Handler<Start> for BsSystem {
                 ))
             }
             Ok(SystemStartArgs::InputOnly { input }) => {
-                tracing::debug!("SystemStartArgs::InputOnly");
+                debug!("SystemStartArgs::InputOnly");
 
                 let addr = ctx.address();
                 let input_clone2 = input.clone();
@@ -364,7 +364,7 @@ impl Handler<Start> for BsSystem {
                         let res = res?;
                         let errored = ChildResult::first_server_error(&res.child_results);
                         if let Some(server_error) = errored {
-                            tracing::debug!("errored: {:?}", errored);
+                            debug!("errored: {:?}", errored);
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
                         actor.accept_watchables(&input_clone2);
@@ -373,7 +373,7 @@ impl Handler<Start> for BsSystem {
                 ))
             }
             Ok(SystemStartArgs::PathWithInvalidInput { path, input_error }) => {
-                tracing::debug!("SystemStartArgs::PathWithInvalidInput");
+                debug!("SystemStartArgs::PathWithInvalidInput");
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
@@ -414,7 +414,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
             .send(ResolveServers { input: msg.input })
             .into_actor(self)
             .map(move |res, actor, _ctx| {
-                tracing::debug!(" + did override input");
+                debug!(" + did override input");
                 let output = match res {
                     Ok(Ok(res)) => Ok(res),
                     Ok(Err(s_e)) => Err(s_e),
@@ -446,7 +446,7 @@ impl actix::Handler<ResolveServers> for BsSystem {
         let addr = servers_addr.clone();
 
         let f = async move {
-            tracing::debug!("will mark input as changed");
+            debug!("will mark input as changed");
             let results = addr.send(InputChanged { input: msg.input }).await;
 
             let Ok(result_set) = results else {
@@ -454,7 +454,7 @@ impl actix::Handler<ResolveServers> for BsSystem {
                 unreachable!("?1 {:?}", e);
             };
 
-            tracing::debug!(
+            debug!(
                 "result_set from resolve servers {}",
                 result_set.changes.len()
             );
@@ -488,13 +488,13 @@ impl actix::Handler<ResolveServers> for BsSystem {
                         }
                     }
                     ChildResult::Patched(p) => {
-                        tracing::debug!("ChildResult::Patched {:?}", p);
+                        debug!("ChildResult::Patched {:?}", p);
                     }
                     ChildResult::PatchErr(e) => {
-                        tracing::debug!("ChildResult::PatchErr {:?}", e);
+                        debug!("ChildResult::PatchErr {:?}", e);
                     }
                     ChildResult::CreateErr(e) => {
-                        tracing::debug!("ChildResult::CreateErr {:?}", e);
+                        debug!("ChildResult::CreateErr {:?}", e);
                     }
                 }
             }
@@ -512,11 +512,11 @@ impl actix::Handler<ResolveServers> for BsSystem {
                             server_resp: resp.clone(),
                             child_results: res.clone(),
                         };
-                        tracing::debug!("will emit {:?}", evt);
+                        debug!("will emit {:?}", evt);
                         async move {
                             match external_event_sender.send(AnyEvent::Internal(evt)).await {
                                 Ok(_) => {}
-                                Err(e) => tracing::debug!(?e),
+                                Err(e) => debug!(?e),
                             };
                         }
                     });

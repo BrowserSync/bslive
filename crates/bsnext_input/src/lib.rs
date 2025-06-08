@@ -42,6 +42,13 @@ impl Input {
         }
     }
     pub fn before_run_opts(&self) -> Vec<RunOptItem> {
+        let root_tasks = self
+            .watchers
+            .iter()
+            .flat_map(|watcher| watcher.opts.as_ref().and_then(|spec| spec.before.clone()))
+            .flatten()
+            .map(BeforeRunOptItem::into_run_opt);
+
         let startup_server_tasks = self
             .servers
             .iter()
@@ -70,7 +77,8 @@ impl Input {
             })
             .map(BeforeRunOptItem::into_run_opt);
 
-        startup_server_tasks
+        root_tasks
+            .chain(startup_server_tasks)
             .chain(route_startup_tasks)
             .collect::<Vec<_>>()
     }
