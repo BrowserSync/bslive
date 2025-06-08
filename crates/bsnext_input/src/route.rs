@@ -460,15 +460,6 @@ impl Display for BsLiveRunner {
 #[derive(
     Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
-pub struct Watcher {
-    pub dir: Option<String>,
-    #[serde(flatten)]
-    pub opts: Option<Spec>,
-}
-
-#[derive(
-    Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize,
-)]
 pub struct MultiWatch {
     pub dirs: WatcherDirs,
     #[serde(flatten)]
@@ -506,14 +497,6 @@ impl WatcherDirs {
             WatcherDirs::Many(item) if !item.is_empty() => item.iter().map(PathBuf::from).collect(),
             WatcherDirs::Many(_) => todo!("cannot get here?"),
         }
-    }
-}
-
-impl Watcher {
-    pub fn add_task(&mut self, item: RunOptItem) {
-        let opts = self.opts.get_or_insert_default();
-        let list = opts.run.get_or_insert(vec![]);
-        list.push(item);
     }
 }
 
