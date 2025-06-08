@@ -5,6 +5,6 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub struct PathMonitor {
     pub(crate) addr: Addr<FsWatcher>,
-    pub(crate) path: PathBuf,
+    pub(crate) paths: Vec<PathBuf>,
     pub(crate) watchable_hash: u64,
 }

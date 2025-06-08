@@ -1,4 +1,7 @@
-use crate::route::{DebounceDuration, FilterKind, RunOpt, RunOptItem, ShRunOptItem, Spec};
+use crate::route::{
+    DebounceDuration, FilterKind, RunAll, RunAllOpts, RunOptItem, RunSeq, SeqOpts, ShRunOptItem,
+    Spec,
+};
 use crate::watch_opts::WatchOpts;
 
 #[test]
@@ -13,6 +16,7 @@ fn test_watch_opts_debounce() {
         filter: Some(FilterKind::StringDefault("**/*.css".into())),
         ignore: None,
         run: None,
+        before: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
@@ -28,6 +32,7 @@ fn test_watch_opts_inline_filter() {
         filter: Some(FilterKind::StringDefault("**/*.css".into())),
         ignore: None,
         run: None,
+        before: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
@@ -46,6 +51,7 @@ fn test_watch_opts_explicit_filter_ext() {
         }),
         ignore: None,
         run: None,
+        before: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
@@ -63,6 +69,7 @@ fn test_watch_opts_explicit_filter_glob() {
         }),
         ignore: None,
         run: None,
+        before: None,
     });
     let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
     assert_eq!(expected, actual);
@@ -77,11 +84,11 @@ fn test_watch_opts_run_seq() {
       - sh: echo 3
     "#;
     let expected = Spec {
-        run: Some(RunOpt::Seq(vec![
+        run: Some(vec![
             RunOptItem::Sh(ShRunOptItem::new("echo 1")),
             RunOptItem::Sh(ShRunOptItem::new("echo 2")),
             RunOptItem::Sh(ShRunOptItem::new("echo 3")),
-        ])),
+        ]),
         ..Default::default()
     };
     let actual: Spec = serde_yaml::from_str(input).unwrap();
@@ -92,19 +99,17 @@ fn test_watch_opts_run_seq() {
 fn test_watch_opts_run_all() {
     let input = r#"
     run:
-      all:
-        - sh: echo 1
-        - sh: echo 2
-        - sh: echo 3
+      - all:
+         - sh: echo 1
+         - sh: echo 2
+         - sh: echo 3
     "#;
     let expected = Spec {
-        run: Some(RunOpt::All {
-            all: vec![
-                RunOptItem::Sh(ShRunOptItem::new("echo 1")),
-                RunOptItem::Sh(ShRunOptItem::new("echo 2")),
-                RunOptItem::Sh(ShRunOptItem::new("echo 3")),
-            ],
-        }),
+        run: Some(vec![RunOptItem::All(RunAll::new(vec![
+            RunOptItem::Sh(ShRunOptItem::new("echo 1")),
+            RunOptItem::Sh(ShRunOptItem::new("echo 2")),
+            RunOptItem::Sh(ShRunOptItem::new("echo 3")),
+        ]))]),
         ..Default::default()
     };
     let actual: Spec = serde_yaml::from_str(input).unwrap();
@@ -122,16 +127,14 @@ fn test_watch_opts_run_all_nested() {
         - sh: echo 4
     "#;
     let expected = Spec {
-        run: Some(RunOpt::Seq(vec![
+        run: Some(vec![
             RunOptItem::Sh(ShRunOptItem::new("echo 1")),
-            RunOptItem::All {
-                all: vec![
-                    RunOptItem::Sh(ShRunOptItem::new("echo 2")),
-                    RunOptItem::Sh(ShRunOptItem::new("echo 3")),
-                    RunOptItem::Sh(ShRunOptItem::new("echo 4")),
-                ],
-            },
-        ])),
+            RunOptItem::All(RunAll::new(vec![
+                RunOptItem::Sh(ShRunOptItem::new("echo 2")),
+                RunOptItem::Sh(ShRunOptItem::new("echo 3")),
+                RunOptItem::Sh(ShRunOptItem::new("echo 4")),
+            ])),
+        ]),
         ..Default::default()
     };
     let actual: Spec = serde_yaml::from_str(input).unwrap();
@@ -139,12 +142,59 @@ fn test_watch_opts_run_all_nested() {
 }
 
 #[test]
-fn error_handled_with_route() {
+fn test_watch_opts_run_all_max_concurrency() {
     let input = r#"
-      run:
-        - sh: 'echo 1'
+    run:
+      - sh: echo 1
+      - all:
+         - sh: echo 2
+         - sh: echo 3
+         - sh: echo 4
+        opts:
+          max: 10
     "#;
+    let expected = Spec {
+        run: Some(vec![
+            RunOptItem::Sh(ShRunOptItem::new("echo 1")),
+            RunOptItem::All(RunAll::with_opts(
+                vec![
+                    RunOptItem::Sh(ShRunOptItem::new("echo 2")),
+                    RunOptItem::Sh(ShRunOptItem::new("echo 3")),
+                    RunOptItem::Sh(ShRunOptItem::new("echo 4")),
+                ],
+                RunAllOpts { max: 10 },
+            )),
+        ]),
+        ..Default::default()
+    };
     let actual: Spec = serde_yaml::from_str(input).unwrap();
-    // assert_eq!(expected, actual);
-    dbg!(&actual);
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_watch_opts_run_seq_exit() {
+    let input = r#"
+    run:
+      - seq:
+         - sh: echo 2
+         - sh: echo 3
+         - sh: echo 4
+        opts:
+          exit_on_fail: false
+    "#;
+    let expected = Spec {
+        run: Some(vec![RunOptItem::Seq(RunSeq::with_opts(
+            vec![
+                RunOptItem::Sh(ShRunOptItem::new("echo 2")),
+                RunOptItem::Sh(ShRunOptItem::new("echo 3")),
+                RunOptItem::Sh(ShRunOptItem::new("echo 4")),
+            ],
+            SeqOpts {
+                exit_on_fail: false,
+            },
+        ))]),
+        ..Default::default()
+    };
+    let actual: Spec = serde_yaml::from_str(input).unwrap();
+    assert_eq!(actual, expected);
 }

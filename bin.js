@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-const {startSync} = require("./index.js");
-let code = startSync(process.argv.slice(1));
+const { startBlocking } = require("./index.js");
+let code = startBlocking(process.argv.slice(1));
 process.exit(code);

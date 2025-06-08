@@ -1,12 +1,19 @@
-use crate::{OutputFormat, WriteOption};
+use crate::{LineNumberOption, OutputFormat, WriteOption};
 use std::fs::File;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
-pub fn init_tracing_subscriber(debug_str: &str, format: OutputFormat, write_option: WriteOption) {
+pub fn init_tracing_subscriber(
+    debug_str: &str,
+    format: OutputFormat,
+    write_option: WriteOption,
+    line_opts: LineNumberOption,
+) {
     let filter =
         tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| debug_str.into());
+
+    let include_lines = line_opts == LineNumberOption::FileAndLineNumber;
 
     let fmt_layer = match (format, write_option) {
         (OutputFormat::Json, WriteOption::None) => tracing_subscriber::fmt::layer()
@@ -28,7 +35,8 @@ pub fn init_tracing_subscriber(debug_str: &str, format: OutputFormat, write_opti
                 .without_time()
                 .with_ansi(true)
                 .with_target(false)
-                .with_file(true)
+                .with_file(include_lines)
+                .with_line_number(include_lines)
                 .boxed()
         }
         (OutputFormat::Normal, WriteOption::File) | (OutputFormat::Tui, WriteOption::File) => {
@@ -37,9 +45,9 @@ pub fn init_tracing_subscriber(debug_str: &str, format: OutputFormat, write_opti
                 .with_ansi(false)
                 .with_writer(file)
                 .with_thread_names(true)
-                .with_line_number(true)
                 .with_target(false)
-                .with_file(true)
+                .with_file(include_lines)
+                .with_line_number(include_lines)
                 .boxed()
         }
     };

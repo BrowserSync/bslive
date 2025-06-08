@@ -1,6 +1,7 @@
 use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_dto::internal::AnyEvent;
 use bsnext_system::start::start_command::StartCommand;
+use bsnext_system::start::start_kind::StartKind;
 use bsnext_system::start::start_system::start_system;
 use std::fs;
 use std::path::PathBuf;
@@ -39,15 +40,10 @@ servers:
 
     let (events_sender, _) = mpsc::channel::<AnyEvent>(1);
 
-    let api = start_system(
-        cwd,
-        FsOpts::default(),
-        InputOpts::default(),
-        events_sender,
-        start,
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    let start_kind = StartKind::from_args(&FsOpts::default(), &InputOpts::default(), &start);
+    let api = start_system(cwd, start_kind, events_sender)
+        .await
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     let active_servers = api.active_servers().await?;
     let s1 = active_servers.first().unwrap();

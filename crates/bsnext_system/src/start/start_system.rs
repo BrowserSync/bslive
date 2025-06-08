@@ -1,8 +1,6 @@
-use crate::start::start_command::StartCommand;
 use crate::start::start_kind::StartKind;
 use crate::{BsSystem, BsSystemApi, Start};
 use actix::Actor;
-use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_dto::internal::AnyEvent;
 use bsnext_dto::{DidStart, StartupError};
 use std::path::PathBuf;
@@ -10,15 +8,12 @@ use tokio::sync::oneshot;
 
 pub async fn start_system(
     cwd: PathBuf,
-    fs_opts: FsOpts,
-    input_opts: InputOpts,
+    start_kind: StartKind,
     events_sender: tokio::sync::mpsc::Sender<AnyEvent>,
-    start_command: StartCommand,
 ) -> Result<BsSystemApi, StartupError> {
     let (tx, rx) = oneshot::channel();
     let system = BsSystem::new();
     let sys_addr = system.start();
-    let start_kind = StartKind::from_args(&fs_opts, &input_opts, &start_command);
 
     tracing::debug!("{:#?}", start_kind);
 

@@ -64,6 +64,12 @@ pub enum WriteOption {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LineNumberOption {
+    FileAndLineNumber,
+    None,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OtelOption {
     On,
     Off,
@@ -73,9 +79,10 @@ pub fn init_tracing(
     log_level: Option<LogLevel>,
     format: OutputFormat,
     write_option: WriteOption,
+    line_opts: LineNumberOption,
 ) -> Option<()> {
     let level = level(log_level);
-    raw_tracing::init_tracing_subscriber(&level, format, write_option);
+    raw_tracing::init_tracing_subscriber(&level, format, write_option, line_opts);
     None::<()>
 }
 

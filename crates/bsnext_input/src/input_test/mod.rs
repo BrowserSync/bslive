@@ -1,6 +1,6 @@
 use crate::route::{
-    CompressionOpts, CorsOpts, DebounceDuration, DelayKind, DelayOpts, FilterKind, Route, Spec,
-    Watcher,
+    CompressionOpts, CorsOpts, DebounceDuration, DelayKind, DelayOpts, FilterKind, MultiWatch,
+    Route, Spec, WatcherDirs,
 };
 use crate::watch_opts::WatchOpts;
 use crate::Input;
@@ -218,6 +218,7 @@ fn test_deserialize_watch() {
             filter: None,
             ignore: None,
             run: None,
+            before: None,
         })
     );
 }
@@ -228,8 +229,8 @@ fn test_deserialize_server_watch_list() {
 servers:
 - bind_address: 0.0.0.0:4000
   watchers:
-    - dir: ./
-    - dir: ./other
+    - dirs: ./
+    - dirs: ./other
       debounce:
         ms: 2000
       filter:
@@ -239,12 +240,12 @@ servers:
     assert_eq!(
         c.servers.get(0).unwrap().watchers,
         vec![
-            Watcher {
-                dir: "./".to_string(),
+            MultiWatch {
+                dirs: WatcherDirs::Single("./".to_string()),
                 opts: Some(Spec::default())
             },
-            Watcher {
-                dir: "./other".to_string(),
+            MultiWatch {
+                dirs: WatcherDirs::Single("./other".to_string()),
                 opts: Some(Spec {
                     debounce: Some(DebounceDuration::Ms(2000)),
                     filter: Some(FilterKind::Extension {

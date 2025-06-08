@@ -113,6 +113,7 @@ fn is_ignored_path_type<P: AsRef<Path>>(subject: &P) -> bool {
         .ends_with(b"~")
 }
 
+// todo: If a folder is explicitly watched, these rules should be ignored
 fn is_auto_excluded<P: AsRef<Path>>(cwd: &P, subject: &P) -> bool {
     // todo: allow more config here...
     let excluded: HashSet<&OsStr> = [

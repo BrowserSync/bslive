@@ -1,7 +1,7 @@
-use crate::task::{TaskCommand, TaskResult};
+use crate::task::TaskCommand;
 use actix::{Handler, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::AnyEvent;
+use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
 
 #[derive(Default, Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct ExtEventSender;
@@ -33,27 +33,30 @@ impl Handler<TaskCommand> for ExtEventSender {
 
     fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
         let comms = msg.comms();
-        let evt = match &msg {
+        let sender = comms.any_event_sender.clone();
+        let events: Vec<AnyEvent> = match msg {
             TaskCommand::Changes { changes, .. } => {
                 let as_strings = changes
                     .iter()
                     .map(|p| p.to_string_lossy().to_string())
                     .collect::<Vec<String>>();
 
-                AnyEvent::External(ExternalEventsDTO::FilesChanged(
+                vec![AnyEvent::External(ExternalEventsDTO::FilesChanged(
                     bsnext_dto::FilesChangedDTO {
                         paths: as_strings.clone(),
                     },
-                ))
+                ))]
             }
+            TaskCommand::Exec { .. } => vec![],
         };
-        let sender = comms.any_event_sender.clone();
         Box::pin(async move {
-            match sender.send(evt).await {
-                Ok(_) => tracing::trace!("sent"),
-                Err(e) => tracing::error!("{e}"),
-            };
-            TaskResult::ok(0)
+            for evt in events {
+                match sender.send(evt).await {
+                    Ok(_) => tracing::trace!("sent"),
+                    Err(e) => tracing::error!("{e}"),
+                };
+            }
+            TaskResult::ok(InvocationId(0))
         })
     }
 }

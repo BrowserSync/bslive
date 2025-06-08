@@ -1,3 +1,4 @@
+use crate::route::{BeforeRunOptItem, MultiWatch, RunOptItem};
 use crate::server_config::{ServerConfig, ServerIdentity};
 use crate::startup::StartupContext;
 use crate::yml::YamlError;
@@ -27,12 +28,65 @@ pub mod yml;
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Input {
+    #[serde(default)]
     pub servers: Vec<server_config::ServerConfig>,
+    #[serde(default)]
+    pub watchers: Vec<MultiWatch>,
 }
 
 impl Input {
     pub fn from_server(s: ServerConfig) -> Self {
-        Self { servers: vec![s] }
+        Self {
+            servers: vec![s],
+            ..Default::default()
+        }
+    }
+    pub fn before_run_opts(&self) -> Vec<RunOptItem> {
+        let root_tasks = self
+            .watchers
+            .iter()
+            .flat_map(|watcher| watcher.opts.as_ref().and_then(|spec| spec.before.clone()))
+            .flatten()
+            .map(BeforeRunOptItem::into_run_opt);
+
+        let startup_server_tasks = self
+            .servers
+            .iter()
+            .flat_map(|server| {
+                server
+                    .watchers
+                    .iter()
+                    .filter_map(|watcher| {
+                        watcher.opts.as_ref().and_then(|spec| spec.before.clone())
+                    })
+                    .flatten()
+            })
+            .map(BeforeRunOptItem::into_run_opt);
+
+        let route_startup_tasks = self
+            .servers
+            .iter()
+            .flat_map(|server| {
+                server
+                    .routes
+                    .iter()
+                    .filter_map(|route| {
+                        route.opts.watch.spec().and_then(|spec| spec.before.clone())
+                    })
+                    .flatten()
+            })
+            .map(BeforeRunOptItem::into_run_opt);
+
+        root_tasks
+            .chain(startup_server_tasks)
+            .chain(route_startup_tasks)
+            .collect::<Vec<_>>()
+    }
+    pub fn ids(&self) -> Vec<ServerIdentity> {
+        self.servers
+            .iter()
+            .map(|x| x.identity.clone())
+            .collect::<Vec<_>>()
     }
 }
 

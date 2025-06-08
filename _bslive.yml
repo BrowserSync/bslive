@@ -13,4 +13,11 @@ servers:
           debounce:
             ms: 300
           run:
-            - sh: 'npm ls --color=always'
+            - all:
+                - sh: echo 2
+                - sh: exit 0
+                - sh: sleep 1 && echo '->hehe'
+                  name: '[another attempt--->]'
+                - seq:
+                    - sleep 1
+                    - echo 'after?'

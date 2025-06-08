@@ -1,35 +1,44 @@
 use crate::any_monitor::{AnyMonitor, PathWatchable};
 use actix::{
-    Actor, ActorContext, Addr, AsyncContext, Handler, ResponseActFuture, ResponseFuture, Running,
-    WrapFuture,
+    Actor, ActorContext, ActorFutureExt, Addr, AsyncContext, Handler, ResponseActFuture,
+    ResponseFuture, Running, WrapFuture,
 };
 
-use actix::ActorFutureExt;
-use actix_rt::Arbiter;
-use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
-use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
-use bsnext_input::{Input, InputCtx};
-use std::collections::HashMap;
-use std::path::PathBuf;
-
+use crate::any_watchable::to_any_watchables;
 use crate::monitor_any_watchables::MonitorPathWatchables;
+use crate::task::{Task, TaskCommand};
+use crate::task_group::TaskGroup;
+use crate::task_list::TaskList;
+use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
+use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
+use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::{AnyEvent, ChildNotCreated, ChildResult, InternalEvents, ServerError};
+use bsnext_dto::internal::{
+    AnyEvent, ChildResult, InitialTaskError, InternalEvents, ServerError, TaskReportAndTree,
+};
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
 use bsnext_fs::{FsEvent, FsEventContext};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::{Input, InputCtx};
 use input_monitor::{InputMonitor, MonitorInput};
 use route_watchable::to_route_watchables;
 use server_watchable::to_server_watchables;
 use start::start_kind::StartKind;
+use std::collections::HashMap;
+use std::future::ready;
+use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
+use tokio::sync::oneshot::Receiver;
+use tracing::debug;
+use trigger_task::TriggerTask;
 
 pub mod any_monitor;
+pub mod any_watchable;
 pub mod args;
 pub mod cli;
 pub mod export;
@@ -41,11 +50,16 @@ mod input_watchable;
 mod monitor_any_watchables;
 mod path_monitor;
 mod route_watchable;
-pub mod runner;
 pub mod server_watchable;
 pub mod start;
 pub mod task;
+pub mod task_group;
+pub mod task_group_runner;
+pub mod task_list;
 pub mod tasks;
+mod trigger_fs_task;
+mod trigger_task;
+pub mod watch;
 
 #[derive(Debug)]
 pub(crate) struct BsSystem {
@@ -54,7 +68,7 @@ pub(crate) struct BsSystem {
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<PathWatchable, AnyMonitor>,
-    tasks: HashMap<FsEventContext, usize>,
+    tasks: HashMap<FsEventContext, TaskList>,
     cwd: Option<PathBuf>,
     start_context: Option<StartupContext>,
 }
@@ -127,15 +141,15 @@ impl BsSystem {
         }
     }
 
+    #[tracing::instrument(skip_all, name = "BsSystem.accept_watchables")]
     fn accept_watchables(&mut self, input: &Input) {
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
+        let any_watchables = to_any_watchables(input);
 
-        tracing::debug!(
-            "accepting {} route watchables, and {} server watchables",
-            route_watchables.len(),
-            server_watchables.len()
-        );
+        debug!("processing {} route watchables", route_watchables.len(),);
+        debug!("processing {} server watchables", server_watchables.len());
+        debug!("processing {} any watchables", any_watchables.len());
 
         let Some(self_address) = &self.self_addr else {
             unreachable!("?")
@@ -146,23 +160,28 @@ impl BsSystem {
         };
 
         // todo: clean up this merging
-        let mut all_watchables = route_watchables
+        let all_watchables = route_watchables
             .iter()
-            .map(|r| PathWatchable::Route(r.to_owned()))
-            .collect::<Vec<_>>();
+            .map(|r| PathWatchable::Route(r.to_owned()));
 
         let servers = server_watchables
             .iter()
-            .map(|w| PathWatchable::Server(w.to_owned()))
-            .collect::<Vec<_>>();
+            .map(|w| PathWatchable::Server(w.to_owned()));
 
-        all_watchables.extend(servers);
+        let any = any_watchables
+            .iter()
+            .map(|w| PathWatchable::Any(w.to_owned()));
+
+        let watchables = all_watchables.chain(servers).chain(any).collect::<Vec<_>>();
+
         let cwd = cwd.clone();
         let addr = self_address.clone();
-        let msg = MonitorPathWatchables {
-            watchables: all_watchables,
-            cwd,
-        };
+        debug!(
+            "{} watchables to add, cwd: {}",
+            watchables.len(),
+            cwd.display()
+        );
+        let msg = MonitorPathWatchables { watchables, cwd };
 
         addr.do_send(msg);
     }
@@ -194,7 +213,7 @@ impl BsSystem {
     }
 
     fn publish_any_event(&mut self, evt: AnyEvent) {
-        tracing::debug!(?evt);
+        tracing::trace!(?evt);
 
         if let Some(any_event_sender) = &self.any_event_sender {
             Arbiter::current().spawn({
@@ -208,6 +227,40 @@ impl BsSystem {
             });
         }
     }
+
+    fn before(&mut self, input: &Input) -> (TriggerTask, Receiver<TaskReportAndTree>) {
+        let cmd = TaskCommand::Exec {
+            invocation_id: 0,
+            task_comms: self.task_comms(),
+        };
+
+        let all = input.before_run_opts();
+        let runner = TaskList::seq_from(&all);
+        let task_group = TaskGroup::from(runner.clone());
+        let task = Task::Group(task_group);
+        let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
+        (TriggerTask::new(task, cmd, runner, tx), rx)
+    }
+}
+
+async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupOk> {
+    let clone = input.clone();
+    let clone2 = input.clone();
+    let report_and_tree = addr.send(ResolveInitialTasks { input: clone }).await??;
+    let servers_resp = addr.send(ResolveServers { input: clone2 });
+    let (servers, child_results) = servers_resp.await??;
+    Ok(SetupOk {
+        report_and_tree,
+        servers,
+        child_results,
+    })
+}
+
+struct SetupOk {
+    servers: GetActiveServersResponse,
+    #[allow(dead_code)]
+    report_and_tree: TaskReportAndTree,
+    child_results: Vec<ChildResult>,
 }
 
 impl Actor for BsSystem {
@@ -260,7 +313,7 @@ impl Handler<Start> for BsSystem {
         self.any_event_sender = Some(msg.events_sender.clone());
         self.cwd = Some(msg.cwd);
 
-        tracing::debug!("self.cwd {:?}", self.cwd);
+        debug!("self.cwd {:?}", self.cwd);
 
         let Some(cwd) = &self.cwd else {
             unreachable!("?")
@@ -273,90 +326,65 @@ impl Handler<Start> for BsSystem {
         let start_context = StartupContext::from_cwd(self.cwd.as_ref());
         self.start_context = Some(start_context.clone());
 
-        tracing::debug!(?start_context);
+        debug!(?start_context);
 
         match msg.kind.input(&start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
-                tracing::debug!("SystemStartArgs::PathWithInput");
-                let ids = input
-                    .servers
-                    .iter()
-                    .map(|x| x.identity.clone())
-                    .collect::<Vec<_>>();
+                debug!("SystemStartArgs::PathWithInput");
 
+                let ids = input.ids();
                 let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
-                let input_clone = input.clone();
+                let input_clone2 = input.clone();
+                let addr = ctx.address();
+                let jobs = setup_jobs(addr, input.clone());
 
-                let f = ctx
-                    .address()
-                    .send(ResolveServers { input })
-                    .into_actor(self)
-                    .map(move |res, actor, ctx| match res {
-                        Ok(Ok((resp, _))) => {
-                            ctx.notify(MonitorInput {
-                                path: path.clone(),
-                                cwd: actor.cwd.clone().unwrap(),
-                                input_ctx,
-                            });
-                            // todo: where to better sequence these side-effects
-                            actor.accept_watchables(&input_clone);
-                            Ok(DidStart::Started(resp))
-                        }
-                        Ok(Err(e)) => Err(StartupError::Other(e.to_string())),
-                        Err(e) => Err(StartupError::Other(e.to_string())),
-                    });
-
-                Box::pin(f)
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
+                        let SetupOk { servers, .. } = res.map_err(StartupError::Any)?;
+                        ctx.notify(MonitorInput {
+                            path: path.clone(),
+                            cwd: actor.cwd.clone().unwrap(),
+                            input_ctx,
+                        });
+                        // todo: where to better sequence these side-effects?
+                        actor.accept_watchables(&input_clone2);
+                        Ok(DidStart::Started(servers))
+                    },
+                ))
             }
             Ok(SystemStartArgs::InputOnly { input }) => {
-                tracing::debug!("SystemStartArgs::InputOnly");
+                debug!("SystemStartArgs::InputOnly");
 
-                let input_clone = input.clone();
-                let f = ctx
-                    .address()
-                    .send(ResolveServers { input })
-                    .into_actor(self)
-                    .map(move |res, actor, _ctx| match res {
-                        Ok(Ok((resp, child_results))) => {
-                            let errored = child_results
-                                .iter()
-                                .find(|x| matches!(x, ChildResult::CreateErr(..)));
-                            if let Some(ChildResult::CreateErr(ChildNotCreated {
-                                server_error,
-                                ..
-                            })) = errored
-                            {
-                                tracing::debug!("errored: {:?}", errored);
-                                Err(StartupError::ServerError((*server_error).to_owned()))
-                            } else {
-                                actor.accept_watchables(&input_clone);
-                                Ok(DidStart::Started(resp))
-                            }
+                let addr = ctx.address();
+                let input_clone2 = input.clone();
+                let jobs = setup_jobs(addr, input.clone());
+
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
+                        let res = res?;
+                        let errored = ChildResult::first_server_error(&res.child_results);
+                        if let Some(server_error) = errored {
+                            debug!("errored: {:?}", errored);
+                            return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        Ok(Err(e)) => {
-                            tracing::debug!(?e, "server error");
-                            Err(StartupError::Other(e.to_string()))
-                        }
-                        Err(e) => {
-                            tracing::debug!(?e, "other error");
-                            Err(StartupError::Other(e.to_string()))
-                        }
-                    });
-                Box::pin(f)
+                        actor.accept_watchables(&input_clone2);
+                        Ok(DidStart::Started(res.servers))
+                    },
+                ))
             }
             Ok(SystemStartArgs::PathWithInvalidInput { path, input_error }) => {
-                tracing::debug!("SystemStartArgs::PathWithInvalidInput");
+                debug!("SystemStartArgs::PathWithInvalidInput");
                 ctx.notify(MonitorInput {
                     path: path.clone(),
                     cwd: cwd.clone(),
                     input_ctx: InputCtx::default(),
                 });
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
-                let f = async move { Ok(DidStart::Started(Default::default())) }.into_actor(self);
+                let f = ready(Ok(DidStart::Started(Default::default()))).into_actor(self);
                 Box::pin(f)
             }
             Err(e) => {
-                let f = async move { Err(StartupError::InputError(*e)) }.into_actor(self);
+                let f = ready(Err(StartupError::InputError(*e))).into_actor(self);
                 Box::pin(f)
             }
         }
@@ -386,7 +414,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
             .send(ResolveServers { input: msg.input })
             .into_actor(self)
             .map(move |res, actor, _ctx| {
-                tracing::debug!(" + did override input");
+                debug!(" + did override input");
                 let output = match res {
                     Ok(Ok(res)) => Ok(res),
                     Ok(Err(s_e)) => Err(s_e),
@@ -418,7 +446,7 @@ impl actix::Handler<ResolveServers> for BsSystem {
         let addr = servers_addr.clone();
 
         let f = async move {
-            tracing::debug!("will mark input as changed");
+            debug!("will mark input as changed");
             let results = addr.send(InputChanged { input: msg.input }).await;
 
             let Ok(result_set) = results else {
@@ -426,7 +454,7 @@ impl actix::Handler<ResolveServers> for BsSystem {
                 unreachable!("?1 {:?}", e);
             };
 
-            tracing::debug!(
+            debug!(
                 "result_set from resolve servers {}",
                 result_set.changes.len()
             );
@@ -460,13 +488,13 @@ impl actix::Handler<ResolveServers> for BsSystem {
                         }
                     }
                     ChildResult::Patched(p) => {
-                        tracing::debug!("ChildResult::Patched {:?}", p);
+                        debug!("ChildResult::Patched {:?}", p);
                     }
                     ChildResult::PatchErr(e) => {
-                        tracing::debug!("ChildResult::PatchErr {:?}", e);
+                        debug!("ChildResult::PatchErr {:?}", e);
                     }
                     ChildResult::CreateErr(e) => {
-                        tracing::debug!("ChildResult::CreateErr {:?}", e);
+                        debug!("ChildResult::CreateErr {:?}", e);
                     }
                 }
             }
@@ -484,11 +512,11 @@ impl actix::Handler<ResolveServers> for BsSystem {
                             server_resp: resp.clone(),
                             child_results: res.clone(),
                         };
-                        tracing::debug!("will emit {:?}", evt);
+                        debug!("will emit {:?}", evt);
                         async move {
                             match external_event_sender.send(AnyEvent::Internal(evt)).await {
                                 Ok(_) => {}
-                                Err(e) => tracing::debug!(?e),
+                                Err(e) => debug!(?e),
                             };
                         }
                     });
@@ -499,6 +527,31 @@ impl actix::Handler<ResolveServers> for BsSystem {
         };
 
         Box::pin(f)
+    }
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "Result<TaskReportAndTree, InitialTaskError>")]
+struct ResolveInitialTasks {
+    input: Input,
+}
+
+impl actix::Handler<ResolveInitialTasks> for BsSystem {
+    type Result = ResponseFuture<Result<TaskReportAndTree, InitialTaskError>>;
+
+    fn handle(&mut self, msg: ResolveInitialTasks, ctx: &mut Self::Context) -> Self::Result {
+        let (next, rx) = self.before(&msg.input);
+        ctx.notify(next);
+
+        Box::pin(async move {
+            match rx.await {
+                Ok(TaskReportAndTree { report, tree }) if report.is_ok() => {
+                    Ok(TaskReportAndTree { report, tree })
+                }
+                Ok(TaskReportAndTree { .. }) => Err(InitialTaskError::FailedReport),
+                Err(_) => Err(InitialTaskError::FailedUnknown),
+            }
+        })
     }
 }
 

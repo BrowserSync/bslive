@@ -3,10 +3,13 @@ use crate::args::{Args, SubCommands};
 use crate::export::export_cmd;
 use crate::start;
 use crate::start::start_command::StartCommand;
+use crate::start::start_kind::start_from_inputs::StartFromInput;
+use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
-use bsnext_core::shared_args::{FsOpts, InputOpts};
+use bsnext_input::route::MultiWatch;
+use bsnext_input::Input;
 use bsnext_output::OutputWriters;
-use bsnext_tracing::{init_tracing, OutputFormat, WriteOption};
+use bsnext_tracing::{init_tracing, LineNumberOption, OutputFormat, WriteOption};
 use clap::Parser;
 use std::env::current_dir;
 use std::ffi::OsString;
@@ -28,7 +31,18 @@ where
         WriteOption::None
     };
 
-    init_tracing(args.logging.log_level, args.format, write_log_opt);
+    let line_opts = if args.logging.filenames {
+        LineNumberOption::FileAndLineNumber
+    } else {
+        LineNumberOption::None
+    };
+
+    init_tracing(
+        args.logging.log_level,
+        args.format,
+        write_log_opt,
+        line_opts,
+    );
 
     tracing::debug!("{:#?}", args);
 
@@ -52,6 +66,8 @@ where
         })
     });
 
+    tracing::debug!("subcommand = {:?}", command);
+
     match command {
         SubCommands::Export(cmd) => {
             let start_cmd = StartCommand {
@@ -68,26 +84,26 @@ where
             todo!("{:?}", example);
         }
         SubCommands::Start(start) => {
-            stdout_wrapper(start, args.fs_opts, args.input_opts, cwd, writer).await
+            let start_kind = StartKind::from_args(&args.fs_opts, &args.input_opts, &start);
+            start_stdout_wrapper(start_kind, cwd, writer).await
+        }
+        SubCommands::Watch(watch) => {
+            let mut input = Input::default();
+            let multi = MultiWatch::from(watch);
+            input.watchers.push(multi);
+            let start_kind = StartKind::FromInput(StartFromInput { input });
+            start_stdout_wrapper(start_kind, cwd, writer).await
         }
     }
 }
 
-async fn stdout_wrapper(
-    start_cmd: StartCommand,
-    fs_opts: FsOpts,
-    input_opts: InputOpts,
+async fn start_stdout_wrapper(
+    start_kind: StartKind,
     cwd: PathBuf,
     writer: OutputWriters,
 ) -> anyhow::Result<()> {
     let (events_sender, channel_future) = stdout_channel(writer);
-    let system_handle = actix_rt::spawn(start::with_sender(
-        cwd,
-        fs_opts,
-        input_opts,
-        events_sender,
-        start_cmd,
-    ));
+    let system_handle = actix_rt::spawn(start::with_sender(cwd, start_kind, events_sender));
     let channel_handle = actix_rt::spawn(channel_future);
     let output = tokio::select! {
         r = system_handle => {

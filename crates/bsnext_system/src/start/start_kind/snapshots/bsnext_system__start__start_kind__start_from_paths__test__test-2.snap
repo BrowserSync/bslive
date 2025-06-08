@@ -18,3 +18,4 @@ servers:
     playground: ~
     clients:
       log: info
+watchers: []

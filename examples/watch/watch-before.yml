@@ -1,0 +1,25 @@
+servers:
+  - name: 'watch-before-tasks'
+    watchers:
+      - dirs: examples/watch/src
+        filter:
+          ext: 'css'
+        before:
+          - sh: echo "watchers.before.before"
+          - sh: echo "watchers.before.after"
+        run:
+          - sh: echo "watchers.run.before"
+          - sh: echo "watchers.run.after"
+    routes:
+      - path: /
+        dir: examples/watch/src/index.html
+        watch:
+          debounce:
+            ms: 0
+          before:
+            - sh: "echo 'Start A' && sleep 0.2"
+            - sh: "echo 'End A' && sleep 0.2"
+          run:
+            - seq:
+                - sh: "echo 'Start B' && sleep 0.3 && echo 'End B' && sleep 0.3"
+                - sh: "echo 'Start C' && sleep 0.3 && echo 'End C' && sleep 0.3"

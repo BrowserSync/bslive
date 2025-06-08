@@ -1,9 +1,10 @@
-use crate::task::{TaskCommand, TaskResult};
+use crate::task::TaskCommand;
 use actix::ResponseFuture;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::AnyEvent;
+use bsnext_dto::internal::{AnyEvent, ExitCode, InvocationId, TaskResult};
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
 use std::ffi::OsString;
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::ops::Deref;
 use std::process::Stdio;
@@ -19,6 +20,28 @@ pub struct ShCmd {
     sh: Cmd,
     name: Option<String>,
     output: ShCmdOutput,
+    timeout: ShDuration,
+}
+
+impl Display for ShCmd {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", (*self.sh).to_string_lossy())
+    }
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+struct ShDuration(pub Duration);
+
+impl ShDuration {
+    pub fn duration(&self) -> &Duration {
+        &self.0
+    }
+}
+
+impl Default for ShDuration {
+    fn default() -> Self {
+        ShDuration(Duration::from_secs(60))
+    }
 }
 
 #[derive(Debug, Default, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
@@ -35,6 +58,7 @@ impl ShCmd {
             sh: Cmd(cmd),
             name: None,
             output: Default::default(),
+            timeout: Default::default(),
         }
     }
     pub fn named(cmd: OsString, name: impl Into<String>) -> Self {
@@ -42,6 +66,7 @@ impl ShCmd {
             sh: Cmd(cmd),
             name: Some(name.into()),
             output: Default::default(),
+            timeout: Default::default(),
         }
     }
 
@@ -131,6 +156,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
         let any_event_sender2 = msg.comms().any_event_sender.clone();
         let reason = match &msg {
             TaskCommand::Changes { changes, .. } => format!("{} files changed", changes.len()),
+            TaskCommand::Exec { .. } => "command executed".to_string(),
         };
         let files = match &msg {
             TaskCommand::Changes { changes, .. } => changes
@@ -138,10 +164,12 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
+            TaskCommand::Exec { .. } => "NONE".to_string(),
         };
 
         let sh_prefix = Arc::new(self.prefix());
         let sh_prefix_2 = sh_prefix.clone();
+        let max_duration = self.timeout.duration().to_owned();
 
         let fut = async move {
             let mut child = Command::new("sh")
@@ -203,19 +231,31 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 }
             });
 
-            // todo: where to encode things like this timeout?
-            let sleep = tokio::time::sleep(Duration::from_secs(10));
+            let sleep = tokio::time::sleep(max_duration);
 
             tokio::pin!(sleep);
+            let invocation_id = 0;
 
-            tokio::select! {
+            let result: TaskResult = tokio::select! {
                 _ = &mut sleep => {
                     tracing::info!("⌛️ operation timed out");
+                    TaskResult::timeout(InvocationId(invocation_id))
                 }
-                _ = child.wait() => {
-                    tracing::info!("✅ operation completed");
+                out = child.wait() => {
+                    tracing::info!("✅ operation ended");
+                    match out {
+                        Ok(exit) => match exit.code() {
+                           Some(0) => TaskResult::ok(InvocationId(invocation_id)),
+                           Some(code) => {
+                                tracing::debug!("did exit with code {}", code);
+                                TaskResult::err_code(InvocationId(invocation_id), ExitCode(code))
+                            },
+                           None => TaskResult::err_message(InvocationId(invocation_id), "unknown error!")
+                        },
+                        Err(err) => TaskResult::err_message(InvocationId(invocation_id), &err.to_string())
+                    }
                 }
-            }
+            };
             if let Some(pid) = pid {
                 let _ = kill_tree::tokio::kill_tree(pid).await;
                 tracing::trace!("child tree killed");
@@ -232,7 +272,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
 
             tracing::debug!("✅ Run (+cleanup) complete");
 
-            TaskResult::ok(0)
+            result
         };
         Box::pin(fut)
     }

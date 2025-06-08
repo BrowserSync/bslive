@@ -99,9 +99,7 @@ fn from_dir_paths<T: AsRef<str>>(
             .collect(),
         ..Default::default()
     };
-    Ok(Input {
-        servers: vec![server],
-    })
+    Ok(Input::from_server(server))
 }
 
 #[cfg(test)]

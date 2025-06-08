@@ -269,16 +269,8 @@ pub struct Spec {
     pub debounce: Option<DebounceDuration>,
     pub filter: Option<FilterKind>,
     pub ignore: Option<FilterKind>,
-    pub run: Option<RunOpt>,
-}
-
-#[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
-)]
-#[serde(untagged)]
-pub enum RunOpt {
-    All { all: Vec<RunOptItem> },
-    Seq(Vec<RunOptItem>),
+    pub run: Option<Vec<RunOptItem>>,
+    pub before: Option<Vec<BeforeRunOptItem>>,
 }
 
 #[derive(
@@ -315,9 +307,120 @@ impl ShRunOptItem {
 pub enum RunOptItem {
     BsLive { bslive: BsLiveRunner },
     Sh(ShRunOptItem),
-    All { all: Vec<RunOptItem> },
-    Seq { seq: Vec<RunOptItem> },
+    All(RunAll),
+    Seq(RunSeq),
     ShImplicit(String),
+}
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+#[serde(untagged)]
+pub enum BeforeRunOptItem {
+    Sh(ShRunOptItem),
+    All(RunAll),
+    Seq(RunSeq),
+}
+
+impl BeforeRunOptItem {
+    pub fn into_run_opt(self) -> RunOptItem {
+        match self {
+            BeforeRunOptItem::Sh(sh) => RunOptItem::Sh(sh),
+            BeforeRunOptItem::All(run_all) => RunOptItem::All(run_all),
+            BeforeRunOptItem::Seq(run_seq) => RunOptItem::Seq(run_seq),
+        }
+    }
+}
+
+#[derive(
+    Debug,
+    Default,
+    Ord,
+    PartialOrd,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    serde::Deserialize,
+    serde::Serialize,
+)]
+pub struct RunAll {
+    pub all: Vec<RunOptItem>,
+    #[serde(default, rename = "opts")]
+    pub run_all_opts: RunAllOpts,
+}
+
+impl RunAll {
+    pub fn new(items: Vec<RunOptItem>) -> Self {
+        Self {
+            all: items,
+            run_all_opts: Default::default(),
+        }
+    }
+
+    pub fn with_opts(items: Vec<RunOptItem>, opts: RunAllOpts) -> Self {
+        Self {
+            all: items,
+            run_all_opts: opts,
+        }
+    }
+
+    pub fn items(&self) -> &Vec<RunOptItem> {
+        &self.all
+    }
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub struct RunAllOpts {
+    pub max: u8,
+}
+
+impl Default for RunAllOpts {
+    fn default() -> Self {
+        Self { max: 5 }
+    }
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub struct SeqOpts {
+    pub exit_on_fail: bool,
+}
+
+impl Default for SeqOpts {
+    fn default() -> Self {
+        Self { exit_on_fail: true }
+    }
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub struct RunSeq {
+    pub seq: Vec<RunOptItem>,
+    #[serde(default, rename = "opts")]
+    pub seq_opts: SeqOpts,
+}
+
+impl RunSeq {
+    pub fn new(items: Vec<RunOptItem>) -> Self {
+        Self {
+            seq: items,
+            seq_opts: std::default::Default::default(),
+        }
+    }
+    pub fn with_opts(items: Vec<RunOptItem>, seq_opts: SeqOpts) -> Self {
+        Self {
+            seq: items,
+            seq_opts,
+        }
+    }
+
+    pub fn items(&self) -> &Vec<RunOptItem> {
+        &self.seq
+    }
 }
 
 #[derive(
@@ -345,11 +448,62 @@ pub enum BsLiveRunner {
     ExtEvent,
 }
 
+impl Display for BsLiveRunner {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BsLiveRunner::NotifyServer => write!(f, "BsLiveRunner::NotifyServer"),
+            BsLiveRunner::ExtEvent => write!(f, "BsLiveRunner::ExtEvent"),
+        }
+    }
+}
+
 #[derive(
     Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
-pub struct Watcher {
-    pub dir: String,
+pub struct MultiWatch {
+    pub dirs: WatcherDirs,
     #[serde(flatten)]
     pub opts: Option<Spec>,
+}
+
+#[derive(
+    Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+#[serde(untagged)]
+pub enum WatcherDirs {
+    Single(String),
+    Many(Vec<String>),
+}
+
+impl WatcherDirs {
+    pub fn one(path_str: &str) -> Self {
+        Self::Single(path_str.to_string())
+    }
+    pub fn many(path_str: &[&str]) -> Self {
+        Self::Many(path_str.iter().map(ToString::to_string).collect())
+    }
+    pub fn first_as_pathbuf(&self) -> PathBuf {
+        match self {
+            WatcherDirs::Single(item) => PathBuf::from(item),
+            WatcherDirs::Many(item) if !item.is_empty() => {
+                PathBuf::from(item.first().expect("guarded"))
+            }
+            WatcherDirs::Many(_) => todo!("cannot get here?"),
+        }
+    }
+    pub fn as_pathbufs(&self) -> Vec<PathBuf> {
+        match self {
+            WatcherDirs::Single(item) => vec![PathBuf::from(item)],
+            WatcherDirs::Many(item) if !item.is_empty() => item.iter().map(PathBuf::from).collect(),
+            WatcherDirs::Many(_) => vec![],
+        }
+    }
+}
+
+impl MultiWatch {
+    pub fn add_task(&mut self, item: RunOptItem) {
+        let opts = self.opts.get_or_insert_default();
+        let list = opts.run.get_or_insert(vec![]);
+        list.push(item);
+    }
 }

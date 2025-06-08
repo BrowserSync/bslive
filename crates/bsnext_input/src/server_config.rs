@@ -1,6 +1,6 @@
 use crate::client_config::ClientConfig;
 use crate::playground::Playground;
-use crate::route::{Route, Watcher};
+use crate::route::{MultiWatch, Route};
 use crate::{rand_word, PortError};
 use serde::{de, Deserializer};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -14,7 +14,7 @@ pub struct ServerConfig {
     #[serde(default)]
     pub routes: Vec<Route>,
     #[serde(default)]
-    pub watchers: Vec<Watcher>,
+    pub watchers: Vec<MultiWatch>,
     #[serde(default)]
     pub playground: Option<Playground>,
     #[serde(default)]

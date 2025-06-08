@@ -12,6 +12,7 @@ use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
 use bsnext_tracing::LogLevel;
 use typeshare::typeshare;
 
+pub mod archy;
 pub mod external_events;
 pub mod internal;
 pub mod internal_events;
@@ -118,6 +119,9 @@ impl From<&StartupEvent> for StartupEventDTO {
             StartupEvent::FailedStartup(StartupError::ServerError(err)) => {
                 StartupEventDTO::FailedStartup(err.to_string())
             }
+            StartupEvent::FailedStartup(StartupError::Any(err)) => {
+                StartupEventDTO::FailedStartup(err.to_string())
+            }
         }
     }
 }
@@ -135,6 +139,15 @@ pub struct InputAcceptedDTO {
 pub enum OutputLineDTO {
     Stdout(StdoutLineDTO),
     Stderr(StderrLineDTO),
+}
+
+impl OutputLineDTO {
+    pub fn stdout(line: String, prefix: Option<String>) -> Self {
+        Self::Stdout(StdoutLineDTO { line, prefix })
+    }
+    pub fn stderr(line: String, prefix: Option<String>) -> Self {
+        Self::Stderr(StderrLineDTO { line, prefix })
+    }
 }
 
 #[derive(Debug, serde::Serialize, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
@@ -336,6 +349,8 @@ pub enum StartupError {
     ServerError(#[from] ServerError),
     #[error("{0}")]
     Other(String),
+    #[error("{0}")]
+    Any(#[from] anyhow::Error),
 }
 
 /// @discriminator kind

@@ -2,12 +2,12 @@
   "name": "@browsersync/bslive",
   "version": "0.16.2",
   "main": "index.js",
-  "types": "index.d.ts",
   "bin": {
     "bslive": "./bin.js"
   },
   "files": [
     "index.js",
+    "entry.mjs",
     "index.d.ts",
     "bin.js"
   ],

@@ -16,6 +16,7 @@ pub mod start_from_example;
 pub mod start_from_inputs;
 pub mod start_from_paths;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum StartKind {
     FromInput(StartFromInput),
@@ -48,6 +49,7 @@ impl StartKind {
         if cmd.trailing.is_empty() {
             tracing::debug!("0 trailing, {} inputs", input_opts.input.len());
             if input_opts.input.is_empty() && !cmd.proxies.is_empty() {
+                tracing::debug!("input was empty, but had proxies");
                 let first_proxy = cmd.proxies.first().expect("guarded first proxy");
                 let r = Route::proxy(first_proxy);
                 let id = ServerIdentity::from_port_or_named(cmd.port).unwrap_or_else(|_e| {
@@ -58,6 +60,11 @@ impl StartKind {
                 let input = Input::from_server(ser);
                 StartKind::FromInput(StartFromInput { input })
             } else {
+                tracing::debug!(
+                    input_len = input_opts.input.len(),
+                    proxes = cmd.proxies.len(),
+                    "neither inputs nor proxies were present"
+                );
                 StartKind::FromInputPaths(StartFromInputPaths {
                     input_paths: input_opts.input.clone(),
                     port: cmd.port,

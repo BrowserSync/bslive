@@ -294,10 +294,18 @@ export const inputErrorDTOSchema = z.discriminatedUnion("kind", [
     }),
 ]);
 
-export const internalEventsDTOSchema = z.object({
-    kind: z.literal("ServersChanged"),
-    payload: getActiveServersResponseDTOSchema,
-});
+export const internalEventsDTOSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("ServersChanged"),
+        payload: getActiveServersResponseDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("TaskReport"),
+        payload: z.object({
+            id: z.string(),
+        }),
+    }),
+]);
 
 export const startupEventDTOSchema = z.discriminatedUnion("kind", [
     z.object({

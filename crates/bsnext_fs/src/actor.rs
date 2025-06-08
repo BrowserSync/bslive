@@ -5,6 +5,7 @@ use crate::{watcher, Debounce, FsEvent, FsEventContext};
 use actix::{Actor, Addr, AsyncContext, Recipient, Running};
 use actix_rt::Arbiter;
 use futures_util::StreamExt;
+use std::fmt::{Display, Formatter};
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -13,6 +14,7 @@ use crate::filter::Filter;
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 
+#[derive(Debug)]
 pub struct FsWatcher {
     pub watcher: Option<notify::RecommendedWatcher>,
     raw_fs_stream: Arc<broadcast::Sender<InnerChangeEvent>>,
@@ -22,6 +24,17 @@ pub struct FsWatcher {
     pub filters: Vec<Filter>,
     pub ignore: Vec<Filter>,
     pub cwd: PathBuf,
+}
+
+impl Display for FsWatcher {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "FsWatcher {{ cwd: '{}', debounce: '{:?}' }}",
+            self.cwd.display(),
+            self.debounce
+        )
+    }
 }
 
 impl FsWatcher {
@@ -41,7 +54,7 @@ impl FsWatcher {
         }
     }
 
-    pub fn for_input(cwd: &Path, id: u64) -> Self {
+    pub fn for_root(cwd: &Path, id: u64) -> Self {
         let ctx = FsEventContext { id, origin_id: id };
         Self::new(cwd, ctx)
     }

@@ -66,6 +66,9 @@ export const test = base.extend<{
             kind: z.infer<typeof either>["kind"],
             count?: number,
         ) => Promise<z.infer<typeof either>[]>;
+        outputLines: (
+            count?: number,
+        ) => Promise<z.infer<typeof outputLineDTOSchema>["payload"][]>;
         api: (kind: "events") => string;
         // next: (args: NextArgs) => Promise<string[]>;
     };
@@ -109,7 +112,9 @@ export const test = base.extend<{
                         });
                         const parsed = loose.safeParse(json);
                         if (parsed.error) {
-                            console.log("cannot continue0");
+                            console.log(
+                                "cannot continue - probably an unsupported type",
+                            );
                         } else {
                             if (parsed.data.kind === "OutputLine") {
                                 const tryOutput = outputLineDTOSchema.safeParse(
@@ -207,6 +212,31 @@ export const test = base.extend<{
                         );
                         if (matched.length >= count) {
                             resolve(matched);
+                            clearInterval(int);
+                            return;
+                        }
+                    }, 50);
+                });
+            },
+            outputLines(
+                count: number = 1,
+            ): Promise<z.infer<typeof outputLineDTOSchema>["payload"][]> {
+                return new Promise((resolve, reject) => {
+                    let start = Date.now();
+                    let max = 5000;
+                    let int = setInterval(() => {
+                        if (Date.now() - start > max) {
+                            reject(
+                                new Error(`timed out waiting for OutputLine`),
+                            );
+                            clearInterval(int);
+                            return;
+                        }
+                        const matched = parsedMessages.filter(
+                            (x) => x.kind === "OutputLine",
+                        );
+                        if (matched.length >= count) {
+                            resolve(matched.map((x) => x.payload.payload));
                             clearInterval(int);
                             return;
                         }

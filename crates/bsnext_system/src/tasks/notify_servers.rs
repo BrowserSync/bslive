@@ -1,6 +1,7 @@
-use crate::task::{TaskCommand, TaskResult};
+use crate::task::TaskCommand;
 use actix::{Actor, Handler, ResponseFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
+use bsnext_dto::internal::{InvocationId, TaskResult};
 
 #[derive(Default)]
 pub struct NotifyServers {}
@@ -41,7 +42,10 @@ impl Handler<TaskCommand> for NotifyServers {
                 paths: changes.clone(),
                 ctx: fs_event_context.clone(),
             }),
+            TaskCommand::Exec { .. } => {
+                todo!("I cannot accept this")
+            }
         }
-        Box::pin(async { TaskResult::ok(0) })
+        Box::pin(async { TaskResult::ok(InvocationId(0)) })
     }
 }

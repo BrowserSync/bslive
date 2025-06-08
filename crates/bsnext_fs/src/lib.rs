@@ -60,6 +60,9 @@ impl FsEventContext {
     pub fn id(&self) -> u64 {
         self.id
     }
+    pub fn is_root(&self) -> bool {
+        self.id == 0 && self.origin_id == 0
+    }
 }
 
 impl Default for FsEventContext {
