@@ -1,6 +1,6 @@
 {
   "name": "@browsersync/bslive",
-  "version": "0.16.2",
+  "version": "0.17.0",
   "main": "index.js",
   "bin": {
     "bslive": "./bin.js"
