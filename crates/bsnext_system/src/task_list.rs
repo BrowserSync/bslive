@@ -122,7 +122,7 @@ impl TaskList {
             run_kind: RunKind::Sequence {
                 opts: SequenceOpts::default(),
             },
-            tasks: p0.iter().map(|opt| Runnable::from(opt)).collect(),
+            tasks: p0.iter().map(Runnable::from).collect(),
         }
     }
 

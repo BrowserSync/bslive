@@ -29,20 +29,26 @@ impl actix::Handler<FsEvent> for BsSystem {
                 }
                 None
             }
-            FsEventKind::Change(inner) => match self.handle_any_change(&msg.fs_event_ctx, &inner) {
-                // if the change included a new Input, use it
-                (any_event, Some(input)) => {
-                    tracing::info!("will override input");
-                    ctx.notify(OverrideInput {
-                        input,
-                        original_event: any_event,
-                    });
-                    // return None here so that the event is not published yet (the updated Input will do it)
-                    None
+            FsEventKind::Change(inner) if msg.fs_event_ctx.is_root() => {
+                match self.handle_input_change(&inner) {
+                    // if the change included a new Input, use it
+                    (any_event, Some(input)) => {
+                        tracing::info!("will override input");
+                        ctx.notify(OverrideInput {
+                            input,
+                            original_event: any_event,
+                        });
+                        // return None here so that the event is not published yet (the updated Input will do it)
+                        None
+                    }
+                    // otherwise publish the change as usual
+                    (evt, None) => Some(evt),
                 }
-                // otherwise publish the change as usual
-                (evt, None) => Some(evt),
-            },
+            }
+            FsEventKind::Change(inner) => {
+                let evt = self.handle_any_change(&msg.fs_event_ctx, &inner);
+                Some(evt)
+            }
             FsEventKind::PathAdded(path) => self.handle_path_added(&path),
             FsEventKind::PathRemoved(path) => self.handle_path_removed(&path),
             FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(&pdo),
@@ -122,25 +128,17 @@ impl BsSystem {
         &mut self,
         fs_event_ctx: &FsEventContext,
         inner: &ChangeEvent,
-    ) -> (AnyEvent, Option<Input>) {
-        match fs_event_ctx.id() {
-            0 => self.handle_input_change(inner),
-            _ => {
-                tracing::trace!(?inner, "Other file changed");
-                if let Some(servers) = &self.servers_addr {
-                    servers.do_send(FileChanged {
-                        path: inner.absolute_path.clone(),
-                        ctx: fs_event_ctx.clone(),
-                    })
-                }
-                (
-                    AnyEvent::External(ExternalEventsDTO::FileChanged(
-                        bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
-                    )),
-                    None,
-                )
-            }
+    ) -> AnyEvent {
+        tracing::trace!(?inner, "Other file changed");
+        if let Some(servers) = &self.servers_addr {
+            servers.do_send(FileChanged {
+                path: inner.absolute_path.clone(),
+                ctx: fs_event_ctx.clone(),
+            })
         }
+        AnyEvent::External(ExternalEventsDTO::FileChanged(
+            bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
+        ))
     }
     fn handle_input_change(&mut self, inner: &ChangeEvent) -> (AnyEvent, Option<Input>) {
         tracing::info!("InputFile file changed {:?}", inner);

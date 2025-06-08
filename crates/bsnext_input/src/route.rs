@@ -495,7 +495,7 @@ impl WatcherDirs {
         match self {
             WatcherDirs::Single(item) => PathBuf::from(item),
             WatcherDirs::Many(item) if !item.is_empty() => {
-                PathBuf::from(item.get(0).expect("guarded"))
+                PathBuf::from(item.first().expect("guarded"))
             }
             WatcherDirs::Many(_) => todo!("cannot get here?"),
         }

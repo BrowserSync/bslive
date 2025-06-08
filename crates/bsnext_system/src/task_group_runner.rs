@@ -79,18 +79,14 @@ impl Handler<TaskCommand> for TaskGroupRunner {
                                 let is_ok = result.is_ok();
                                 done.push((index, result.to_report(id)));
                                 if is_ok {
-                                    tracing::debug!(
+                                    debug!(
                                         "index {index} completed, will move to next text in seq"
                                     );
+                                } else if exit_on_failure {
+                                    debug!("stopping after index {index} id: {id} ran, because it did not complete successfully.");
+                                    break;
                                 } else {
-                                    if exit_on_failure {
-                                        tracing::debug!("stopping after index {index} id: {id} ran, because it did not complete successfully.");
-                                        break;
-                                    } else {
-                                        tracing::debug!(
-                                            "continuing after failure, because of config"
-                                        );
-                                    }
+                                    debug!("continuing after failure, because of config");
                                 }
                             }
                             Err(e) => tracing::error!("{e}"),

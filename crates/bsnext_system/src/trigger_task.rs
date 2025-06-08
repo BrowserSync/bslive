@@ -8,16 +8,6 @@ use std::collections::HashMap;
 /// A struct representing a message to trigger a specific task in the system.
 /// This message will be handled by an actor in the Actix framework.
 ///
-/// # Attributes
-/// - `task`: The task that needs to be executed. This is represented by the `Task` struct,
-/// which should encapsulate all the information required to identify or process the task.
-/// - `cmd`: A specific command or action (`TaskCommand`) associated with the task.
-/// This determines how the task should be executed or managed.
-/// - `runner`: The entity (`Runner`) responsible for executing the task.
-/// This can be used to specify the execution context or environment.
-/// - `done`: A one-shot sender channel (`tokio::sync::oneshot::Sender<TaskReportAndTree>`)
-/// to signal the completion of the task processing and provide the resulting task report and its tree structure.
-///
 /// # Derive Attributes
 /// - `#[derive(actix::Message)]`: Indicates that this struct is a message type compatible with the Actix actor framework.
 /// - `#[rtype(result = "()")]`: Specifies that the actor handling this message does not need to return any result.
@@ -26,7 +16,8 @@ use std::collections::HashMap;
 pub struct TriggerTask {
     pub task: Task,
     pub cmd: TaskCommand,
-    pub runner: TaskList,
+    pub task_list: TaskList,
+    /// A one-shot sender channel to signal the completion of the task processing and provide the resulting task report and its tree structure.
     pub done: tokio::sync::oneshot::Sender<TaskReportAndTree>,
 }
 
@@ -40,7 +31,7 @@ impl TriggerTask {
         Self {
             task,
             cmd,
-            runner,
+            task_list: runner,
             done,
         }
     }
@@ -51,7 +42,7 @@ impl Handler<TriggerTask> for BsSystem {
 
     fn handle(&mut self, msg: TriggerTask, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd;
-        let runner = msg.runner;
+        let runner = msg.task_list;
         let task_id = runner.as_id();
         let cmd_recipient = Box::new(msg.task).into_task_recipient();
         let done = msg.done;

@@ -169,7 +169,7 @@ impl actix::Handler<TaskCommand> for ShCmd {
 
         let sh_prefix = Arc::new(self.prefix());
         let sh_prefix_2 = sh_prefix.clone();
-        let max_duration = self.timeout.duration().clone();
+        let max_duration = self.timeout.duration().to_owned();
 
         let fut = async move {
             let mut child = Command::new("sh")
