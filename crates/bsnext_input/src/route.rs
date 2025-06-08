@@ -495,7 +495,7 @@ impl WatcherDirs {
         match self {
             WatcherDirs::Single(item) => vec![PathBuf::from(item)],
             WatcherDirs::Many(item) if !item.is_empty() => item.iter().map(PathBuf::from).collect(),
-            WatcherDirs::Many(_) => todo!("cannot get here?"),
+            WatcherDirs::Many(_) => vec![],
         }
     }
 }

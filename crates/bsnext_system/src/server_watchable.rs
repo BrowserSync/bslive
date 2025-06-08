@@ -41,11 +41,6 @@ pub fn to_task_list(spec: &Spec) -> Option<TaskList> {
     // if the 'run' key was given, it's a list of steps.
     let run = spec.run.as_ref()?;
 
-    // if it's empty, pretend it was absent
-    if run.is_empty() {
-        return None;
-    };
-
     // otherwise, construct a runner
     Some(TaskList::seq_from(run))
 }
