@@ -6,10 +6,7 @@ use crate::start::start_command::StartCommand;
 use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
-use crate::watch::WatchCommand;
-use bsnext_input::route::{
-    BeforeRunOptItem, MultiWatch, PrefixOpt, RunOptItem, ShRunOptItem, Spec, WatcherDirs,
-};
+use bsnext_input::route::MultiWatch;
 use bsnext_input::Input;
 use bsnext_output::OutputWriters;
 use bsnext_tracing::{init_tracing, LineNumberOption, OutputFormat, WriteOption};
@@ -97,56 +94,6 @@ where
             let start_kind = StartKind::FromInput(StartFromInput { input });
             start_stdout_wrapper(start_kind, cwd, writer).await
         }
-    }
-}
-
-impl From<WatchCommand> for MultiWatch {
-    fn from(value: WatchCommand) -> Self {
-        let dirs = WatcherDirs::Many(value.paths);
-        let run_opts = value
-            .command
-            .iter()
-            .map(ToOwned::to_owned)
-            .enumerate()
-            .map(move |(index, item)| {
-                let name = Some(format!("command:{}", index));
-                let prefix = value.no_prefix.then(|| PrefixOpt::Bool(false));
-                RunOptItem::Sh(ShRunOptItem {
-                    sh: item,
-                    name,
-                    prefix,
-                })
-            })
-            .collect::<Vec<_>>();
-
-        let before = value
-            .initial
-            .iter()
-            .map(ToOwned::to_owned)
-            .enumerate()
-            .map(move |(index, item)| {
-                let name = Some(format!("initial:{}", index));
-                let prefix = value.no_prefix.then(|| PrefixOpt::Bool(false));
-                BeforeRunOptItem::Sh(ShRunOptItem {
-                    sh: item,
-                    name,
-                    prefix,
-                })
-            })
-            .collect::<Vec<_>>();
-
-        let spec = Spec {
-            before: Some(before),
-            run: Some(run_opts),
-            ..Default::default()
-        };
-
-        let mut watcher = MultiWatch {
-            dirs,
-            opts: Some(spec),
-        };
-
-        watcher
     }
 }
 
