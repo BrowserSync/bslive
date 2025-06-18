@@ -40,7 +40,7 @@ impl Handler<TaskCommand> for NotifyServers {
                 ..
             } => sender.do_send(FilesChanged {
                 paths: changes.clone(),
-                ctx: fs_event_context.clone(),
+                ctx: fs_event_context,
             }),
             TaskCommand::Exec { .. } => {
                 todo!("I cannot accept this")

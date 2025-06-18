@@ -43,14 +43,14 @@ impl Handler<TriggerFsTask> for BsSystem {
         let cmd = msg.cmd();
         let fs_ctx = msg.fs_ctx();
         let entry = self.tasks.get(fs_ctx);
-        let cloned_id = fs_ctx.clone();
+        let cloned_id = *fs_ctx;
 
         if let Some(entry) = entry {
             tracing::info!("ignoring concurrent task triggering: prev: {:?}", entry);
             return Box::pin(async {}.into_actor(self));
         }
 
-        self.tasks.insert(fs_ctx.clone(), msg.runner.to_owned());
+        self.tasks.insert(*fs_ctx, msg.runner.to_owned());
         let task_id = msg.runner.as_id();
         let cmd_recipient = Box::new(msg.task).into_task_recipient();
 

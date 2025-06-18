@@ -1,13 +1,9 @@
-use crate::path_monitor::PathMonitor;
+use crate::path_monitor::{PathMonitor, PathMonitorMeta, StopPathMonitor};
 use crate::path_watchable::PathWatchable;
 use crate::BsSystem;
-use actix::{Actor, AsyncContext};
-use bsnext_fs::actor::FsWatcher;
-use bsnext_fs::filter::Filter;
-use bsnext_fs::stop_handler::StopWatcher;
-use bsnext_fs::watch_path_handler::RequestWatchPath;
+use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
-use bsnext_input::route::{DebounceDuration, FilterKind, Spec};
+use bsnext_input::route::{DebounceDuration, Spec};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -39,8 +35,8 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
         debug!("{} monitors to add", to_add.len());
 
         for any_watchable in to_remove {
-            if let Some(mon) = self.any_monitors.get(any_watchable) {
-                mon.addr.do_send(StopWatcher);
+            if let Some((path_monitor_addr, _)) = self.any_monitors.get(any_watchable) {
+                path_monitor_addr.do_send(StopPathMonitor);
                 ctx.notify(DropMonitor((*any_watchable).clone()))
             }
         }
@@ -57,25 +53,7 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             };
 
             let fs_ctx = FsEventContext::new(fs_ctx_id, watchable_hash);
-            let mut watcher = FsWatcher::new(&msg.cwd, fs_ctx.clone());
-
             let opts = any_watchable.spec_opts();
-
-            if let Some(filter_kind) = &opts.filter {
-                let filters = convert(filter_kind);
-                for filter in filters {
-                    debug!(filter = ?filter, "append filter");
-                    watcher.with_filter(filter);
-                }
-            }
-            if let Some(ignore_filter_kind) = &opts.ignore {
-                let ignores = convert(ignore_filter_kind);
-                for ignore in ignores {
-                    debug!(ignore = ?ignore, "with ignore");
-                    watcher.with_ignore(ignore);
-                }
-            }
-
             let duration = match opts {
                 Spec {
                     debounce: Some(DebounceDuration::Ms(ms)),
@@ -85,49 +63,18 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             };
 
             let debounce = Debounce::Buffered { duration };
-            watcher.with_debounce(debounce);
+            let monitor = PathMonitor::new(
+                ctx.address().recipient(),
+                debounce,
+                msg.cwd.clone(),
+                fs_ctx,
+                (*any_watchable).clone(),
+            );
+            let meta = PathMonitorMeta::from(&monitor);
+            let monitor = monitor.start();
 
-            debug!("{}", watcher);
-
-            let watcher_addr = watcher.start();
-            let monitor = PathMonitor::new(watcher_addr, fs_ctx);
-
-            for single_path in &any_watchable.watch_paths() {
-                debug!(path = %single_path.display());
-                monitor.addr.do_send(RequestWatchPath {
-                    recipients: vec![ctx.address().recipient()],
-                    path: single_path.to_path_buf(),
-                });
-            }
-
-            ctx.notify(InsertMonitor((*any_watchable).clone(), monitor))
+            ctx.notify(InsertMonitor((*any_watchable).clone(), monitor, meta))
         }
-    }
-}
-
-fn convert(fk: &FilterKind) -> Vec<Filter> {
-    match fk {
-        FilterKind::StringDefault(string_default) => {
-            if string_default.contains("*") {
-                vec![Filter::Glob {
-                    glob: string_default.to_string(),
-                }]
-            } else {
-                vec![Filter::Any {
-                    any: string_default.to_string(),
-                }]
-            }
-        }
-        FilterKind::Extension { ext } => vec![Filter::Extension {
-            ext: ext.to_string(),
-        }],
-        FilterKind::Glob { glob } => vec![Filter::Glob {
-            glob: glob.to_string(),
-        }],
-        FilterKind::List(items) => items.iter().flat_map(convert).collect::<Vec<_>>(),
-        FilterKind::Any { any } => vec![Filter::Any {
-            any: any.to_string(),
-        }],
     }
 }
 
@@ -147,7 +94,7 @@ impl actix::Handler<DropMonitor> for BsSystem {
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
-struct InsertMonitor(PathWatchable, PathMonitor);
+struct InsertMonitor(PathWatchable, Addr<PathMonitor>, PathMonitorMeta);
 
 impl actix::Handler<InsertMonitor> for BsSystem {
     type Result = ();
@@ -156,7 +103,7 @@ impl actix::Handler<InsertMonitor> for BsSystem {
         let span = debug_span!("InsertMonitor");
         let _guard = span.enter();
         debug!("{}", msg.0);
-        self.any_monitors.insert(msg.0, msg.1);
+        self.any_monitors.insert(msg.0, (msg.1, msg.2));
         debug!("+ Monitor count {}", self.any_monitors.len());
     }
 }

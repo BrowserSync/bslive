@@ -31,7 +31,15 @@ impl PathFilter for Filter {
                 );
                 did_match
             }
-            Filter::Any { any } => pd.absolute.to_string_lossy().contains(any),
+            Filter::Any { any } => {
+                let did_match = pd.absolute.to_string_lossy().contains(any);
+                tracing::trace!(
+                    "testing Filter::Any `{:?}` against `{}` = {did_match}",
+                    any,
+                    pd.absolute.display(),
+                );
+                did_match
+            }
         }
     }
 }

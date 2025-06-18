@@ -1,15 +1,18 @@
+use crate::any_watchable::AnyWatchable;
+use crate::path_monitor::PathMonitor;
+use crate::path_watchable::PathWatchable;
 use crate::BsSystem;
-use actix::{Actor, AsyncContext};
-use bsnext_fs::actor::FsWatcher;
-use bsnext_fs::watch_path_handler::RequestWatchPath;
-use bsnext_fs::Debounce;
+use actix::{Actor, Addr, AsyncContext};
+use bsnext_fs::{Debounce, FsEventContext};
+use bsnext_input::route::Spec;
 use bsnext_input::InputCtx;
 use std::path::PathBuf;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct InputMonitor {
-    // pub addr: Addr<FsWatcher>,
+    #[allow(dead_code)]
+    pub addr: Addr<PathMonitor>,
     pub input_ctx: InputCtx,
 }
 
@@ -17,6 +20,7 @@ pub struct InputMonitor {
 #[rtype(result = "()")]
 pub struct MonitorInput {
     pub path: PathBuf,
+    #[allow(dead_code)]
     pub cwd: PathBuf,
     pub input_ctx: InputCtx,
 }
@@ -26,25 +30,35 @@ impl actix::Handler<MonitorInput> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "Handler->MonitorInput->BsSystem")]
     fn handle(&mut self, msg: MonitorInput, ctx: &mut Self::Context) -> Self::Result {
-        let mut input_watcher = FsWatcher::for_root(&msg.cwd, 0);
-
-        // todo: does this need to be configurable (eg: by main config)?
-        input_watcher.with_debounce(Debounce::Trailing {
+        let sys = ctx.address().recipient();
+        let debounce = Debounce::Trailing {
             duration: Duration::from_millis(300),
+        };
+
+        let cwd = self
+            .cwd
+            .as_ref()
+            .map(ToOwned::to_owned)
+            .expect("if this fails, lots will");
+
+        let ctx = FsEventContext::for_root();
+        let pw = PathWatchable::Any(AnyWatchable {
+            dirs: vec![msg.path.to_path_buf()],
+            spec: Spec::default(),
+            task_list: None,
         });
+
+        let input_path_monitor = PathMonitor::new(sys, debounce, cwd, ctx, pw);
 
         tracing::debug!("starting input monitor");
 
-        let input_watcher_addr = input_watcher.start();
-        let input_monitor = InputMonitor {
-            // addr: input_watcher_addr.clone(),
-            input_ctx: msg.input_ctx.clone(),
-        };
-        self.input_monitors = Some(input_monitor);
+        let input_watcher_addr = input_path_monitor.start();
 
-        input_watcher_addr.do_send(RequestWatchPath {
-            recipients: vec![ctx.address().recipient()],
-            path: msg.path.to_path_buf(),
-        });
+        let input_monitor = InputMonitor {
+            input_ctx: msg.input_ctx.clone(),
+            addr: input_watcher_addr,
+        };
+
+        self.input_monitors = Some(input_monitor);
     }
 }

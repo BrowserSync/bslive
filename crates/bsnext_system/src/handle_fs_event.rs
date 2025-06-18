@@ -1,4 +1,6 @@
 use crate::input_fs::from_input_path;
+use crate::path_monitor::PathMonitorMeta;
+use crate::path_watchable::PathWatchable;
 use crate::task::{Task, TaskCommand, TaskComms};
 use crate::task_group::TaskGroup;
 use crate::task_list::{BsLiveTask, Runnable, TaskList};
@@ -10,48 +12,38 @@ use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
-    BufferedChangeEvent, ChangeEvent, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
-    PathEvent,
+    BufferedChangeEvent, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathAddedEvent,
+    PathDescriptionOwned, PathEvent,
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use tracing::info;
+use tracing::{debug_span, info};
 
 impl actix::Handler<FsEvent> for BsSystem {
     type Result = ();
-    fn handle(&mut self, msg: FsEvent, ctx: &mut Self::Context) -> Self::Result {
-        let next = match msg.kind {
-            FsEventKind::ChangeBuffered(buffer_change) => {
-                if let Some((task, cmd, runner)) =
-                    self.handle_buffered(&msg.fs_event_ctx, buffer_change)
-                {
+    #[tracing::instrument(skip_all, name = "Handler->FsEvent->BsSystem")]
+    fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) -> Self::Result {
+        if let Some(evt) = self.handle_fs_event(msg) {
+            tracing::trace!("will publish any_event {:?}", evt);
+            self.publish_any_event(evt)
+        }
+    }
+}
+
+impl actix::Handler<FsEventGrouping> for BsSystem {
+    type Result = ();
+
+    fn handle(&mut self, msg: FsEventGrouping, ctx: &mut Self::Context) -> Self::Result {
+        let span = debug_span!("Handler->FsEventGrouping->BsSystem");
+        let _guard = span.enter();
+        let next = match msg {
+            FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event),
+            FsEventGrouping::Buffered(buff) => {
+                if let Some((task, cmd, runner)) = self.handle_buffered(buff) {
                     tracing::debug!("will trigger task runner");
                     ctx.notify(TriggerFsTask::new(task, cmd, runner));
                 }
                 None
             }
-            FsEventKind::Change(inner) if msg.fs_event_ctx.is_root() => {
-                match self.handle_input_change(&inner) {
-                    // if the change included a new Input, use it
-                    (any_event, Some(input)) => {
-                        tracing::info!("will override input");
-                        ctx.notify(OverrideInput {
-                            input,
-                            original_event: any_event,
-                        });
-                        // return None here so that the event is not published yet (the updated Input will do it)
-                        None
-                    }
-                    // otherwise publish the change as usual
-                    (evt, None) => Some(evt),
-                }
-            }
-            FsEventKind::Change(inner) => {
-                let evt = self.handle_any_change(&msg.fs_event_ctx, &inner);
-                Some(evt)
-            }
-            FsEventKind::PathAdded(path) => self.handle_path_added(&path),
-            FsEventKind::PathRemoved(path) => self.handle_path_removed(&path),
-            FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(&pdo),
         };
         if let Some(any_event) = next {
             tracing::trace!("will publish any_event {:?}", any_event);
@@ -61,13 +53,60 @@ impl actix::Handler<FsEvent> for BsSystem {
 }
 
 impl BsSystem {
+    fn handle_fs_event(&mut self, fs_event: FsEvent) -> Option<AnyEvent> {
+        match &fs_event.kind {
+            FsEventKind::Change(ch) if fs_event.fs_event_ctx.is_root() => {
+                tracing::info!("fs_event_ctx=root");
+                match self.handle_input_change(ch) {
+                    // if the change included a new Input, use it
+                    (any_event, Some(input)) => {
+                        tracing::info!("will override input");
+                        if let Some(addr) = &self.self_addr {
+                            addr.do_send(OverrideInput {
+                                input,
+                                original_event: any_event,
+                            });
+                        };
+                        // return None here so that the event is not published yet (the updated Input will do it)
+                        None
+                    }
+                    // otherwise publish the change as usual
+                    (evt, None) => Some(evt),
+                }
+            }
+            FsEventKind::Change(inner) => {
+                let evt = self.handle_any_change(&fs_event.fs_event_ctx, inner);
+                Some(evt)
+            }
+            FsEventKind::PathAdded(path) => {
+                let Some(pw) = self.monitor_meta(&fs_event.fs_event_ctx) else {
+                    tracing::error!("missing path_watchable");
+                    return None;
+                };
+                self.handle_path_added(path, pw)
+            }
+            FsEventKind::PathRemoved(path) => self.handle_path_removed(path),
+            FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),
+        }
+    }
+    fn monitor_meta(&self, incoming: &FsEventContext) -> Option<&PathMonitorMeta> {
+        self.any_monitors
+            .iter()
+            .find(|(.., (_addr, PathMonitorMeta { ref fs_ctx, .. }))| fs_ctx == incoming)
+            .map(|(.., (_addr, meta))| meta)
+    }
+    fn path_watchable(&self, incoming: &FsEventContext) -> Option<&PathWatchable> {
+        self.any_monitors
+            .iter()
+            .find(|(.., (_path_monitor, PathMonitorMeta { ref fs_ctx, .. }))| fs_ctx == incoming)
+            .map(|(pw, ..)| pw)
+    }
     #[tracing::instrument(skip_all)]
     fn handle_buffered(
         &mut self,
-        fs_event_ctx: &FsEventContext,
         buf: BufferedChangeEvent,
     ) -> Option<(Task, TaskCommand, TaskList)> {
-        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?fs_event_ctx, ?buf);
+        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
             if let Some(fp) = mon.input_ctx.file_path() {
@@ -93,11 +132,11 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let fs_event_runner = self.as_runner_for_fs_event(fs_event_ctx);
+        let fs_event_runner = self.as_runner_for_fs_event(&change.fs_ctx);
 
         let cmd = TaskCommand::Changes {
             changes: paths,
-            fs_event_context: fs_event_ctx.clone(),
+            fs_event_context: change.fs_ctx,
             task_comms: self.task_comms(),
             invocation_id: 0,
         };
@@ -127,20 +166,22 @@ impl BsSystem {
     fn handle_any_change(
         &mut self,
         fs_event_ctx: &FsEventContext,
-        inner: &ChangeEvent,
+        inner: &PathDescriptionOwned,
     ) -> AnyEvent {
         tracing::trace!(?inner, "Other file changed");
         if let Some(servers) = &self.servers_addr {
             servers.do_send(FileChanged {
-                path: inner.absolute_path.clone(),
-                ctx: fs_event_ctx.clone(),
+                path: inner.absolute.clone(),
+                ctx: *fs_event_ctx,
             })
         }
         AnyEvent::External(ExternalEventsDTO::FileChanged(
-            bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
+            bsnext_dto::FileChangedDTO::from_path_buf(
+                inner.relative.as_ref().unwrap_or(&inner.absolute),
+            ),
         ))
     }
-    fn handle_input_change(&mut self, inner: &ChangeEvent) -> (AnyEvent, Option<Input>) {
+    fn handle_input_change(&mut self, inner: &PathDescriptionOwned) -> (AnyEvent, Option<Input>) {
         tracing::info!("InputFile file changed {:?}", inner);
 
         let ctx = self
@@ -149,23 +190,27 @@ impl BsSystem {
             .map(|x| x.input_ctx.clone())
             .unwrap_or_default();
 
-        let input = from_input_path(&inner.absolute_path, &ctx);
+        let input = from_input_path(&inner.absolute, &ctx);
 
         let Ok(input) = input else {
             let err = input.unwrap_err();
             return (AnyEvent::Internal(InternalEvents::InputError(*err)), None);
         };
 
+        let Some(relative) = &inner.relative else {
+            todo!("todo: is this reachable?")
+        };
+
         (
             AnyEvent::External(ExternalEventsDTO::InputFileChanged(
-                bsnext_dto::FileChangedDTO::from_path_buf(&inner.path),
+                bsnext_dto::FileChangedDTO::from_path_buf(relative),
             )),
             Some(input),
         )
     }
-    fn handle_path_added(&mut self, path: &PathAddedEvent) -> Option<AnyEvent> {
+    fn handle_path_added(&self, path: &PathAddedEvent, meta: &PathMonitorMeta) -> Option<AnyEvent> {
         Some(AnyEvent::External(ExternalEventsDTO::Watching(
-            WatchingDTO::from_path_buf(&path.path, path.debounce),
+            WatchingDTO::from_path_buf(&path.path, meta.debounce),
         )))
     }
 
@@ -192,28 +237,23 @@ impl BsSystem {
 
     #[tracing::instrument(skip_all)]
     fn as_runner_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskList {
-        let matching_monitor = self
-            .any_monitors
-            .iter()
-            .find(|(_, path_monitor)| path_monitor.fs_ctx == (*fs_event_ctx));
+        let Some(path_watchable) = self.path_watchable(fs_event_ctx) else {
+            tracing::error!("did not find a matching monitor");
+            return TaskList::seq(&[]);
+        };
 
-        if let Some((path_watchable, _any_monitor)) = matching_monitor {
-            info!("matching monitor, path_watchable: {}", path_watchable);
-            info!("matching fs_event_ctx: {:?}", fs_event_ctx);
-            let custom_task_list = path_watchable.task_list();
-            if let None = custom_task_list {
-                info!("no custom tasks given, NotifyServer + ExtEvent will be defaults");
-            }
-            let runner = custom_task_list.map(ToOwned::to_owned).unwrap_or_else(|| {
-                TaskList::seq(&[
-                    Runnable::BsLiveTask(BsLiveTask::NotifyServer),
-                    Runnable::BsLiveTask(BsLiveTask::ExtEvent),
-                ])
-            });
+        info!("matching monitor, path_watchable: {}", path_watchable);
+        info!("matching fs_event_ctx: {:?}", fs_event_ctx);
 
-            return runner;
+        let custom_task_list = path_watchable.task_list();
+        if custom_task_list.is_none() {
+            info!("no custom tasks given, NotifyServer + ExtEvent will be defaults");
         }
-
-        TaskList::seq(&[])
+        custom_task_list.map(ToOwned::to_owned).unwrap_or_else(|| {
+            TaskList::seq(&[
+                Runnable::BsLiveTask(BsLiveTask::NotifyServer),
+                Runnable::BsLiveTask(BsLiveTask::ExtEvent),
+            ])
+        })
     }
 }

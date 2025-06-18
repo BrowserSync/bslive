@@ -1,12 +1,9 @@
 pub mod actor;
-mod buffered_debounce;
+pub mod buffered_debounce;
 pub mod filter;
 pub mod inner_fs_event_handler;
-pub mod remove_path_handler;
 pub mod stop_handler;
-mod stream;
-#[cfg(test)]
-mod test;
+pub mod stream;
 pub mod watch_path_handler;
 mod watcher;
 
@@ -14,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 // use tokio_stream::StreamExt;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub enum Debounce {
     Trailing { duration: Duration },
     Buffered { duration: Duration },
@@ -50,7 +47,7 @@ impl Debounce {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub struct FsEventContext {
     pub id: u64,
     pub origin_id: u64,
@@ -59,6 +56,12 @@ pub struct FsEventContext {
 impl FsEventContext {
     pub fn new(id: u64, origin_id: u64) -> Self {
         Self { id, origin_id }
+    }
+    pub fn for_root() -> Self {
+        Self {
+            id: 0,
+            origin_id: 0,
+        }
     }
 }
 
@@ -80,7 +83,7 @@ impl Default for FsEventContext {
     }
 }
 
-#[derive(actix::Message, Debug, Clone)]
+#[derive(actix::Message, Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 #[rtype(result = "()")]
 pub struct FsEvent {
     pub kind: FsEventKind,
@@ -88,11 +91,11 @@ pub struct FsEvent {
 }
 
 impl FsEvent {
-    pub fn changed<A: AsRef<Path>>(abs: A, path: A, ctx_id: u64) -> Self {
+    pub fn changed<A: AsRef<Path>>(absolute: A, relative: A, ctx_id: u64) -> Self {
         Self {
-            kind: FsEventKind::Change(ChangeEvent {
-                absolute_path: PathBuf::from(abs.as_ref()),
-                path: PathBuf::from(path.as_ref()),
+            kind: FsEventKind::Change(PathDescriptionOwned {
+                absolute: PathBuf::from(absolute.as_ref()),
+                relative: Some(PathBuf::from(relative.as_ref())),
             }),
             fs_event_ctx: FsEventContext {
                 id: ctx_id,
@@ -102,20 +105,12 @@ impl FsEvent {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FsEventKind {
-    Change(ChangeEvent),
-    ChangeBuffered(BufferedChangeEvent),
+    Change(PathDescriptionOwned),
     PathAdded(PathAddedEvent),
     PathRemoved(PathEvent),
     PathNotFoundError(PathEvent),
-}
-
-#[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "()")]
-pub struct ChangeEvent {
-    pub absolute_path: PathBuf,
-    pub path: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -124,7 +119,7 @@ pub struct PathDescription<'a> {
     pub relative: Option<&'a Path>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub struct PathDescriptionOwned {
     pub absolute: PathBuf,
     pub relative: Option<PathBuf>,
@@ -141,8 +136,27 @@ impl<'a> From<&'a PathDescription<'_>> for PathDescriptionOwned {
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "()")]
+pub enum FsEventGrouping {
+    Singular(FsEvent),
+    Buffered(BufferedChangeEvent),
+}
+
+impl FsEventGrouping {
+    pub fn buffered_change(
+        events: Vec<PathDescriptionOwned>,
+        fs_event_context: FsEventContext,
+    ) -> Self {
+        Self::Buffered(BufferedChangeEvent {
+            events,
+            fs_ctx: fs_event_context,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct BufferedChangeEvent {
     pub events: Vec<PathDescriptionOwned>,
+    pub fs_ctx: FsEventContext,
 }
 
 impl BufferedChangeEvent {
@@ -155,23 +169,24 @@ impl BufferedChangeEvent {
                     .filter(|x| x.absolute != path)
                     .map(ToOwned::to_owned)
                     .collect(),
+                fs_ctx: self.fs_ctx,
             }
         } else {
             Self {
                 events: self.events,
+                fs_ctx: self.fs_ctx,
             }
         }
     }
 }
 
-#[derive(actix::Message, Debug, Clone)]
+#[derive(actix::Message, Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 #[rtype(result = "()")]
 pub struct PathAddedEvent {
     pub path: PathBuf,
-    pub debounce: Debounce,
 }
 
-#[derive(actix::Message, Debug, Clone)]
+#[derive(actix::Message, Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 #[rtype(result = "()")]
 pub struct PathEvent {
     pub path: PathBuf,

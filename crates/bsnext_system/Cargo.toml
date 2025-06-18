@@ -24,6 +24,7 @@ kill_tree = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
 actix = { workspace = true }
 actix-rt = { workspace = true }
 tracing = { workspace = true }

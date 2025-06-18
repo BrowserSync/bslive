@@ -4,8 +4,8 @@ use actix::{
 };
 
 use crate::any_watchable::to_any_watchables;
-use crate::monitor_any_watchables::MonitorPathWatchables;
-use crate::path_monitor::PathMonitor;
+use crate::monitor_path_watchables::MonitorPathWatchables;
+use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
 use crate::task::{Task, TaskCommand};
 use crate::task_group::TaskGroup;
@@ -47,7 +47,7 @@ mod handle_fs_event;
 pub mod input_fs;
 mod input_monitor;
 mod input_watchable;
-mod monitor_any_watchables;
+mod monitor_path_watchables;
 mod path_monitor;
 mod path_watchable;
 mod route_watchable;
@@ -68,7 +68,7 @@ pub(crate) struct BsSystem {
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
-    any_monitors: HashMap<PathWatchable, PathMonitor>,
+    any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
     tasks: HashMap<FsEventContext, TaskList>,
     cwd: Option<PathBuf>,
     start_context: Option<StartupContext>,
@@ -236,6 +236,7 @@ impl BsSystem {
         };
 
         let all = input.before_run_opts();
+        debug!("{} before tasks to execute", all.len());
         let runner = TaskList::seq_from(&all);
         let task_group = TaskGroup::from(runner.clone());
         let task = Task::Group(task_group);
@@ -438,6 +439,7 @@ struct ResolveServers {
 impl actix::Handler<ResolveServers> for BsSystem {
     type Result = ResponseFuture<Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>>;
 
+    #[tracing::instrument(skip_all, name = "Handler->ResolveServers->BsSystem")]
     fn handle(&mut self, msg: ResolveServers, _ctx: &mut Self::Context) -> Self::Result {
         let Some(servers_addr) = &self.servers_addr else {
             unreachable!("self.servers_addr cannot be absent?");
@@ -447,7 +449,7 @@ impl actix::Handler<ResolveServers> for BsSystem {
         let addr = servers_addr.clone();
 
         let f = async move {
-            debug!("will mark input as changed");
+            debug!("will mark input as changed or new");
             let results = addr.send(InputChanged { input: msg.input }).await;
 
             let Ok(result_set) = results else {
@@ -540,6 +542,7 @@ struct ResolveInitialTasks {
 impl actix::Handler<ResolveInitialTasks> for BsSystem {
     type Result = ResponseFuture<Result<TaskReportAndTree, InitialTaskError>>;
 
+    #[tracing::instrument(skip_all, name = "Handler->ResolveInitialTasks->BsSystem")]
     fn handle(&mut self, msg: ResolveInitialTasks, ctx: &mut Self::Context) -> Self::Result {
         let (next, rx) = self.before(&msg.input);
         ctx.notify(next);

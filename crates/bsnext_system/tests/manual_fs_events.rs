@@ -53,7 +53,7 @@ servers:
     let id = first.identity.as_id();
 
     let r = ReceiverStream::new(events_receiver)
-        // .inspect(|e| println!("{:?}", e))
+        // .inspect(|e| println!("{:#?}", e))
         .filter(|e| {
             futures::future::ready(matches!(
                 &e,

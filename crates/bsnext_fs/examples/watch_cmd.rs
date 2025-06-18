@@ -1,7 +1,7 @@
 use actix::{Actor, ActorFutureExt, ResponseActFuture, WrapFuture};
 use bsnext_fs::actor::FsWatcher;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
-use bsnext_fs::{BufferedChangeEvent, Debounce, FsEvent, FsEventContext, FsEventKind};
+use bsnext_fs::{FsEvent, FsEventContext, FsEventKind};
 use std::ffi::OsString;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -19,17 +19,11 @@ async fn main() -> anyhow::Result<()> {
         bsnext_tracing::LineNumberOption::None,
     );
     let (File(file), Dir(dir)) = mock_path("mocks/01.txt");
-    let mut fs = FsWatcher::new(&dir, FsEventContext::default());
-    fs.with_debounce(Debounce::Trailing {
-        duration: Duration::from_millis(500),
-    });
-    let addr = fs.start();
     let ex = Example::from_str("echo 'hello world!' && printenv")?;
     let recip = ex.start();
-    addr.do_send(RequestWatchPath {
-        path: file,
-        recipients: vec![recip.recipient()],
-    });
+    let fs = FsWatcher::new(&dir, FsEventContext::default(), recip.recipient());
+    let addr = fs.start();
+    addr.do_send(RequestWatchPath { path: file });
     tokio::time::sleep(Duration::from_secs(1000)).await;
     Ok(())
 }
@@ -82,14 +76,7 @@ impl actix::Handler<FsEvent> for Example {
         let running = self.running;
         let valid_trigger = match kind {
             FsEventKind::Change(ch) => {
-                tracing::debug!("    change {}", ch.path.display());
-                true
-            }
-            FsEventKind::ChangeBuffered(BufferedChangeEvent { events }) => {
-                tracing::debug!("    got {} events", events.len());
-                for x in events {
-                    tracing::debug!("      abs: {}", x.absolute.display());
-                }
+                tracing::debug!("    change {:?}", ch.relative);
                 true
             }
             FsEventKind::PathAdded(path) => {
