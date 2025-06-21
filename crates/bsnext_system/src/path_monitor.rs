@@ -10,7 +10,7 @@ use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
     Debounce, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathDescriptionOwned,
 };
-use bsnext_input::route::{FilterKind, Spec};
+use bsnext_input::route::FilterKind;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -82,17 +82,34 @@ impl actix::Actor for PathMonitor {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         for single_path in &self.path_watchable.watch_paths() {
+            let as_str = single_path.to_string_lossy();
+            let (path, filter) = path_and_filter_p(&as_str);
+
+            // create a filter list, first using the optional filter given above
+            let mut filters = filter.into_iter().collect::<Vec<_>>();
+
+            // additional filter from options?
+            let spec_opts = self.path_watchable.spec_opts();
+            if let Some(filter) = &spec_opts.filter {
+                filters.push(filter.clone());
+            }
+
+            // create the watcher now
             let watcher = to_watcher(
                 &self.cwd,
-                self.path_watchable.spec_opts(),
+                Some(&FilterKind::List(filters)),
+                spec_opts.filter.as_ref(),
                 self.fs_ctx,
                 ctx.address().recipient(),
             );
+
             let watcher_addr = watcher.start();
             let watcher_addr_clone = watcher_addr.clone();
+
             self.addrs.push(watcher_addr);
+
             watcher_addr_clone.do_send(RequestWatchPath {
-                path: single_path.to_path_buf(),
+                path: path.to_path_buf(),
             });
         }
         let Some(receiver) = self.inner_receiver.take() else {
@@ -109,6 +126,32 @@ impl actix::Actor for PathMonitor {
                 <Self as StreamHandler<Vec<FsEvent>>>::add_stream(stream, ctx);
             }
         }
+    }
+}
+
+fn path_and_filter(p: &str) -> (&Path, Option<FilterKind>) {
+    if let Some((b, a)) = p.split_once("*") {
+        (
+            Path::new(b),
+            Some(FilterKind::Glob {
+                glob: p.to_string(),
+            }),
+        )
+    } else {
+        (Path::new(p), None)
+    }
+}
+
+fn path_and_filter_p(p: &str) -> (&Path, Option<FilterKind>) {
+    if let Some((before, ..)) = p.split_once("*") {
+        (
+            &Path::new(before),
+            Some(FilterKind::Glob {
+                glob: p.to_string(),
+            }),
+        )
+    } else {
+        (&Path::new(p), None)
     }
 }
 
@@ -164,20 +207,21 @@ impl Handler<FsEvent> for PathMonitor {
 
 fn to_watcher(
     cwd: &Path,
-    opts: &Spec,
+    filter: Option<&FilterKind>,
+    ignore: Option<&FilterKind>,
     fs_ctx: FsEventContext,
     receiver: Recipient<FsEvent>,
 ) -> FsWatcher {
     let mut watcher = FsWatcher::new(cwd, fs_ctx, receiver);
 
-    if let Some(filter_kind) = &opts.filter {
+    if let Some(filter_kind) = &filter {
         let filters = convert(filter_kind);
         for filter in filters {
             debug!(filter = ?filter, "append filter");
             watcher.with_filter(filter);
         }
     }
-    if let Some(ignore_filter_kind) = &opts.ignore {
+    if let Some(ignore_filter_kind) = &ignore {
         let ignores = convert(ignore_filter_kind);
         for ignore in ignores {
             debug!(ignore = ?ignore, "with ignore");
