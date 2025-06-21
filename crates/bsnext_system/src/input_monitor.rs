@@ -1,5 +1,5 @@
 use crate::any_watchable::AnyWatchable;
-use crate::path_monitor::PathMonitor;
+use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
 use crate::BsSystem;
 use actix::{Actor, Addr, AsyncContext};
@@ -13,6 +13,7 @@ use std::time::Duration;
 pub struct InputMonitor {
     #[allow(dead_code)]
     pub addr: Addr<PathMonitor>,
+    pub monitor_meta: PathMonitorMeta,
     pub input_ctx: InputCtx,
 }
 
@@ -49,6 +50,7 @@ impl actix::Handler<MonitorInput> for BsSystem {
         });
 
         let input_path_monitor = PathMonitor::new(sys, debounce, cwd, ctx, pw);
+        let meta = PathMonitorMeta::from(&input_path_monitor);
 
         tracing::debug!("starting input monitor");
 
@@ -57,6 +59,7 @@ impl actix::Handler<MonitorInput> for BsSystem {
         let input_monitor = InputMonitor {
             input_ctx: msg.input_ctx.clone(),
             addr: input_watcher_addr,
+            monitor_meta: meta,
         };
 
         self.input_monitors = Some(input_monitor);

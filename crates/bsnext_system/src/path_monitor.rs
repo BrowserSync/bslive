@@ -1,19 +1,16 @@
 use crate::path_watchable::PathWatchable;
-use actix::{Addr, AsyncContext, Handler, Recipient, Running};
+use actix::{ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
 use bsnext_fs::buffered_debounce::BufferedStreamOpsExt;
 use bsnext_fs::filter::Filter;
-use bsnext_fs::inner_fs_event_handler::{MultipleInnerChangeEvent, SingleInnerChangeEvent};
 use bsnext_fs::stop_handler::StopWatcher;
 use bsnext_fs::stream::StreamOpsExt;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
-    Debounce, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathAddedEvent,
-    PathDescriptionOwned, PathEvent,
+    Debounce, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathDescriptionOwned,
 };
 use bsnext_input::route::{FilterKind, Spec};
-use futures_util::StreamExt;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -32,7 +29,7 @@ pub struct PathMonitor {
     inner_receiver: Option<tokio::sync::mpsc::Receiver<FsEvent>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PathMonitorMeta {
     #[allow(dead_code)]
     pub cwd: PathBuf,
@@ -50,6 +47,33 @@ impl From<&PathMonitor> for PathMonitorMeta {
             fs_ctx: value.fs_ctx,
             debounce: value.debounce,
         }
+    }
+}
+
+impl StreamHandler<FsEvent> for PathMonitor {
+    fn handle(&mut self, event: FsEvent, _ctx: &mut Context<PathMonitor>) {
+        self.sys.do_send(FsEventGrouping::Singular(event))
+    }
+}
+
+impl StreamHandler<Vec<FsEvent>> for PathMonitor {
+    fn handle(&mut self, events: Vec<FsEvent>, _ctx: &mut Context<PathMonitor>) {
+        debug!("  └ got {} events to process", events.len());
+        // let now = Instant::now();
+        // let original_len = events.len();
+        // let unique_len = unique.len();
+        let unique = events.iter().collect::<BTreeSet<_>>();
+        debug!("  └ {} unique event after converting to set", unique.len());
+        debug!("  └ {:?}", unique);
+        let outgoing = unique
+            .into_iter()
+            .filter_map(|e| match &e.kind {
+                FsEventKind::Change(pd) => Some(pd.to_owned()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        self.sys
+            .do_send(FsEventGrouping::buffered_change(outgoing, self.fs_ctx))
     }
 }
 
@@ -71,39 +95,20 @@ impl actix::Actor for PathMonitor {
                 path: single_path.to_path_buf(),
             });
         }
-        Arbiter::current().spawn({
-            let debounce = self.debounce;
-            let a = ctx.address();
-            let Some(receiver) = self.inner_receiver.take() else {
-                panic!("impossible?")
-            };
-            async move {
-                match debounce {
-                    Debounce::Trailing { duration } => {
-                        let stream = ReceiverStream::new(receiver).debounce(duration);
-                        let mut debounced_stream = Box::pin(stream);
-                        while let Some(event) = debounced_stream.next().await {
-                            a.do_send(SingleInnerChangeEvent { event });
-                        }
-                    }
-                    Debounce::Buffered { duration } => {
-                        let stream = ReceiverStream::new(receiver).buffered_debounce(duration);
-                        let mut debounced_stream = Box::pin(stream);
-                        while let Some(events) = debounced_stream.next().await {
-                            a.do_send(MultipleInnerChangeEvent { events });
-                        }
-                    }
-                };
+        let Some(receiver) = self.inner_receiver.take() else {
+            panic!("impossible?")
+        };
+        let debounce = self.debounce;
+        match debounce {
+            Debounce::Trailing { duration } => {
+                let stream = ReceiverStream::new(receiver).debounce(duration);
+                <Self as StreamHandler<FsEvent>>::add_stream(stream, ctx);
             }
-        });
-    }
-
-    fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        Running::Stop
-    }
-
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        dbg!(&"stopped");
+            Debounce::Buffered { duration } => {
+                let stream = ReceiverStream::new(receiver).buffered_debounce(duration);
+                <Self as StreamHandler<Vec<FsEvent>>>::add_stream(stream, ctx);
+            }
+        }
     }
 }
 
@@ -133,44 +138,11 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
     }
 }
 
-impl Handler<MultipleInnerChangeEvent> for PathMonitor {
-    type Result = ();
-
-    #[tracing::instrument(skip_all, name = "Handler->MultipleInnerChangeEvent->PathMonitor")]
-    fn handle(&mut self, msg: MultipleInnerChangeEvent, _ctx: &mut Self::Context) -> Self::Result {
-        debug!("  └ got {} events to process", msg.events.len());
-        // let now = Instant::now();
-        // let original_len = msg.events.len();
-        // let unique_len = unique.len();
-        let unique = msg.events.iter().collect::<BTreeSet<_>>();
-        debug!("  └ {} unique event after converting to set", unique.len());
-        debug!("  └ {:?}", unique);
-        let outgoing = unique
-            .into_iter()
-            .filter_map(|e| match &e.kind {
-                FsEventKind::Change(pd) => Some(pd.to_owned()),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
-        self.sys
-            .do_send(FsEventGrouping::buffered_change(outgoing, self.fs_ctx))
-    }
-}
-impl Handler<SingleInnerChangeEvent> for PathMonitor {
-    type Result = ();
-    #[tracing::instrument(skip_all, name = "Handler->SingleInnerChangeEvent->PathMonitor")]
-    fn handle(&mut self, msg: SingleInnerChangeEvent, _ctx: &mut Self::Context) -> Self::Result {
-        debug!("will forward single event to sys");
-        self.sys.do_send(FsEventGrouping::Singular(msg.event))
-    }
-}
-
 impl Handler<FsEvent> for PathMonitor {
     type Result = ();
     fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) -> Self::Result {
         let span = debug_span!("Handler->FsEvent->PathMonitor");
         let _guard = span.enter();
-        debug!(?self.fs_ctx);
         let sender = self.inner_sender.clone();
         match &msg.kind {
             FsEventKind::Change(PathDescriptionOwned { .. }) => {
@@ -182,14 +154,9 @@ impl Handler<FsEvent> for PathMonitor {
                     };
                 });
             }
-            FsEventKind::PathAdded(PathAddedEvent { path }) => {
-                debug!("FsEventKind::PathAdded {}", path.display());
-            }
-            FsEventKind::PathRemoved(PathEvent { path }) => {
-                debug!("FsEventKind::PathRemoved {}", path.display())
-            }
-            FsEventKind::PathNotFoundError(PathEvent { path }) => {
-                debug!("FsEventKind::PathNotFoundError {}", path.display())
+            _ => {
+                // todo: any need to buffer these?
+                self.sys.do_send(FsEventGrouping::Singular(msg))
             }
         }
     }
@@ -228,11 +195,12 @@ pub struct StopPathMonitor;
 impl Handler<StopPathMonitor> for PathMonitor {
     type Result = ();
 
-    fn handle(&mut self, _msg: StopPathMonitor, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: StopPathMonitor, ctx: &mut Self::Context) -> Self::Result {
         for x in &self.addrs {
             x.do_send(StopWatcher)
         }
         self.addrs = vec![];
+        ctx.stop();
     }
 }
 

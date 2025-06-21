@@ -18,17 +18,6 @@ use bsnext_fs::{
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 use tracing::{debug_span, info};
 
-impl actix::Handler<FsEvent> for BsSystem {
-    type Result = ();
-    #[tracing::instrument(skip_all, name = "Handler->FsEvent->BsSystem")]
-    fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) -> Self::Result {
-        if let Some(evt) = self.handle_fs_event(msg) {
-            tracing::trace!("will publish any_event {:?}", evt);
-            self.publish_any_event(evt)
-        }
-    }
-}
-
 impl actix::Handler<FsEventGrouping> for BsSystem {
     type Result = ();
 
@@ -37,7 +26,7 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
         let _guard = span.enter();
         let next = match msg {
             FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event),
-            FsEventGrouping::Buffered(buff) => {
+            FsEventGrouping::BufferedChange(buff) => {
                 if let Some((task, cmd, runner)) = self.handle_buffered(buff) {
                     tracing::debug!("will trigger task runner");
                     ctx.notify(TriggerFsTask::new(task, cmd, runner));
@@ -80,7 +69,7 @@ impl BsSystem {
             }
             FsEventKind::PathAdded(path) => {
                 let Some(pw) = self.monitor_meta(&fs_event.fs_event_ctx) else {
-                    tracing::error!("missing path_watchable");
+                    tracing::error!(evt=?fs_event, "missing monitor meta data");
                     return None;
                 };
                 self.handle_path_added(path, pw)
@@ -90,10 +79,14 @@ impl BsSystem {
         }
     }
     fn monitor_meta(&self, incoming: &FsEventContext) -> Option<&PathMonitorMeta> {
-        self.any_monitors
-            .iter()
-            .find(|(.., (_addr, PathMonitorMeta { ref fs_ctx, .. }))| fs_ctx == incoming)
-            .map(|(.., (_addr, meta))| meta)
+        if incoming.is_root() {
+            self.input_monitors.as_ref().map(|m| &m.monitor_meta)
+        } else {
+            self.any_monitors
+                .iter()
+                .find(|(.., (_addr, PathMonitorMeta { ref fs_ctx, .. }))| fs_ctx == incoming)
+                .map(|(.., (_addr, meta))| meta)
+        }
     }
     fn path_watchable(&self, incoming: &FsEventContext) -> Option<&PathWatchable> {
         self.any_monitors
@@ -110,7 +103,7 @@ impl BsSystem {
 
         let change = if let Some(mon) = &self.input_monitors {
             if let Some(fp) = mon.input_ctx.file_path() {
-                tracing::debug!("Dropping input crossover");
+                tracing::debug!("Dropping input crossover {}", fp.display());
                 buf.dropping_absolute(fp)
             } else {
                 buf

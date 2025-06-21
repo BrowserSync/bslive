@@ -22,7 +22,7 @@ use bsnext_dto::internal::{
     AnyEvent, ChildResult, InitialTaskError, InternalEvents, ServerError, TaskReportAndTree,
 };
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
-use bsnext_fs::{FsEvent, FsEventContext};
+use bsnext_fs::{FsEvent, FsEventContext, FsEventGrouping};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::{Input, InputCtx};
 use input_monitor::{InputMonitor, MonitorInput};
@@ -43,7 +43,7 @@ pub mod args;
 pub mod cli;
 pub mod export;
 mod ext_event_sender;
-mod handle_fs_event;
+mod handle_fs_event_grouping;
 pub mod input_fs;
 mod input_monitor;
 mod input_watchable;
@@ -101,7 +101,7 @@ impl BsSystemApi {
     }
 
     pub fn fs_event(&self, evt: FsEvent) {
-        self.sys_address.do_send(evt)
+        self.sys_address.do_send(FsEventGrouping::Singular(evt))
     }
 
     pub async fn active_servers(&self) -> Result<Vec<ActiveServer>, ServerError> {

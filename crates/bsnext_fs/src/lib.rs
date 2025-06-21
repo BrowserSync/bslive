@@ -138,7 +138,7 @@ impl<'a> From<&'a PathDescription<'_>> for PathDescriptionOwned {
 #[rtype(result = "()")]
 pub enum FsEventGrouping {
     Singular(FsEvent),
-    Buffered(BufferedChangeEvent),
+    BufferedChange(BufferedChangeEvent),
 }
 
 impl FsEventGrouping {
@@ -146,7 +146,7 @@ impl FsEventGrouping {
         events: Vec<PathDescriptionOwned>,
         fs_event_context: FsEventContext,
     ) -> Self {
-        Self::Buffered(BufferedChangeEvent {
+        Self::BufferedChange(BufferedChangeEvent {
             events,
             fs_ctx: fs_event_context,
         })
