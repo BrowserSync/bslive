@@ -133,13 +133,13 @@ impl actix::Actor for PathMonitor {
 fn path_and_filter_p(p: &str) -> (&Path, Option<FilterKind>) {
     if let Some((before, ..)) = p.split_once("*") {
         (
-            &Path::new(before),
+            Path::new(before),
             Some(FilterKind::Glob {
                 glob: p.to_string(),
             }),
         )
     } else {
-        (&Path::new(p), None)
+        (Path::new(p), None)
     }
 }
 
@@ -147,7 +147,7 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
     match fk {
         FilterKind::StringDefault(string_default) => {
             if string_default.contains("*") {
-                let pattern = Pattern::new(&string_default);
+                let pattern = Pattern::new(string_default);
                 match pattern {
                     Ok(pattern) => {
                         vec![Filter::Glob { glob: pattern }]

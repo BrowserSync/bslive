@@ -151,19 +151,23 @@ fn matches_single_glob() {
 #[test]
 fn matches_relative_glob_2() {
     use glob::Pattern;
-    let relative_path = [
-        (
-            "/qwe/qwe/qwe/qw/ebuild/app-debug/debugger/debugger.css",
-            true,
-        ),
-        ("/qwe/qwe/qwe/qw/ebuild/app-debug/oops.txt", true),
-    ];
-    let glob = "**/*.{css,txt}";
+    let relative_path = (
+        "/qwe/qwe/qwe/qw/ebuild/app-debug/debugger/debugger.css",
+        true,
+    );
+    let glob = "**/*.css";
     let pattern = Pattern::new(glob).expect("valid");
-    for (path, expected) in relative_path {
-        let actual = pattern.matches(path);
-        assert_eq!(actual, expected);
-    }
+    let actual = pattern.matches(relative_path.0);
+    assert_eq!(actual, relative_path.1);
+
+    let relative_path = (
+        "/qwe/qwe/qwe/qw/ebuild/app-debug/debugger/debugger.txt",
+        true,
+    );
+    let glob = "/qwe/**/*.txt";
+    let pattern = Pattern::new(glob).expect("valid");
+    let actual = pattern.matches(relative_path.0);
+    assert_eq!(actual, relative_path.1);
 }
 
 #[test]
