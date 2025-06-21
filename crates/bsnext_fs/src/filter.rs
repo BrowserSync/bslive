@@ -1,11 +1,11 @@
 use crate::PathDescription;
-use glob_match::glob_match;
+use glob::Pattern;
 
 #[derive(Debug, Clone)]
 pub enum Filter {
     None,
     Extension { ext: String },
-    Glob { glob: String },
+    Glob { glob: Pattern },
     Any { any: String },
 }
 
@@ -22,7 +22,7 @@ impl PathFilter for Filter {
             Filter::Glob { glob } => {
                 let target = pd.relative.unwrap_or(pd.absolute);
                 let compare = target.to_string_lossy().to_string();
-                let did_match = glob_match(glob, &compare);
+                let did_match = glob.matches(&compare);
                 tracing::trace!(
                     "testing glob `{}` against `{}`: {}",
                     glob,

@@ -11,6 +11,7 @@ use bsnext_fs::{
     Debounce, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathDescriptionOwned,
 };
 use bsnext_input::route::FilterKind;
+use glob::Pattern;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -129,19 +130,6 @@ impl actix::Actor for PathMonitor {
     }
 }
 
-fn path_and_filter(p: &str) -> (&Path, Option<FilterKind>) {
-    if let Some((b, a)) = p.split_once("*") {
-        (
-            Path::new(b),
-            Some(FilterKind::Glob {
-                glob: p.to_string(),
-            }),
-        )
-    } else {
-        (Path::new(p), None)
-    }
-}
-
 fn path_and_filter_p(p: &str) -> (&Path, Option<FilterKind>) {
     if let Some((before, ..)) = p.split_once("*") {
         (
@@ -159,9 +147,17 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
     match fk {
         FilterKind::StringDefault(string_default) => {
             if string_default.contains("*") {
-                vec![Filter::Glob {
-                    glob: string_default.to_string(),
-                }]
+                let pattern = Pattern::new(&string_default);
+                match pattern {
+                    Ok(pattern) => {
+                        vec![Filter::Glob { glob: pattern }]
+                    }
+                    Err(e) => {
+                        tracing::error!("could not use glob {:?}", string_default);
+                        tracing::debug!(?e);
+                        vec![]
+                    }
+                }
             } else {
                 vec![Filter::Any {
                     any: string_default.to_string(),
@@ -171,9 +167,17 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
         FilterKind::Extension { ext } => vec![Filter::Extension {
             ext: ext.to_string(),
         }],
-        FilterKind::Glob { glob } => vec![Filter::Glob {
-            glob: glob.to_string(),
-        }],
+        FilterKind::Glob { glob } => {
+            let pattern = Pattern::new(glob);
+            match pattern {
+                Ok(pattern) => vec![Filter::Glob { glob: pattern }],
+                Err(e) => {
+                    tracing::error!("could not use glob {:?}", glob);
+                    tracing::debug!(?e);
+                    vec![]
+                }
+            }
+        }
         FilterKind::List(items) => items.iter().flat_map(convert).collect::<Vec<_>>(),
         FilterKind::Any { any } => vec![Filter::Any {
             any: any.to_string(),

@@ -142,15 +142,15 @@ fn is_auto_excluded<P: AsRef<Path>>(cwd: &P, subject: &P) -> bool {
 
 #[test]
 fn matches_single_glob() {
-    use glob_match::glob_match;
-    let p1 = "public/css/style.css";
-    let g = "public/css/*.css";
-    let actual = glob_match(g, p1);
-    assert_eq!(actual, true);
+    let p1 = "tests/sse.spec.ts-snapshots/examples-openai-bslive-yml-server-sent-events-1-chromium-darwin.txt";
+    let g = "tests/**/*.txt";
+    let actual = glob::Pattern::new(g).unwrap();
+    let r = actual.matches(p1);
+    assert_eq!(r, true);
 }
 #[test]
 fn matches_relative_glob_2() {
-    use glob_match::glob_match;
+    use glob::Pattern;
     let relative_path = [
         (
             "/qwe/qwe/qwe/qw/ebuild/app-debug/debugger/debugger.css",
@@ -159,16 +159,16 @@ fn matches_relative_glob_2() {
         ("/qwe/qwe/qwe/qw/ebuild/app-debug/oops.txt", true),
     ];
     let glob = "**/*.{css,txt}";
+    let pattern = Pattern::new(glob).expect("valid");
     for (path, expected) in relative_path {
-        let actual = glob_match(glob, path);
+        let actual = pattern.matches(path);
         assert_eq!(actual, expected);
     }
 }
 
 #[test]
 fn matches_absolute_glob() {
-    use glob_match::glob_match;
-
+    use glob::Pattern;
     let test_cases = vec![
         (
             "/absolute/path/public/css/style.css",
@@ -218,7 +218,8 @@ fn matches_absolute_glob() {
     ];
 
     for (path, glob, expected) in test_cases {
-        let actual = glob_match(glob, path);
+        let pattern = Pattern::new(glob).expect("valid");
+        let actual = pattern.matches(path);
         assert_eq!(actual, expected);
     }
 }
