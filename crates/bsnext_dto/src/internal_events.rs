@@ -115,7 +115,7 @@ pub fn print_server_updates(evts: &[ChildResult]) -> Vec<String> {
                 }
                 for x in &child.route_change_set.added {
                     lines.push(format!(
-                        "[patched] {} {:?}",
+                        "[added] {} {:?}",
                         iden(&child.server_handler.identity),
                         x
                     ));
