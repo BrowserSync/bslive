@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, clap::Parser)]
+#[derive(Debug, Default, Clone, Copy, clap::Parser)]
 pub struct LoggingOpts {
     #[arg(short, long, value_enum)]
     pub log_level: Option<bsnext_tracing::LogLevel>,

@@ -1,9 +1,11 @@
 use crate::runtime_ctx::RuntimeCtx;
 use crate::server::router::common::{into_state, uri_to_res_parts};
+use crate::shared_args::LoggingOpts;
 use bsnext_fs_helpers::{FsWriteError, WriteMode};
 use bsnext_input::route::{Route, RouteKind};
 use bsnext_input::server_config::ServerConfig;
 use bsnext_output::OutputWriterTrait;
+use bsnext_tracing::OutputFormat;
 use futures_util::future::join_all;
 use http::response::Parts;
 use std::clone::Clone;
@@ -110,6 +112,14 @@ pub struct ExportCommand {
     /// When provided, just prints what might happen instead of actually causing side effects
     #[arg(long)]
     pub dry_run: bool,
+
+    /// logging options
+    #[clap(flatten)]
+    pub logging: LoggingOpts,
+
+    /// output options
+    #[arg(short, long, value_enum, default_value_t)]
+    pub format: OutputFormat,
 
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub trailing: Vec<String>,

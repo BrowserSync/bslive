@@ -21,6 +21,8 @@ pub async fn main() -> Result<(), anyhow::Error> {
         port: None,
         trailing: vec![as_str],
         proxies: vec![],
+        logging: Default::default(),
+        format: Default::default(),
     };
 
     let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);

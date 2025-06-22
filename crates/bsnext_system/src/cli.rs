@@ -21,32 +21,31 @@ where
     I: IntoIterator<Item = T> + std::fmt::Debug,
     T: Into<OsString> + Clone,
 {
-    std::env::set_var("RUST_LIB_BACKTRACE", "0");
+    unsafe {
+        std::env::set_var("RUST_LIB_BACKTRACE", "0");
+    }
     let args = Args::parse_from(itr);
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
 
-    let write_log_opt = if args.logging.write_log {
+    let logging = *args.logging();
+    let write_log_opt = if logging.write_log {
         WriteOption::File
     } else {
         WriteOption::None
     };
 
-    let line_opts = if args.logging.filenames {
+    let line_opts = if logging.filenames {
         LineNumberOption::FileAndLineNumber
     } else {
         LineNumberOption::None
     };
 
-    init_tracing(
-        args.logging.log_level,
-        args.format,
-        write_log_opt,
-        line_opts,
-    );
+    let format = args.format();
+    init_tracing(logging.log_level, format, write_log_opt, line_opts);
 
     tracing::debug!("{:#?}", args);
 
-    let format_clone = args.format;
+    let format_clone = format;
 
     let writer = match format_clone {
         OutputFormat::Tui => OutputWriters::Pretty,
@@ -57,12 +56,14 @@ where
     tracing::debug!("writer: {}", writer);
 
     // create a channel onto which commands can publish events
-    let command = args.command.unwrap_or_else(|| {
+    let command = args.command.unwrap_or_else(move || {
         SubCommands::Start(StartCommand {
             cors: false,
             port: args.port,
             trailing: args.trailing.clone(),
             proxies: vec![],
+            logging,
+            format,
         })
     });
 
@@ -75,6 +76,8 @@ where
                 port: None,
                 trailing: cmd.trailing.clone(),
                 proxies: vec![],
+                logging,
+                format,
             };
             let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
             let result = export_cmd(&cwd, &args.fs_opts, &args.input_opts, &cmd, &start_cmd).await;

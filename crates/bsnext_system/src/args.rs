@@ -10,10 +10,10 @@ use bsnext_tracing::OutputFormat;
 #[command(version, name = "Browsersync Live", propagate_version = true)]
 pub struct Args {
     #[clap(flatten)]
-    pub logging: LoggingOpts,
+    logging: LoggingOpts,
 
     #[arg(short, long, value_enum, default_value_t)]
-    pub format: OutputFormat,
+    format: OutputFormat,
 
     #[clap(flatten)]
     pub input_opts: InputOpts,
@@ -30,6 +30,25 @@ pub struct Args {
 
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub trailing: Vec<String>,
+}
+
+impl Args {
+    pub fn logging(&self) -> &LoggingOpts {
+        match &self.command {
+            Some(SubCommands::Watch(WatchCommand { logging, .. })) => logging,
+            Some(SubCommands::Start(StartCommand { logging, .. })) => logging,
+            Some(SubCommands::Export(ExportCommand { logging, .. })) => logging,
+            _ => &self.logging,
+        }
+    }
+    pub fn format(&self) -> OutputFormat {
+        match &self.command {
+            Some(SubCommands::Watch(WatchCommand { format, .. })) => format.to_owned(),
+            Some(SubCommands::Start(StartCommand { format, .. })) => format.to_owned(),
+            Some(SubCommands::Export(ExportCommand { format, .. })) => format.to_owned(),
+            _ => self.format,
+        }
+    }
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]

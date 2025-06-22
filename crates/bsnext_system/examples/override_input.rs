@@ -36,6 +36,7 @@ servers:
         port: None,
         trailing: vec![],
         proxies: vec![],
+        ..Default::default()
     };
 
     let (events_sender, _) = mpsc::channel::<AnyEvent>(1);
