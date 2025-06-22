@@ -99,7 +99,7 @@ impl actix::Actor for PathMonitor {
             let watcher = to_watcher(
                 &self.cwd,
                 Some(&FilterKind::List(filters)),
-                spec_opts.filter.as_ref(),
+                spec_opts.ignore.as_ref(),
                 self.fs_ctx,
                 ctx.address().recipient(),
             );
@@ -173,7 +173,6 @@ impl PathFilter for PathAndFilter<'_> {
 fn convert(fk: &FilterKind) -> Vec<Filter> {
     match fk {
         FilterKind::StringDefault(string_default) => {
-            println!("did convert");
             if string_default.contains("*") {
                 let is_abs = Path::new(&string_default).is_absolute();
                 let glob = globset::GlobBuilder::new(string_default)

@@ -87,8 +87,10 @@ export const test = base.extend<{
         const base = join(cwd, ...test_dir);
         const file = join(base, "..", "bin.js");
         const stdout: string[] = [];
+        const combined_args = [...ann.args, "-f", "json"];
 
-        let child = fork(file, ["-f", "json", ...ann.args], {
+        console.log("will exec with args: ", combined_args);
+        let child = fork(file, combined_args, {
             cwd,
             stdio: "pipe",
         });
@@ -129,6 +131,7 @@ export const test = base.extend<{
                     }
                 } catch (e) {
                     // something went REALLY wrong?
+                    console.log(e);
                     console.error("JSON not accepted", json);
                 }
             }
@@ -158,7 +161,16 @@ export const test = base.extend<{
             });
         });
         const data: TServersResp = await new Promise((resolve, reject) => {
+            let max = 1000;
+            let elapsed = 0;
             let int = setInterval(() => {
+                elapsed += 100;
+                if (elapsed >= max) {
+                    console.log(parsedMessages);
+                    console.log(failedMessages);
+                    reject(new Error("1000 timeout expired"));
+                    return clearInterval(int);
+                }
                 for (let line of parsedMessages) {
                     if (line.kind === "ServersChanged") {
                         resolve(line.payload as TServersResp);

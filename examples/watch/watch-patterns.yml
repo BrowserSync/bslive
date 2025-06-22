@@ -1,0 +1,8 @@
+servers:
+  - name: 'watch-patterns'
+    watchers:
+      - dirs: 'examples/watch/src/*.{css,txt}'
+        debounce:
+          ms: 0
+        run:
+          - sh: echo 'something inside examples/watch/src/ changed'

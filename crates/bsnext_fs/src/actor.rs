@@ -90,8 +90,8 @@ impl FsWatcher {
                         }
                     };
 
-                    tracing::trace!("any_matches: {}: {any_match}", filters.len());
-                    tracing::trace!("ignored: {}: {ignored}", ignore.len());
+                    tracing::trace!("any_matches: count: {}: {any_match}", filters.len());
+                    tracing::trace!("ignored: count: {}: {ignored}", ignore.len());
 
                     if any_match && !ignored {
                         let as_fs_event = FsEvent {
