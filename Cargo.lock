@@ -457,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "bslive"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "actix-rt",
  "bsnext_system",
@@ -470,7 +470,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "actix-rt",
  "anyhow",
@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_client"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "bsnext_dto",
  "serde_json",
@@ -487,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_core"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "actix",
  "actix-rt",
@@ -528,7 +528,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_dto"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "actix",
  "anyhow",
@@ -546,7 +546,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_example"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "bsnext_html",
  "bsnext_input",
@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_fs"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "actix",
  "actix-rt",
@@ -577,7 +577,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_fs_helpers"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "thiserror",
  "tracing",
@@ -585,7 +585,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_guards"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "axum",
  "http",
@@ -596,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_html"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "bsnext_input",
@@ -609,7 +609,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_input"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "bsnext_fs_helpers",
@@ -630,14 +630,14 @@ dependencies = [
 
 [[package]]
 name = "bsnext_js"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "bsnext_input",
 ]
 
 [[package]]
 name = "bsnext_md"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "bsnext_input",
@@ -653,7 +653,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_output"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "tracing",
@@ -661,7 +661,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_resp"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -678,7 +678,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_system"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "actix",
  "actix-rt",
@@ -711,11 +711,11 @@ dependencies = [
 
 [[package]]
 name = "bsnext_task"
-version = "0.17.0"
+version = "0.18.0"
 
 [[package]]
 name = "bsnext_tracing"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "clap",
  "serde",
@@ -724,7 +724,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_utils"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "bsnext_yaml"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "bsnext_input",
  "miette",
