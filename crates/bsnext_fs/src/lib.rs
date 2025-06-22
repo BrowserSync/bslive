@@ -119,6 +119,43 @@ pub struct PathDescription<'a> {
     pub relative: Option<&'a Path>,
 }
 
+pub struct Abs<'a>(pub &'a str);
+pub struct Cwd<'a>(pub &'a str);
+
+impl<'a> PathDescription<'a> {
+    pub fn new_abs(abs: &'a str) -> Self {
+        Self {
+            relative: None,
+            absolute: Path::new(abs),
+        }
+    }
+    pub fn new_rel(abs: &'a str, rel: &'a str) -> Self {
+        Self {
+            relative: Some(Path::new(rel)),
+            absolute: Path::new(abs),
+        }
+    }
+    pub fn from_cwd(abs: &'a Abs, cwd: &'a Cwd) -> Self {
+        let abs = Path::new(abs.0);
+        match abs.strip_prefix(Path::new(cwd.0)) {
+            Ok(stripped) => Self {
+                absolute: abs,
+                relative: Some(stripped),
+            },
+            Err(e) => {
+                tracing::debug!(
+                    "could not strip prefix when using PathDescription.from_cwd {:?}",
+                    e
+                );
+                Self {
+                    absolute: abs,
+                    relative: None,
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub struct PathDescriptionOwned {
     pub absolute: PathBuf,

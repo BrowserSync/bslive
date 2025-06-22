@@ -1,16 +1,21 @@
 use crate::PathDescription;
-use glob::Pattern;
+use glob::{MatchOptions, Pattern};
 
 #[derive(Debug, Clone)]
 pub enum Filter {
     None,
     Extension { ext: String },
-    Glob { glob: Pattern },
+    Glob { glob: Pattern, scope: FilterScope },
     Any { any: String },
+}
+#[derive(Debug, Clone)]
+pub enum FilterScope {
+    Abs,
+    Rel,
 }
 
 impl PathFilter for Filter {
-    fn filter(&self, pd: &PathDescription) -> bool {
+    fn any(&self, pd: &PathDescription) -> bool {
         match self {
             Filter::None => false,
             Filter::Extension { ext } => {
@@ -19,11 +24,19 @@ impl PathFilter for Filter {
                     .extension()
                     .is_some_and(|x| x.to_string_lossy() == *ext)
             }
-            Filter::Glob { glob } => {
-                let target = pd.relative.unwrap_or(pd.absolute);
+            Filter::Glob { glob, scope } => {
+                let target = match (scope, pd.relative) {
+                    (FilterScope::Rel, Some(rel)) => rel,
+                    _ => pd.absolute,
+                };
                 let compare = target.to_string_lossy().to_string();
-                let did_match = glob.matches(&compare);
-                tracing::trace!(
+                let opts = MatchOptions {
+                    case_sensitive: false,
+                    require_literal_separator: true,
+                    require_literal_leading_dot: true,
+                };
+                let did_match = glob.matches_with(&compare, opts);
+                println!(
                     "testing glob `{}` against `{}`: {}",
                     glob,
                     compare.as_str(),
@@ -45,5 +58,5 @@ impl PathFilter for Filter {
 }
 
 pub trait PathFilter {
-    fn filter(&self, pd: &PathDescription) -> bool;
+    fn any(&self, pd: &PathDescription) -> bool;
 }

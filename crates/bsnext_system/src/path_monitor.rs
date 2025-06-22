@@ -3,12 +3,13 @@ use actix::{ActorContext, Addr, AsyncContext, Context, Handler, Recipient, Strea
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
 use bsnext_fs::buffered_debounce::BufferedStreamOpsExt;
-use bsnext_fs::filter::Filter;
+use bsnext_fs::filter::{Filter, FilterScope, PathFilter};
 use bsnext_fs::stop_handler::StopWatcher;
 use bsnext_fs::stream::StreamOpsExt;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
-    Debounce, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathDescriptionOwned,
+    Debounce, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathDescription,
+    PathDescriptionOwned,
 };
 use bsnext_input::route::FilterKind;
 use glob::Pattern;
@@ -84,10 +85,10 @@ impl actix::Actor for PathMonitor {
     fn started(&mut self, ctx: &mut Self::Context) {
         for single_path in &self.path_watchable.watch_paths() {
             let as_str = single_path.to_string_lossy();
-            let (path, filter) = path_and_filter_p(&as_str);
+            let PathAndFilter { path, filter_kind } = PathAndFilter::new(&as_str);
 
             // create a filter list, first using the optional filter given above
-            let mut filters = filter.into_iter().collect::<Vec<_>>();
+            let mut filters = filter_kind.into_iter().collect::<Vec<_>>();
 
             // additional filter from options?
             let spec_opts = self.path_watchable.spec_opts();
@@ -130,28 +131,62 @@ impl actix::Actor for PathMonitor {
     }
 }
 
-fn path_and_filter_p(p: &str) -> (&Path, Option<FilterKind>) {
-    if let Some((before, ..)) = p.split_once("*") {
-        (
-            Path::new(before),
-            Some(FilterKind::Glob {
-                glob: p.to_string(),
-            }),
-        )
-    } else {
-        (Path::new(p), None)
+struct PathAndFilter<'a> {
+    path: &'a Path,
+    filter_kind: Option<FilterKind>,
+}
+
+impl<'a> PathAndFilter<'a> {
+    pub fn new(p: &'a str) -> Self {
+        if let Some((before, ..)) = p.split_once("*") {
+            PathAndFilter {
+                path: Path::new(before),
+                filter_kind: Some(FilterKind::Glob {
+                    glob: p.to_string(),
+                }),
+            }
+        } else {
+            PathAndFilter {
+                path: Path::new(p),
+                filter_kind: None,
+            }
+        }
+    }
+}
+
+impl PathFilter for PathAndFilter<'_> {
+    fn any(&self, pd: &PathDescription) -> bool {
+        match &self.filter_kind {
+            None => {
+                if self.path == pd.absolute {
+                    return true;
+                }
+                pd.relative.map(|rel| rel == self.path).unwrap_or(false)
+            }
+            Some(filter) => {
+                let filters = convert(filter);
+                filters.iter().any(|x| x.any(pd))
+            }
+        }
     }
 }
 
 fn convert(fk: &FilterKind) -> Vec<Filter> {
     match fk {
         FilterKind::StringDefault(string_default) => {
+            println!("did convert");
             if string_default.contains("*") {
+                let is_abs = Path::new(&string_default).is_absolute();
                 let pattern = Pattern::new(string_default);
                 match pattern {
-                    Ok(pattern) => {
-                        vec![Filter::Glob { glob: pattern }]
-                    }
+                    Ok(pattern) if is_abs => vec![Filter::Glob {
+                        glob: pattern,
+                        scope: FilterScope::Abs,
+                    }],
+                    Ok(pattern) => vec![Filter::Glob {
+                        glob: pattern,
+                        scope: FilterScope::Rel,
+                    }],
                     Err(e) => {
                         tracing::error!("could not use glob {:?}", string_default);
                         tracing::debug!(?e);
@@ -168,9 +203,17 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
             ext: ext.to_string(),
         }],
         FilterKind::Glob { glob } => {
+            let is_abs = Path::new(&glob).is_absolute();
             let pattern = Pattern::new(glob);
             match pattern {
-                Ok(pattern) => vec![Filter::Glob { glob: pattern }],
+                Ok(pattern) if is_abs => vec![Filter::Glob {
+                    glob: pattern,
+                    scope: FilterScope::Abs,
+                }],
+                Ok(pattern) => vec![Filter::Glob {
+                    glob: pattern,
+                    scope: FilterScope::Rel,
+                }],
                 Err(e) => {
                     tracing::error!("could not use glob {:?}", glob);
                     tracing::debug!(?e);
@@ -182,6 +225,42 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
         FilterKind::Any { any } => vec![Filter::Any {
             any: any.to_string(),
         }],
+    }
+}
+
+#[test]
+fn test_e2e_filtering() {
+    use bsnext_fs::{Abs, Cwd};
+    let abs = Abs("/user/shakyshane/abc/style.css");
+    let cwd = Cwd("/user/shakyshane");
+    let dirs = [
+        (&abs, &cwd, "abc/*.css", true),
+        (&abs, &cwd, "**/*.css", true),
+        (&abs, &cwd, "def/*.css", false),
+        (&abs, &cwd, "abc/style.css", true),
+        (&abs, &cwd, "/user/shakyshane/abc/style.css", true),
+        (&abs, &cwd, "/user/shakyshane/abc/*.css", true),
+        (&abs, &cwd, "/user/shakyshane/**/*.css", true),
+        (&abs, &cwd, "/user/shakyshane/*.css", false),
+        (&abs, &cwd, "**/abc/*.css", true),
+        (&abs, &cwd, "**/def/*.css", false),
+        (&abs, &cwd, "abc/**/*.css", true),
+        (&abs, &cwd, "def/**/*.css", false),
+        (&abs, &cwd, "*.css", false),
+        (&abs, &cwd, "style.css", false),
+        (&abs, &cwd, "abc/s*.css", true),
+        (&abs, &cwd, "abc/style.*", true),
+        (&abs, &cwd, "*/style.css", true),
+    ];
+    for (abs, cwd, dir, expected) in dirs {
+        let change = PathDescription::from_cwd(abs, cwd);
+        let v = PathAndFilter::new(dir);
+        let actual = v.any(&change);
+        assert_eq!(
+            actual, expected,
+            "dir was: {}, result should be {}",
+            dir, expected
+        );
     }
 }
 

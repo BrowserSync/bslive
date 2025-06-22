@@ -77,23 +77,23 @@ impl FsWatcher {
                         absolute: &raw_event.absolute_path,
                         relative,
                     };
-                    let filtered = if filters.is_empty() {
+                    let any_match = if filters.is_empty() {
                         true
                     } else {
-                        filters.iter().any(|filter| filter.filter(&pd))
+                        filters.iter().any(|filter| filter.any(&pd))
                     };
                     let ignored = {
                         if ignore.is_empty() {
                             false
                         } else {
-                            ignore.iter().any(|filter| filter.filter(&pd))
+                            ignore.iter().any(|filter| filter.any(&pd))
                         }
                     };
 
-                    tracing::trace!("filtered: {}: {filtered}", filters.len());
+                    tracing::trace!("any_matches: {}: {any_match}", filters.len());
                     tracing::trace!("ignored: {}: {ignored}", ignore.len());
 
-                    if filtered && !ignored {
+                    if any_match && !ignored {
                         let as_fs_event = FsEvent {
                             kind: FsEventKind::Change(PathDescriptionOwned::from(&pd)),
                             fs_event_ctx: ctx,
@@ -101,7 +101,7 @@ impl FsWatcher {
                         receiver.do_send(as_fs_event);
                     } else {
                         tracing::trace!(
-                            "not forwarding this event. filtered: {filtered}, ignored: {ignored}"
+                            "not forwarding this event. filtered: {any_match}, ignored: {ignored}"
                         );
                     }
                 }
