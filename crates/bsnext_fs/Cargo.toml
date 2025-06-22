@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 notify = "6.1.1"
 pin-project-lite = "0.2.14"
-glob = { workspace = true }
+globset = { workspace = true }
 
 actix = { workspace = true }
 actix-rt = { workspace = true }

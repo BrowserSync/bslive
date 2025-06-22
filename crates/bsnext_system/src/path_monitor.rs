@@ -12,7 +12,6 @@ use bsnext_fs::{
     PathDescriptionOwned,
 };
 use bsnext_input::route::FilterKind;
-use glob::Pattern;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -177,14 +176,20 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
             println!("did convert");
             if string_default.contains("*") {
                 let is_abs = Path::new(&string_default).is_absolute();
-                let pattern = Pattern::new(string_default);
-                match pattern {
+                let glob = globset::GlobBuilder::new(string_default)
+                    .literal_separator(true)
+                    .case_insensitive(true)
+                    .build()
+                    .map(|x| x.compile_matcher());
+                match glob {
                     Ok(pattern) if is_abs => vec![Filter::Glob {
                         glob: pattern,
+                        raw: string_default.to_string(),
                         scope: FilterScope::Abs,
                     }],
                     Ok(pattern) => vec![Filter::Glob {
                         glob: pattern,
+                        raw: string_default.to_string(),
                         scope: FilterScope::Rel,
                     }],
                     Err(e) => {
@@ -204,18 +209,24 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
         }],
         FilterKind::Glob { glob } => {
             let is_abs = Path::new(&glob).is_absolute();
-            let pattern = Pattern::new(glob);
-            match pattern {
+            let matcher = globset::GlobBuilder::new(glob)
+                .literal_separator(true)
+                .case_insensitive(true)
+                .build()
+                .map(|x| x.compile_matcher());
+            match matcher {
                 Ok(pattern) if is_abs => vec![Filter::Glob {
                     glob: pattern,
+                    raw: glob.to_string(),
                     scope: FilterScope::Abs,
                 }],
                 Ok(pattern) => vec![Filter::Glob {
                     glob: pattern,
+                    raw: glob.to_string(),
                     scope: FilterScope::Rel,
                 }],
                 Err(e) => {
-                    tracing::error!("could not use glob {:?}", glob);
+                    tracing::error!("could not use glob '{:?}'", glob);
                     tracing::debug!(?e);
                     vec![]
                 }
@@ -240,6 +251,8 @@ fn test_e2e_filtering() {
         (&abs, &cwd, "abc/style.css", true),
         (&abs, &cwd, "/user/shakyshane/abc/style.css", true),
         (&abs, &cwd, "/user/shakyshane/abc/*.css", true),
+        (&abs, &cwd, "/user/shakyshane/abc/*.{css,txt}", true),
+        (&abs, &cwd, "/user/shakyshane/abc/*.{txt}", false),
         (&abs, &cwd, "/user/shakyshane/**/*.css", true),
         (&abs, &cwd, "/user/shakyshane/*.css", false),
         (&abs, &cwd, "**/abc/*.css", true),

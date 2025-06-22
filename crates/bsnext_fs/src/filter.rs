@@ -1,12 +1,19 @@
 use crate::PathDescription;
-use glob::{MatchOptions, Pattern};
 
 #[derive(Debug, Clone)]
 pub enum Filter {
     None,
-    Extension { ext: String },
-    Glob { glob: Pattern, scope: FilterScope },
-    Any { any: String },
+    Extension {
+        ext: String,
+    },
+    Glob {
+        glob: globset::GlobMatcher,
+        raw: String,
+        scope: FilterScope,
+    },
+    Any {
+        any: String,
+    },
 }
 #[derive(Debug, Clone)]
 pub enum FilterScope {
@@ -24,21 +31,17 @@ impl PathFilter for Filter {
                     .extension()
                     .is_some_and(|x| x.to_string_lossy() == *ext)
             }
-            Filter::Glob { glob, scope } => {
+            Filter::Glob { glob, scope, raw } => {
                 let target = match (scope, pd.relative) {
                     (FilterScope::Rel, Some(rel)) => rel,
                     _ => pd.absolute,
                 };
                 let compare = target.to_string_lossy().to_string();
-                let opts = MatchOptions {
-                    case_sensitive: false,
-                    require_literal_separator: true,
-                    require_literal_leading_dot: true,
-                };
-                let did_match = glob.matches_with(&compare, opts);
-                println!(
+
+                let did_match = glob.is_match(&compare);
+                tracing::debug!(
                     "testing glob `{}` against `{}`: {}",
-                    glob,
+                    raw,
                     compare.as_str(),
                     did_match
                 );
