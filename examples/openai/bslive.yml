@@ -7,9 +7,13 @@ servers:
         proxy: https://api.openai.com
       - path: /openai/v1/chat/completions
         cors: true
-        sse: |
-          data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}]}
-          
-          data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"content":"Thsis"},"logprobs":null,"finish_reason":null}]}
-          
-          data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"content":" is"},"logprobs":null,"finish_reason":null}]}          
+        sse:
+          body: |
+            data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}]}
+            
+            data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"content":"Thsis"},"logprobs":null,"finish_reason":null}]}
+            
+            data: {"id":"chatcmpl-98DH53xoEHQ7RhaBF9Djt0GoczbM2","object":"chat.completion.chunk","created":1711744679,"model":"gpt-3.5-turbo-0125","system_fingerprint":"fp_3bc1b5746c","choices":[{"index":0,"delta":{"content":" is"},"logprobs":null,"finish_reason":null}]}
+            
+            data: [DONE] 
+            

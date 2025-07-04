@@ -80,6 +80,10 @@ export const inputAcceptedDTOSchema = z.object({
     path: z.string(),
 });
 
+export const sseDTOOptsSchema = z.object({
+    body: z.string(),
+});
+
 export const routeKindDTOSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("Html"),
@@ -102,7 +106,7 @@ export const routeKindDTOSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("Sse"),
         payload: z.object({
-            sse: z.string(),
+            sse: sseDTOOptsSchema,
         }),
     }),
     z.object({
@@ -119,11 +123,6 @@ export const routeKindDTOSchema = z.discriminatedUnion("kind", [
         }),
     }),
 ]);
-
-export const routeDTOSchema = z.object({
-    path: z.string(),
-    kind: routeKindDTOSchema,
-});
 
 export const serverChangeSchema = z.discriminatedUnion("kind", [
     z.object({
@@ -157,9 +156,9 @@ export const serverChangeSetSchema = z.object({
     items: z.array(serverChangeSetItemSchema),
 });
 
-export const serverDescSchema = z.object({
-    routes: z.array(routeDTOSchema),
-    id: z.string(),
+export const routeDTOSchema = z.object({
+    path: z.string(),
+    kind: routeKindDTOSchema,
 });
 
 export const serversChangedDTOSchema = z.object({
@@ -317,6 +316,11 @@ export const startupEventDTOSchema = z.discriminatedUnion("kind", [
         payload: z.string(),
     }),
 ]);
+
+export const serverDescSchema = z.object({
+    routes: z.array(routeDTOSchema),
+    id: z.string(),
+});
 
 export const externalEventsDTOSchema = z.discriminatedUnion("kind", [
     z.object({

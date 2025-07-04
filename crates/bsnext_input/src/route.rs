@@ -136,7 +136,12 @@ impl RouteKind {
         RouteKind::Raw(RawRoute::Json { json })
     }
     pub fn new_sse(raw: impl Into<String>) -> Self {
-        RouteKind::Raw(RawRoute::Sse { sse: raw.into() })
+        RouteKind::Raw(RawRoute::Sse {
+            sse: SseOpts {
+                body: raw.into(),
+                throttle_ms: None,
+            },
+        })
     }
 }
 
@@ -185,7 +190,13 @@ pub enum RawRoute {
     Html { html: String },
     Json { json: JsonWrapper },
     Raw { raw: String },
-    Sse { sse: String },
+    Sse { sse: SseOpts },
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+pub struct SseOpts {
+    pub body: String,
+    pub throttle_ms: Option<u64>,
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]

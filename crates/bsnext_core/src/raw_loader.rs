@@ -8,7 +8,7 @@ use http::header::CONTENT_TYPE;
 
 use axum::body::Body;
 use axum::response::sse::Event;
-use bsnext_input::route::RawRoute;
+use bsnext_input::route::{RawRoute, SseOpts};
 use bytes::Bytes;
 use http::{StatusCode, Uri};
 use http_body_util::BodyExt;
@@ -28,18 +28,21 @@ async fn raw_resp_for(uri: Uri, route: &RawRoute) -> impl IntoResponse {
         }
         RawRoute::Json { json } => Json(&json.0).into_response(),
         RawRoute::Raw { raw } => text_asset_response(uri.path(), raw).into_response(),
-        RawRoute::Sse { sse } => {
-            let l = sse
+        RawRoute::Sse {
+            sse: SseOpts { body, throttle_ms },
+        } => {
+            let l = body
                 .lines()
                 .map(|l| l.to_owned())
-                .map(|l| l.strip_prefix("data:").unwrap_or(&l).to_owned())
-                .filter(|l| !l.trim().is_empty())
+                .map(|l| l.strip_prefix("data:").unwrap_or(&l).trim().to_owned())
+                .filter(|l| !l.is_empty())
                 .collect::<Vec<_>>();
 
             tracing::trace!(lines.count = l.len(), "sending EventStream");
 
+            let milli = throttle_ms.unwrap_or(10);
             let stream = tokio_stream::iter(l)
-                .throttle(Duration::from_millis(10))
+                .throttle(Duration::from_millis(milli))
                 .map(|chu| Event::default().data(chu))
                 .map(Ok::<_, Infallible>);
 
@@ -69,10 +72,11 @@ mod raw_test {
             - path: /json
               json: [1]
             - path: /sse
-              sse: |
-                a
-                b
-                c"#;
+              sse:
+                body: |
+                  a
+                  b
+                  c"#;
 
         {
             let routes: Vec<Route> = serde_yaml::from_str(routes_input)?;

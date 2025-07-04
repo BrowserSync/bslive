@@ -13,6 +13,7 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
 use tower::ServiceExt;
 use tower_http::decompression::DecompressionLayer;
+use tracing::{trace_span, Instrument};
 
 #[derive(Debug, Clone)]
 pub struct ProxyConfig {
@@ -47,11 +48,12 @@ pub async fn proxy_handler(
     req: Request,
 ) -> Result<Response, AnyAppError> {
     let target = config.target.clone();
-
-    tracing::trace!(?config);
     let path = req.uri().path();
 
-    tracing::trace!(req.uri = %path, config.path = config.path);
+    let span = trace_span!("proxy_handler");
+    let _g = span.enter();
+
+    tracing::trace!(?config);
 
     let path_query = req
         .uri()
@@ -79,6 +81,7 @@ pub async fn proxy_handler(
 
     // todo(alpha): Which other headers to mod here?
     req.headers_mut().insert("host", host_header_value);
+    req.headers_mut().remove("referer");
 
     // decompress requests if needed
     if let Some(h) = req.extensions().get::<InjectHandling>() {
@@ -89,16 +92,24 @@ pub async fn proxy_handler(
                 .headers()
                 .get("accept")
                 .map(|h| h.to_str().unwrap_or("")),
-            "will accept request + decompress"
+            "will accept request + decompress?"
         );
         if req_accepted {
             let sv2 = any(serve_one_proxy_req.layer(DecompressionLayer::new()));
-            return Ok(sv2.oneshot(req).await.into_response());
+            return Ok(sv2
+                .oneshot(req)
+                .instrument(span.clone())
+                .await
+                .into_response());
         }
     }
 
     let sv2 = any(serve_one_proxy_req);
-    Ok(sv2.oneshot(req).await.into_response())
+    Ok(sv2
+        .oneshot(req)
+        .instrument(span.clone())
+        .await
+        .into_response())
 }
 
 async fn serve_one_proxy_req(req: Request) -> Response {
@@ -108,10 +119,13 @@ async fn serve_one_proxy_req(req: Request) -> Response {
             .get::<Client<HttpsConnector<HttpConnector>, Body>>()
             .expect("must have a client, move this to an extractor?")
     };
+    tracing::trace!(req.headers = ?req.headers());
     let client_c = client.clone();
-    client_c
+    let resp = client_c
         .request(req)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)
-        .into_response()
+        .into_response();
+    tracing::trace!(resp.headers = ?resp.headers());
+    resp
 }
