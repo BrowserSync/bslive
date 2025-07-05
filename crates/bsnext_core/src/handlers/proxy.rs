@@ -61,7 +61,7 @@ pub async fn proxy_handler(
         .map(|v| v.as_str())
         .unwrap_or(path);
 
-    let uri = format!("{}{}", target, path_query);
+    let uri = format!("{target}{path_query}");
     let parsed = Uri::try_from(uri).context("tried to parse")?;
 
     let target = match (parsed.host(), parsed.port()) {

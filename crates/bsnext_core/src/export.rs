@@ -38,14 +38,14 @@ impl OutputWriterTrait for ExportError {
             "kind": named,
             "error": error_string
         });
-        writeln!(_sink, "{}", v)?;
+        writeln!(_sink, "{v}")?;
         Ok(())
     }
 
     fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
         match self {
             ExportError::Fs(fs_write_error) => {
-                writeln!(sink, "[export]: Error! {}", fs_write_error)?;
+                writeln!(sink, "[export]: Error! {fs_write_error}")?;
             }
         }
         Ok(())
@@ -55,7 +55,7 @@ impl OutputWriterTrait for ExportError {
 impl OutputWriterTrait for ExportEvent {
     fn write_json<W: Write>(&self, _sink: &mut W) -> anyhow::Result<()> {
         let str = serde_json::to_string(&self)?;
-        writeln!(_sink, "{}", str)?;
+        writeln!(_sink, "{str}")?;
         Ok(())
     }
 

@@ -8,7 +8,7 @@ pub const WS_PATH: &str = "/__bs_ws";
 
 pub fn html_with_base(base_override: &str) -> String {
     let base = UI_HTML;
-    let next = format!("<base href=\"{}\" />", base_override);
+    let next = format!("<base href=\"{base_override}\" />");
     let replaced = base.replace("<base href=\"/\" />", next.as_str());
     replaced
 }

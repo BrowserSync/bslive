@@ -1,10 +1,10 @@
-use std::convert::Infallible;
-
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response, Sse};
 use axum::Json;
 use http::header::CONTENT_TYPE;
+use std::convert::Infallible;
+use std::fs;
 
 use axum::body::Body;
 use axum::response::sse::Event;
@@ -31,17 +31,45 @@ async fn raw_resp_for(uri: Uri, route: &RawRoute) -> impl IntoResponse {
         RawRoute::Sse {
             sse: SseOpts { body, throttle_ms },
         } => {
-            let l = body
+            let file_prefix = body.split_once("file:");
+            let body = match file_prefix {
+                None => body.to_owned(),
+                Some((_, path)) => {
+                    let span = tracing::debug_span!("reading SSE body content", path = path);
+                    let _g = span.enter();
+                    tracing::debug!(?path, "will read sse file content");
+                    match fs::read_to_string(path) {
+                        Ok(str) => {
+                            tracing::debug!("did read {} bytes", str.len());
+                            str
+                        }
+                        Err(err) => {
+                            tracing::error!(?err, ?path);
+                            return (
+                                StatusCode::NOT_FOUND,
+                                format!("{path} was not found. err {err}"),
+                            )
+                                .into_response();
+                        }
+                    }
+                }
+            };
+            let iter = body
                 .lines()
-                .map(|l| l.to_owned())
-                .map(|l| l.strip_prefix("data:").unwrap_or(&l).trim().to_owned())
+                .map(|l| {
+                    l.trim()
+                        .strip_prefix("data:")
+                        .unwrap_or(l)
+                        .trim()
+                        .to_owned()
+                })
                 .filter(|l| !l.is_empty())
                 .collect::<Vec<_>>();
 
-            tracing::trace!(lines.count = l.len(), "sending EventStream");
+            tracing::trace!(lines.count = iter.len(), "sending EventStream");
 
             let milli = throttle_ms.unwrap_or(10);
-            let stream = tokio_stream::iter(l)
+            let stream = tokio_stream::iter(iter)
                 .throttle(Duration::from_millis(milli))
                 .map(|chu| Event::default().data(chu))
                 .map(Ok::<_, Infallible>);
