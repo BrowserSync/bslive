@@ -1,23 +1,15 @@
 servers:
-  - port: 3000
-    clients:
-      log: trace
-      watchers:
-        - dir: crates
-          run:
-            - sh: cargo build
+  - port: 3001
     routes:
-      - path: /
+      - path: /shane
+        raw: "here2"
+        when:
+          query:
+            - has: 'abc'
+      - path: /shane
+        raw: "here"
+        when:
+          query:
+            - has: 'def'
+      - path: /shane
         dir: examples/basic/public
-        watch:
-          debounce:
-            ms: 300
-          run:
-            - all:
-                - sh: echo 2
-                - sh: exit 0
-                - sh: sleep 1 && echo '->hehe'
-                  name: '[another attempt--->]'
-                - seq:
-                    - sleep 1
-                    - echo 'after?'

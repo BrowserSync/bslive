@@ -44,6 +44,7 @@ impl Playground {
                 kind: RouteKind::new_html(FALLBACK_HTML),
                 opts: Default::default(),
             }),
+            when: Default::default(),
         };
         let js_route = Route {
             path: js,

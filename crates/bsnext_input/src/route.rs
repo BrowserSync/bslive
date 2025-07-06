@@ -1,6 +1,7 @@
 use crate::path_def::PathDef;
 use crate::route_cli::RouteCli;
 use crate::watch_opts::WatchOpts;
+use crate::when_guard::WhenGuard;
 use bsnext_resp::cache_opts::CacheOpts;
 use bsnext_resp::inject_opts::InjectOpts;
 use matchit::InsertError;
@@ -20,6 +21,7 @@ pub struct Route {
     #[serde(flatten)]
     pub opts: Opts,
     pub fallback: Option<FallbackRoute>,
+    pub when: Option<WhenGuard>,
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
@@ -65,6 +67,7 @@ impl Default for Route {
                 ..Default::default()
             },
             fallback: Default::default(),
+            when: Default::default(),
         }
     }
 }

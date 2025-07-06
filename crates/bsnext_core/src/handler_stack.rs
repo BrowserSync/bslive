@@ -4,14 +4,27 @@ use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
 use crate::runtime_ctx::RuntimeCtx;
 use crate::serve_dir::try_many_services_dir;
+use axum::body::Body;
+use axum::extract::{Request, State};
 use axum::handler::Handler;
-use axum::middleware::{from_fn, from_fn_with_state};
+use axum::middleware::{from_fn, from_fn_with_state, Next};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{any, any_service, get_service, MethodRouter};
-use axum::{Extension, Router};
+use axum::{middleware, Extension, Router};
+use bsnext_guards::route_guard::RouteGuard;
 use bsnext_input::route::{DirRoute, FallbackRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
+use bsnext_input::when_guard::{HasGuard, WhenGuard};
+use http::request::Parts;
+use http::{Method, StatusCode, Uri};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use tower::ServiceExt;
 use tower_http::services::{ServeDir, ServeFile};
+
+#[derive(Debug, PartialEq)]
+pub struct HandlerStackAlt {
+    pub routes: Vec<Route>,
+}
 
 #[derive(Debug, PartialEq)]
 pub enum HandlerStack {
@@ -134,11 +147,34 @@ impl RouteMap {
                 route_list.len()
             );
 
-            let stack = routes_to_stack(route_list);
-            let path_router = stack_to_router(&path, stack, ctx);
+            // let stack = routes_to_stack(route_list);
+            // let path_router = stack_to_router(&path, stack, ctx);
+            let stack = routes_to_alt_stack(path.as_str(), route_list, ctx.clone());
+            tracing::trace!("will merge router at path: `{path}`");
 
             tracing::trace!("will merge router at path: `{path}`");
-            router = router.merge(path_router);
+            router = router.merge(stack);
+        }
+
+        router
+    }
+
+    pub fn into_alt_router(self, ctx: &RuntimeCtx) -> Router {
+        let mut router = Router::new();
+
+        tracing::trace!("processing `{}` different routes", self.mapping.len());
+
+        for (path, route_list) in self.mapping {
+            tracing::trace!(
+                "processing path: `{}` with `{}` routes",
+                path,
+                route_list.len()
+            );
+
+            let stack = routes_to_alt_stack(path.as_str(), route_list, ctx.clone());
+            tracing::trace!("will merge router at path: `{path}`");
+
+            router = router.merge(stack);
         }
 
         router
@@ -233,6 +269,125 @@ pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
 
 pub fn routes_to_stack(routes: Vec<Route>) -> HandlerStack {
     routes.into_iter().fold(HandlerStack::None, append_stack)
+}
+
+pub fn routes_to_alt_stack(path: &str, routes: Vec<Route>, ctx: RuntimeCtx) -> Router {
+    let r = Router::new().layer(from_fn_with_state((path.to_string(), routes, ctx), try_one));
+    Router::new().nest_service(path, r)
+}
+
+pub async fn try_one(
+    State((path, routes, ctx)): State<(String, Vec<Route>, RuntimeCtx)>,
+    uri: Uri,
+    req: Request,
+    next: Next,
+) -> impl IntoResponse {
+    println!("before uri={uri}, path={path}");
+
+    let (original_parts, original_body) = req.into_parts();
+
+    for (index, route) in routes.into_iter().enumerate() {
+        let accept = route.when.as_ref().unwrap_or(&WhenGuard::Always);
+
+        let will_serve = match accept {
+            WhenGuard::Always => true,
+            WhenGuard::Never => false,
+            WhenGuard::Query { query } => query
+                .iter()
+                .map(QueryHasGuard)
+                .any(|x| x.accept_req_parts(&original_parts)),
+        };
+
+        if !will_serve {
+            continue;
+        }
+
+        let m_r = match route.kind {
+            RouteKind::Raw(raw) => any_service(serve_raw_one.with_state(raw.clone())),
+            RouteKind::Proxy(_) => todo!("RouteKind::Proxy"),
+            RouteKind::Dir(dir_route) => {
+                let svc = match &dir_route.base {
+                    Some(base_dir) => {
+                        tracing::trace!(
+                            "combining root: `{}` with given path: `{}`",
+                            base_dir.display(),
+                            dir_route.dir
+                        );
+                        ServeDir::new(base_dir.join(&dir_route.dir))
+                    }
+                    None => {
+                        let pb = PathBuf::from(&dir_route.dir);
+                        if pb.is_absolute() {
+                            tracing::trace!("no root given, using `{}` directly", dir_route.dir);
+                            ServeDir::new(&dir_route.dir)
+                        } else {
+                            let joined = ctx.cwd().join(pb);
+                            tracing::trace!(
+                                "prepending the current directory to relative path {} {}",
+                                ctx.cwd().display(),
+                                joined.display()
+                            );
+                            ServeDir::new(joined)
+                        }
+                    }
+                }
+                .append_index_html_on_directories(true);
+                get_service(svc)
+            }
+        };
+
+        let raw_out = optional_layers(m_r, &route.opts);
+        let req_clone = Request::from_parts(original_parts.clone(), Body::empty());
+        let result = raw_out.oneshot(req_clone).await;
+
+        match result {
+            Ok(result) if result.status() == 404 => {
+                tracing::trace!("  ❌ not found at index {}, trying another", index);
+                continue;
+            }
+            Ok(result) if result.status() == 405 => {
+                tracing::trace!("  ❌ 405, trying another...");
+                continue;
+            }
+            Ok(result) => {
+                println!("got a result {index}");
+                tracing::trace!(
+                    ?index,
+                    " - ✅ a non-404 response was given {}",
+                    result.status()
+                );
+                return result.into_response();
+            }
+            Err(e) => {
+                tracing::error!(?e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        }
+    }
+
+    let r = Request::from_parts(original_parts.clone(), original_body);
+    let res = next.run(r).await;
+    println!("after");
+    res
+}
+
+pub async fn serve_one(uri: Uri, req: Request) -> Response {
+    (StatusCode::NOT_FOUND, format!("No route for {uri}")).into_response()
+}
+
+struct QueryHasGuard<'a>(pub &'a HasGuard);
+
+impl RouteGuard for QueryHasGuard<'_> {
+    fn accept_req_parts(&self, parts: &Parts) -> bool {
+        let Some(query) = parts.uri.query() else {
+            return false;
+        };
+        match &self.0 {
+            HasGuard::Is { is } => is == query,
+            HasGuard::Has { has } => query.contains(has),
+            HasGuard::NotHas { not_has } => !query.contains(not_has),
+        }
+    }
 }
 
 pub fn stack_to_router(path: &str, stack: HandlerStack, ctx: &RuntimeCtx) -> Router {
@@ -380,14 +535,15 @@ mod test {
                 .unwrap();
 
             let route_map = RouteMap::new_from_routes(&first.routes);
-            let router = route_map.into_router(&RuntimeCtx::default());
+            let router = route_map.into_alt_router(&RuntimeCtx::default());
             let request = Request::get("/styles.css").body(Body::empty())?;
 
             // Define the request
             // Make a one-shot request on the router
             let response = router.oneshot(request).await?;
-            let (_parts, body) = to_resp_parts_and_body(response).await;
+            let (parts, body) = to_resp_parts_and_body(response).await;
 
+            assert_eq!(parts.status.as_u16(), 200);
             assert_eq!(body, "body { background: red }");
         }
 
@@ -406,7 +562,7 @@ mod test {
                 .unwrap();
 
             let route_map = RouteMap::new_from_routes(&first.routes);
-            let router = route_map.into_router(&RuntimeCtx::default());
+            let router = route_map.into_alt_router(&RuntimeCtx::default());
             let raw_request = Request::get("/").body(Body::empty())?;
             let response = router.oneshot(raw_request).await?;
             let (_parts, body) = to_resp_parts_and_body(response).await;
@@ -416,7 +572,7 @@ mod test {
             let cwd = cwd.ancestors().nth(2).unwrap();
             let ctx = RuntimeCtx::new(cwd);
             let route_map = RouteMap::new_from_routes(&first.routes);
-            let router = route_map.into_router(&ctx);
+            let router = route_map.into_alt_router(&ctx);
             let dir_request = Request::get("/script.js").body(Body::empty())?;
             let response = router.oneshot(dir_request).await?;
             let (_parts, body) = to_resp_parts_and_body(response).await;

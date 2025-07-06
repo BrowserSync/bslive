@@ -14,11 +14,11 @@ pub async fn try_many_services_dir(
 ) -> impl IntoResponse {
     tracing::trace!(?uri, "{} services", router_list.len());
 
-    let (a, b) = req.into_parts();
+    let (original_parts, original_body) = req.into_parts();
 
     for (index, method_router) in router_list.into_iter().enumerate() {
         // tracing::trace!(?path_buf);
-        let req_clone = Request::from_parts(a.clone(), Body::empty());
+        let req_clone = Request::from_parts(original_parts.clone(), Body::empty());
         let result = method_router.oneshot(req_clone).await;
         match result {
             Ok(result) if result.status() == 404 => {
@@ -44,7 +44,7 @@ pub async fn try_many_services_dir(
         }
     }
     tracing::trace!(" - REQUEST was NOT HANDLED BY SERVE_DIR (will be sent onwards)");
-    let r = Request::from_parts(a.clone(), b);
+    let r = Request::from_parts(original_parts.clone(), original_body);
     next.run(r).await
     // StatusCode::NOT_FOUND.into_response()
 }

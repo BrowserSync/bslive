@@ -20,7 +20,7 @@ pub async fn serve_raw_one(uri: Uri, state: State<RawRoute>, req: Request) -> Re
     raw_resp_for(uri, &state.0).await.into_response()
 }
 
-async fn raw_resp_for(uri: Uri, route: &RawRoute) -> impl IntoResponse {
+pub async fn raw_resp_for(uri: Uri, route: &RawRoute) -> impl IntoResponse {
     match route {
         RawRoute::Html { html } => {
             tracing::trace!("raw_resp_for will respond with HTML");

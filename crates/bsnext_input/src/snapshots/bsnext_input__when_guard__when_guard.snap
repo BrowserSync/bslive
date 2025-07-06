@@ -1,0 +1,13 @@
+---
+source: crates/bsnext_input/src/when_guard.rs
+expression: "&when"
+---
+A {
+    when: Query {
+        query: [
+            NotHas {
+                not_has: "here",
+            },
+        ],
+    },
+}

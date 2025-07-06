@@ -3,6 +3,12 @@ servers:
     routes:
       - path: /styles.css
         raw: 'body { background: red }'
+      - path: /styles.css
+        raw: 'body { background: blue }'
+      - path: /kittens.css
+        raw: 'body { background: grey }'
+      - path: /other
+        raw: 'body { background: pink }'
   - name: "raw+dir"
     routes:
       - path: /
@@ -28,3 +34,18 @@ servers:
       - path: /script.js
         raw: 'console.log("hello world!")'
         cors: true
+  - name: "multiple raw routes"
+    port: 3000
+    routes:
+      - path: /script.js
+        raw: "hello from 1st"
+        when:
+          query:
+            - has: 'include'
+      - path: /script.js
+        raw: "hello from 2nd"
+        when:
+          query:
+            - is: '2nd=please'
+      - path: /script.js
+        dir: examples/basic/public/script.js
