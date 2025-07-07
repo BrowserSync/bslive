@@ -114,7 +114,7 @@ mod raw_test {
             // Make a one-shot request on the router
             let response = router.oneshot(request).await?;
             let (_parts, body) = to_resp_parts_and_body(response).await;
-            assert_eq!(body, "<h1>Welcome to Route 1.1</h1>");
+            assert_eq!(body, "<h1>Welcome to Route 1</h1>");
         }
 
         {

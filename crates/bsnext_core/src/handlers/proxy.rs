@@ -112,6 +112,7 @@ pub async fn proxy_handler(
         .into_response())
 }
 
+#[tracing::instrument(skip_all)]
 async fn serve_one_proxy_req(req: Request) -> Response {
     tracing::trace!("serve_one_proxy_req {}", req.uri().to_string());
     let client = {
@@ -120,12 +121,14 @@ async fn serve_one_proxy_req(req: Request) -> Response {
             .expect("must have a client, move this to an extractor?")
     };
     tracing::trace!(req.headers = ?req.headers());
+    tracing::trace!(req.method = ?req.method());
     let client_c = client.clone();
     let resp = client_c
         .request(req)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)
         .into_response();
+    tracing::trace!(resp.status = resp.status().as_u16());
     tracing::trace!(resp.headers = ?resp.headers());
     resp
 }

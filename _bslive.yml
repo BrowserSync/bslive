@@ -1,6 +1,17 @@
 servers:
+  - port: 3002
+    routes:
+      - path: /api
+        json: [ 1,2 ]
+        when:
+          query:
+            - has: 'mock'
+      - path: /api
+        proxy: https://duckduckgo.github.io
   - port: 3001
     routes:
+      - path: /a/really/:long/path
+        dir: examples/basic/public
       - path: /shane
         raw: "here2"
         when:
@@ -13,3 +24,12 @@ servers:
             - has: 'def'
       - path: /shane
         dir: examples/basic/public
+      - path: /shane
+        dir: examples/html
+      - path: /
+        html: "4"
+        when:
+          query:
+            - is: 'a=b'
+      - path: /
+        html: "3"

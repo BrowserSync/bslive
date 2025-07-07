@@ -514,6 +514,7 @@ dependencies = [
  "hyper-tls",
  "hyper-util",
  "insta",
+ "log",
  "mime_guess",
  "serde",
  "serde_json",

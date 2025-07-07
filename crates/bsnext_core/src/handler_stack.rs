@@ -1,121 +1,42 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig};
-use crate::not_found::not_found_service::not_found_loader;
-use crate::optional_layers::optional_layers;
+use crate::optional_layers::{optional_layers, optional_layers_lol};
 use crate::raw_loader::serve_raw_one;
 use crate::runtime_ctx::RuntimeCtx;
-use crate::serve_dir::try_many_services_dir;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::Handler;
 use axum::middleware::{from_fn, from_fn_with_state, Next};
-use axum::response::{IntoResponse, Response};
+use axum::response::IntoResponse;
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{middleware, Extension, Router};
 use bsnext_guards::route_guard::RouteGuard;
-use bsnext_input::route::{DirRoute, FallbackRoute, Opts, ProxyRoute, RawRoute, Route, RouteKind};
+use bsnext_input::route::{Route, RouteKind};
 use bsnext_input::when_guard::{HasGuard, WhenGuard};
 use http::request::Parts;
 use http::{Method, StatusCode, Uri};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tower::ServiceExt;
-use tower_http::services::{ServeDir, ServeFile};
-
-#[derive(Debug, PartialEq)]
-pub struct HandlerStackAlt {
-    pub routes: Vec<Route>,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum HandlerStack {
-    None,
-    // todo: make this a separate thing
-    Raw(RawRouteOpts),
-    RawAndDirs {
-        raw: RawRouteOpts,
-        dirs: Vec<DirRouteOpts>,
-    },
-    Dirs(Vec<DirRouteOpts>),
-    Proxy {
-        proxy: ProxyRoute,
-        opts: Opts,
-    },
-    DirsProxy {
-        dirs: Vec<DirRouteOpts>,
-        proxy: ProxyRoute,
-        opts: Opts,
-    },
-}
-
-#[derive(Debug, PartialEq)]
-pub struct DirRouteOpts {
-    dir_route: DirRoute,
-    opts: Opts,
-    fallback_route: Option<FallbackRoute>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct RawRouteOpts {
-    raw_route: RawRoute,
-    opts: Opts,
-}
-
-impl DirRouteOpts {
-    pub fn as_serve_dir(&self, cwd: &Path) -> ServeDir {
-        match &self.dir_route.base {
-            Some(base_dir) => {
-                tracing::trace!(
-                    "combining root: `{}` with given path: `{}`",
-                    base_dir.display(),
-                    self.dir_route.dir
-                );
-                ServeDir::new(base_dir.join(&self.dir_route.dir))
-            }
-            None => {
-                let pb = PathBuf::from(&self.dir_route.dir);
-                if pb.is_absolute() {
-                    tracing::trace!("no root given, using `{}` directly", self.dir_route.dir);
-                    ServeDir::new(&self.dir_route.dir)
-                } else {
-                    let joined = cwd.join(pb);
-                    tracing::trace!(
-                        "prepending the current directory to relative path {} {}",
-                        cwd.display(),
-                        joined.display()
-                    );
-                    ServeDir::new(joined)
-                }
-            }
-        }
-        .append_index_html_on_directories(true)
-    }
-    pub fn as_serve_file(&self) -> ServeFile {
-        match &self.dir_route.base {
-            Some(base_dir) => {
-                tracing::trace!(
-                    "combining root: `{}` with given path: `{}`",
-                    base_dir.display(),
-                    self.dir_route.dir
-                );
-                ServeFile::new(base_dir.join(&self.dir_route.dir))
-            }
-            None => {
-                tracing::trace!("no root given, using `{}` directly", self.dir_route.dir);
-                ServeFile::new(&self.dir_route.dir)
-            }
-        }
-    }
-}
-
-impl DirRouteOpts {
-    fn new(p0: DirRoute, p1: Opts, fallback_route: Option<FallbackRoute>) -> DirRouteOpts {
-        Self {
-            dir_route: p0,
-            opts: p1,
-            fallback_route,
-        }
-    }
-}
+use tower_http::services::ServeDir;
+use tracing::{trace, trace_span};
+// impl DirRouteOpts {
+//     pub fn as_serve_file(&self) -> ServeFile {
+//         match &self.dir_route.base {
+//             Some(base_dir) => {
+//                 tracing::trace!(
+//                     "combining root: `{}` with given path: `{}`",
+//                     base_dir.display(),
+//                     self.dir_route.dir
+//                 );
+//                 ServeFile::new(base_dir.join(&self.dir_route.dir))
+//             }
+//             None => {
+//                 tracing::trace!("no root given, using `{}` directly", self.dir_route.dir);
+//                 ServeFile::new(&self.dir_route.dir)
+//             }
+//         }
+//     }
+// }
 
 pub struct RouteMap {
     pub mapping: HashMap<String, Vec<Route>>,
@@ -135,45 +56,20 @@ impl RouteMap {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     pub fn into_router(self, ctx: &RuntimeCtx) -> Router {
         let mut router = Router::new();
 
-        tracing::trace!("processing `{}` different routes", self.mapping.len());
+        trace!("processing `{}` different routes", self.mapping.len());
 
-        for (path, route_list) in self.mapping {
-            tracing::trace!(
-                "processing path: `{}` with `{}` routes",
-                path,
-                route_list.len()
-            );
+        for (index, (path, route_list)) in self.mapping.into_iter().enumerate() {
+            trace!(?index, ?path, "creating for `{}` routes", route_list.len());
 
             // let stack = routes_to_stack(route_list);
             // let path_router = stack_to_router(&path, stack, ctx);
-            let stack = routes_to_alt_stack(path.as_str(), route_list, ctx.clone());
-            tracing::trace!("will merge router at path: `{path}`");
+            let stack = route_list_for_path(path.as_str(), route_list, ctx.clone());
 
-            tracing::trace!("will merge router at path: `{path}`");
-            router = router.merge(stack);
-        }
-
-        router
-    }
-
-    pub fn into_alt_router(self, ctx: &RuntimeCtx) -> Router {
-        let mut router = Router::new();
-
-        tracing::trace!("processing `{}` different routes", self.mapping.len());
-
-        for (path, route_list) in self.mapping {
-            tracing::trace!(
-                "processing path: `{}` with `{}` routes",
-                path,
-                route_list.len()
-            );
-
-            let stack = routes_to_alt_stack(path.as_str(), route_list, ctx.clone());
-            tracing::trace!("will merge router at path: `{path}`");
-
+            trace!(?index, ?path, "will merge router");
             router = router.merge(stack);
         }
 
@@ -181,115 +77,48 @@ impl RouteMap {
     }
 }
 
-pub fn append_stack(state: HandlerStack, route: Route) -> HandlerStack {
-    match state {
-        HandlerStack::None => match route.kind {
-            RouteKind::Raw(raw_route) => HandlerStack::Raw(RawRouteOpts {
-                raw_route,
-                opts: route.opts,
-            }),
-            RouteKind::Proxy(new_proxy_route) => HandlerStack::Proxy {
-                proxy: new_proxy_route,
-                opts: route.opts,
-            },
-            RouteKind::Dir(dir) => {
-                HandlerStack::Dirs(vec![DirRouteOpts::new(dir, route.opts, route.fallback)])
-            }
-        },
-        HandlerStack::Raw(RawRouteOpts { raw_route, opts }) => match route.kind {
-            // if a second 'raw' is seen, just use it, discarding the previous
-            RouteKind::Raw(raw_route) => HandlerStack::Raw(RawRouteOpts {
-                raw_route,
-                opts: route.opts,
-            }),
-            RouteKind::Dir(dir) => HandlerStack::RawAndDirs {
-                dirs: vec![DirRouteOpts::new(dir, route.opts, None)],
-                raw: RawRouteOpts { raw_route, opts },
-            },
-            // 'raw' handlers never get updated
-            _ => HandlerStack::Raw(RawRouteOpts { raw_route, opts }),
-        },
-        HandlerStack::RawAndDirs { .. } => {
-            todo!("support RawAndDirs")
-        }
-        HandlerStack::Dirs(mut dirs) => match route.kind {
-            RouteKind::Dir(next_dir) => {
-                dirs.push(DirRouteOpts::new(next_dir, route.opts, route.fallback));
-                HandlerStack::Dirs(dirs)
-            }
-            RouteKind::Proxy(proxy) => HandlerStack::DirsProxy {
-                dirs,
-                proxy,
-                opts: route.opts,
-            },
-            _ => HandlerStack::Dirs(dirs),
-        },
-        HandlerStack::Proxy { proxy, opts } => match route.kind {
-            RouteKind::Dir(dir) => HandlerStack::DirsProxy {
-                dirs: vec![DirRouteOpts::new(dir, route.opts, route.fallback)],
-                proxy,
-                opts,
-            },
-            _ => HandlerStack::Proxy { proxy, opts },
-        },
-        HandlerStack::DirsProxy {
-            mut dirs,
-            proxy,
-            opts,
-        } => match route.kind {
-            RouteKind::Dir(dir) => {
-                dirs.push(DirRouteOpts::new(dir, route.opts, route.fallback));
-                HandlerStack::DirsProxy { dirs, proxy, opts }
-            }
-            // todo(alpha): how to handle multiple proxies? should it just override for now?
-            _ => HandlerStack::DirsProxy { dirs, proxy, opts },
-        },
-    }
+#[tracing::instrument(skip_all)]
+pub fn route_list_for_path(path: &str, routes: Vec<Route>, ctx: RuntimeCtx) -> Router {
+    // let r1 = from_fn_with_state((path.to_string(), routes, ctx), try_one);
+    let svc = any_service(try_one.with_state((path.to_string(), routes, ctx)));
+    // if path.contains("{") {
+    //     tracing::trace!(?path, "route");
+    //     return Router::new().route(path, svc);
+    // }
+    tracing::trace!("nest_service");
+    Router::new()
+        .nest_service(path, svc)
+        .layer(from_fn(uri_extension))
 }
-
-pub fn fallback_to_layered_method_router(route: FallbackRoute) -> MethodRouter {
-    match route.kind {
-        RouteKind::Raw(raw_route) => {
-            let svc = any_service(serve_raw_one.with_state(raw_route));
-            optional_layers(svc, &route.opts)
-        }
-        RouteKind::Proxy(_new_proxy_route) => {
-            // todo(alpha): make a decision proxy as a fallback
-            todo!("add support for RouteKind::Proxy as a fallback?")
-        }
-        RouteKind::Dir(dir) => {
-            tracing::trace!("creating fallback for dir {:?}", dir);
-            let item = DirRouteOpts::new(dir, route.opts, None);
-            let serve_dir_service = item.as_serve_file();
-            let service = get_service(serve_dir_service);
-            optional_layers(service, &item.opts)
-        }
-    }
-}
-
-pub fn routes_to_stack(routes: Vec<Route>) -> HandlerStack {
-    routes.into_iter().fold(HandlerStack::None, append_stack)
-}
-
-pub fn routes_to_alt_stack(path: &str, routes: Vec<Route>, ctx: RuntimeCtx) -> Router {
-    let r = Router::new().layer(from_fn_with_state((path.to_string(), routes, ctx), try_one));
-    Router::new().nest_service(path, r)
+#[derive(Debug, Clone)]
+pub struct OuterUri(pub Uri);
+pub async fn uri_extension(uri: Uri, mut req: Request, next: Next) -> impl IntoResponse {
+    req.extensions_mut().insert(OuterUri(uri));
+    next.run(req).await
 }
 
 pub async fn try_one(
     State((path, routes, ctx)): State<(String, Vec<Route>, RuntimeCtx)>,
-    uri: Uri,
+    Extension(uri): Extension<OuterUri>,
+    local_uri: Uri,
     req: Request,
-    next: Next,
 ) -> impl IntoResponse {
-    println!("before uri={uri}, path={path}");
+    let span = trace_span!("try_one", uri = ?uri.0, path = path, local_uri = ?local_uri);
+    let _g = span.enter();
 
-    let (original_parts, original_body) = req.into_parts();
+    let (mut original_parts, original_body) = req.into_parts();
+    // original_parts.uri = uri.0;
+    trace!(?original_parts);
+    trace!("will try {} routes", routes.len());
 
     for (index, route) in routes.into_iter().enumerate() {
-        let accept = route.when.as_ref().unwrap_or(&WhenGuard::Always);
+        let span = trace_span!("index", index = index);
+        let _g = span.enter();
 
-        let will_serve = match accept {
+        let accept = route.when.as_ref().unwrap_or(&WhenGuard::Always);
+        trace!(?accept);
+
+        let can_serve = match accept {
             WhenGuard::Always => true,
             WhenGuard::Never => false,
             WhenGuard::Query { query } => query
@@ -298,60 +127,39 @@ pub async fn try_one(
                 .any(|x| x.accept_req_parts(&original_parts)),
         };
 
-        if !will_serve {
+        trace!(?can_serve);
+
+        if !can_serve {
             continue;
         }
 
-        let m_r = match route.kind {
-            RouteKind::Raw(raw) => any_service(serve_raw_one.with_state(raw.clone())),
-            RouteKind::Proxy(_) => todo!("RouteKind::Proxy"),
-            RouteKind::Dir(dir_route) => {
-                let svc = match &dir_route.base {
-                    Some(base_dir) => {
-                        tracing::trace!(
-                            "combining root: `{}` with given path: `{}`",
-                            base_dir.display(),
-                            dir_route.dir
-                        );
-                        ServeDir::new(base_dir.join(&dir_route.dir))
-                    }
-                    None => {
-                        let pb = PathBuf::from(&dir_route.dir);
-                        if pb.is_absolute() {
-                            tracing::trace!("no root given, using `{}` directly", dir_route.dir);
-                            ServeDir::new(&dir_route.dir)
-                        } else {
-                            let joined = ctx.cwd().join(pb);
-                            tracing::trace!(
-                                "prepending the current directory to relative path {} {}",
-                                ctx.cwd().display(),
-                                joined.display()
-                            );
-                            ServeDir::new(joined)
-                        }
-                    }
-                }
-                .append_index_html_on_directories(true);
-                get_service(svc)
+        trace!(?original_parts);
+
+        let result = match to_method_router(&path, &route, &ctx) {
+            Either::Left(router) => {
+                let raw_out = optional_layers(router, &route.opts);
+                let req_clone = Request::from_parts(original_parts.clone(), Body::empty());
+                raw_out.oneshot(req_clone).await
+            }
+            Either::Right(method_router) => {
+                let raw_out = optional_layers_lol(method_router, &route.opts);
+                let req_clone = Request::from_parts(original_parts.clone(), Body::empty());
+                raw_out.oneshot(req_clone).await
             }
         };
 
-        let raw_out = optional_layers(m_r, &route.opts);
-        let req_clone = Request::from_parts(original_parts.clone(), Body::empty());
-        let result = raw_out.oneshot(req_clone).await;
-
         match result {
             Ok(result) if result.status() == 404 => {
-                tracing::trace!("  ❌ not found at index {}, trying another", index);
+                trace!("  ❌ not found at index {}, trying another", index);
                 continue;
             }
             Ok(result) if result.status() == 405 => {
-                tracing::trace!("  ❌ 405, trying another...");
+                trace!("  ❌ 405, trying another...");
                 continue;
             }
             Ok(result) => {
                 println!("got a result {index}");
-                tracing::trace!(
+                trace!(
                     ?index,
                     " - ✅ a non-404 response was given {}",
                     result.status()
@@ -365,14 +173,51 @@ pub async fn try_one(
         }
     }
 
-    let r = Request::from_parts(original_parts.clone(), original_body);
-    let res = next.run(r).await;
-    println!("after");
-    res
+    StatusCode::NOT_FOUND.into_response()
 }
 
-pub async fn serve_one(uri: Uri, req: Request) -> Response {
-    (StatusCode::NOT_FOUND, format!("No route for {uri}")).into_response()
+enum Either {
+    Left(Router),
+    Right(MethodRouter),
+}
+fn to_method_router(path: &str, route: &Route, ctx: &RuntimeCtx) -> Either {
+    match &route.kind {
+        RouteKind::Raw(raw) => Either::Right(any_service(serve_raw_one.with_state(raw.clone()))),
+        RouteKind::Proxy(proxy) => {
+            let proxy_config = ProxyConfig {
+                target: proxy.proxy.clone(),
+                path: path.to_string(),
+            };
+            let proxy_with_decompression = proxy_handler.layer(Extension(proxy_config.clone()));
+            let as_service = any(proxy_with_decompression);
+            Either::Left(Router::new().nest_service(path, as_service))
+        }
+        RouteKind::Dir(dir_route) => {
+            let svc = match &dir_route.base {
+                Some(base_dir) => {
+                    tracing::trace!(
+                        "combining root: `{}` with given path: `{}`",
+                        base_dir.display(),
+                        dir_route.dir
+                    );
+                    ServeDir::new(base_dir.join(&dir_route.dir))
+                }
+                None => {
+                    let pb = PathBuf::from(&dir_route.dir);
+                    if pb.is_absolute() {
+                        trace!("no root given, using `{}` directly", dir_route.dir);
+                        ServeDir::new(&dir_route.dir)
+                    } else {
+                        let joined = ctx.cwd().join(pb);
+                        trace!(?joined, "serving");
+                        ServeDir::new(joined)
+                    }
+                }
+            }
+            .append_index_html_on_directories(true);
+            Either::Right(get_service(svc))
+        }
+    }
 }
 
 struct QueryHasGuard<'a>(pub &'a HasGuard);
@@ -390,76 +235,6 @@ impl RouteGuard for QueryHasGuard<'_> {
     }
 }
 
-pub fn stack_to_router(path: &str, stack: HandlerStack, ctx: &RuntimeCtx) -> Router {
-    match stack {
-        HandlerStack::None => unreachable!(),
-        HandlerStack::Raw(RawRouteOpts { raw_route, opts }) => {
-            let svc = any_service(serve_raw_one.with_state(raw_route));
-            let out = optional_layers(svc, &opts);
-            Router::new().route_service(path, out)
-        }
-        HandlerStack::RawAndDirs {
-            dirs,
-            raw: RawRouteOpts { raw_route, opts },
-        } => {
-            let svc = any_service(serve_raw_one.with_state(raw_route));
-            let raw_out = optional_layers(svc, &opts);
-            let service = serve_dir_layer(&dirs, Router::new(), ctx);
-            Router::new().route(path, raw_out).fallback_service(service)
-        }
-        HandlerStack::Dirs(dirs) => {
-            let service = serve_dir_layer(&dirs, Router::new(), ctx);
-            Router::new()
-                .nest_service(path, service)
-                .layer(from_fn(not_found_loader))
-        }
-        HandlerStack::Proxy { proxy, opts } => {
-            let proxy_config = ProxyConfig {
-                target: proxy.proxy.clone(),
-                path: path.to_string(),
-            };
-
-            let proxy_with_decompression = proxy_handler.layer(Extension(proxy_config.clone()));
-            let as_service = any(proxy_with_decompression);
-
-            Router::new().nest_service(path, optional_layers(as_service, &opts))
-        }
-        HandlerStack::DirsProxy { dirs, proxy, opts } => {
-            let proxy_router = stack_to_router(path, HandlerStack::Proxy { proxy, opts }, ctx);
-            let r1 = serve_dir_layer(&dirs, Router::new().fallback_service(proxy_router), ctx);
-            Router::new().nest_service(path, r1)
-        }
-    }
-}
-
-fn serve_dir_layer(
-    dir_list_with_opts: &[DirRouteOpts],
-    initial: Router,
-    ctx: &RuntimeCtx,
-) -> Router {
-    let serve_dir_items = dir_list_with_opts
-        .iter()
-        .map(|dir_route| match &dir_route.fallback_route {
-            None => {
-                let serve_dir_service = dir_route.as_serve_dir(ctx.cwd());
-                let service = get_service(serve_dir_service);
-                optional_layers(service, &dir_route.opts)
-            }
-            Some(fallback) => {
-                let stack = fallback_to_layered_method_router(fallback.clone());
-                let serve_dir_service = dir_route
-                    .as_serve_dir(ctx.cwd())
-                    .fallback(stack)
-                    .call_fallback_on_method_not_allowed(true);
-                let service = any_service(serve_dir_service);
-                optional_layers(service, &dir_route.opts)
-            }
-        })
-        .collect::<Vec<MethodRouter>>();
-
-    initial.layer(from_fn_with_state(serve_dir_items, try_many_services_dir))
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -469,58 +244,7 @@ mod test {
 
     use bsnext_input::Input;
     use http::Request;
-    use insta::assert_debug_snapshot;
-
     use tower::ServiceExt;
-
-    #[test]
-    fn test_handler_stack_01() -> anyhow::Result<()> {
-        let yaml = include_str!("../../../examples/basic/handler_stack.yml");
-        let input = serde_yaml::from_str::<Input>(&yaml)?;
-        let first = input
-            .servers
-            .iter()
-            .find(|x| x.identity.is_named("raw"))
-            .map(ToOwned::to_owned)
-            .unwrap();
-
-        let actual = routes_to_stack(first.routes);
-        assert_debug_snapshot!(actual);
-        Ok(())
-    }
-
-    #[test]
-    fn test_handler_stack_02() -> anyhow::Result<()> {
-        let yaml = include_str!("../../../examples/basic/handler_stack.yml");
-        let input = serde_yaml::from_str::<Input>(&yaml)?;
-        let first = input
-            .servers
-            .iter()
-            .find(|x| x.identity.is_named("2dirs+proxy"))
-            .map(ToOwned::to_owned)
-            .unwrap();
-
-        let actual = routes_to_stack(first.routes);
-
-        assert_debug_snapshot!(actual);
-        Ok(())
-    }
-    #[test]
-    fn test_handler_stack_03() -> anyhow::Result<()> {
-        let yaml = include_str!("../../../examples/basic/handler_stack.yml");
-        let input = serde_yaml::from_str::<Input>(&yaml)?;
-        let first = input
-            .servers
-            .iter()
-            .find(|s| s.identity.is_named("raw+opts"))
-            .map(ToOwned::to_owned)
-            .unwrap();
-
-        let actual = routes_to_stack(first.routes);
-
-        assert_debug_snapshot!(actual);
-        Ok(())
-    }
 
     #[tokio::test]
     async fn test_routes_to_router() -> anyhow::Result<()> {
@@ -535,7 +259,7 @@ mod test {
                 .unwrap();
 
             let route_map = RouteMap::new_from_routes(&first.routes);
-            let router = route_map.into_alt_router(&RuntimeCtx::default());
+            let router = route_map.into_router(&RuntimeCtx::default());
             let request = Request::get("/styles.css").body(Body::empty())?;
 
             // Define the request
@@ -562,7 +286,7 @@ mod test {
                 .unwrap();
 
             let route_map = RouteMap::new_from_routes(&first.routes);
-            let router = route_map.into_alt_router(&RuntimeCtx::default());
+            let router = route_map.into_router(&RuntimeCtx::default());
             let raw_request = Request::get("/").body(Body::empty())?;
             let response = router.oneshot(raw_request).await?;
             let (_parts, body) = to_resp_parts_and_body(response).await;
@@ -572,7 +296,7 @@ mod test {
             let cwd = cwd.ancestors().nth(2).unwrap();
             let ctx = RuntimeCtx::new(cwd);
             let route_map = RouteMap::new_from_routes(&first.routes);
-            let router = route_map.into_alt_router(&ctx);
+            let router = route_map.into_router(&ctx);
             let dir_request = Request::get("/script.js").body(Body::empty())?;
             let response = router.oneshot(dir_request).await?;
             let (_parts, body) = to_resp_parts_and_body(response).await;

@@ -75,6 +75,7 @@ impl RouteGuard for InjectionItem {
             None => true,
             Some(ml) => ml.test_uri(req.uri()),
         };
+        println!("{}", uri_is_allowed);
         if uri_is_allowed {
             match &self.inner {
                 Injection::BsLive(built_ins) => built_ins.accept_req(req),
