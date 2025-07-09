@@ -1,13 +1,14 @@
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response, Sse};
-use axum::Json;
+use axum::{Extension, Json};
 use http::header::CONTENT_TYPE;
 use std::convert::Infallible;
 use std::fs;
 
 use axum::body::Body;
 use axum::response::sse::Event;
+use bsnext_guards::OuterUri;
 use bsnext_input::route::{RawRoute, SseOpts};
 use bytes::Bytes;
 use http::{StatusCode, Uri};
@@ -15,12 +16,18 @@ use http_body_util::BodyExt;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
-pub async fn serve_raw_one(uri: Uri, state: State<RawRoute>, req: Request) -> Response {
-    tracing::trace!("serve_raw_one {}", req.uri().to_string());
-    raw_resp_for(uri, &state.0).await.into_response()
+pub async fn serve_raw_one(
+    uri: Uri,
+    Extension(outer_uri): Extension<OuterUri>,
+    state: State<RawRoute>,
+    _req: Request,
+) -> Response {
+    tracing::trace!(?outer_uri, ?uri, "serve_raw_one");
+    raw_resp_for(outer_uri, &state.0).await.into_response()
 }
 
-pub async fn raw_resp_for(uri: Uri, route: &RawRoute) -> impl IntoResponse {
+pub async fn raw_resp_for(outer_uri: OuterUri, route: &RawRoute) -> impl IntoResponse {
+    let uri = outer_uri.0;
     match route {
         RawRoute::Html { html } => {
             tracing::trace!("raw_resp_for will respond with HTML");

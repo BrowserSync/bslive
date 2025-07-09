@@ -1,11 +1,18 @@
 servers:
+  - port: 3003
+    routes:
+      - path: /api
+        proxy: https://example.com
+        rewrite_uri: false
   - port: 3002
     routes:
+      - path: /
+        html: lol
       - path: /api
         json: [ 1,2 ]
         when:
           query:
-            - has: 'mock'
+            has: 'mock'
       - path: /api
         proxy: https://duckduckgo.github.io
   - port: 3001
@@ -15,13 +22,13 @@ servers:
       - path: /shane
         raw: "here2"
         when:
-          query:
-            - has: 'abc'
+          - query:
+              has: 'abc'
       - path: /shane
         raw: "here"
         when:
-          query:
-            - has: 'def'
+          - query:
+              has: 'def'
       - path: /shane
         dir: examples/basic/public
       - path: /shane
@@ -29,7 +36,7 @@ servers:
       - path: /
         html: "4"
         when:
-          query:
-            - is: 'a=b'
+          - query:
+              is: 'a=b'
       - path: /
         html: "3"

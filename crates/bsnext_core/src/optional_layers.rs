@@ -3,7 +3,7 @@ use axum::extract::{Request, State};
 use axum::middleware::{map_response_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::MethodRouter;
-use axum::{middleware, Extension, Router};
+use axum::{middleware, Extension};
 use axum_extra::middleware::option_layer;
 use bsnext_input::route::{CompType, CompressionOpts, CorsOpts, DelayKind, DelayOpts, Opts};
 use bsnext_resp::{response_modifications_layer, InjectHandling};
@@ -17,53 +17,7 @@ use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 
-pub fn optional_layers(app: Router, opts: &Opts) -> Router {
-    let mut app = app;
-    let cors_enabled_layer = opts
-        .cors
-        .as_ref()
-        .filter(|v| **v == CorsOpts::Cors(true))
-        .map(|_| CorsLayer::permissive());
-
-    let compression_layer = opts.compression.as_ref().and_then(comp_opts_to_layer);
-
-    let delay_enabled_layer = opts
-        .delay
-        .as_ref()
-        .map(|delay| middleware::from_fn_with_state(delay.clone(), delay_mw));
-
-    let injections = opts.inject.as_injections();
-
-    let set_response_headers_layer = opts
-        .headers
-        .as_ref()
-        .map(|headers| map_response_with_state(headers.clone(), set_resp_headers_from_strs));
-
-    let headers = opts.cache.as_headers();
-    let prevent_cache_headers_layer = map_response_with_state(headers, set_resp_headers);
-
-    let optional_stack = ServiceBuilder::new()
-        .layer(middleware::from_fn(dynamic_query_params_handler))
-        .layer(middleware::from_fn(response_modifications_layer))
-        .layer(prevent_cache_headers_layer)
-        .layer(option_layer(set_response_headers_layer))
-        .layer(option_layer(cors_enabled_layer))
-        .layer(option_layer(delay_enabled_layer));
-
-    app = app.layer(optional_stack);
-
-    // The compression layer has a different type, so needs to apply outside the optional stack
-    // this essentially wrapping everything.
-    // I'm sure there's a cleaner way...
-    if let Some(cl) = compression_layer {
-        app = app.layer(cl);
-    }
-
-    app.layer(Extension(InjectHandling {
-        items: injections.items,
-    }))
-}
-pub fn optional_layers_lol(app: MethodRouter, opts: &Opts) -> MethodRouter {
+pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
     let mut app = app;
     let cors_enabled_layer = opts
         .cors

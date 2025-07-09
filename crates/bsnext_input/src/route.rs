@@ -21,7 +21,14 @@ pub struct Route {
     #[serde(flatten)]
     pub opts: Opts,
     pub fallback: Option<FallbackRoute>,
-    pub when: Option<WhenGuard>,
+    pub when: Option<ListOrSingle<WhenGuard>>,
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
+pub enum ListOrSingle<T> {
+    WhenOne(T),
+    WhenMany(Vec<T>),
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
@@ -114,6 +121,8 @@ impl Route {
             },
             kind: RouteKind::Proxy(ProxyRoute {
                 proxy: a.as_ref().to_string(),
+                proxy_headers: None,
+                rewrite_uri: None,
             }),
             ..Default::default()
         }
@@ -126,6 +135,21 @@ pub enum RouteKind {
     Raw(RawRoute),
     Proxy(ProxyRoute),
     Dir(DirRoute),
+}
+
+impl Display for RouteKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RouteKind::Raw(raw) => match raw {
+                RawRoute::Html { html: _ } => write!(f, "Raw(HTML)"),
+                RawRoute::Json { json: _ } => write!(f, "Raw(JSON)"),
+                RawRoute::Raw { raw: _ } => write!(f, "Raw(Text)"),
+                RawRoute::Sse { sse: _ } => write!(f, "Raw(SSE)"),
+            },
+            RouteKind::Proxy(proxy) => write!(f, "Proxy({})", proxy.proxy),
+            RouteKind::Dir(dir) => write!(f, "Dir({})", dir.dir),
+        }
+    }
 }
 
 impl RouteKind {
@@ -185,6 +209,8 @@ pub struct DirRoute {
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ProxyRoute {
     pub proxy: String,
+    pub proxy_headers: Option<BTreeMap<String, String>>,
+    pub rewrite_uri: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]

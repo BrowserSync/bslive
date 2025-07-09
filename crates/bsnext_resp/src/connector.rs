@@ -2,17 +2,17 @@ use crate::injector_guard::ByteReplacer;
 use crate::RespMod;
 use axum::extract::Request;
 use bsnext_guards::route_guard::RouteGuard;
-use http::Response;
+use http::{Response, Uri};
 
 #[derive(Debug, Default)]
 pub struct Connector;
 
 impl RouteGuard for Connector {
-    fn accept_req(&self, req: &Request) -> bool {
+    fn accept_req(&self, req: &Request, _outer_uri: &Uri) -> bool {
         RespMod::accepts_html(req)
     }
 
-    fn accept_res<T>(&self, res: &Response<T>) -> bool {
+    fn accept_res<T>(&self, res: &Response<T>, _outer_uri: &Uri) -> bool {
         RespMod::is_html(res)
     }
 }

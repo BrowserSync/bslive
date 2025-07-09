@@ -81,7 +81,11 @@ impl From<RouteKind> for RouteKindDTO {
                     sse: SseDTOOpts { body: opts.body },
                 },
             },
-            RouteKind::Proxy(ProxyRoute { proxy }) => RouteKindDTO::Proxy { proxy },
+            RouteKind::Proxy(ProxyRoute {
+                proxy,
+                proxy_headers: _outgoing_headers,
+                rewrite_uri: _rewrite,
+            }) => RouteKindDTO::Proxy { proxy },
             RouteKind::Dir(DirRoute { dir, base }) => RouteKindDTO::Dir {
                 dir,
                 base: base.map(|b| b.to_string_lossy().to_string()),

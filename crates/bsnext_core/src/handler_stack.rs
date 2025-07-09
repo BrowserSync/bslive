@@ -1,19 +1,21 @@
-use crate::handlers::proxy::{proxy_handler, ProxyConfig};
-use crate::optional_layers::{optional_layers, optional_layers_lol};
+use crate::handlers::proxy::{proxy_handler, ProxyConfig, RewriteKind};
+use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
 use crate::runtime_ctx::RuntimeCtx;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::Handler;
-use axum::middleware::{from_fn, from_fn_with_state, Next};
+use axum::middleware::from_fn;
 use axum::response::IntoResponse;
 use axum::routing::{any, any_service, get_service, MethodRouter};
-use axum::{middleware, Extension, Router};
+use axum::{Extension, Router};
 use bsnext_guards::route_guard::RouteGuard;
-use bsnext_input::route::{Route, RouteKind};
+use bsnext_guards::{uri_extension, OuterUri};
+use bsnext_input::route::{ListOrSingle, Route, RouteKind};
 use bsnext_input::when_guard::{HasGuard, WhenGuard};
 use http::request::Parts;
-use http::{Method, StatusCode, Uri};
+use http::uri::PathAndQuery;
+use http::{Response, StatusCode, Uri};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tower::ServiceExt;
@@ -90,63 +92,84 @@ pub fn route_list_for_path(path: &str, routes: Vec<Route>, ctx: RuntimeCtx) -> R
         .nest_service(path, svc)
         .layer(from_fn(uri_extension))
 }
-#[derive(Debug, Clone)]
-pub struct OuterUri(pub Uri);
-pub async fn uri_extension(uri: Uri, mut req: Request, next: Next) -> impl IntoResponse {
-    req.extensions_mut().insert(OuterUri(uri));
-    next.run(req).await
-}
 
 pub async fn try_one(
     State((path, routes, ctx)): State<(String, Vec<Route>, RuntimeCtx)>,
-    Extension(uri): Extension<OuterUri>,
-    local_uri: Uri,
+    Extension(OuterUri(outer_uri)): Extension<OuterUri>,
+    parts: Parts,
+    uri: Uri,
     req: Request,
 ) -> impl IntoResponse {
-    let span = trace_span!("try_one", uri = ?uri.0, path = path, local_uri = ?local_uri);
+    let span = trace_span!("try_one", outer_uri = ?outer_uri, path = path, local_uri = ?uri);
     let _g = span.enter();
 
-    let (mut original_parts, original_body) = req.into_parts();
-    // original_parts.uri = uri.0;
-    trace!(?original_parts);
+    let pq = outer_uri.path_and_query();
+
+    trace!(?parts);
     trace!("will try {} routes", routes.len());
 
-    for (index, route) in routes.into_iter().enumerate() {
+    let candidates = routes
+        .iter()
+        .enumerate()
+        .filter(|(index, route)| {
+            let span = trace_span!("early filter for candidates", index = index);
+            let _g = span.enter();
+
+            trace!(?route.kind);
+
+            let can_serve: bool = route
+                .when
+                .as_ref()
+                .map(|when| match &when {
+                    ListOrSingle::WhenOne(when) => match_one(when, &outer_uri, &path, pq, &parts),
+                    ListOrSingle::WhenMany(many) => many
+                        .iter()
+                        .all(|when| match_one(when, &outer_uri, &path, pq, &parts)),
+                })
+                .unwrap_or(true);
+
+            trace!(?can_serve);
+
+            if !can_serve {
+                return false;
+            }
+
+            true
+        })
+        .collect::<Vec<_>>();
+
+    trace!("{} candidates", candidates.len());
+
+    let mut body: Option<Body> = candidates.last().and_then(|(_, route)| {
+        if matches!(route.kind, RouteKind::Proxy(..)) {
+            trace!("will consume body for proxy");
+            Some(req.into_body())
+        } else {
+            None
+        }
+    });
+
+    for (index, route) in &candidates {
         let span = trace_span!("index", index = index);
         let _g = span.enter();
 
-        let accept = route.when.as_ref().unwrap_or(&WhenGuard::Always);
-        trace!(?accept);
+        trace!(?parts);
 
-        let can_serve = match accept {
-            WhenGuard::Always => true,
-            WhenGuard::Never => false,
-            WhenGuard::Query { query } => query
-                .iter()
-                .map(QueryHasGuard)
-                .any(|x| x.accept_req_parts(&original_parts)),
+        let method_router = to_method_router(&path, route, &ctx);
+        let raw_out: MethodRouter = optional_layers(method_router, &route.opts);
+        let req_clone = match route.kind {
+            RouteKind::Raw(_) => Request::from_parts(parts.clone(), Body::empty()),
+            RouteKind::Proxy(_) => {
+                if let Some(body) = body.take() {
+                    Request::from_parts(parts.clone(), body)
+                } else {
+                    Request::from_parts(parts.clone(), Body::empty())
+                }
+            }
+            RouteKind::Dir(_) => Request::from_parts(parts.clone(), Body::empty()),
         };
 
-        trace!(?can_serve);
-
-        if !can_serve {
-            continue;
-        }
-
-        trace!(?original_parts);
-
-        let result = match to_method_router(&path, &route, &ctx) {
-            Either::Left(router) => {
-                let raw_out = optional_layers(router, &route.opts);
-                let req_clone = Request::from_parts(original_parts.clone(), Body::empty());
-                raw_out.oneshot(req_clone).await
-            }
-            Either::Right(method_router) => {
-                let raw_out = optional_layers_lol(method_router, &route.opts);
-                let req_clone = Request::from_parts(original_parts.clone(), Body::empty());
-                raw_out.oneshot(req_clone).await
-            }
-        };
+        let result = raw_out.oneshot(req_clone).await;
 
         match result {
             Ok(result) if result.status() == 404 => {
@@ -158,7 +181,6 @@ pub async fn try_one(
                 continue;
             }
             Ok(result) => {
-                println!("got a result {index}");
                 trace!(
                     ?index,
                     " - ✅ a non-404 response was given {}",
@@ -176,21 +198,35 @@ pub async fn try_one(
     StatusCode::NOT_FOUND.into_response()
 }
 
-enum Either {
-    Left(Router),
-    Right(MethodRouter),
+fn match_one(
+    when_guard: &WhenGuard,
+    outer_uri: &Uri,
+    path: &str,
+    pq: Option<&PathAndQuery>,
+    parts: &Parts,
+) -> bool {
+    match when_guard {
+        WhenGuard::Always => true,
+        WhenGuard::Never => false,
+        WhenGuard::ExactUri { exact_uri: true } => path == pq.map(|pq| pq.as_str()).unwrap_or("/"),
+        WhenGuard::ExactUri { exact_uri: false } => path != pq.map(|pq| pq.as_str()).unwrap_or("/"),
+        WhenGuard::Query { query } => QueryHasGuard(query).accept_req_parts(parts, outer_uri),
+        WhenGuard::Accept { accept } => AcceptHasGuard(accept).accept_req_parts(parts, outer_uri),
+    }
 }
-fn to_method_router(path: &str, route: &Route, ctx: &RuntimeCtx) -> Either {
+
+fn to_method_router(path: &str, route: &Route, ctx: &RuntimeCtx) -> MethodRouter {
     match &route.kind {
-        RouteKind::Raw(raw) => Either::Right(any_service(serve_raw_one.with_state(raw.clone()))),
+        RouteKind::Raw(raw) => any_service(serve_raw_one.with_state(raw.clone())),
         RouteKind::Proxy(proxy) => {
             let proxy_config = ProxyConfig {
                 target: proxy.proxy.clone(),
                 path: path.to_string(),
+                headers: proxy.proxy_headers.clone().unwrap_or_default(),
+                rewrite_kind: RewriteKind::from(proxy.rewrite_uri),
             };
             let proxy_with_decompression = proxy_handler.layer(Extension(proxy_config.clone()));
-            let as_service = any(proxy_with_decompression);
-            Either::Left(Router::new().nest_service(path, as_service))
+            any(proxy_with_decompression)
         }
         RouteKind::Dir(dir_route) => {
             let svc = match &dir_route.base {
@@ -215,7 +251,7 @@ fn to_method_router(path: &str, route: &Route, ctx: &RuntimeCtx) -> Either {
                 }
             }
             .append_index_html_on_directories(true);
-            Either::Right(get_service(svc))
+            get_service(svc)
         }
     }
 }
@@ -223,14 +259,48 @@ fn to_method_router(path: &str, route: &Route, ctx: &RuntimeCtx) -> Either {
 struct QueryHasGuard<'a>(pub &'a HasGuard);
 
 impl RouteGuard for QueryHasGuard<'_> {
-    fn accept_req_parts(&self, parts: &Parts) -> bool {
+    fn accept_req(&self, _req: &Request, _outer_uri: &Uri) -> bool {
+        true
+    }
+
+    fn accept_res<T>(&self, _res: &Response<T>, _outer_uri: &Uri) -> bool {
+        true
+    }
+
+    fn accept_req_parts(&self, parts: &Parts, _outer_uri: &Uri) -> bool {
         let Some(query) = parts.uri.query() else {
             return false;
         };
         match &self.0 {
-            HasGuard::Is { is } => is == query,
+            HasGuard::Is { is } | HasGuard::Literal(is) => is == query,
             HasGuard::Has { has } => query.contains(has),
             HasGuard::NotHas { not_has } => !query.contains(not_has),
+        }
+    }
+}
+struct AcceptHasGuard<'a>(pub &'a HasGuard);
+
+impl RouteGuard for AcceptHasGuard<'_> {
+    fn accept_req(&self, _req: &Request, _outer_uri: &Uri) -> bool {
+        true
+    }
+
+    fn accept_res<T>(&self, _res: &Response<T>, _outer_uri: &Uri) -> bool {
+        true
+    }
+
+    fn accept_req_parts(&self, parts: &Parts, _outer_uri: &Uri) -> bool {
+        let Some(query) = parts.headers.get("accept") else {
+            return false;
+        };
+        let Ok(str) = std::str::from_utf8(query.as_bytes()) else {
+            tracing::error!("bytes incorrrect");
+            return false;
+        };
+        match &self.0 {
+            HasGuard::Literal(is) | HasGuard::Is { is } => is == str,
+            HasGuard::Has { has } => str.contains(has),
+            HasGuard::NotHas { not_has } => !str.contains(not_has),
         }
     }
 }

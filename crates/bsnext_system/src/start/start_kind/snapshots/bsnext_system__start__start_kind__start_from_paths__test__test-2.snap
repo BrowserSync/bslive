@@ -14,6 +14,7 @@ servers:
         cache: prevent
         compression: ~
         fallback: ~
+        when: ~
     watchers: []
     playground: ~
     clients:

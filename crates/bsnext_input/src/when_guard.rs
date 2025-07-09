@@ -4,8 +4,14 @@ pub enum WhenGuard {
     #[default]
     Always,
     Never,
+    ExactUri {
+        exact_uri: bool,
+    },
     Query {
-        query: Vec<HasGuard>,
+        query: HasGuard,
+    },
+    Accept {
+        accept: HasGuard,
     },
 }
 
@@ -19,7 +25,7 @@ fn test_when_guard() {
     let input = r#"
     when:
       query:
-        - not.has: "here"
+        not.has: "here"
     "#;
     let when: A = serde_yaml::from_str(input).expect("test");
     assert_debug_snapshot!(&when);
@@ -35,7 +41,7 @@ fn test_when_guard_has() {
     let input = r#"
     when:
       query:
-        - has: "here"
+        has: "here"
     "#;
     let when: A = serde_yaml::from_str(input).expect("test");
     assert_debug_snapshot!(&when);
@@ -44,6 +50,8 @@ fn test_when_guard_has() {
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
 pub enum HasGuard {
+    /// A direct, exact match
+    Literal(String),
     /// A direct, exact match
     Is { is: String },
     /// Contains the substring

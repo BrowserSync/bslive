@@ -5,7 +5,7 @@ use crate::injector_guard::ByteReplacer;
 use axum::extract::Request;
 use bsnext_guards::route_guard::RouteGuard;
 use bsnext_guards::MatcherList;
-use http::Response;
+use http::{Response, Uri};
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
@@ -70,30 +70,29 @@ pub struct UnknownStringDef {
     pub name: String,
 }
 impl RouteGuard for InjectionItem {
-    fn accept_req(&self, req: &Request) -> bool {
+    fn accept_req(&self, req: &Request, outer_uri: &Uri) -> bool {
         let uri_is_allowed = match self.only.as_ref() {
             None => true,
-            Some(ml) => ml.test_uri(req.uri()),
+            Some(ml) => ml.test_uri(outer_uri),
         };
-        println!("{}", uri_is_allowed);
         if uri_is_allowed {
             match &self.inner {
-                Injection::BsLive(built_ins) => built_ins.accept_req(req),
+                Injection::BsLive(built_ins) => built_ins.accept_req(req, outer_uri),
                 Injection::UnknownNamed(_) => todo!("accept_req Injection::UnknownNamed"),
-                Injection::Replacement(def) => def.accept_req(req),
-                Injection::Addition(add) => add.accept_req(req),
+                Injection::Replacement(def) => def.accept_req(req, outer_uri),
+                Injection::Addition(add) => add.accept_req(req, outer_uri),
             }
         } else {
             false
         }
     }
 
-    fn accept_res<T>(&self, res: &Response<T>) -> bool {
+    fn accept_res<T>(&self, res: &Response<T>, outer_uri: &Uri) -> bool {
         match &self.inner {
-            Injection::BsLive(built_ins) => built_ins.accept_res(res),
+            Injection::BsLive(built_ins) => built_ins.accept_res(res, outer_uri),
             Injection::UnknownNamed(_) => todo!("accept_res Injection::UnknownNamed"),
-            Injection::Replacement(def) => def.accept_res(res),
-            Injection::Addition(add) => add.accept_res(res),
+            Injection::Replacement(def) => def.accept_res(res, outer_uri),
+            Injection::Addition(add) => add.accept_res(res, outer_uri),
         }
     }
 }

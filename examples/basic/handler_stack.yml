@@ -13,6 +13,8 @@ servers:
     routes:
       - path: /
         html: hello world!
+        when:
+          exact_uri: true
       - path: /
         dir: examples/basic/public
   - name: "2dirs"
@@ -41,11 +43,11 @@ servers:
         raw: "hello from 1st"
         when:
           query:
-            - has: 'include'
+            has: 'include'
       - path: /script.js
         raw: "hello from 2nd"
         when:
           query:
-            - is: '2nd=please'
+            is: '2nd=please'
       - path: /script.js
         dir: examples/basic/public/script.js

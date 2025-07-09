@@ -4,10 +4,8 @@ expression: "&when"
 ---
 A {
     when: Query {
-        query: [
-            NotHas {
-                not_has: "here",
-            },
-        ],
+        query: NotHas {
+            not_has: "here",
+        },
     },
 }

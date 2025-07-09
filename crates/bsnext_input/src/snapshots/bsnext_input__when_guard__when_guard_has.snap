@@ -4,10 +4,8 @@ expression: "&when"
 ---
 A {
     when: Query {
-        query: [
-            Has {
-                has: "here",
-            },
-        ],
+        query: Has {
+            has: "here",
+        },
     },
 }
