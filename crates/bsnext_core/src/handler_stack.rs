@@ -19,26 +19,8 @@ use http::{Response, StatusCode, Uri};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tower::ServiceExt;
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 use tracing::{trace, trace_span};
-// impl DirRouteOpts {
-//     pub fn as_serve_file(&self) -> ServeFile {
-//         match &self.dir_route.base {
-//             Some(base_dir) => {
-//                 tracing::trace!(
-//                     "combining root: `{}` with given path: `{}`",
-//                     base_dir.display(),
-//                     self.dir_route.dir
-//                 );
-//                 ServeFile::new(base_dir.join(&self.dir_route.dir))
-//             }
-//             None => {
-//                 tracing::trace!("no root given, using `{}` directly", self.dir_route.dir);
-//                 ServeFile::new(&self.dir_route.dir)
-//             }
-//         }
-//     }
-// }
 
 pub struct RouteMap {
     pub mapping: HashMap<String, Vec<Route>>,
@@ -83,10 +65,6 @@ impl RouteMap {
 pub fn route_list_for_path(path: &str, routes: Vec<Route>, ctx: RuntimeCtx) -> Router {
     // let r1 = from_fn_with_state((path.to_string(), routes, ctx), try_one);
     let svc = any_service(try_one.with_state((path.to_string(), routes, ctx)));
-    // if path.contains("{") {
-    //     tracing::trace!(?path, "route");
-    //     return Router::new().route(path, svc);
-    // }
     tracing::trace!("nest_service");
     Router::new()
         .nest_service(path, svc)
@@ -155,7 +133,7 @@ pub async fn try_one(
 
         trace!(?parts);
 
-        let method_router = to_method_router(&path, route, &ctx);
+        let method_router = to_method_router(&path, &route.kind, &ctx);
         let raw_out: MethodRouter = optional_layers(method_router, &route.opts);
         let req_clone = match route.kind {
             RouteKind::Raw(_) => Request::from_parts(parts.clone(), Body::empty()),
@@ -172,22 +150,24 @@ pub async fn try_one(
         let result = raw_out.oneshot(req_clone).await;
 
         match result {
-            Ok(result) if result.status() == 404 => {
-                trace!("  ❌ not found at index {}, trying another", index);
-                continue;
-            }
-            Ok(result) if result.status() == 405 => {
-                trace!("  ❌ 405, trying another...");
-                continue;
-            }
-            Ok(result) => {
-                trace!(
-                    ?index,
-                    " - ✅ a non-404 response was given {}",
-                    result.status()
-                );
-                return result.into_response();
-            }
+            Ok(result) => match result.status().as_u16() {
+                404 | 405 => {
+                    if let Some(fallback) = &route.fallback {
+                        let mr = to_method_router(&path, &fallback.kind, &ctx);
+                        let raw_out: MethodRouter = optional_layers(mr, &fallback.opts);
+                        let raw_fb = Request::from_parts(parts.clone(), Body::empty());
+                        return raw_out.oneshot(raw_fb).await.into_response();
+                    }
+                }
+                _ => {
+                    trace!(
+                        ?index,
+                        " - ✅ a non-404 response was given {}",
+                        result.status()
+                    );
+                    return result.into_response();
+                }
+            },
             Err(e) => {
                 tracing::error!(?e);
                 return StatusCode::INTERNAL_SERVER_ERROR.into_response();
@@ -195,6 +175,7 @@ pub async fn try_one(
         }
     }
 
+    tracing::trace!("StatusCode::NOT_FOUND");
     StatusCode::NOT_FOUND.into_response()
 }
 
@@ -215,8 +196,8 @@ fn match_one(
     }
 }
 
-fn to_method_router(path: &str, route: &Route, ctx: &RuntimeCtx) -> MethodRouter {
-    match &route.kind {
+fn to_method_router(path: &str, route_kind: &RouteKind, ctx: &RuntimeCtx) -> MethodRouter {
+    match route_kind {
         RouteKind::Raw(raw) => any_service(serve_raw_one.with_state(raw.clone())),
         RouteKind::Proxy(proxy) => {
             let proxy_config = ProxyConfig {
@@ -229,29 +210,32 @@ fn to_method_router(path: &str, route: &Route, ctx: &RuntimeCtx) -> MethodRouter
             any(proxy_with_decompression)
         }
         RouteKind::Dir(dir_route) => {
-            let svc = match &dir_route.base {
+            tracing::trace!(?dir_route);
+            match &dir_route.base {
                 Some(base_dir) => {
                     tracing::trace!(
                         "combining root: `{}` with given path: `{}`",
                         base_dir.display(),
                         dir_route.dir
                     );
-                    ServeDir::new(base_dir.join(&dir_route.dir))
+                    get_service(ServeDir::new(base_dir.join(&dir_route.dir)))
                 }
                 None => {
                     let pb = PathBuf::from(&dir_route.dir);
-                    if pb.is_absolute() {
+                    if pb.is_file() {
+                        get_service(ServeFile::new(pb))
+                    } else if pb.is_absolute() {
                         trace!("no root given, using `{}` directly", dir_route.dir);
-                        ServeDir::new(&dir_route.dir)
+                        get_service(
+                            ServeDir::new(&dir_route.dir).append_index_html_on_directories(true),
+                        )
                     } else {
                         let joined = ctx.cwd().join(pb);
                         trace!(?joined, "serving");
-                        ServeDir::new(joined)
+                        get_service(ServeDir::new(joined).append_index_html_on_directories(true))
                     }
                 }
             }
-            .append_index_html_on_directories(true);
-            get_service(svc)
         }
     }
 }
