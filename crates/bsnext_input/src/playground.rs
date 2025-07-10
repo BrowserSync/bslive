@@ -1,5 +1,6 @@
 use crate::path_def::PathDef;
-use crate::route::{FallbackRoute, Opts, Route, RouteKind};
+use crate::route::{FallbackRoute, ListOrSingle, Opts, Route, RouteKind};
+use crate::when_guard::WhenGuard;
 use bsnext_guards::path_matcher::PathMatcher;
 use bsnext_guards::MatcherList;
 use bsnext_resp::builtin_strings::{BuiltinStringDef, BuiltinStrings};
@@ -44,7 +45,9 @@ impl Playground {
                 kind: RouteKind::new_html(FALLBACK_HTML),
                 opts: Default::default(),
             }),
-            when: Default::default(),
+            when: Some(ListOrSingle::WhenOne(WhenGuard::ExactUri {
+                exact_uri: true,
+            })),
         };
         let js_route = Route {
             path: js,
