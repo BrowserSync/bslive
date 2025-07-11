@@ -28,6 +28,7 @@ use std::sync::Arc;
 use tower::{ServiceBuilder, ServiceExt};
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 use tracing::{span, Level};
 
 mod assets;
@@ -43,10 +44,7 @@ pub fn make_router(state: &Arc<ServerState>) -> Router {
         .merge(dynamic_loaders(state.clone()));
 
     router
-        // todo(alpha): enable tracing on a per-item basis?
-        // .layer(TraceLayer::new_for_http())
-        // todo(alpha): re-enable in the correct place?
-        // .layer(TimeoutLayer::new(Duration::from_secs(10)))
+        .layer(TraceLayer::new_for_http())
         .layer(Extension(client))
     // todo: When to add this compression back in?
     // .layer(CompressionLayer::new())
