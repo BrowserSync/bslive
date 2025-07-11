@@ -82,7 +82,7 @@ export type RouteKindDTO =
 	raw: string;
 }}
 	| { kind: "Sse", payload: {
-	sse: string;
+	sse: SseDTOOpts;
 }}
 	| { kind: "Proxy", payload: {
 	proxy: string;
@@ -124,6 +124,10 @@ export interface ServerDesc {
 
 export interface ServersChangedDTO {
 	servers_resp: GetActiveServersResponseDTO;
+}
+
+export interface SseDTOOpts {
+	body: string;
 }
 
 export interface StderrLineDTO {

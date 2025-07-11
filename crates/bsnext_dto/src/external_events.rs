@@ -100,7 +100,7 @@ where
 
 pub fn print_stopped_watching<W: Write>(w: &mut W, evt: &StoppedWatchingDTO) -> anyhow::Result<()> {
     for x in &evt.paths {
-        writeln!(w, "[watching:stopped] {}", x)?;
+        writeln!(w, "[watching:stopped] {x}")?;
     }
     Ok(())
 }

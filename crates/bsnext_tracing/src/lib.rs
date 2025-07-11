@@ -75,27 +75,48 @@ pub enum OtelOption {
     Off,
 }
 
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
+pub enum LogHttp {
+    #[default]
+    On,
+    Off,
+}
+
 pub fn init_tracing(
     log_level: Option<LogLevel>,
+    log_http: LogHttp,
     format: OutputFormat,
     write_option: WriteOption,
     line_opts: LineNumberOption,
 ) -> Option<()> {
-    let level = level(log_level);
+    let level = level(log_level, log_http);
     raw_tracing::init_tracing_subscriber(&level, format, write_option, line_opts);
     None::<()>
 }
 
-pub fn level(log_level: Option<LogLevel>) -> String {
-    match log_level {
-        None => String::new(),
-        Some(level) => {
+pub fn level(log_level: Option<LogLevel>, log_http: LogHttp) -> String {
+    match (log_level, log_http) {
+        (None, LogHttp::Off) => String::new(),
+        (None, LogHttp::On) => "tower_http=debug".to_string(),
+        (Some(level), LogHttp::On) => {
             let level = level.to_string();
             let lines = [
                 format!("bsnext={level}"),
                 "bsnext_fs::stream=info".to_string(),
                 "bsnext_fs::buffered_debounce=info".to_string(),
-                // format!("tower_http={level}"),
+                format!("tower_http=debug"),
+                // "bsnext_fs::watcher=info".to_string(),
+                // "bsnext_core::server_actor=info".to_string(),
+            ];
+
+            lines.join(",")
+        }
+        (Some(level), LogHttp::Off) => {
+            let level = level.to_string();
+            let lines = [
+                format!("bsnext={level}"),
+                "bsnext_fs::stream=info".to_string(),
+                "bsnext_fs::buffered_debounce=info".to_string(),
                 // "bsnext_fs::watcher=info".to_string(),
                 // "bsnext_core::server_actor=info".to_string(),
             ];

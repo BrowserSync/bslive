@@ -1,5 +1,7 @@
+use crate::root_path::{RootPath, RootPathError};
 use http::Uri;
 use std::str::FromStr;
+use tracing::trace_span;
 use urlpattern::UrlPatternInit;
 use urlpattern::UrlPatternMatchInput;
 use urlpattern::{UrlPattern, UrlPatternOptions};
@@ -7,14 +9,19 @@ use urlpattern::{UrlPattern, UrlPatternOptions};
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
 pub enum PathMatcher {
-    Str(String),
+    Str(#[serde(with = "crate::root_path")] RootPath),
     Def(PathMatcherDef),
 }
 
-impl PathMatcher {
-    pub fn str(str: impl Into<String>) -> Self {
-        Self::Str(str.into())
+impl FromStr for PathMatcher {
+    type Err = RootPathError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(PathMatcher::Str(RootPath::from_str(s)?))
     }
+}
+
+impl PathMatcher {
     pub fn pathname(str: impl Into<String>) -> Self {
         Self::Def(PathMatcherDef {
             pathname: Some(str.into()),
@@ -37,6 +44,8 @@ pub struct PathMatcherDef {
 
 impl PathMatcher {
     pub fn test_uri(&self, uri: &Uri) -> bool {
+        let span = trace_span!("test_uri", uri = ?uri, path_matcher = ?self);
+        let _g = span.enter();
         let Some(path_and_query) = uri.path_and_query() else {
             tracing::error!("how is this possible?");
             return false;
@@ -51,11 +60,13 @@ impl PathMatcher {
             ..Default::default()
         };
 
+        tracing::trace!(?incoming);
+
         // convert the config into UrlPatternInit
         // example: /style.css
         let matching_options: UrlPatternInit = match self {
             PathMatcher::Str(str) => {
-                if let Ok(uri) = &Uri::from_str(str) {
+                if let Ok(uri) = &Uri::from_str(str.as_str()) {
                     if let Some(pq) = uri.path_and_query() {
                         let path = pq.path();
                         let query = pq.query();
@@ -65,11 +76,11 @@ impl PathMatcher {
                             ..Default::default()
                         }
                     } else {
-                        tracing::error!("could not parse the matching string you gave {}", str);
+                        tracing::trace!(?str, "path and query was missing");
                         Default::default()
                     }
                 } else {
-                    tracing::error!("could not parse the matching string you gave {}", str);
+                    tracing::trace!(?str, "Uri::from_str failed");
                     Default::default()
                 }
             }
@@ -80,11 +91,14 @@ impl PathMatcher {
             },
         };
         let opts = UrlPatternOptions::default();
+        tracing::trace!(?opts);
+
         let Ok(pattern) = <UrlPattern>::parse(matching_options, opts) else {
             tracing::error!("could not parse the input");
             return false;
         };
-        // dbg!(&incoming);
+        tracing::trace!(?pattern);
+
         match pattern.test(UrlPatternMatchInput::Init(incoming)) {
             Ok(true) => {
                 tracing::trace!("matched!");
@@ -106,6 +120,7 @@ impl PathMatcher {
 mod test {
     use crate::path_matcher::PathMatcher;
     use http::Uri;
+    use std::str::FromStr;
 
     #[test]
     fn test_url_pattern_pathname() {
@@ -128,14 +143,14 @@ mod test {
         );
     }
     #[test]
-    fn test_url_pattern_query() {
-        let pm = PathMatcher::str("/?abc=true");
+    fn test_url_pattern_query() -> anyhow::Result<()> {
+        let pm = PathMatcher::from_str("/?abc=true")?;
         assert_eq!(pm.test_uri(&Uri::from_static("/")), false);
         assert_eq!(pm.test_uri(&Uri::from_static("/?def=true")), false);
         assert_eq!(pm.test_uri(&Uri::from_static("/?abc=true")), true);
         assert_eq!(pm.test_uri(&Uri::from_static("/?abc=")), false);
 
-        let pm2 = PathMatcher::str("/**/*?delayms");
+        let pm2 = PathMatcher::from_str("/**/*?delayms")?;
         assert_eq!(pm2.test_uri(&Uri::from_static("/?delayms")), true);
 
         let pm2 = PathMatcher::query("?*a*b*c*foo=bar");
@@ -143,18 +158,19 @@ mod test {
             pm2.test_uri(&Uri::from_static("/?delay.ms=2000&a-b-c-foo=bar")),
             true
         );
+        Ok(())
     }
     #[test]
-    fn test_url_pattern_str() {
-        let pm = PathMatcher::str("/");
+    fn test_url_pattern_str() -> anyhow::Result<()> {
+        let pm = PathMatcher::from_str("/")?;
         assert_eq!(pm.test_uri(&Uri::from_static("/")), true);
-        let pm = PathMatcher::str("/*.css");
+        let pm = PathMatcher::from_str("/*.css")?;
         assert_eq!(pm.test_uri(&Uri::from_static("/style.css")), true);
-        let pm = PathMatcher::str("/here/*.css");
+        let pm = PathMatcher::from_str("/here/*.css")?;
         assert_eq!(pm.test_uri(&Uri::from_static("/style.css")), false);
-        let pm = PathMatcher::str("/**/*.css");
+        let pm = PathMatcher::from_str("/**/*.css")?;
         assert_eq!(pm.test_uri(&Uri::from_static("/style.css")), true);
-        let pm = PathMatcher::str("/**/*.css");
+        let pm = PathMatcher::from_str("/**/*.css")?;
         assert_eq!(
             pm.test_uri(&Uri::from_static("/a/b/c/--oopasxstyle.css")),
             true
@@ -163,5 +179,6 @@ mod test {
             pm.test_uri(&Uri::from_static("/a/b/c/--oopasxstyle.html")),
             false
         );
+        Ok(())
     }
 }

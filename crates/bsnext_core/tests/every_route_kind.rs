@@ -23,7 +23,8 @@ servers:
   - path: /raw
     raw: -----raw-content----
   - path: /sse
-    sse: |
+    sse: 
+      body: |
         a
         b
         c

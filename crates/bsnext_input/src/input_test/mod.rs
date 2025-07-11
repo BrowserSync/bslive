@@ -257,6 +257,26 @@ servers:
         ]
     )
 }
+// #[test]
+// fn test_deserialize_server_watch_run_opts() {
+//     let input = r#"
+// servers:
+// - bind_address: 0.0.0.0:4000
+//   watchers:
+//     - dirs: ./
+//     - dirs: ./other
+//       debounce:
+//         ms: 2000
+//       filter:
+//         ext: "**/*.css"
+//       run:
+//         - sh: echo lol
+//         - bslive: huh
+// "#;
+//     let c: Result<Input, _> = serde_yaml::from_str(input);
+//     assert!(c.is_err());
+//     // dbg!(&c.servers.get(0).unwrap().watchers.get(1).unwrap());
+// }
 #[test]
 fn test_deserialize_server_clients_config() {
     let input = r#"

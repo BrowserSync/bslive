@@ -198,7 +198,7 @@ impl Display for TaskResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.status {
             TaskStatus::Ok(_s) => write!(f, "✅"),
-            TaskStatus::Err(err) => write!(f, "❌, {}", err),
+            TaskStatus::Err(err) => write!(f, "❌, {err}"),
         }
     }
 }

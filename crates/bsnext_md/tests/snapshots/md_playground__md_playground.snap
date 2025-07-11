@@ -31,7 +31,9 @@ expression: routes
                         only: Some(
                             Item(
                                 Str(
-                                    "/",
+                                    RootPath {
+                                        inner: "/",
+                                    },
                                 ),
                             ),
                         ),
@@ -47,7 +49,9 @@ expression: routes
                         only: Some(
                             Item(
                                 Str(
-                                    "/",
+                                    RootPath {
+                                        inner: "/",
+                                    },
                                 ),
                             ),
                         ),
@@ -61,7 +65,9 @@ expression: routes
                         only: Some(
                             Item(
                                 Str(
-                                    "/",
+                                    RootPath {
+                                        inner: "/",
+                                    },
                                 ),
                             ),
                         ),
@@ -94,6 +100,13 @@ expression: routes
                 },
             },
         ),
+        when: Some(
+            WhenOne(
+                ExactUri {
+                    exact_uri: true,
+                },
+            ),
+        ),
     },
     Route {
         path: PathDef {
@@ -118,6 +131,7 @@ expression: routes
             compression: None,
         },
         fallback: None,
+        when: None,
     },
     Route {
         path: PathDef {
@@ -142,6 +156,7 @@ expression: routes
             compression: None,
         },
         fallback: None,
+        when: None,
     },
     Route {
         path: PathDef {
@@ -166,5 +181,6 @@ expression: routes
             compression: None,
         },
         fallback: None,
+        when: None,
     },
 ]

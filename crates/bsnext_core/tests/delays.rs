@@ -71,6 +71,8 @@ async fn test_proxy_delay() -> Result<(), anyhow::Error> {
     );
     proxy_route.kind = RouteKind::Proxy(ProxyRoute {
         proxy: proxy.http_addr.clone(),
+        rewrite_uri: None,
+        proxy_headers: None,
     });
 
     let state = into_state(config);

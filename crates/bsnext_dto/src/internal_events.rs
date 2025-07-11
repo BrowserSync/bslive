@@ -63,18 +63,18 @@ impl OutputWriterTrait for InternalEvents {
                 let n = miette::GraphicalReportHandler::new();
                 let mut inner = String::new();
                 n.render_report(&mut inner, bs_rules).expect("write?");
-                writeln!(sink, "{}", inner)?;
+                writeln!(sink, "{inner}")?;
             }
             InternalEvents::InputError(err) => {
-                writeln!(sink, "{}", err)?;
+                writeln!(sink, "{err}")?;
             }
             InternalEvents::StartupError(err) => {
-                writeln!(sink, "{}", err)?;
+                writeln!(sink, "{err}")?;
             }
             InternalEvents::TaskReport(TaskReportAndTree { report, tree }) => {
                 if report.has_errors() {
                     let s = archy(tree, None);
-                    write!(sink, "{}", s)?;
+                    write!(sink, "{s}")?;
                 }
             }
         }
@@ -136,19 +136,19 @@ pub fn print_server_updates(evts: &[ChildResult]) -> Vec<String> {
 pub fn server_display(identity_dto: &ServerIdentityDTO, socket_addr: &str) -> String {
     match &identity_dto {
         ServerIdentityDTO::Both { name, .. } => {
-            format!("[server] [{}] http://{}", name, socket_addr)
+            format!("[server] [{name}] http://{socket_addr}")
         }
         ServerIdentityDTO::Address { .. } => {
-            format!("[server] http://{}", socket_addr)
+            format!("[server] http://{socket_addr}")
         }
         ServerIdentityDTO::Named { name } => {
-            format!("[server] [{}] http://{}", name, &socket_addr)
+            format!("[server] [{name}] http://{socket_addr}")
         }
         ServerIdentityDTO::Port { port } => {
-            format!("[server] [{}] http://{}", port, &socket_addr)
+            format!("[server] [{port}] http://{socket_addr}")
         }
         ServerIdentityDTO::PortNamed { name, .. } => {
-            format!("[server] [{}] http://{}", name, &socket_addr)
+            format!("[server] [{name}] http://{socket_addr}")
         }
     }
 }

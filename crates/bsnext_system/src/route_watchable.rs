@@ -1,10 +1,10 @@
 use crate::server_watchable::to_task_list;
 use crate::task_list::TaskList;
-use bsnext_input::route::{DirRoute, FilterKind, RouteKind, Spec};
+use bsnext_input::route::{DirRoute, FilterKind, RawRoute, RouteKind, Spec, SseOpts};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::watch_opts::WatchOpts;
 use bsnext_input::Input;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct RouteWatchable {
@@ -24,23 +24,41 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                 .routes
                 .iter()
                 .filter(|r| r.opts.watch.is_enabled())
-                .filter_map(|r| match &r.kind {
-                    RouteKind::Raw(_) => None,
-                    RouteKind::Proxy(_) => None,
-                    RouteKind::Dir(DirRoute { dir, .. }) => {
-                        let spec = to_spec(&r.opts.watch);
-                        let run = to_task_list(&spec);
-                        Some(RouteWatchable {
-                            server_identity: server_config.identity.clone(),
-                            route_path: r.path.as_str().to_owned(),
-                            dir: PathBuf::from(dir),
-                            spec,
-                            task_list: run,
-                        })
-                    }
+                .filter_map(|r| {
+                    let output = match &r.kind {
+                        RouteKind::Raw(route) => maybe_source_file(route).map(PathBuf::from),
+                        RouteKind::Dir(DirRoute { dir, .. }) => Some(PathBuf::from(dir)),
+                        RouteKind::Proxy(_) => None,
+                    };
+
+                    // exit early if there's no related path
+                    let pb = output?;
+
+                    let identity = server_config.identity.clone();
+
+                    let spec = to_spec(&r.opts.watch);
+                    let run = to_task_list(&spec);
+                    let route_path = r.path.as_str().to_owned();
+
+                    Some(RouteWatchable {
+                        server_identity: identity,
+                        route_path,
+                        dir: pb,
+                        spec,
+                        task_list: run,
+                    })
                 })
         })
         .collect()
+}
+
+pub fn maybe_source_file(raw_route: &RawRoute) -> Option<&Path> {
+    match raw_route {
+        RawRoute::Sse {
+            sse: SseOpts { body, .. },
+        } => body.split_once("file:").map(|(_, path)| Path::new(path)),
+        _ => None,
+    }
 }
 
 pub fn to_spec(wo: &WatchOpts) -> Spec {

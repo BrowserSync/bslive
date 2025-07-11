@@ -32,7 +32,11 @@ impl TryInto<Route> for RouteCli {
             },
             SubCommands::Proxy { path, target, opts } => Route {
                 path: PathDef::try_new(path)?,
-                kind: RouteKind::Proxy(ProxyRoute { proxy: target }),
+                kind: RouteKind::Proxy(ProxyRoute {
+                    proxy: target,
+                    proxy_headers: None,
+                    rewrite_uri: None,
+                }),
                 opts: opts_to_route_opts(&opts),
                 ..std::default::Default::default()
             },
