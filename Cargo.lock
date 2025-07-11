@@ -588,9 +588,11 @@ dependencies = [
 name = "bsnext_guards"
 version = "0.18.0"
 dependencies = [
+ "anyhow",
  "axum",
  "http",
  "serde",
+ "thiserror",
  "tracing",
  "urlpattern",
 ]

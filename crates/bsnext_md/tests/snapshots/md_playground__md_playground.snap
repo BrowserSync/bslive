@@ -31,7 +31,9 @@ expression: routes
                         only: Some(
                             Item(
                                 Str(
-                                    "/",
+                                    RootPath {
+                                        inner: "/",
+                                    },
                                 ),
                             ),
                         ),
@@ -47,7 +49,9 @@ expression: routes
                         only: Some(
                             Item(
                                 Str(
-                                    "/",
+                                    RootPath {
+                                        inner: "/",
+                                    },
                                 ),
                             ),
                         ),
@@ -61,7 +65,9 @@ expression: routes
                         only: Some(
                             Item(
                                 Str(
-                                    "/",
+                                    RootPath {
+                                        inner: "/",
+                                    },
                                 ),
                             ),
                         ),
@@ -94,7 +100,13 @@ expression: routes
                 },
             },
         ),
-        when: None,
+        when: Some(
+            WhenOne(
+                ExactUri {
+                    exact_uri: true,
+                },
+            ),
+        ),
     },
     Route {
         path: PathDef {

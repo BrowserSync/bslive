@@ -4,6 +4,9 @@ servers:
       - path: /api
         proxy: https://example.com
         rewrite_uri: false
+        inject:
+          - append: 'abc'
+            only: /index.html
   - port: 3002
     routes:
       - path: /

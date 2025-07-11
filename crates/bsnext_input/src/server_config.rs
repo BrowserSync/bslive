@@ -29,11 +29,13 @@ impl ServerConfig {
         let routes = self.routes.clone();
         match &self.playground {
             None => self.routes.clone(),
-            Some(playground) => {
-                let mut pg_routes = playground.as_routes();
-                pg_routes.extend(routes);
-                pg_routes
-            }
+            Some(playground) => match playground.as_routes() {
+                Ok(mut pg_routes) => {
+                    pg_routes.extend(routes);
+                    pg_routes
+                }
+                Err(_) => routes,
+            },
         }
     }
     pub fn raw_routes(&self) -> &[Route] {

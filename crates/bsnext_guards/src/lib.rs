@@ -5,6 +5,7 @@ use axum::response::IntoResponse;
 use http::Uri;
 
 pub mod path_matcher;
+pub mod root_path;
 pub mod route_guard;
 
 #[derive(Debug, Default, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]

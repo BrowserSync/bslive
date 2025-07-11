@@ -6,6 +6,7 @@ use bsnext_guards::MatcherList;
 use bsnext_resp::builtin_strings::{BuiltinStringDef, BuiltinStrings};
 use bsnext_resp::inject_addition::{AdditionPosition, InjectAddition};
 use bsnext_resp::inject_opts::{InjectOpts, Injection, InjectionItem};
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Default, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Playground {
@@ -17,7 +18,7 @@ pub struct Playground {
 const FALLBACK_HTML: &str = "This is a BSLIVE playground";
 
 impl Playground {
-    pub fn as_routes(&self) -> Vec<Route> {
+    pub fn as_routes(&self) -> anyhow::Result<Vec<Route>> {
         let home_path = PathDef::try_new("/");
         let js_path = PathDef::try_new("/__bslive_playground.js");
         let css_path = PathDef::try_new("/__bslive_playground.css");
@@ -26,7 +27,7 @@ impl Playground {
         let (Ok(home), Ok(js), Ok(css), Ok(reset_path)) =
             (home_path, js_path, css_path, reset_path)
         else {
-            return vec![];
+            return Ok(vec![]);
         };
 
         let home_route = Route {
@@ -36,7 +37,7 @@ impl Playground {
                 cors: None,
                 delay: None,
                 watch: Default::default(),
-                inject: playground_wrap(),
+                inject: playground_wrap()?,
                 headers: None,
                 compression: None,
                 ..Default::default()
@@ -72,11 +73,11 @@ impl Playground {
             kind: RouteKind::new_raw(include_str!("../../../ui/styles/reset.css")),
             ..Default::default()
         };
-        vec![home_route, js_route, css_route, reset_route]
+        Ok(vec![home_route, js_route, css_route, reset_route])
     }
 }
 
-fn playground_wrap() -> InjectOpts {
+fn playground_wrap() -> anyhow::Result<InjectOpts> {
     let prepend = r#"
 <!doctype html>
   <html lang="en">
@@ -93,24 +94,24 @@ fn playground_wrap() -> InjectOpts {
   </body>
 </html>
 "#;
-    InjectOpts::Items(vec![
+    Ok(InjectOpts::Items(vec![
         InjectionItem {
             inner: Injection::Addition(InjectAddition {
                 addition_position: AdditionPosition::Prepend(prepend.to_string()),
             }),
-            only: Some(MatcherList::Item(PathMatcher::Str("/".to_string()))),
+            only: Some(MatcherList::Item(PathMatcher::from_str("/")?)),
         },
         InjectionItem {
             inner: Injection::Addition(InjectAddition {
                 addition_position: AdditionPosition::Append(append.to_string()),
             }),
-            only: Some(MatcherList::Item(PathMatcher::Str("/".to_string()))),
+            only: Some(MatcherList::Item(PathMatcher::from_str("/")?)),
         },
         InjectionItem {
             inner: Injection::BsLive(BuiltinStringDef {
                 name: BuiltinStrings::Connector,
             }),
-            only: Some(MatcherList::Item(PathMatcher::Str("/".to_string()))),
+            only: Some(MatcherList::Item(PathMatcher::from_str("/")?)),
         },
-    ])
+    ]))
 }
