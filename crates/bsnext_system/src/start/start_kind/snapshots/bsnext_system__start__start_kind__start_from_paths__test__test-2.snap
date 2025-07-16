@@ -15,6 +15,7 @@ servers:
         compression: ~
         fallback: ~
         when: ~
+        when_body: ~
     watchers: []
     playground: ~
     clients:

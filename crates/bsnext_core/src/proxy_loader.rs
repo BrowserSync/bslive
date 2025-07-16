@@ -3,9 +3,10 @@ mod test {
 
     use crate::handler_stack::RouteMap;
     use crate::runtime_ctx::RuntimeCtx;
-    use crate::server::router::common::{test_proxy, to_resp_parts_and_body};
+    use crate::server::router::common::{test_proxy, to_resp_body, to_resp_parts_and_body};
     use axum::body::Body;
     use axum::extract::Request;
+    use axum::response::IntoResponse;
     use axum::routing::{get, post};
     use axum::{Extension, Json, Router};
     use bsnext_input::route::Route;
@@ -118,6 +119,90 @@ mod test {
 
         Ok(())
     }
+    #[tokio::test]
+    async fn test_post_guard() -> anyhow::Result<()> {
+        let https = HttpsConnector::new();
+        let client: Client<HttpsConnector<HttpConnector>, Body> =
+            Client::builder(TokioExecutor::new()).build(https);
+
+        #[derive(Debug, serde::Serialize, serde::Deserialize)]
+        struct Person {
+            name: String,
+        }
+
+        async fn handler(Json(mut person): Json<Person>) -> impl IntoResponse {
+            dbg!(&person);
+            person.name = format!("-->{}", person.name);
+            Json(person)
+        }
+
+        let proxy_app = Router::new()
+            .route("/did-post", post(handler))
+            .route("/control", post(handler));
+
+        let proxy = test_proxy(proxy_app).await?;
+
+        let routes_input = format!(
+            r#"
+            - path: /did-post
+              rewrite_uri: false
+              proxy: {http}
+              when_body:
+                json:
+                    path: "/name"
+                    is: "shane"
+            - path: /control
+              rewrite_uri: false
+              proxy: {http}
+              when_body:
+                json:
+                    path: "/name"
+                    is: "kittie"
+        "#,
+            http = proxy.http_addr
+        );
+
+        let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
+        let router = RouteMap::new_from_routes(&routes)
+            .into_router(&RuntimeCtx::default())
+            .layer(Extension(client));
+
+        let expected_response_body = "{\"name\":\"-->shane\"}";
+
+        let outgoing_body = serde_json::to_string(&json!({
+            "name": "shane"
+        }))?;
+
+        // expected
+        {
+            // Define the request
+            let request = Request::post("/did-post")
+                .header("Content-Type", "application/json")
+                .body(outgoing_body.clone())?;
+
+            // Make a one-shot request on the router
+            let response = router.clone().oneshot(request).await?;
+            let body = to_resp_body(response).await;
+            assert_eq!(body, expected_response_body);
+        }
+
+        // control, this makes sure we can see a 404
+        {
+            // Define the request
+            let request = Request::post("/control")
+                .header("Content-Type", "application/json")
+                .body(outgoing_body.clone())?;
+
+            // Make a one-shot request on the router
+            let response = router.oneshot(request).await?;
+            assert_eq!(response.status().as_u16(), 404);
+        }
+
+        proxy.destroy().await?;
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_path_rewriting() -> anyhow::Result<()> {
         let https = HttpsConnector::new();

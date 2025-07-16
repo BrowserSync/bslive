@@ -104,7 +104,7 @@ pub fn level(log_level: Option<LogLevel>, log_http: LogHttp) -> String {
                 format!("bsnext={level}"),
                 "bsnext_fs::stream=info".to_string(),
                 "bsnext_fs::buffered_debounce=info".to_string(),
-                format!("tower_http=debug"),
+                "tower_http=debug".to_string(),
                 // "bsnext_fs::watcher=info".to_string(),
                 // "bsnext_core::server_actor=info".to_string(),
             ];

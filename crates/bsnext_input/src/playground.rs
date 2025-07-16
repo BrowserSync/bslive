@@ -49,6 +49,7 @@ impl Playground {
             when: Some(ListOrSingle::WhenOne(WhenGuard::ExactUri {
                 exact_uri: true,
             })),
+            when_body: None,
         };
         let js_route = Route {
             path: js,

@@ -107,6 +107,7 @@ expression: routes
                 },
             ),
         ),
+        when_body: None,
     },
     Route {
         path: PathDef {
@@ -132,6 +133,7 @@ expression: routes
         },
         fallback: None,
         when: None,
+        when_body: None,
     },
     Route {
         path: PathDef {
@@ -157,6 +159,7 @@ expression: routes
         },
         fallback: None,
         when: None,
+        when_body: None,
     },
     Route {
         path: PathDef {
@@ -182,5 +185,6 @@ expression: routes
         },
         fallback: None,
         when: None,
+        when_body: None,
     },
 ]
