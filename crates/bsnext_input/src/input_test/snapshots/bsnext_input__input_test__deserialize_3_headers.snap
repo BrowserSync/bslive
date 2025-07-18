@@ -36,6 +36,8 @@ Config {
                 compression: None,
             },
             fallback: None,
+            when: None,
+            when_body: None,
         },
     ],
 }

@@ -2,17 +2,17 @@ use crate::injector_guard::ByteReplacer;
 use crate::RespMod;
 use axum::extract::Request;
 use bsnext_guards::route_guard::RouteGuard;
-use http::Response;
+use http::{Response, Uri};
 
 #[derive(Debug, Default)]
 pub struct JsConnector;
 
 impl RouteGuard for JsConnector {
-    fn accept_req(&self, _req: &Request) -> bool {
+    fn accept_req(&self, _req: &Request, _outer_uri: &Uri) -> bool {
         true
     }
 
-    fn accept_res<T>(&self, res: &Response<T>) -> bool {
+    fn accept_res<T>(&self, res: &Response<T>, _outer_uri: &Uri) -> bool {
         let is_js = RespMod::is_js(res);
         tracing::trace!("is_js: {}", is_js);
         is_js

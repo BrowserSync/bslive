@@ -9,3 +9,5 @@ serde = { workspace = true }
 tracing = { workspace = true }
 axum = { workspace = true }
 http = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }

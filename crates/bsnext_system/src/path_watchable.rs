@@ -25,7 +25,7 @@ impl Display for PathWatchable {
                     .map(|x| format!("'{}'", x.display()))
                     .collect::<Vec<_>>()
                     .join(", ");
-                write!(f, "PathWatchable::Server({})", lines)?;
+                write!(f, "PathWatchable::Server({lines})")?;
             }
             PathWatchable::Route(route) => {
                 write!(f, "PathWatchable::Route('{}')", route.dir.display())?;
@@ -37,7 +37,7 @@ impl Display for PathWatchable {
                     .map(|x| format!("'{}'", x.display()))
                     .collect::<Vec<_>>()
                     .join(", ");
-                write!(f, "PathWatchable::Any({})", lines)?;
+                write!(f, "PathWatchable::Any({lines})")?;
             }
         }
         Ok(())

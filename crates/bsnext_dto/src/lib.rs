@@ -57,9 +57,15 @@ pub enum RouteKindDTO {
     Html { html: String },
     Json { json_str: String },
     Raw { raw: String },
-    Sse { sse: String },
+    Sse { sse: SseDTOOpts },
     Proxy { proxy: String },
     Dir { dir: String, base: Option<String> },
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize)]
+pub struct SseDTOOpts {
+    pub body: String,
 }
 
 impl From<RouteKind> for RouteKindDTO {
@@ -71,9 +77,16 @@ impl From<RouteKind> for RouteKindDTO {
                     json_str: serde_json::to_string(&json).expect("unreachable"),
                 },
                 RawRoute::Raw { raw } => RouteKindDTO::Raw { raw },
-                RawRoute::Sse { sse } => RouteKindDTO::Sse { sse },
+                RawRoute::Sse { sse: opts } => RouteKindDTO::Sse {
+                    sse: SseDTOOpts { body: opts.body },
+                },
             },
-            RouteKind::Proxy(ProxyRoute { proxy }) => RouteKindDTO::Proxy { proxy },
+            RouteKind::Proxy(ProxyRoute {
+                proxy,
+                proxy_headers: _outgoing_headers,
+                rewrite_uri: _rewrite,
+                ..
+            }) => RouteKindDTO::Proxy { proxy },
             RouteKind::Dir(DirRoute { dir, base }) => RouteKindDTO::Dir {
                 dir,
                 base: base.map(|b| b.to_string_lossy().to_string()),

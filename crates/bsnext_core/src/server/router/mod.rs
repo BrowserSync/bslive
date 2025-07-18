@@ -9,6 +9,7 @@ use axum::routing::{get, MethodRouter};
 use axum::{http, middleware, Extension, Router};
 
 use crate::meta::MetaData;
+use crate::not_found::not_found_service::not_found_loader;
 use crate::server::router::assets::pub_ui_assets;
 use crate::server::router::pub_api::pub_api;
 use crate::server::state::ServerState;
@@ -27,6 +28,7 @@ use std::sync::Arc;
 use tower::{ServiceBuilder, ServiceExt};
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 use tracing::{span, Level};
 
 mod assets;
@@ -42,10 +44,7 @@ pub fn make_router(state: &Arc<ServerState>) -> Router {
         .merge(dynamic_loaders(state.clone()));
 
     router
-        // todo(alpha): enable tracing on a per-item basis?
-        // .layer(TraceLayer::new_for_http())
-        // todo(alpha): re-enable in the correct place?
-        // .layer(TimeoutLayer::new(Duration::from_secs(10)))
+        .layer(TraceLayer::new_for_http())
         .layer(Extension(client))
     // todo: When to add this compression back in?
     // .layer(CompressionLayer::new())
@@ -105,9 +104,7 @@ pub fn dynamic_loaders(state: Arc<ServerState>) -> Router {
         .layer(
             ServiceBuilder::new()
                 .layer(from_fn_with_state(state.clone(), tagging_layer))
-                // .layer(from_fn_with_state(state.clone(), maybe_proxy))
-                // todo(alpha): have the order listed here instead: static -> dir -> proxy
-                // .layer(from_fn_with_state(state.clone(), not_found_loader))
+                .layer(from_fn_with_state(state.clone(), not_found_loader))
                 .layer(from_fn_with_state(state.clone(), dynamic_router)),
         )
         .layer(CatchPanicLayer::custom(handle_panic))

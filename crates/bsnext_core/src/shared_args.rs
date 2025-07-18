@@ -10,6 +10,10 @@ pub struct LoggingOpts {
     #[arg(long, name = "write-log")]
     pub write_log: bool,
 
+    /// allow http-level logging overrides
+    #[arg(long, name = "log-http")]
+    pub log_http: Option<bsnext_tracing::LogHttp>,
+
     /// output internal logs to bslive.log in the current directory
     #[arg(long)]
     pub filenames: bool,

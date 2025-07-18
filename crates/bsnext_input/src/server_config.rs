@@ -29,11 +29,13 @@ impl ServerConfig {
         let routes = self.routes.clone();
         match &self.playground {
             None => self.routes.clone(),
-            Some(playground) => {
-                let mut pg_routes = playground.as_routes();
-                pg_routes.extend(routes);
-                pg_routes
-            }
+            Some(playground) => match playground.as_routes() {
+                Ok(mut pg_routes) => {
+                    pg_routes.extend(routes);
+                    pg_routes
+                }
+                Err(_) => routes,
+            },
         }
     }
     pub fn raw_routes(&self) -> &[Route] {
@@ -95,7 +97,7 @@ where
             if value <= u16::MAX as u64 {
                 Ok(value as u16)
             } else {
-                Err(E::custom(format!("port number out of range: {}", value)))
+                Err(E::custom(format!("port number out of range: {value}")))
             }
         }
 
@@ -105,7 +107,7 @@ where
         {
             value
                 .parse::<u16>()
-                .map_err(|_| E::custom(format!("invalid port number: {}", value)))
+                .map_err(|_| E::custom(format!("invalid port number: {value}")))
         }
     }
 

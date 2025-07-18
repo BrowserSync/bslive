@@ -6,7 +6,8 @@ use crate::handler_stack::RouteMap;
 use crate::runtime_ctx::RuntimeCtx;
 use axum::body::Body;
 use axum::extract::Request;
-use axum::response::Response;
+use axum::middleware::{from_fn, Next};
+use axum::response::{IntoResponse, Response};
 use axum::Router;
 use bsnext_dto::ClientEvent;
 use bsnext_input::server_config::ServerConfig;
@@ -133,6 +134,11 @@ pub async fn test_proxy(router: Router) -> anyhow::Result<TestProxy> {
 
         // give consumers the address
         address_sender.send(socket_addr).expect("can send");
+        async fn logger(req: Request, next: Next) -> impl IntoResponse {
+            next.run(req).await
+        }
+
+        let router = router.layer(from_fn(logger));
 
         // serve and wait for shutdown
         axum::serve(listener, router)

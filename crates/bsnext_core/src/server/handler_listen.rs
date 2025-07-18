@@ -108,14 +108,14 @@ impl actix::Handler<Listen> for ServerActor {
                     }
                     _ => {
                         tracing::debug!("❌ {:?} [not-started] UNKNOWN {}", identity, e);
-                        Err(ServerError::Unknown(format!("{}", e)))
+                        Err(ServerError::Unknown(format!("{e}")))
                     }
                 },
             };
             if !oneshot_send.is_closed() {
                 let _r = oneshot_send.send(result);
             } else {
-                tracing::debug!("a channel was closed? {:?}", result);
+                tracing::debug!("a channel was closed? {result:?}");
             }
         };
 
@@ -134,7 +134,7 @@ impl actix::Handler<Listen> for ServerActor {
                 Ok(Err(server_error)) => Err(server_error),
                 Err(other) => {
                     tracing::error!("-->{other}");
-                    Err(ServerError::Unknown(format!("{:?}", other)))
+                    Err(ServerError::Unknown(format!("{other:?}")))
                 }
             }
         })

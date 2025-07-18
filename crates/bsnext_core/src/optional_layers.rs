@@ -59,9 +59,11 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
         app = app.layer(cl);
     }
 
-    app.layer(Extension(InjectHandling {
+    app = app.layer(Extension(InjectHandling {
         items: injections.items,
-    }))
+    }));
+
+    app
 }
 
 async fn delay_mw(
@@ -78,10 +80,10 @@ async fn delay_mw(
     }
 }
 
-async fn set_resp_headers_from_strs<B>(
+async fn set_resp_headers_from_strs(
     State(header_map): State<BTreeMap<String, String>>,
-    mut response: Response<B>,
-) -> Response<B> {
+    mut response: Response,
+) -> Response {
     let headers = response.headers_mut();
     for (k, v) in header_map {
         let hn = HeaderName::from_bytes(k.as_bytes());
