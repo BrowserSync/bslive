@@ -85,6 +85,7 @@ impl From<RouteKind> for RouteKindDTO {
                 proxy,
                 proxy_headers: _outgoing_headers,
                 rewrite_uri: _rewrite,
+                ..
             }) => RouteKindDTO::Proxy { proxy },
             RouteKind::Dir(DirRoute { dir, base }) => RouteKindDTO::Dir {
                 dir,

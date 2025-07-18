@@ -77,8 +77,8 @@ pub enum OtelOption {
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
 pub enum LogHttp {
-    #[default]
     On,
+    #[default]
     Off,
 }
 

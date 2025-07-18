@@ -5,27 +5,36 @@ use crate::runtime_ctx::RuntimeCtx;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::Handler;
-use axum::middleware::from_fn;
+use axum::middleware::{from_fn, map_response, Next};
 use axum::response::IntoResponse;
 use axum::routing::{any, any_service, get_service, MethodRouter};
-use axum::{Extension, Router};
+use axum::{middleware, Extension, Router};
+use axum_extra::middleware::option_layer;
 use bsnext_guards::route_guard::RouteGuard;
 use bsnext_guards::{uri_extension, OuterUri};
-use bsnext_input::route::{ListOrSingle, Route, RouteKind};
+use bsnext_input::route::{ListOrSingle, ProxyRoute, Route, RouteKind};
 use bsnext_input::when_guard::{HasGuard, JsonGuard, JsonPropGuard, WhenBodyGuard, WhenGuard};
 use bytes::Bytes;
-use http::header::CONTENT_TYPE;
+use http::header::{ACCEPT, CONTENT_TYPE};
 use http::request::Parts;
 use http::uri::PathAndQuery;
 use http::{Method, Response, StatusCode, Uri};
 use http_body_util::BodyExt;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::ffi::OsStr;
+use std::io;
 use std::ops::ControlFlow;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use tokio::fs::{create_dir_all, File};
+use tokio::io::{AsyncWriteExt, BufWriter};
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 use tower::ServiceExt;
+use tower_http::decompression::DecompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
-use tracing::{debug, trace, trace_span};
+use tracing::{debug, error, trace, trace_span};
 
 pub struct RouteMap {
     pub mapping: HashMap<String, Vec<Route>>,
@@ -136,10 +145,28 @@ pub async fn try_one(
                 .when_body
                 .as_ref()
                 .is_some_and(|body| NeedsJsonGuard(body).accept_req(&req, &outer_uri));
+
+            let css_req = req
+                .headers()
+                .get(ACCEPT)
+                .and_then(|h| h.to_str().ok())
+                .map(|c| c.contains("text/css"))
+                .unwrap_or(false);
+
+            let js_req = Path::new(req.uri().path())
+                .extension()
+                .is_some_and(|ext| ext == OsStr::new("js"));
+            let mirror = if (css_req || js_req) {
+                RouteHelper(&route).mirror().map(|v| v.to_path_buf())
+            } else {
+                None
+            };
+
             RouteCandidate {
                 index,
                 consume,
                 route,
+                mirror,
             }
         })
         .collect::<Vec<_>>();
@@ -163,7 +190,18 @@ pub async fn try_one(
             continue 'find_candidates;
         }
 
-        let method_router = to_method_router(&path, &candidate.route.kind, &ctx);
+        trace!(mirror = ?candidate.mirror);
+
+        let method_router = match &candidate.mirror {
+            None => to_method_router(&path, &candidate.route.kind, &ctx),
+            Some(mirror_path) => to_method_router(&path, &candidate.route.kind, &ctx)
+                .layer(DecompressionLayer::new())
+                .layer(middleware::from_fn_with_state(
+                    mirror_path.to_owned(),
+                    mirror_handler,
+                )),
+        };
+
         let raw_out: MethodRouter = optional_layers(method_router, &candidate.route.opts);
         let req_clone = match candidate.route.kind {
             RouteKind::Raw(_) => Request::from_parts(parts.clone(), Body::empty()),
@@ -177,6 +215,7 @@ pub async fn try_one(
             RouteKind::Dir(_) => Request::from_parts(parts.clone(), Body::empty()),
         };
 
+        // MAKE THE REQUEST
         let result = raw_out.oneshot(req_clone).await;
 
         match result {
@@ -210,11 +249,25 @@ pub async fn try_one(
     StatusCode::NOT_FOUND.into_response()
 }
 
+struct RouteHelper<'a>(pub &'a Route);
+
+impl<'a> RouteHelper<'a> {
+    fn mirror(&self) -> Option<&Path> {
+        match &self.0.kind {
+            RouteKind::Proxy(ProxyRoute {
+                unstable_mirror, ..
+            }) => unstable_mirror.as_ref().map(|s| Path::new(s)),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct RouteCandidate<'a> {
     index: usize,
     route: &'a Route,
     consume: bool,
+    mirror: Option<PathBuf>,
 }
 
 impl RouteCandidate<'_> {
@@ -287,6 +340,52 @@ fn to_method_router(path: &str, route_kind: &RouteKind, ctx: &RuntimeCtx) -> Met
             }
         }
     }
+}
+
+async fn mirror_handler(
+    State(path): State<PathBuf>,
+    req: Request,
+    next: Next,
+) -> impl IntoResponse {
+    let (mut sender, receiver) = tokio::sync::mpsc::channel::<Result<Bytes, io::Error>>(100);
+    let as_stream = ReceiverStream::from(receiver);
+    let c = req.uri().clone();
+    let p = path.join(c.path().strip_prefix("/").unwrap());
+
+    let r = next.run(req).await;
+    let s = r.into_body().into_data_stream();
+
+    tokio::spawn(async move {
+        let s = s.throttle(Duration::from_millis(10));
+        tokio::pin!(s);
+        create_dir_all(&p.parent().unwrap()).await.unwrap();
+        let mut file = BufWriter::new(File::create(p).await.unwrap());
+
+        while let Some(Ok(b)) = s.next().await {
+            match file.write(&b).await {
+                Ok(_) => {}
+                Err(e) => error!(?e, "could not write"),
+            };
+            // match file.write("\n".as_bytes()).await {
+            //     Ok(_) => {}
+            //     Err(e) => error!(?e, "could not new line"),
+            // };
+            match file.flush().await {
+                Ok(_) => {}
+                Err(e) => error!(?e, "could not flush"),
+            };
+            match sender.send(Ok(b)).await {
+                Ok(_) => {}
+                Err(e) => {
+                    error!(?e, "sender was dropped before reading was finished");
+                    error!("will break");
+                    break;
+                }
+            };
+        }
+    });
+
+    Body::from_stream(as_stream).into_response()
 }
 
 struct QueryHasGuard<'a>(pub &'a HasGuard);

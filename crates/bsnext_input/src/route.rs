@@ -125,6 +125,7 @@ impl Route {
                 proxy: a.as_ref().to_string(),
                 proxy_headers: None,
                 rewrite_uri: None,
+                unstable_mirror: None,
             }),
             ..Default::default()
         }
@@ -213,6 +214,12 @@ pub struct ProxyRoute {
     pub proxy: String,
     pub proxy_headers: Option<BTreeMap<String, String>>,
     pub rewrite_uri: Option<bool>,
+    pub unstable_mirror: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+struct Mirror {
+    pub dir: String,
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]

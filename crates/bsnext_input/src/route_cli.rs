@@ -36,6 +36,7 @@ impl TryInto<Route> for RouteCli {
                     proxy: target,
                     proxy_headers: None,
                     rewrite_uri: None,
+                    unstable_mirror: None,
                 }),
                 opts: opts_to_route_opts(&opts),
                 ..std::default::Default::default()
