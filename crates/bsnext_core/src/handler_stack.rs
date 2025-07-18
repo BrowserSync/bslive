@@ -14,6 +14,7 @@ use bsnext_guards::route_guard::RouteGuard;
 use bsnext_guards::{uri_extension, OuterUri};
 use bsnext_input::route::{ListOrSingle, ProxyRoute, Route, RouteKind};
 use bsnext_input::when_guard::{HasGuard, JsonGuard, JsonPropGuard, WhenBodyGuard, WhenGuard};
+use bsnext_resp::InjectHandling;
 use bytes::Bytes;
 use http::header::{ACCEPT, CONTENT_TYPE};
 use http::request::Parts;
@@ -162,11 +163,18 @@ pub async fn try_one(
                 None
             };
 
+            let injections = route.opts.inject.as_injections();
+            let req_accepted = injections
+                .items
+                .iter()
+                .any(|item| item.accept_req(&req, &outer_uri));
+
             RouteCandidate {
                 index,
                 consume,
                 route,
                 mirror,
+                inject: req_accepted,
             }
         })
         .collect::<Vec<_>>();
@@ -192,15 +200,19 @@ pub async fn try_one(
 
         trace!(mirror = ?candidate.mirror);
 
-        let method_router = match &candidate.mirror {
-            None => to_method_router(&path, &candidate.route.kind, &ctx),
-            Some(mirror_path) => to_method_router(&path, &candidate.route.kind, &ctx)
-                .layer(DecompressionLayer::new())
-                .layer(middleware::from_fn_with_state(
-                    mirror_path.to_owned(),
-                    mirror_handler,
-                )),
-        };
+        let mut method_router = to_method_router(&path, &candidate.route.kind, &ctx);
+
+        // decompress if needed
+        if candidate.mirror.is_some() || candidate.inject {
+            method_router = method_router.layer(DecompressionLayer::new());
+        }
+
+        if let Some(mirror_path) = &candidate.mirror {
+            method_router = method_router.layer(middleware::from_fn_with_state(
+                mirror_path.to_owned(),
+                mirror_handler,
+            ));
+        }
 
         let raw_out: MethodRouter = optional_layers(method_router, &candidate.route.opts);
         let req_clone = match candidate.route.kind {
@@ -268,6 +280,7 @@ struct RouteCandidate<'a> {
     route: &'a Route,
     consume: bool,
     mirror: Option<PathBuf>,
+    inject: bool,
 }
 
 impl RouteCandidate<'_> {

@@ -127,27 +127,6 @@ pub async fn proxy_handler(
         }
     }
 
-    // decompress requests if needed
-    if let Some(h) = req.extensions().get::<InjectHandling>() {
-        let req_accepted = h.items.iter().any(|item| item.accept_req(&req, &outer_uri));
-        tracing::trace!(
-            req.accepted = req_accepted,
-            req.accept.header = req
-                .headers()
-                .get("accept")
-                .map(|h| h.to_str().unwrap_or("")),
-            "will accept request + decompress?"
-        );
-        if req_accepted {
-            let sv2 = any(serve_one_proxy_req.layer(DecompressionLayer::new()));
-            return Ok(sv2
-                .oneshot(req)
-                .instrument(span.clone())
-                .await
-                .into_response());
-        }
-    }
-
     let sv2 = any(serve_one_proxy_req);
     Ok(sv2
         .oneshot(req)
