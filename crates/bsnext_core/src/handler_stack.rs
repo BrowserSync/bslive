@@ -6,20 +6,19 @@ use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::Handler;
 use axum::middleware::{from_fn, map_response, Next};
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{middleware, Extension, Router};
-use axum_extra::middleware::option_layer;
 use bsnext_guards::route_guard::RouteGuard;
 use bsnext_guards::{uri_extension, OuterUri};
 use bsnext_input::route::{ListOrSingle, ProxyRoute, Route, RouteKind};
 use bsnext_input::when_guard::{HasGuard, JsonGuard, JsonPropGuard, WhenBodyGuard, WhenGuard};
-use bsnext_resp::InjectHandling;
+use bsnext_resp::{response_modifications_layer, InjectHandling};
 use bytes::Bytes;
 use http::header::{ACCEPT, CONTENT_TYPE};
 use http::request::Parts;
 use http::uri::PathAndQuery;
-use http::{Method, Response, StatusCode, Uri};
+use http::{header, Method, StatusCode, Uri};
 use http_body_util::BodyExt;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -27,12 +26,12 @@ use std::ffi::OsStr;
 use std::io;
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 use tokio::fs::{create_dir_all, File};
 use tokio::io::{AsyncWriteExt, BufWriter};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_stream::StreamExt;
 use tower::ServiceExt;
+use tower_http::compression::{CompressionLayer, Predicate};
 use tower_http::decompression::DecompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{debug, error, trace, trace_span};
@@ -157,7 +156,7 @@ pub async fn try_one(
             let js_req = Path::new(req.uri().path())
                 .extension()
                 .is_some_and(|ext| ext == OsStr::new("js"));
-            let mirror = if (css_req || js_req) {
+            let mirror = if css_req || js_req {
                 RouteHelper(&route).mirror().map(|v| v.to_path_buf())
             } else {
                 None
@@ -171,7 +170,7 @@ pub async fn try_one(
 
             RouteCandidate {
                 index,
-                consume,
+                consume_body: consume,
                 route,
                 mirror,
                 inject: req_accepted,
@@ -200,21 +199,100 @@ pub async fn try_one(
 
         trace!(mirror = ?candidate.mirror);
 
+        #[derive(Clone, PartialEq, Debug)]
+        enum Encoding {
+            Gzip,
+            Br,
+            Deflate,
+            Zstd,
+        }
+
+        async fn mapper(res: Response) -> Response {
+            let h = res.headers().get(header::CONTENT_ENCODING);
+            let h = h.and_then(|hv| match hv.as_bytes() {
+                b"gzip" => Some(Encoding::Gzip),
+                b"deflate" => Some(Encoding::Deflate),
+                b"br" => Some(Encoding::Br),
+                b"zstd" => Some(Encoding::Zstd),
+                _ => None,
+            });
+            // let enc =
+            let (parts, body) = res.into_parts();
+            let mut next_req = Response::from_parts(parts, body);
+            if let Some(val) = h {
+                let m = next_req.extensions_mut();
+                m.insert(val);
+            }
+            next_req
+        }
+
+        impl Predicate for Encoding {
+            fn should_compress<B>(&self, response: &Response<B>) -> bool {
+                match response.extensions().get::<Encoding>() {
+                    Some(encoding) => encoding == self,
+                    None => false,
+                }
+            }
+        }
+
         let mut method_router = to_method_router(&path, &candidate.route.kind, &ctx);
 
-        // decompress if needed
-        if candidate.mirror.is_some() || candidate.inject {
+        if candidate.inject {
+            let injections = candidate.route.opts.inject.as_injections();
+            trace!(?injections);
+            method_router = method_router.layer(map_response(mapper));
             method_router = method_router.layer(DecompressionLayer::new());
+            method_router = method_router.layer(middleware::from_fn(response_modifications_layer));
+            method_router = method_router.layer(Extension(InjectHandling {
+                items: injections.items,
+            }));
+            method_router = method_router.layer(
+                CompressionLayer::new()
+                    .zstd(false)
+                    .gzip(false)
+                    .br(false)
+                    .deflate(true)
+                    .compress_when(Encoding::Deflate),
+            );
+            method_router = method_router.layer(
+                CompressionLayer::new()
+                    .zstd(false)
+                    .gzip(false)
+                    .br(true)
+                    .deflate(false)
+                    .compress_when(Encoding::Br),
+            );
+            method_router = method_router.layer(
+                CompressionLayer::new()
+                    .zstd(false)
+                    .gzip(true)
+                    .br(false)
+                    .deflate(false)
+                    .compress_when(Encoding::Gzip),
+            );
+            method_router = method_router.layer(
+                CompressionLayer::new()
+                    .zstd(true)
+                    .gzip(false)
+                    .br(false)
+                    .deflate(false)
+                    .compress_when(Encoding::Zstd),
+            );
         }
 
-        if let Some(mirror_path) = &candidate.mirror {
-            method_router = method_router.layer(middleware::from_fn_with_state(
-                mirror_path.to_owned(),
-                mirror_handler,
-            ));
-        }
+        // decompress if needed
+        // if candidate.mirror.is_some() {
+        //     method_router = method_router.layer(DecompressionLayer::new());
+        // }
+        //
+        // if let Some(mirror_path) = &candidate.mirror {
+        //     method_router = method_router.layer(middleware::from_fn_with_state(
+        //         mirror_path.to_owned(),
+        //         mirror_handler,
+        //     ));
+        // }
 
-        let raw_out: MethodRouter = optional_layers(method_router, &candidate.route.opts);
+        // let raw_out: MethodRouter = optional_layers(method_router, &candidate.route.opts);
         let req_clone = match candidate.route.kind {
             RouteKind::Raw(_) => Request::from_parts(parts.clone(), Body::empty()),
             RouteKind::Proxy(_) => {
@@ -228,7 +306,7 @@ pub async fn try_one(
         };
 
         // MAKE THE REQUEST
-        let result = raw_out.oneshot(req_clone).await;
+        let result = method_router.oneshot(req_clone).await;
 
         match result {
             Ok(result) => match result.status().as_u16() {
@@ -278,14 +356,14 @@ impl<'a> RouteHelper<'a> {
 struct RouteCandidate<'a> {
     index: usize,
     route: &'a Route,
-    consume: bool,
+    consume_body: bool,
     mirror: Option<PathBuf>,
     inject: bool,
 }
 
 impl RouteCandidate<'_> {
     pub async fn try_exec(&self, body: &mut Option<Body>) -> (Option<Body>, ControlFlow<()>) {
-        if self.consume {
+        if self.consume_body {
             trace!("trying to collect body because candidate needs it");
             match_json_body(body, self.route).await
         } else {
@@ -355,21 +433,22 @@ fn to_method_router(path: &str, route_kind: &RouteKind, ctx: &RuntimeCtx) -> Met
     }
 }
 
+#[allow(dead_code)]
 async fn mirror_handler(
     State(path): State<PathBuf>,
     req: Request,
     next: Next,
 ) -> impl IntoResponse {
-    let (mut sender, receiver) = tokio::sync::mpsc::channel::<Result<Bytes, io::Error>>(100);
-    let as_stream = ReceiverStream::from(receiver);
+    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<Result<Bytes, io::Error>>();
+    let as_stream = UnboundedReceiverStream::from(receiver);
     let c = req.uri().clone();
     let p = path.join(c.path().strip_prefix("/").unwrap());
-
     let r = next.run(req).await;
-    let s = r.into_body().into_data_stream();
+    let (parts, body) = r.into_parts();
+    let s = body.into_data_stream();
 
     tokio::spawn(async move {
-        let s = s.throttle(Duration::from_millis(10));
+        // let s = s.throttle(Duration::from_millis(10));
         tokio::pin!(s);
         create_dir_all(&p.parent().unwrap()).await.unwrap();
         let mut file = BufWriter::new(File::create(p).await.unwrap());
@@ -387,7 +466,7 @@ async fn mirror_handler(
                 Ok(_) => {}
                 Err(e) => error!(?e, "could not flush"),
             };
-            match sender.send(Ok(b)).await {
+            match sender.send(Ok(b)) {
                 Ok(_) => {}
                 Err(e) => {
                     error!(?e, "sender was dropped before reading was finished");
@@ -398,7 +477,7 @@ async fn mirror_handler(
         }
     });
 
-    Body::from_stream(as_stream).into_response()
+    Response::from_parts(parts, Body::from_stream(as_stream))
 }
 
 struct QueryHasGuard<'a>(pub &'a HasGuard);
