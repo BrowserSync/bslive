@@ -19,6 +19,7 @@ use axum::middleware::Next;
 use axum::response::IntoResponse;
 use axum::Extension;
 use bsnext_guards::route_guard::RouteGuard;
+use bsnext_guards::OuterUri;
 use http::header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE};
 use http::{Response, StatusCode};
 use http_body_util::BodyExt;
@@ -58,17 +59,19 @@ pub struct InjectHandling {
 
 pub async fn response_modifications_layer(
     Extension(inject): Extension<InjectHandling>,
+    Extension(OuterUri(outer_uri)): Extension<OuterUri>,
     req: Request,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let span = span!(parent: None, Level::TRACE, "resp-mod", uri=req.uri().path());
+    let span =
+        span!(parent: None, Level::TRACE, "resp-mod", uri=req.uri().path(), outer_uri=?outer_uri);
     let _guard = span.enter();
 
     // bail when there are no accepting modifications
     let req_accepted: Vec<InjectionItem> = inject
         .items
         .into_iter()
-        .filter(|item| item.accept_req(&req))
+        .filter(|item| item.accept_req(&req, &outer_uri))
         .collect();
 
     if req_accepted.is_empty() {
@@ -81,7 +84,7 @@ pub async fn response_modifications_layer(
     // also bail if no responses are accepted
     let res_accepted: Vec<InjectionItem> = req_accepted
         .into_iter()
-        .filter(|item| item.accept_res(&res))
+        .filter(|item| item.accept_res(&res, &outer_uri))
         .collect();
     if res_accepted.is_empty() {
         return Ok(res.into_response());

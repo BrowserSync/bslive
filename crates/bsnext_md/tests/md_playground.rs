@@ -33,7 +33,7 @@ console.log("hello world")
     let routes = first_server
         .playground
         .as_ref()
-        .map(|x| x.as_routes())
+        .map(|x| x.as_routes().unwrap())
         .unwrap();
     insta::assert_debug_snapshot!(routes);
     Ok(())

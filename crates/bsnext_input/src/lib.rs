@@ -24,6 +24,7 @@ pub mod target;
 #[cfg(test)]
 pub mod watch_opt_test;
 pub mod watch_opts;
+pub mod when_guard;
 pub mod yml;
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]

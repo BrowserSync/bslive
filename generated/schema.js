@@ -88,6 +88,9 @@ var injectConfigSchema = z.object({
 var inputAcceptedDTOSchema = z.object({
   path: z.string()
 });
+var sseDTOOptsSchema = z.object({
+  body: z.string()
+});
 var routeKindDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Html"),
@@ -110,7 +113,7 @@ var routeKindDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Sse"),
     payload: z.object({
-      sse: z.string()
+      sse: sseDTOOptsSchema
     })
   }),
   z.object({
@@ -127,10 +130,6 @@ var routeKindDTOSchema = z.discriminatedUnion("kind", [
     })
   })
 ]);
-var routeDTOSchema = z.object({
-  path: z.string(),
-  kind: routeKindDTOSchema
-});
 var serverChangeSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Stopped"),
@@ -160,9 +159,9 @@ var serverChangeSetItemSchema = z.object({
 var serverChangeSetSchema = z.object({
   items: z.array(serverChangeSetItemSchema)
 });
-var serverDescSchema = z.object({
-  routes: z.array(routeDTOSchema),
-  id: z.string()
+var routeDTOSchema = z.object({
+  path: z.string(),
+  kind: routeKindDTOSchema
 });
 var serversChangedDTOSchema = z.object({
   servers_resp: getActiveServersResponseDTOSchema
@@ -307,6 +306,10 @@ var startupEventDTOSchema = z.discriminatedUnion("kind", [
     payload: z.string()
   })
 ]);
+var serverDescSchema = z.object({
+  routes: z.array(routeDTOSchema),
+  id: z.string()
+});
 var externalEventsDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("ServersChanged"),
@@ -368,6 +371,7 @@ export {
   serverDescSchema,
   serverIdentityDTOSchema,
   serversChangedDTOSchema,
+  sseDTOOptsSchema,
   startupEventDTOSchema,
   stderrLineDTOSchema,
   stdoutLineDTOSchema,

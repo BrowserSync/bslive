@@ -35,7 +35,7 @@ impl From<WatchCommand> for MultiWatch {
             .map(ToOwned::to_owned)
             .enumerate()
             .map(move |(index, item)| {
-                let name = Some(format!("command:{}", index));
+                let name = Some(format!("command:{index}"));
                 let prefix = value.no_prefix.then_some(PrefixOpt::Bool(false));
                 RunOptItem::Sh(ShRunOptItem {
                     sh: item,
@@ -51,7 +51,7 @@ impl From<WatchCommand> for MultiWatch {
             .map(ToOwned::to_owned)
             .enumerate()
             .map(move |(index, item)| {
-                let name = Some(format!("initial:{}", index));
+                let name = Some(format!("initial:{index}"));
                 let prefix = value.no_prefix.then_some(PrefixOpt::Bool(false));
                 BeforeRunOptItem::Sh(ShRunOptItem {
                     sh: item,

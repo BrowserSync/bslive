@@ -514,6 +514,7 @@ dependencies = [
  "hyper-tls",
  "hyper-util",
  "insta",
+ "log",
  "mime_guess",
  "serde",
  "serde_json",
@@ -587,9 +588,11 @@ dependencies = [
 name = "bsnext_guards"
 version = "0.18.0"
 dependencies = [
+ "anyhow",
  "axum",
  "http",
  "serde",
+ "thiserror",
  "tracing",
  "urlpattern",
 ]

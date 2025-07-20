@@ -46,7 +46,7 @@ impl Display for Token {
             Token::RightTurnContinueDown => '├',
             Token::T => '┬',
         };
-        write!(f, "{}", t)
+        write!(f, "{t}")
     }
 }
 
@@ -103,7 +103,7 @@ pub fn archy(obj: &ArchyNode, line_prefix: Option<&str>) -> String {
                 .collect::<Vec<_>>()
                 .join("");
 
-            format!("{}{}{}{}", line_prefix, connector, branch, subtree_sliced)
+            format!("{line_prefix}{connector}{branch}{subtree_sliced}")
         })
         .collect::<Vec<_>>()
         .join("");

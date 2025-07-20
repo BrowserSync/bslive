@@ -1,6 +1,7 @@
 use crate::path_def::PathDef;
 use crate::route_cli::RouteCli;
 use crate::watch_opts::WatchOpts;
+use crate::when_guard::{WhenBodyGuard, WhenGuard};
 use bsnext_resp::cache_opts::CacheOpts;
 use bsnext_resp::inject_opts::InjectOpts;
 use matchit::InsertError;
@@ -20,6 +21,15 @@ pub struct Route {
     #[serde(flatten)]
     pub opts: Opts,
     pub fallback: Option<FallbackRoute>,
+    pub when: Option<ListOrSingle<WhenGuard>>,
+    pub when_body: Option<ListOrSingle<WhenBodyGuard>>,
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
+pub enum ListOrSingle<T> {
+    WhenOne(T),
+    WhenMany(Vec<T>),
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
@@ -65,6 +75,8 @@ impl Default for Route {
                 ..Default::default()
             },
             fallback: Default::default(),
+            when: Default::default(),
+            when_body: None,
         }
     }
 }
@@ -111,6 +123,9 @@ impl Route {
             },
             kind: RouteKind::Proxy(ProxyRoute {
                 proxy: a.as_ref().to_string(),
+                proxy_headers: None,
+                rewrite_uri: None,
+                unstable_mirror: None,
             }),
             ..Default::default()
         }
@@ -125,6 +140,21 @@ pub enum RouteKind {
     Dir(DirRoute),
 }
 
+impl Display for RouteKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RouteKind::Raw(raw) => match raw {
+                RawRoute::Html { html: _ } => write!(f, "Raw(HTML)"),
+                RawRoute::Json { json: _ } => write!(f, "Raw(JSON)"),
+                RawRoute::Raw { raw: _ } => write!(f, "Raw(Text)"),
+                RawRoute::Sse { sse: _ } => write!(f, "Raw(SSE)"),
+            },
+            RouteKind::Proxy(proxy) => write!(f, "Proxy({})", proxy.proxy),
+            RouteKind::Dir(dir) => write!(f, "Dir({})", dir.dir),
+        }
+    }
+}
+
 impl RouteKind {
     pub fn new_html(html: impl Into<String>) -> Self {
         RouteKind::Raw(RawRoute::Html { html: html.into() })
@@ -136,7 +166,12 @@ impl RouteKind {
         RouteKind::Raw(RawRoute::Json { json })
     }
     pub fn new_sse(raw: impl Into<String>) -> Self {
-        RouteKind::Raw(RawRoute::Sse { sse: raw.into() })
+        RouteKind::Raw(RawRoute::Sse {
+            sse: SseOpts {
+                body: raw.into(),
+                throttle_ms: None,
+            },
+        })
     }
 }
 
@@ -177,6 +212,14 @@ pub struct DirRoute {
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ProxyRoute {
     pub proxy: String,
+    pub proxy_headers: Option<BTreeMap<String, String>>,
+    pub rewrite_uri: Option<bool>,
+    pub unstable_mirror: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+struct Mirror {
+    pub dir: String,
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
@@ -185,7 +228,13 @@ pub enum RawRoute {
     Html { html: String },
     Json { json: JsonWrapper },
     Raw { raw: String },
-    Sse { sse: String },
+    Sse { sse: SseOpts },
+}
+
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+pub struct SseOpts {
+    pub body: String,
+    pub throttle_ms: Option<u64>,
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]

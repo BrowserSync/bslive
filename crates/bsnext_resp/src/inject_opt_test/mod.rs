@@ -191,6 +191,7 @@ fn test_inject_append_prepend() {
 
 #[test]
 fn test_path_matchers() {
+    use std::str::FromStr;
     #[derive(Debug, serde::Deserialize)]
     struct A {
         inject: InjectOpts,
@@ -208,7 +209,7 @@ inject:
                 addition_position: AdditionPosition::Append("lol".to_string()),
             }),
             only: Some(MatcherList::Items(vec![
-                PathMatcher::str("/*.css"),
+                PathMatcher::from_str("/*.css").unwrap(),
                 PathMatcher::pathname("/*.css"),
             ])),
         }),
@@ -219,6 +220,7 @@ inject:
 
 #[test]
 fn test_path_matcher_single() {
+    use std::str::FromStr;
     #[derive(Debug, serde::Deserialize)]
     struct A {
         inject: InjectOpts,
@@ -233,7 +235,7 @@ fn test_path_matcher_single() {
             inner: Injection::Addition(InjectAddition {
                 addition_position: AdditionPosition::Append("lol".to_string()),
             }),
-            only: Some(MatcherList::Item(PathMatcher::str("/*.css"))),
+            only: Some(MatcherList::Item(PathMatcher::from_str("/*.css").unwrap())),
         }),
     };
     let actual: Result<A, _> = serde_yaml::from_str(input);

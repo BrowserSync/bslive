@@ -41,7 +41,13 @@ where
     };
 
     let format = args.format();
-    init_tracing(logging.log_level, format, write_log_opt, line_opts);
+    init_tracing(
+        logging.log_level,
+        logging.log_http.unwrap_or_default(),
+        format,
+        write_log_opt,
+        line_opts,
+    );
 
     tracing::debug!("{:#?}", args);
 

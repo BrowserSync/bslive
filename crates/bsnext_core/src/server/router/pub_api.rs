@@ -22,7 +22,7 @@ async fn all_servers_handler(State(app): State<Arc<ServerState>>, _uri: Uri) -> 
             }
             Err(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Could not fetch servers: {}", err),
+                format!("Could not fetch servers: {err}"),
             )
                 .into_response(),
         },

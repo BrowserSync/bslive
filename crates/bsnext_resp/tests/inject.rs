@@ -47,8 +47,10 @@ async fn test_inject_only_1_level() -> anyhow::Result<()> {
 
 mod helpers {
     use axum::body::Body;
+    use axum::middleware::from_fn;
     use axum::response::IntoResponse;
     use axum::{middleware, Extension, Router};
+    use bsnext_guards::uri_extension;
     use bsnext_resp::inject_opts::InjectionItem;
     use bsnext_resp::{response_modifications_layer, InjectHandling};
     use http::Request;
@@ -60,7 +62,8 @@ mod helpers {
             .layer(middleware::from_fn(response_modifications_layer))
             .layer(Extension(InjectHandling {
                 items: items.to_vec(),
-            }));
+            }))
+            .layer(from_fn(uri_extension));
 
         let r = Request::get(uri).body(Body::empty())?;
         let output = router.oneshot(r).await?;

@@ -1,7 +1,7 @@
 use crate::injector_guard::ByteReplacer;
 use axum::extract::Request;
 use bsnext_guards::route_guard::RouteGuard;
-use http::Response;
+use http::{Response, Uri};
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct InjectAddition {
@@ -17,11 +17,11 @@ pub enum AdditionPosition {
 }
 
 impl RouteGuard for InjectAddition {
-    fn accept_req(&self, _req: &Request) -> bool {
+    fn accept_req(&self, _req: &Request, _outer_uri: &Uri) -> bool {
         true
     }
 
-    fn accept_res<T>(&self, _res: &Response<T>) -> bool {
+    fn accept_res<T>(&self, _res: &Response<T>, _outer_uri: &Uri) -> bool {
         true
     }
 }

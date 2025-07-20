@@ -79,15 +79,15 @@ fn route_to_markdown(kind: &RouteKind, path: &str) -> String {
 }
 
 fn fenced_input(code: &str) -> String {
-    format!("```yaml bslive_input\n{}```", code)
+    format!("```yaml bslive_input\n{code}```")
 }
 
 fn fenced_route(code: &str) -> String {
-    format!("```yaml bslive_route\n{}```", code)
+    format!("```yaml bslive_route\n{code}```")
 }
 
 fn fenced_playground(code: &str) -> String {
-    format!("```html playground\n{}\n```", code)
+    format!("```html playground\n{code}\n```")
 }
 
 fn fenced_body(lang: &str, code: &str) -> String {

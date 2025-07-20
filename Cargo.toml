@@ -16,7 +16,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.15", features = ["sync"] }
 futures = "0.3.30"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
-tower = { version = "0.4", features = ['steer'] }
+tower = { version = "0.4", features = ['steer', 'util'] }
 tower-http = { version = "0.6.0", features = ['trace', 'fs', 'compression-full', 'decompression-full', 'catch-panic', 'cors', 'timeout', 'set-header', ] }
 tracing = { version = "0.1.35", default-features = false, features = ["std", "attributes"] }
 actix = "0.13.1"

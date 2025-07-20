@@ -1,23 +1,45 @@
 servers:
-  - port: 3000
-    clients:
-      log: trace
-      watchers:
-        - dir: crates
-          run:
-            - sh: cargo build
+  - port: 3003
+    routes:
+      - path: /api
+        proxy: https://example.com
+        rewrite_uri: false
+        inject:
+          - append: 'abc'
+            only: /index.html
+  - port: 3002
     routes:
       - path: /
+        html: lol
+      - path: /api
+        json: [ 1,2 ]
+        when:
+          query:
+            has: 'mock'
+      - path: /api
+        proxy: https://duckduckgo.github.io
+  - port: 3001
+    routes:
+      - path: /a/really/:long/path
         dir: examples/basic/public
-        watch:
-          debounce:
-            ms: 300
-          run:
-            - all:
-                - sh: echo 2
-                - sh: exit 0
-                - sh: sleep 1 && echo '->hehe'
-                  name: '[another attempt--->]'
-                - seq:
-                    - sleep 1
-                    - echo 'after?'
+      - path: /shane
+        raw: "here2"
+        when:
+          - query:
+              has: 'abc'
+      - path: /shane
+        raw: "here"
+        when:
+          - query:
+              has: 'def'
+      - path: /shane
+        dir: examples/basic/public
+      - path: /shane
+        dir: examples/html
+      - path: /
+        html: "4"
+        when:
+          - query:
+              is: 'a=b'
+      - path: /
+        html: "3"

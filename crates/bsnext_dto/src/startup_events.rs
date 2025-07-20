@@ -24,19 +24,19 @@ impl OutputWriterTrait for StartupEvent {
                         let n = miette::GraphicalReportHandler::new();
                         let mut inner = String::new();
                         n.render_report(&mut inner, bs_rules).expect("write?");
-                        writeln!(sink, "{}", inner)?;
+                        writeln!(sink, "{inner}")?;
                     }
                     StartupError::InputError(err) => {
-                        writeln!(sink, "{}", err)?;
+                        writeln!(sink, "{err}")?;
                     }
                     StartupError::Other(e) => {
-                        writeln!(sink, "{}", e)?;
+                        writeln!(sink, "{e}")?;
                     }
                     StartupError::ServerError(e) => {
-                        writeln!(sink, "{}", e)?;
+                        writeln!(sink, "{e}")?;
                     }
                     StartupError::Any(e) => {
-                        writeln!(sink, "{}", e)?;
+                        writeln!(sink, "{e}")?;
                     }
                 }
             }

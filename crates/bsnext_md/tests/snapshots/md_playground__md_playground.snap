@@ -31,7 +31,9 @@ expression: routes
                         only: Some(
                             Item(
                                 Str(
-                                    "/",
+                                    RootPath {
+                                        inner: "/",
+                                    },
                                 ),
                             ),
                         ),
@@ -47,7 +49,9 @@ expression: routes
                         only: Some(
                             Item(
                                 Str(
-                                    "/",
+                                    RootPath {
+                                        inner: "/",
+                                    },
                                 ),
                             ),
                         ),
@@ -61,7 +65,9 @@ expression: routes
                         only: Some(
                             Item(
                                 Str(
-                                    "/",
+                                    RootPath {
+                                        inner: "/",
+                                    },
                                 ),
                             ),
                         ),
@@ -94,6 +100,14 @@ expression: routes
                 },
             },
         ),
+        when: Some(
+            WhenOne(
+                ExactUri {
+                    exact_uri: true,
+                },
+            ),
+        ),
+        when_body: None,
     },
     Route {
         path: PathDef {
@@ -118,6 +132,8 @@ expression: routes
             compression: None,
         },
         fallback: None,
+        when: None,
+        when_body: None,
     },
     Route {
         path: PathDef {
@@ -142,6 +158,8 @@ expression: routes
             compression: None,
         },
         fallback: None,
+        when: None,
+        when_body: None,
     },
     Route {
         path: PathDef {
@@ -166,5 +184,7 @@ expression: routes
             compression: None,
         },
         fallback: None,
+        when: None,
+        when_body: None,
     },
 ]

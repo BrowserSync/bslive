@@ -10,7 +10,10 @@ use tokio::process::Command;
 
 #[actix_rt::main]
 async fn main() -> anyhow::Result<()> {
-    let str = bsnext_tracing::level(Some(bsnext_tracing::LogLevel::Trace));
+    let str = bsnext_tracing::level(
+        Some(bsnext_tracing::LogLevel::Trace),
+        bsnext_tracing::LogHttp::Off,
+    );
     let with = format!("{str},watch_cmd=trace");
     bsnext_tracing::raw_tracing::init_tracing_subscriber(
         &with,
