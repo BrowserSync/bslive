@@ -124,12 +124,17 @@ async fn tagging_layer(
     Ok(r)
 }
 
-#[derive(serde::Deserialize, Debug)]
-pub enum Encoding {
-    Br,
-    Zip,
-}
+#[derive(Clone, serde::Deserialize, PartialEq, Debug)]
+pub struct ProxyResponseEncoding(pub String);
 
+// impl Predicate for Encoding {
+//     fn should_compress<B>(&self, response: &Response<B>) -> bool {
+//         match response.extensions().get::<Encoding>() {
+//             Some(encoding) => encoding == self,
+//             None => false,
+//         }
+//     }
+// }
 pub async fn dynamic_router(
     State(app): State<Arc<ServerState>>,
     req: Request,

@@ -189,7 +189,6 @@ fn into_target_uri(
             v
         }
         (Some(target_only), None) => {
-            dbg!(&target_only);
             let path = target_only.path();
 
             let next = match req_query {

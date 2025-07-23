@@ -6,7 +6,6 @@ use axum::routing::MethodRouter;
 use axum::{middleware, Extension};
 use axum_extra::middleware::option_layer;
 use bsnext_input::route::{CompType, CompressionOpts, CorsOpts, DelayKind, DelayOpts, Opts};
-use bsnext_resp::{response_modifications_layer, InjectHandling};
 use dynamic_query_params::dynamic_query_params_handler;
 use http::{HeaderName, HeaderValue};
 use std::collections::BTreeMap;
@@ -32,7 +31,7 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
         .as_ref()
         .map(|delay| middleware::from_fn_with_state(delay.clone(), delay_mw));
 
-    let injections = opts.inject.as_injections();
+    // let injections = opts.inject.as_injections();
 
     let set_response_headers_layer = opts
         .headers
@@ -44,7 +43,6 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
 
     let optional_stack = ServiceBuilder::new()
         .layer(middleware::from_fn(dynamic_query_params_handler))
-        .layer(middleware::from_fn(response_modifications_layer))
         .layer(prevent_cache_headers_layer)
         .layer(option_layer(set_response_headers_layer))
         .layer(option_layer(cors_enabled_layer))
@@ -59,9 +57,9 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
         app = app.layer(cl);
     }
 
-    app = app.layer(Extension(InjectHandling {
-        items: injections.items,
-    }));
+    // app = app.layer(Extension(InjectHandling {
+    //     items: injections.items,
+    // }));
 
     app
 }

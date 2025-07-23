@@ -46,6 +46,7 @@ serde_json = { workspace = true }
 bytes = { workspace = true }
 http = { workspace = true }
 log = "0.4.21"
+http-body = "1.0.0"
 
 [[example]]
 name = "abc"

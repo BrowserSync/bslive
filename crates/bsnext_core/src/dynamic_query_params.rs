@@ -1,12 +1,12 @@
 use axum::extract::{Query, Request};
 use axum::middleware::Next;
 use axum::response::IntoResponse;
-use bsnext_guards::path_matcher::PathMatcher;
-use bsnext_guards::MatcherList;
+// use bsnext_guards::path_matcher::PathMatcher;
+// use bsnext_guards::MatcherList;
 use bsnext_resp::builtin_strings::{BuiltinStringDef, BuiltinStrings};
 use bsnext_resp::cache_opts::CacheOpts;
-use bsnext_resp::inject_opts::{Injection, InjectionItem};
-use bsnext_resp::InjectHandling;
+// use bsnext_resp::inject_opts::{Injection, InjectionItem};
+// use bsnext_resp::InjectHandling;
 use std::convert::Infallible;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -71,36 +71,36 @@ pub async fn dynamic_query_params_handler(mut req: Request, next: Next) -> impl 
     }
 
     // Other things to apply *before*
-    #[allow(clippy::single_match)]
-    match &query_params {
-        DynamicQueryParams {
-            inject: Some(inject_append),
-            ..
-        } => {
-            let uri = req.uri().clone();
-            let ex = req.extensions_mut();
-            if let Some(inject) = ex.get_mut::<InjectHandling>() {
-                tracing::info!(
-                    "Adding an item to the injection handling on the fly {} {}",
-                    uri.to_string(),
-                    uri.path()
-                );
-                match inject_append {
-                    InjectParam::Other(other) if other == "false" => {
-                        inject.items = vec![];
-                    }
-                    InjectParam::BuiltinStrings(str) => inject.items.push(InjectionItem {
-                        inner: Injection::BsLive(BuiltinStringDef {
-                            name: str.to_owned(),
-                        }),
-                        only: Some(MatcherList::Item(PathMatcher::pathname(uri.path()))),
-                    }),
-                    InjectParam::Other(_) => todo!("other?"),
-                }
-            }
-        }
-        _ => {}
-    }
+    // #[allow(clippy::single_match)]
+    // match &query_params {
+    //     DynamicQueryParams {
+    //         inject: Some(inject_append),
+    //         ..
+    //     } => {
+    //         let uri = req.uri().clone();
+    //         let ex = req.extensions_mut();
+    //         if let Some(inject) = ex.get_mut::<InjectHandling>() {
+    //             tracing::info!(
+    //                 "Adding an item to the injection handling on the fly {} {}",
+    //                 uri.to_string(),
+    //                 uri.path()
+    //             );
+    //             match inject_append {
+    //                 InjectParam::Other(other) if other == "false" => {
+    //                     inject.items = vec![];
+    //                 }
+    //                 InjectParam::BuiltinStrings(str) => inject.items.push(InjectionItem {
+    //                     inner: Injection::BsLive(BuiltinStringDef {
+    //                         name: str.to_owned(),
+    //                     }),
+    //                     only: Some(MatcherList::Item(PathMatcher::pathname(uri.path()))),
+    //                 }),
+    //                 InjectParam::Other(_) => todo!("other?"),
+    //             }
+    //         }
+    //     }
+    //     _ => {}
+    // }
 
     let mut res = next.run(req).await;
 

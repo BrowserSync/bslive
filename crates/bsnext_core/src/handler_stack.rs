@@ -1,11 +1,12 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig, RewriteKind};
-use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
 use crate::runtime_ctx::RuntimeCtx;
+use crate::server::router::ProxyResponseEncoding;
+use actix::ActorStreamExt;
 use axum::body::Body;
 use axum::extract::{Request, State};
-use axum::handler::Handler;
-use axum::middleware::{from_fn, map_response, Next};
+use axum::handler::{Handler, HandlerWithoutStateExt};
+use axum::middleware::{from_fn, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{middleware, Extension, Router};
@@ -15,13 +16,14 @@ use bsnext_input::route::{ListOrSingle, ProxyRoute, Route, RouteKind};
 use bsnext_input::when_guard::{HasGuard, JsonGuard, JsonPropGuard, WhenBodyGuard, WhenGuard};
 use bsnext_resp::{response_modifications_layer, InjectHandling};
 use bytes::Bytes;
-use http::header::{ACCEPT, CONTENT_TYPE};
+use http::header::{ACCEPT, CONTENT_ENCODING, CONTENT_TYPE};
 use http::request::Parts;
 use http::uri::PathAndQuery;
-use http::{header, Method, StatusCode, Uri};
+use http::{HeaderName, HeaderValue, Method, StatusCode, Uri};
 use http_body_util::BodyExt;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::ffi::OsStr;
 use std::io;
 use std::ops::ControlFlow;
@@ -30,7 +32,9 @@ use tokio::fs::{create_dir_all, File};
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_stream::StreamExt;
-use tower::ServiceExt;
+use tower::steer::Steer;
+use tower::util::BoxService;
+use tower::{service_fn, ServiceExt};
 use tower_http::compression::{CompressionLayer, Predicate};
 use tower_http::decompression::DecompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
@@ -199,40 +203,42 @@ pub async fn try_one(
 
         trace!(mirror = ?candidate.mirror);
 
-        #[derive(Clone, PartialEq, Debug)]
-        enum Encoding {
-            Gzip,
-            Br,
-            Deflate,
-            Zstd,
-        }
-
-        async fn mapper(res: Response) -> Response {
-            let h = res.headers().get(header::CONTENT_ENCODING);
-            let h = h.and_then(|hv| match hv.as_bytes() {
-                b"gzip" => Some(Encoding::Gzip),
-                b"deflate" => Some(Encoding::Deflate),
-                b"br" => Some(Encoding::Br),
-                b"zstd" => Some(Encoding::Zstd),
-                _ => None,
-            });
-            // let enc =
-            let (parts, body) = res.into_parts();
-            let mut next_req = Response::from_parts(parts, body);
-            if let Some(val) = h {
-                let m = next_req.extensions_mut();
-                m.insert(val);
-            }
-            next_req
-        }
-
-        impl Predicate for Encoding {
-            fn should_compress<B>(&self, response: &Response<B>) -> bool {
-                match response.extensions().get::<Encoding>() {
-                    Some(encoding) => encoding == self,
-                    None => false,
+        async fn mapper_after_decompress(uri: Uri, req: Request, next: Next) -> impl IntoResponse {
+            let mut res = next.run(req).await;
+            if let Some((k, v)) = match (
+                res.extensions().get::<ProxyResponseEncoding>(),
+                res.headers().get(CONTENT_ENCODING),
+            ) {
+                // if the original CONTENT_ENCODING header was removed
+                (Some(original), None) => {
+                    let bytes = original.0.as_bytes();
+                    Some((
+                        HeaderName::from_static("x-bslive-decompressed-from"),
+                        HeaderValue::from_bytes(bytes)
+                            .unwrap_or(HeaderValue::from_static("unknown")),
+                    ))
                 }
+                _ => None,
+            } {
+                res.headers_mut().insert(k, v);
             }
+            res
+        }
+
+        async fn mapper_before_proxy(uri: Uri, req: Request, next: Next) -> impl IntoResponse {
+            let mut res = next.run(req).await;
+            let prev = {
+                res.headers()
+                    .get(CONTENT_ENCODING)
+                    .as_ref()
+                    .map(|v| (*v).to_owned())
+            };
+            if let Some(hv) = prev {
+                trace!(?hv, "recording a content-encoding header");
+                res.extensions_mut()
+                    .insert(ProxyResponseEncoding(hv.to_str().unwrap().to_string()));
+            }
+            res
         }
 
         let mut method_router = to_method_router(&path, &candidate.route.kind, &ctx);
@@ -240,56 +246,26 @@ pub async fn try_one(
         if candidate.inject {
             let injections = candidate.route.opts.inject.as_injections();
             trace!(?injections);
-            method_router = method_router.layer(map_response(mapper));
+            method_router = method_router.layer(from_fn(mapper_before_proxy));
             method_router = method_router.layer(DecompressionLayer::new());
+            method_router = method_router.layer(from_fn(mapper_after_decompress));
             method_router = method_router.layer(middleware::from_fn(response_modifications_layer));
             method_router = method_router.layer(Extension(InjectHandling {
                 items: injections.items,
             }));
-            method_router = method_router.layer(
-                CompressionLayer::new()
-                    .zstd(false)
-                    .gzip(false)
-                    .br(false)
-                    .deflate(true)
-                    .compress_when(Encoding::Deflate),
-            );
-            method_router = method_router.layer(
-                CompressionLayer::new()
-                    .zstd(false)
-                    .gzip(false)
-                    .br(true)
-                    .deflate(false)
-                    .compress_when(Encoding::Br),
-            );
-            method_router = method_router.layer(
-                CompressionLayer::new()
-                    .zstd(false)
-                    .gzip(true)
-                    .br(false)
-                    .deflate(false)
-                    .compress_when(Encoding::Gzip),
-            );
-            method_router = method_router.layer(
-                CompressionLayer::new()
-                    .zstd(true)
-                    .gzip(false)
-                    .br(false)
-                    .deflate(false)
-                    .compress_when(Encoding::Zstd),
-            );
+            method_router =
+                method_router.layer(CompressionLayer::new().compress_when(OnlyCompressWhen));
         }
 
         // decompress if needed
-        // if candidate.mirror.is_some() {
-        //     method_router = method_router.layer(DecompressionLayer::new());
-        // }
-        //
         // if let Some(mirror_path) = &candidate.mirror {
+        //     method_router = method_router.layer(map_response(mapper));
+        //     method_router = method_router.layer(DecompressionLayer::new());
         //     method_router = method_router.layer(middleware::from_fn_with_state(
         //         mirror_path.to_owned(),
         //         mirror_handler,
         //     ));
+        //     method_router = com(method_router)
         // }
 
         // let raw_out: MethodRouter = optional_layers(method_router, &candidate.route.opts);
@@ -314,9 +290,9 @@ pub async fn try_one(
                 404 | 405 => {
                     if let Some(fallback) = &candidate.route.fallback {
                         let mr = to_method_router(&path, &fallback.kind, &ctx);
-                        let raw_out: MethodRouter = optional_layers(mr, &fallback.opts);
+                        // let raw_out: MethodRouter = optional_layers(mr, &fallback.opts);
                         let raw_fb = Request::from_parts(parts.clone(), Body::empty());
-                        return raw_out.oneshot(raw_fb).await.into_response();
+                        return mr.oneshot(raw_fb).await.into_response();
                     }
                 }
                 _ => {
@@ -337,6 +313,23 @@ pub async fn try_one(
 
     tracing::trace!("StatusCode::NOT_FOUND");
     StatusCode::NOT_FOUND.into_response()
+}
+#[derive(Debug, Clone)]
+struct OnlyCompressWhen;
+impl Predicate for OnlyCompressWhen {
+    fn should_compress<B>(&self, response: &http::Response<B>) -> bool
+    where
+        B: http_body::Body,
+    {
+        match (
+            response.extensions().get::<ProxyResponseEncoding>(),
+            response.headers().get(CONTENT_ENCODING),
+        ) {
+            // if the original CONTENT_ENCODING header was removed
+            (Some(..), None) => true,
+            _ => false,
+        }
+    }
 }
 
 struct RouteHelper<'a>(pub &'a Route);
