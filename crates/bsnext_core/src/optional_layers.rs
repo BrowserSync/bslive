@@ -1,12 +1,11 @@
-use crate::dynamic_query_params;
 use axum::extract::{Request, State};
-use axum::middleware::{map_response_with_state, Next};
+use axum::middleware;
+use axum::middleware::{from_fn, map_response_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::MethodRouter;
-use axum::{middleware, Extension};
 use axum_extra::middleware::option_layer;
 use bsnext_input::route::{CompType, CompressionOpts, CorsOpts, DelayKind, DelayOpts, Opts};
-use dynamic_query_params::dynamic_query_params_handler;
+use bsnext_query::dynamic_query_params::dynamic_query_params_handler;
 use http::{HeaderName, HeaderValue};
 use std::collections::BTreeMap;
 use std::convert::Infallible;
@@ -31,8 +30,6 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
         .as_ref()
         .map(|delay| middleware::from_fn_with_state(delay.clone(), delay_mw));
 
-    // let injections = opts.inject.as_injections();
-
     let set_response_headers_layer = opts
         .headers
         .as_ref()
@@ -42,11 +39,11 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
     let prevent_cache_headers_layer = map_response_with_state(headers, set_resp_headers);
 
     let optional_stack = ServiceBuilder::new()
-        .layer(middleware::from_fn(dynamic_query_params_handler))
         .layer(prevent_cache_headers_layer)
         .layer(option_layer(set_response_headers_layer))
         .layer(option_layer(cors_enabled_layer))
-        .layer(option_layer(delay_enabled_layer));
+        .layer(option_layer(delay_enabled_layer))
+        .layer(from_fn(dynamic_query_params_handler));
 
     app = app.layer(optional_stack);
 
@@ -56,10 +53,6 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
     if let Some(cl) = compression_layer {
         app = app.layer(cl);
     }
-
-    // app = app.layer(Extension(InjectHandling {
-    //     items: injections.items,
-    // }));
 
     app
 }

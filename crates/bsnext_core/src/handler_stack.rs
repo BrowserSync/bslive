@@ -1,44 +1,31 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig, RewriteKind};
+use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
+use crate::route_candidate::RouteCandidate;
+use crate::route_marker::RouteMarker;
+use crate::route_match::RouteMatch;
 use crate::runtime_ctx::RuntimeCtx;
 use crate::server::router::ProxyResponseEncoding;
-use actix::ActorStreamExt;
 use axum::body::Body;
 use axum::extract::{Request, State};
-use axum::handler::{Handler, HandlerWithoutStateExt};
-use axum::middleware::{from_fn, Next};
-use axum::response::{IntoResponse, Response};
+use axum::handler::Handler;
+use axum::middleware::from_fn;
+use axum::response::IntoResponse;
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{middleware, Extension, Router};
-use bsnext_guards::route_guard::RouteGuard;
 use bsnext_guards::{uri_extension, OuterUri};
-use bsnext_input::route::{ListOrSingle, ProxyRoute, Route, RouteKind};
-use bsnext_input::when_guard::{HasGuard, JsonGuard, JsonPropGuard, WhenBodyGuard, WhenGuard};
+use bsnext_input::route::{Route, RouteKind};
 use bsnext_resp::{response_modifications_layer, InjectHandling};
-use bytes::Bytes;
-use http::header::{ACCEPT, CONTENT_ENCODING, CONTENT_TYPE};
+use http::header::CONTENT_ENCODING;
 use http::request::Parts;
-use http::uri::PathAndQuery;
-use http::{HeaderName, HeaderValue, Method, StatusCode, Uri};
-use http_body_util::BodyExt;
-use serde_json::Value;
+use http::{StatusCode, Uri};
 use std::collections::HashMap;
-use std::convert::Infallible;
-use std::ffi::OsStr;
-use std::io;
-use std::ops::ControlFlow;
-use std::path::{Path, PathBuf};
-use tokio::fs::{create_dir_all, File};
-use tokio::io::{AsyncWriteExt, BufWriter};
-use tokio_stream::wrappers::UnboundedReceiverStream;
-use tokio_stream::StreamExt;
-use tower::steer::Steer;
-use tower::util::BoxService;
-use tower::{service_fn, ServiceExt};
+use std::path::PathBuf;
+use tower::ServiceExt;
 use tower_http::compression::{CompressionLayer, Predicate};
 use tower_http::decompression::DecompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
-use tracing::{debug, error, trace, trace_span};
+use tracing::{debug, trace, trace_span};
 
 pub struct RouteMap {
     pub mapping: HashMap<String, Vec<Route>>,
@@ -99,7 +86,7 @@ pub async fn try_one(
     let span = trace_span!("try_one", outer_uri = ?outer_uri, path = path, local_uri = ?uri);
     let _g = span.enter();
 
-    let pq = outer_uri.path_and_query();
+    let path_and_query = outer_uri.path_and_query();
 
     trace!(?parts);
     debug!("will try {} candidate routes", routes.len());
@@ -110,76 +97,9 @@ pub async fn try_one(
         .filter(|(index, route)| {
             let span = trace_span!("early filter for candidates", index = index);
             let _g = span.enter();
-
-            trace!(?route.kind);
-
-            // early checks from parts only
-            let can_serve: bool = route
-                .when
-                .as_ref()
-                .map(|when| match &when {
-                    ListOrSingle::WhenOne(when) => match_one(when, &outer_uri, &path, pq, &parts),
-                    ListOrSingle::WhenMany(many) => many
-                        .iter()
-                        .all(|when| match_one(when, &outer_uri, &path, pq, &parts)),
-                })
-                .unwrap_or(true);
-
-            // if this routes wants to inspect the body, check it was a POST
-            let can_consume = match &route.when_body {
-                None => true,
-                Some(when_body) => {
-                    let consuming = NeedsJsonGuard(when_body).accept_req(&req, &outer_uri);
-                    trace!(route.when_body.json = consuming);
-                    consuming
-                }
-            };
-
-            trace!(?can_serve);
-            trace!(?can_consume);
-
-            if !can_serve || !can_consume {
-                return false;
-            }
-
-            true
+            RouteMatch(route).route_match(&req, &outer_uri, &path, path_and_query, &parts)
         })
-        .map(|(index, route)| {
-            let consume = route
-                .when_body
-                .as_ref()
-                .is_some_and(|body| NeedsJsonGuard(body).accept_req(&req, &outer_uri));
-
-            let css_req = req
-                .headers()
-                .get(ACCEPT)
-                .and_then(|h| h.to_str().ok())
-                .map(|c| c.contains("text/css"))
-                .unwrap_or(false);
-
-            let js_req = Path::new(req.uri().path())
-                .extension()
-                .is_some_and(|ext| ext == OsStr::new("js"));
-            let mirror = if css_req || js_req {
-                RouteHelper(&route).mirror().map(|v| v.to_path_buf())
-            } else {
-                None
-            };
-
-            let injections = route.opts.inject.as_injections();
-            let req_accepted = injections
-                .items
-                .iter()
-                .any(|item| item.accept_req(&req, &outer_uri));
-
-            RouteCandidate {
-                index,
-                consume_body: consume,
-                route,
-                mirror,
-                inject: req_accepted,
-            }
-        })
+        .map(|(index, route)| RouteCandidate::for_route(index, route, &req, &uri, &outer_uri))
         .collect::<Vec<_>>();
 
     debug!("{} candidates passed early checks", candidates.len());
@@ -203,55 +123,16 @@ pub async fn try_one(
 
         trace!(mirror = ?candidate.mirror);
 
-        async fn mapper_after_decompress(uri: Uri, req: Request, next: Next) -> impl IntoResponse {
-            let mut res = next.run(req).await;
-            if let Some((k, v)) = match (
-                res.extensions().get::<ProxyResponseEncoding>(),
-                res.headers().get(CONTENT_ENCODING),
-            ) {
-                // if the original CONTENT_ENCODING header was removed
-                (Some(original), None) => {
-                    let bytes = original.0.as_bytes();
-                    Some((
-                        HeaderName::from_static("x-bslive-decompressed-from"),
-                        HeaderValue::from_bytes(bytes)
-                            .unwrap_or(HeaderValue::from_static("unknown")),
-                    ))
-                }
-                _ => None,
-            } {
-                res.headers_mut().insert(k, v);
-            }
-            res
-        }
-
-        async fn mapper_before_proxy(uri: Uri, req: Request, next: Next) -> impl IntoResponse {
-            let mut res = next.run(req).await;
-            let prev = {
-                res.headers()
-                    .get(CONTENT_ENCODING)
-                    .as_ref()
-                    .map(|v| (*v).to_owned())
-            };
-            if let Some(hv) = prev {
-                trace!(?hv, "recording a content-encoding header");
-                res.extensions_mut()
-                    .insert(ProxyResponseEncoding(hv.to_str().unwrap().to_string()));
-            }
-            res
-        }
-
         let mut method_router = to_method_router(&path, &candidate.route.kind, &ctx);
 
-        if candidate.inject {
-            let injections = candidate.route.opts.inject.as_injections();
+        if let Some(ref injections) = candidate.injections {
             trace!(?injections);
-            method_router = method_router.layer(from_fn(mapper_before_proxy));
+            method_router = method_router.layer(from_fn(RouteMarker::before_proxy));
             method_router = method_router.layer(DecompressionLayer::new());
-            method_router = method_router.layer(from_fn(mapper_after_decompress));
+            method_router = method_router.layer(from_fn(RouteMarker::after_decompress));
             method_router = method_router.layer(middleware::from_fn(response_modifications_layer));
             method_router = method_router.layer(Extension(InjectHandling {
-                items: injections.items,
+                items: injections.items().clone(),
             }));
             method_router =
                 method_router.layer(CompressionLayer::new().compress_when(OnlyCompressWhen));
@@ -268,7 +149,7 @@ pub async fn try_one(
         //     method_router = com(method_router)
         // }
 
-        // let raw_out: MethodRouter = optional_layers(method_router, &candidate.route.opts);
+        let method_router: MethodRouter = optional_layers(method_router, &candidate.route.opts);
         let req_clone = match candidate.route.kind {
             RouteKind::Raw(_) => Request::from_parts(parts.clone(), Body::empty()),
             RouteKind::Proxy(_) => {
@@ -290,9 +171,9 @@ pub async fn try_one(
                 404 | 405 => {
                     if let Some(fallback) = &candidate.route.fallback {
                         let mr = to_method_router(&path, &fallback.kind, &ctx);
-                        // let raw_out: MethodRouter = optional_layers(mr, &fallback.opts);
+                        let raw_out: MethodRouter = optional_layers(mr, &fallback.opts);
                         let raw_fb = Request::from_parts(parts.clone(), Body::empty());
-                        return mr.oneshot(raw_fb).await.into_response();
+                        return raw_out.oneshot(raw_fb).await.into_response();
                     }
                 }
                 _ => {
@@ -329,56 +210,6 @@ impl Predicate for OnlyCompressWhen {
             (Some(..), None) => true,
             _ => false,
         }
-    }
-}
-
-struct RouteHelper<'a>(pub &'a Route);
-
-impl<'a> RouteHelper<'a> {
-    fn mirror(&self) -> Option<&Path> {
-        match &self.0.kind {
-            RouteKind::Proxy(ProxyRoute {
-                unstable_mirror, ..
-            }) => unstable_mirror.as_ref().map(|s| Path::new(s)),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct RouteCandidate<'a> {
-    index: usize,
-    route: &'a Route,
-    consume_body: bool,
-    mirror: Option<PathBuf>,
-    inject: bool,
-}
-
-impl RouteCandidate<'_> {
-    pub async fn try_exec(&self, body: &mut Option<Body>) -> (Option<Body>, ControlFlow<()>) {
-        if self.consume_body {
-            trace!("trying to collect body because candidate needs it");
-            match_json_body(body, self.route).await
-        } else {
-            (None, ControlFlow::Continue(()))
-        }
-    }
-}
-
-fn match_one(
-    when_guard: &WhenGuard,
-    outer_uri: &Uri,
-    path: &str,
-    pq: Option<&PathAndQuery>,
-    parts: &Parts,
-) -> bool {
-    match when_guard {
-        WhenGuard::Always => true,
-        WhenGuard::Never => false,
-        WhenGuard::ExactUri { exact_uri: true } => path == pq.map(|pq| pq.as_str()).unwrap_or("/"),
-        WhenGuard::ExactUri { exact_uri: false } => path != pq.map(|pq| pq.as_str()).unwrap_or("/"),
-        WhenGuard::Query { query } => QueryHasGuard(query).accept_req_parts(parts, outer_uri),
-        WhenGuard::Accept { accept } => AcceptHasGuard(accept).accept_req_parts(parts, outer_uri),
     }
 }
 
@@ -423,246 +254,6 @@ fn to_method_router(path: &str, route_kind: &RouteKind, ctx: &RuntimeCtx) -> Met
                 }
             }
         }
-    }
-}
-
-#[allow(dead_code)]
-async fn mirror_handler(
-    State(path): State<PathBuf>,
-    req: Request,
-    next: Next,
-) -> impl IntoResponse {
-    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<Result<Bytes, io::Error>>();
-    let as_stream = UnboundedReceiverStream::from(receiver);
-    let c = req.uri().clone();
-    let p = path.join(c.path().strip_prefix("/").unwrap());
-    let r = next.run(req).await;
-    let (parts, body) = r.into_parts();
-    let s = body.into_data_stream();
-
-    tokio::spawn(async move {
-        // let s = s.throttle(Duration::from_millis(10));
-        tokio::pin!(s);
-        create_dir_all(&p.parent().unwrap()).await.unwrap();
-        let mut file = BufWriter::new(File::create(p).await.unwrap());
-
-        while let Some(Ok(b)) = s.next().await {
-            match file.write(&b).await {
-                Ok(_) => {}
-                Err(e) => error!(?e, "could not write"),
-            };
-            // match file.write("\n".as_bytes()).await {
-            //     Ok(_) => {}
-            //     Err(e) => error!(?e, "could not new line"),
-            // };
-            match file.flush().await {
-                Ok(_) => {}
-                Err(e) => error!(?e, "could not flush"),
-            };
-            match sender.send(Ok(b)) {
-                Ok(_) => {}
-                Err(e) => {
-                    error!(?e, "sender was dropped before reading was finished");
-                    error!("will break");
-                    break;
-                }
-            };
-        }
-    });
-
-    Response::from_parts(parts, Body::from_stream(as_stream))
-}
-
-struct QueryHasGuard<'a>(pub &'a HasGuard);
-
-impl RouteGuard for QueryHasGuard<'_> {
-    fn accept_req(&self, _req: &Request, _outer_uri: &Uri) -> bool {
-        true
-    }
-
-    fn accept_res<T>(&self, _res: &Response<T>, _outer_uri: &Uri) -> bool {
-        true
-    }
-
-    fn accept_req_parts(&self, parts: &Parts, _outer_uri: &Uri) -> bool {
-        let Some(query) = parts.uri.query() else {
-            return false;
-        };
-        match &self.0 {
-            HasGuard::Is { is } | HasGuard::Literal(is) => is == query,
-            HasGuard::Has { has } => query.contains(has),
-            HasGuard::NotHas { not_has } => !query.contains(not_has),
-        }
-    }
-}
-struct AcceptHasGuard<'a>(pub &'a HasGuard);
-
-impl RouteGuard for AcceptHasGuard<'_> {
-    fn accept_req(&self, _req: &Request, _outer_uri: &Uri) -> bool {
-        true
-    }
-
-    fn accept_res<T>(&self, _res: &Response<T>, _outer_uri: &Uri) -> bool {
-        true
-    }
-
-    fn accept_req_parts(&self, parts: &Parts, _outer_uri: &Uri) -> bool {
-        let Some(query) = parts.headers.get("accept") else {
-            return false;
-        };
-        let Ok(str) = std::str::from_utf8(query.as_bytes()) else {
-            tracing::error!("bytes incorrrect");
-            return false;
-        };
-        match &self.0 {
-            HasGuard::Literal(is) | HasGuard::Is { is } => is == str,
-            HasGuard::Has { has } => str.contains(has),
-            HasGuard::NotHas { not_has } => !str.contains(not_has),
-        }
-    }
-}
-
-struct NeedsJsonGuard<'a>(pub &'a ListOrSingle<WhenBodyGuard>);
-impl RouteGuard for NeedsJsonGuard<'_> {
-    #[tracing::instrument(skip_all, name = "NeedsJsonGuard.accept_req")]
-    fn accept_req(&self, req: &Request, _outer_uri: &Uri) -> bool {
-        let exec = match self.0 {
-            ListOrSingle::WhenOne(WhenBodyGuard::Json { .. }) => true,
-            ListOrSingle::WhenMany(items) => items
-                .iter()
-                .any(|item| matches!(item, WhenBodyGuard::Json { .. })),
-            _ => false,
-        };
-        trace!(?exec);
-        if !exec {
-            return false;
-        }
-        let headers = req.headers();
-        let method = req.method();
-        let json = headers.get(CONTENT_TYPE).is_some_and(|header| {
-            header
-                .to_str()
-                .ok()
-                .map(|h| h.contains("application/json"))
-                .unwrap_or(false)
-        });
-        trace!(?json, ?method, ?headers);
-        json && method == Method::POST
-    }
-
-    fn accept_res<T>(&self, _res: &Response<T>, _outer_uri: &Uri) -> bool {
-        true
-    }
-}
-
-impl NeedsJsonGuard<'_> {
-    pub fn match_body(&self, value: &Value) -> bool {
-        let matches: Vec<(&'_ WhenBodyGuard, bool)> = match self.0 {
-            ListOrSingle::WhenOne(one) => vec![(one, match_one_json(value, one))],
-            ListOrSingle::WhenMany(many) => many
-                .iter()
-                .map(|guard| (guard, match_one_json(value, guard)))
-                .collect(),
-        };
-        matches.iter().all(|(_item, result)| *result)
-    }
-}
-
-pub fn match_one_json(value: &Value, when_body_guard: &WhenBodyGuard) -> bool {
-    match when_body_guard {
-        WhenBodyGuard::Json { json } => match json {
-            JsonGuard::ArrayLast { items, last } => match value.pointer(items) {
-                Some(Value::Array(arr)) => match arr.last() {
-                    None => false,
-                    Some(last_item) => last.iter().all(|prop_guard| match prop_guard {
-                        JsonPropGuard::PathIs { path, is } => match last_item.pointer(path) {
-                            Some(Value::String(val_string)) => val_string == is,
-                            _ => false,
-                        },
-                        JsonPropGuard::PathHas { path, has } => match last_item.pointer(path) {
-                            Some(Value::String(val_string)) => val_string.contains(has),
-                            _ => false,
-                        },
-                    }),
-                },
-                _ => false,
-            },
-            JsonGuard::ArrayAny { items, any } => match value.pointer(items) {
-                Some(Value::Array(arr)) if arr.is_empty() => false,
-                Some(Value::Array(val)) => val
-                    .iter()
-                    .any(|val| any.iter().any(|prop_guard| match_prop(val, prop_guard))),
-                _ => false,
-            },
-            JsonGuard::ArrayAll { items, all } => match value.pointer(items) {
-                Some(Value::Array(arr)) if arr.is_empty() => false,
-                Some(Value::Array(arr)) => arr
-                    .iter()
-                    .any(|one_val| all.iter().all(|guard| match_prop(one_val, guard))),
-                _ => false,
-            },
-            JsonGuard::Path(pg) => match_prop(value, pg),
-        },
-        WhenBodyGuard::Never => false,
-    }
-}
-
-async fn match_json_body(
-    body: &mut Option<Body>,
-    route: &Route,
-) -> (Option<Body>, ControlFlow<()>) {
-    if let Some(inner_body) = body.take() {
-        let collected = inner_body.collect();
-        let bytes = match collected.await {
-            Ok(collected) => collected.to_bytes(),
-            Err(err) => {
-                tracing::error!(?err, "could not collect bytes...");
-                Bytes::new()
-            }
-        };
-
-        trace!("did collect {} bytes", bytes.len());
-
-        match serde_json::from_slice(bytes.iter().as_slice()) {
-            Ok(value) => {
-                let result = route
-                    .when_body
-                    .as_ref()
-                    .map(|when_body| NeedsJsonGuard(when_body).match_body(&value));
-                if result.is_some_and(|res| !res) {
-                    trace!("ignoring, `when_body` was present, but didn't match the guards");
-                    trace!("restoring body from clone");
-                    (Some(Body::from(bytes)), ControlFlow::Break(()))
-                } else {
-                    if result.is_some() {
-                        trace!("✅ when_body produced a valid match");
-                    } else {
-                        trace!("when_body didn't produce a value");
-                    }
-                    (Some(Body::from(bytes)), ControlFlow::Continue(()))
-                }
-            }
-            Err(err) => {
-                tracing::error!(?err, "could not deserialize into Value");
-                (Some(Body::from(bytes)), ControlFlow::Continue(()))
-            }
-        }
-    } else {
-        trace!("could not .take() body");
-        (None, ControlFlow::Continue(()))
-    }
-}
-
-pub fn match_prop(value: &Value, prop_guard: &JsonPropGuard) -> bool {
-    match prop_guard {
-        JsonPropGuard::PathIs { path, is } => match value.pointer(path) {
-            Some(Value::String(val_string)) => val_string == is,
-            _ => false,
-        },
-        JsonPropGuard::PathHas { path, has } => match value.pointer(path) {
-            Some(Value::String(val_string)) => val_string.contains(has),
-            _ => false,
-        },
     }
 }
 
