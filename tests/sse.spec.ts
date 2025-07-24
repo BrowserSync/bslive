@@ -13,7 +13,9 @@ test.describe(
     },
     () => {
         test("server sent events", async ({ page, bs }) => {
-            await page.goto(bs.path("/"), { waitUntil: "networkidle" });
+            await page.goto(bs.named("openai", "/"), {
+                waitUntil: "networkidle",
+            });
             await expect(page.locator("#output")).toContainText(
                 '"" "Thsis" " is"',
                 {
