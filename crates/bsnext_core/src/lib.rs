@@ -13,6 +13,7 @@ pub mod optional_layers;
 pub mod panic_handler;
 pub mod proxy_loader;
 pub mod raw_loader;
+mod route_cache;
 mod route_candidate;
 mod route_compress;
 mod route_delay;

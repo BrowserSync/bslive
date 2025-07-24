@@ -1,6 +1,7 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig, RewriteKind};
 use crate::optional_layers::{delay_mw, optional_layers};
 use crate::raw_loader::serve_raw_one;
+use crate::route_cache::cache_control_layer;
 use crate::route_candidate::RouteCandidate;
 use crate::route_marker::RouteMarker;
 use crate::route_match::RouteMatch;
@@ -8,7 +9,7 @@ use crate::runtime_ctx::RuntimeCtx;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::Handler;
-use axum::middleware::{from_fn, from_fn_with_state};
+use axum::middleware::{from_fn, from_fn_with_state, map_response_with_state};
 use axum::response::IntoResponse;
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{middleware, Extension, Router};
@@ -155,6 +156,13 @@ pub async fn try_one(
         // when a route should incur an initial delay
         if let Some(delay) = &candidate.delay {
             method_router = method_router.layer(from_fn_with_state(delay.opts().clone(), delay_mw));
+        }
+
+        if let Some(cache) = &candidate.cache_prevent {
+            method_router = method_router.layer(map_response_with_state(
+                cache.opts().clone(),
+                cache_control_layer,
+            ))
         }
 
         // decompress if needed

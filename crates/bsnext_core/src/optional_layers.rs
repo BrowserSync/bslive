@@ -1,10 +1,9 @@
 use axum::extract::{Request, State};
-use axum::middleware::{map_response, map_response_with_state, Next};
+use axum::middleware::{map_response_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::MethodRouter;
 use axum_extra::middleware::option_layer;
 use bsnext_input::route::{CorsOpts, DelayKind, DelayOpts, Opts};
-use bsnext_query::dynamic_query_params::dynamic_query_params_after;
 use http::{HeaderName, HeaderValue};
 use std::collections::BTreeMap;
 use std::convert::Infallible;
@@ -26,12 +25,7 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
         .as_ref()
         .map(|headers| map_response_with_state(headers.clone(), set_resp_headers_from_strs));
 
-    let headers = opts.cache.as_headers();
-    let prevent_cache_headers_layer = map_response_with_state(headers, set_resp_headers);
-
     let optional_stack = ServiceBuilder::new()
-        .layer(map_response(dynamic_query_params_after))
-        .layer(prevent_cache_headers_layer)
         .layer(option_layer(set_response_headers_layer))
         .layer(option_layer(cors_enabled_layer));
 
@@ -89,7 +83,7 @@ async fn set_resp_headers_from_strs(
     response
 }
 
-async fn set_resp_headers<B>(
+pub async fn set_resp_headers<B>(
     State(header_map): State<Vec<(HeaderName, HeaderValue)>>,
     mut response: Response<B>,
 ) -> Response<B> {

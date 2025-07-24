@@ -1,4 +1,5 @@
 use crate::body_match::BodyMatch;
+use crate::route_cache::CachePrevent;
 use crate::route_compress::Compress;
 use crate::route_delay::Delay;
 use crate::route_effect::RouteEffect;
@@ -20,6 +21,7 @@ pub struct RouteCandidate<'a> {
     pub injections: Option<Injections>,
     pub delay: Option<Delay>,
     pub compress: Option<Compress>,
+    pub cache_prevent: Option<CachePrevent>,
 }
 
 impl<'a> RouteCandidate<'a> {
@@ -35,6 +37,7 @@ impl<'a> RouteCandidate<'a> {
         let mirror = Mirror::new_opt(route, req, uri, outer_uri);
         let delay = Delay::new_opt(route, req, uri, outer_uri);
         let compress = Compress::new_opt(route, req, uri, outer_uri);
+        let cache_prevent = CachePrevent::new_opt(route, req, uri, outer_uri);
 
         RouteCandidate {
             index,
@@ -44,6 +47,7 @@ impl<'a> RouteCandidate<'a> {
             injections,
             delay,
             compress,
+            cache_prevent,
         }
     }
 }

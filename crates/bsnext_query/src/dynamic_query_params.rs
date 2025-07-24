@@ -1,9 +1,8 @@
 use axum::extract::Query;
-use axum::response::{IntoResponse, Response};
+use axum::response::IntoResponse;
 use bsnext_resp::builtin_strings::BuiltinStrings;
 use bsnext_resp::cache_opts::CacheOpts;
 use http::Uri;
-use std::convert::Infallible;
 
 #[doc = include_str!("./query-params.md")]
 #[derive(Debug, serde::Deserialize)]
@@ -45,34 +44,4 @@ mod test {
         insta::assert_debug_snapshot!(query_with_bool);
         Ok(())
     }
-}
-
-pub async fn dynamic_query_params_after(uri: Uri, mut res: Response) -> impl IntoResponse {
-    let Ok(Query(query_params)) = Query::try_from_uri(&uri) else {
-        return Ok::<_, Infallible>(res);
-    };
-    // things to apply *after*
-    #[allow(clippy::single_match)]
-    match query_params {
-        DynamicQueryParams {
-            cache: Some(cache_opts),
-            ..
-        } => match cache_opts {
-            CacheOpts::Prevent => {
-                let headers_to_add = cache_opts.as_headers();
-                for (name, value) in headers_to_add {
-                    res.headers_mut().insert(name, value);
-                }
-            }
-            CacheOpts::Default => {
-                let headers = CacheOpts::Prevent.as_headers();
-                for (name, _) in headers {
-                    res.headers_mut().remove(name);
-                }
-            }
-        },
-        _ => {}
-    }
-
-    Ok::<_, Infallible>(res)
 }
