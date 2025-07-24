@@ -20,7 +20,7 @@ use axum::response::IntoResponse;
 use axum::Extension;
 use bsnext_guards::route_guard::RouteGuard;
 use bsnext_guards::OuterUri;
-use http::header::{ACCEPT, CONTENT_TYPE};
+use http::header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE};
 use http::{Response, StatusCode};
 use http_body_util::BodyExt;
 use tracing::{span, trace, Level};
@@ -98,7 +98,7 @@ pub async fn response_modifications_layer(
     res.headers_mut()
         .insert("x-bslive-inject", "true".parse().unwrap());
 
-    let (parts, body) = res.into_parts();
+    let (mut parts, body) = res.into_parts();
 
     let bytes = match body.collect().await {
         Ok(collected) => collected.to_bytes(),
@@ -118,7 +118,8 @@ pub async fn response_modifications_layer(
         }
     }
 
-    // parts.headers.insert(CONTENT_LENGTH, next.len().into());
+    parts.headers.insert(CONTENT_LENGTH, next.len().into());
     trace!(?parts.headers);
+    // trace!(?next);
     Ok(Response::from_parts(parts, Body::from(next)))
 }

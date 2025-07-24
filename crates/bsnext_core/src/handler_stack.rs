@@ -1,28 +1,25 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig, RewriteKind};
-use crate::optional_layers::optional_layers;
+use crate::optional_layers::{delay_mw, optional_layers};
 use crate::raw_loader::serve_raw_one;
 use crate::route_candidate::RouteCandidate;
 use crate::route_marker::RouteMarker;
 use crate::route_match::RouteMatch;
 use crate::runtime_ctx::RuntimeCtx;
-use crate::server::router::ProxyResponseEncoding;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::Handler;
-use axum::middleware::from_fn;
+use axum::middleware::{from_fn, from_fn_with_state};
 use axum::response::IntoResponse;
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{middleware, Extension, Router};
 use bsnext_guards::{uri_extension, OuterUri};
 use bsnext_input::route::{Route, RouteKind};
 use bsnext_resp::{response_modifications_layer, InjectHandling};
-use http::header::CONTENT_ENCODING;
 use http::request::Parts;
 use http::{StatusCode, Uri};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tower::ServiceExt;
-use tower_http::compression::{CompressionLayer, Predicate};
 use tower_http::decompression::DecompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{debug, trace, trace_span};
@@ -125,7 +122,8 @@ pub async fn try_one(
 
         let mut method_router = to_method_router(&path, &candidate.route.kind, &ctx);
 
-        if let Some(ref injections) = candidate.injections {
+        // when a proxy needs injections
+        if let (Some(ref injections), true) = (&candidate.injections, candidate.will_proxy()) {
             trace!(?injections);
             method_router = method_router.layer(from_fn(RouteMarker::before_proxy));
             method_router = method_router.layer(DecompressionLayer::new());
@@ -134,8 +132,29 @@ pub async fn try_one(
             method_router = method_router.layer(Extension(InjectHandling {
                 items: injections.items().clone(),
             }));
-            method_router =
-                method_router.layer(CompressionLayer::new().compress_when(OnlyCompressWhen));
+        }
+
+        // when a route needs injections, but it's not a proxy
+        if let (Some(ref injections), false) = (&candidate.injections, candidate.will_proxy()) {
+            trace!(?injections);
+            method_router = method_router.layer(middleware::from_fn(response_modifications_layer));
+            method_router = method_router.layer(Extension(InjectHandling {
+                items: injections.items().clone(),
+            }));
+        }
+
+        // when a route needs compression
+        if let Some(compress) = &candidate.compress {
+            if compress.for_proxy() {
+                method_router = method_router.layer(compress.as_proxy_layer());
+            } else {
+                method_router = method_router.layer(compress.as_any_layer());
+            }
+        }
+
+        // when a route should incur an initial delay
+        if let Some(delay) = &candidate.delay {
+            method_router = method_router.layer(from_fn_with_state(delay.opts().clone(), delay_mw));
         }
 
         // decompress if needed
@@ -150,6 +169,7 @@ pub async fn try_one(
         // }
 
         let method_router: MethodRouter = optional_layers(method_router, &candidate.route.opts);
+
         let req_clone = match candidate.route.kind {
             RouteKind::Raw(_) => Request::from_parts(parts.clone(), Body::empty()),
             RouteKind::Proxy(_) => {
@@ -194,23 +214,6 @@ pub async fn try_one(
 
     tracing::trace!("StatusCode::NOT_FOUND");
     StatusCode::NOT_FOUND.into_response()
-}
-#[derive(Debug, Clone)]
-struct OnlyCompressWhen;
-impl Predicate for OnlyCompressWhen {
-    fn should_compress<B>(&self, response: &http::Response<B>) -> bool
-    where
-        B: http_body::Body,
-    {
-        match (
-            response.extensions().get::<ProxyResponseEncoding>(),
-            response.headers().get(CONTENT_ENCODING),
-        ) {
-            // if the original CONTENT_ENCODING header was removed
-            (Some(..), None) => true,
-            _ => false,
-        }
-    }
 }
 
 fn to_method_router(path: &str, route_kind: &RouteKind, ctx: &RuntimeCtx) -> MethodRouter {

@@ -1,11 +1,9 @@
-use axum::extract::{Query, Request};
-use axum::middleware::Next;
-use axum::response::IntoResponse;
+use axum::extract::Query;
+use axum::response::{IntoResponse, Response};
 use bsnext_resp::builtin_strings::BuiltinStrings;
 use bsnext_resp::cache_opts::CacheOpts;
+use http::Uri;
 use std::convert::Infallible;
-use std::time::Duration;
-use tokio::time::sleep;
 
 #[doc = include_str!("./query-params.md")]
 #[derive(Debug, serde::Deserialize)]
@@ -49,25 +47,10 @@ mod test {
     }
 }
 
-pub async fn dynamic_query_params_handler(req: Request, next: Next) -> impl IntoResponse {
-    let Ok(Query(query_params)) = Query::try_from_uri(req.uri()) else {
-        let res = next.run(req).await;
+pub async fn dynamic_query_params_after(uri: Uri, mut res: Response) -> impl IntoResponse {
+    let Ok(Query(query_params)) = Query::try_from_uri(&uri) else {
         return Ok::<_, Infallible>(res);
     };
-
-    // things to apply *before*
-    #[allow(clippy::single_match)]
-    match &query_params {
-        DynamicQueryParams {
-            delay: Some(ms), ..
-        } => {
-            sleep(Duration::from_millis(*ms)).await;
-        }
-        _ => {}
-    }
-
-    let mut res = next.run(req).await;
-
     // things to apply *after*
     #[allow(clippy::single_match)]
     match query_params {

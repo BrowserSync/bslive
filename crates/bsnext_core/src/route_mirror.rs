@@ -1,3 +1,4 @@
+use crate::route_effect::RouteEffect;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::middleware::Next;
@@ -21,15 +22,8 @@ pub struct Mirror {
     path: PathBuf,
 }
 
-impl Mirror {
-    pub fn from_route(r: &RouteKind) -> Option<Self> {
-        match r {
-            RouteKind::Proxy(proxy) => proxy.mirror().map(|path| Self { path }),
-            RouteKind::Raw(_) => None,
-            RouteKind::Dir(_) => None,
-        }
-    }
-    pub fn new_opt(route: &Route, req: &Request, _uri: &Uri, _outer_uri: &Uri) -> Option<Self> {
+impl RouteEffect for Mirror {
+    fn new_opt(route: &Route, req: &Request, _uri: &Uri, _outer_uri: &Uri) -> Option<Self> {
         let css_req = req
             .headers()
             .get(ACCEPT)
@@ -44,6 +38,16 @@ impl Mirror {
         (js_req || css_req)
             .then(|| Mirror::from_route(&route.kind))
             .flatten()
+    }
+}
+
+impl Mirror {
+    fn from_route(r: &RouteKind) -> Option<Self> {
+        match r {
+            RouteKind::Proxy(proxy) => proxy.mirror().map(|path| Self { path }),
+            RouteKind::Raw(_) => None,
+            RouteKind::Dir(_) => None,
+        }
     }
 }
 

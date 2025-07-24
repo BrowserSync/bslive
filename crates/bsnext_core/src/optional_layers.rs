@@ -1,18 +1,16 @@
 use axum::extract::{Request, State};
-use axum::middleware;
-use axum::middleware::{from_fn, map_response_with_state, Next};
+use axum::middleware::{map_response, map_response_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::MethodRouter;
 use axum_extra::middleware::option_layer;
-use bsnext_input::route::{CompType, CompressionOpts, CorsOpts, DelayKind, DelayOpts, Opts};
-use bsnext_query::dynamic_query_params::dynamic_query_params_handler;
+use bsnext_input::route::{CorsOpts, DelayKind, DelayOpts, Opts};
+use bsnext_query::dynamic_query_params::dynamic_query_params_after;
 use http::{HeaderName, HeaderValue};
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 use std::time::Duration;
 use tokio::time::sleep;
 use tower::ServiceBuilder;
-use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 
 pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
@@ -23,13 +21,6 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
         .filter(|v| **v == CorsOpts::Cors(true))
         .map(|_| CorsLayer::permissive());
 
-    let compression_layer = opts.compression.as_ref().and_then(comp_opts_to_layer);
-
-    let delay_enabled_layer = opts
-        .delay
-        .as_ref()
-        .map(|delay| middleware::from_fn_with_state(delay.clone(), delay_mw));
-
     let set_response_headers_layer = opts
         .headers
         .as_ref()
@@ -39,25 +30,24 @@ pub fn optional_layers(app: MethodRouter, opts: &Opts) -> MethodRouter {
     let prevent_cache_headers_layer = map_response_with_state(headers, set_resp_headers);
 
     let optional_stack = ServiceBuilder::new()
+        .layer(map_response(dynamic_query_params_after))
         .layer(prevent_cache_headers_layer)
         .layer(option_layer(set_response_headers_layer))
-        .layer(option_layer(cors_enabled_layer))
-        .layer(option_layer(delay_enabled_layer))
-        .layer(from_fn(dynamic_query_params_handler));
+        .layer(option_layer(cors_enabled_layer));
 
     app = app.layer(optional_stack);
 
-    // The compression layer has a different type, so needs to apply outside the optional stack
-    // this essentially wrapping everything.
-    // I'm sure there's a cleaner way...
-    if let Some(cl) = compression_layer {
-        app = app.layer(cl);
-    }
+    // // The compression layer has a different type, so needs to apply outside the optional stack
+    // // this essentially wrapping everything.
+    // // I'm sure there's a cleaner way...
+    // if let Some(cl) = compression_layer {
+    //     app = app.layer(cl);
+    // }
 
     app
 }
 
-async fn delay_mw(
+pub async fn delay_mw(
     State(delay_opts): State<DelayOpts>,
     req: Request,
     next: Next,
@@ -108,41 +98,4 @@ async fn set_resp_headers<B>(
         headers.insert(k, v);
     }
     response
-}
-
-fn comp_opts_to_layer(comp: &CompressionOpts) -> Option<CompressionLayer> {
-    match comp {
-        CompressionOpts::Bool(false) => None,
-        CompressionOpts::Bool(true) => Some(CompressionLayer::new()),
-        CompressionOpts::CompType(comp_type) => match comp_type {
-            CompType::Gzip => Some(
-                CompressionLayer::new()
-                    .gzip(true)
-                    .no_br()
-                    .no_deflate()
-                    .no_zstd(),
-            ),
-            CompType::Br => Some(
-                CompressionLayer::new()
-                    .br(true)
-                    .no_gzip()
-                    .no_deflate()
-                    .no_zstd(),
-            ),
-            CompType::Deflate => Some(
-                CompressionLayer::new()
-                    .deflate(true)
-                    .no_gzip()
-                    .no_br()
-                    .no_zstd(),
-            ),
-            CompType::Zstd => Some(
-                CompressionLayer::new()
-                    .zstd(true)
-                    .no_gzip()
-                    .no_deflate()
-                    .no_br(),
-            ),
-        },
-    }
 }

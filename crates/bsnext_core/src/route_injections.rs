@@ -1,3 +1,4 @@
+use crate::route_effect::RouteEffect;
 use axum::extract::{Query, Request};
 use bsnext_guards::path_matcher::PathMatcher;
 use bsnext_guards::MatcherList;
@@ -12,11 +13,8 @@ pub struct Injections {
     items: Vec<InjectionItem>,
 }
 
-impl Injections {
-    pub fn items(&self) -> Vec<InjectionItem> {
-        self.items.clone()
-    }
-    pub fn new_opt(route: &Route, _req: &Request, uri: &Uri, _outer_uri: &Uri) -> Option<Self> {
+impl RouteEffect for Injections {
+    fn new_opt(route: &Route, _req: &Request, uri: &Uri, _outer_uri: &Uri) -> Option<Self> {
         let mut items = match &route.opts.inject {
             InjectOpts::Bool(true) => {
                 vec![InjectionItem {
@@ -56,5 +54,11 @@ impl Injections {
             return None;
         }
         Some(Injections { items })
+    }
+}
+
+impl Injections {
+    pub fn items(&self) -> Vec<InjectionItem> {
+        self.items.clone()
     }
 }
