@@ -1,10 +1,12 @@
 use crate::body_match::BodyMatch;
 use crate::route_cache::CachePrevent;
 use crate::route_compress::Compress;
+use crate::route_cors::Cors;
 use crate::route_delay::Delay;
 use crate::route_effect::RouteEffect;
 use crate::route_injections::Injections;
 use crate::route_mirror::Mirror;
+use crate::route_res_headers::ResHeaders;
 use axum::body::Body;
 use axum::extract::Request;
 use bsnext_input::route::{Route, RouteKind};
@@ -22,6 +24,8 @@ pub struct RouteCandidate<'a> {
     pub delay: Option<Delay>,
     pub compress: Option<Compress>,
     pub cache_prevent: Option<CachePrevent>,
+    pub cors: Option<Cors>,
+    pub res_headers: Option<ResHeaders>,
 }
 
 impl<'a> RouteCandidate<'a> {
@@ -38,6 +42,8 @@ impl<'a> RouteCandidate<'a> {
         let delay = Delay::new_opt(route, req, uri, outer_uri);
         let compress = Compress::new_opt(route, req, uri, outer_uri);
         let cache_prevent = CachePrevent::new_opt(route, req, uri, outer_uri);
+        let cors = Cors::new_opt(route, req, uri, outer_uri);
+        let res_headers = ResHeaders::new_opt(route, req, uri, outer_uri);
 
         RouteCandidate {
             index,
@@ -48,6 +54,8 @@ impl<'a> RouteCandidate<'a> {
             delay,
             compress,
             cache_prevent,
+            cors,
+            res_headers,
         }
     }
 }

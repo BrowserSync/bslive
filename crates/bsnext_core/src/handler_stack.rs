@@ -1,10 +1,11 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig, RewriteKind};
-use crate::optional_layers::{delay_mw, optional_layers};
 use crate::raw_loader::serve_raw_one;
 use crate::route_cache::cache_control_layer;
 use crate::route_candidate::RouteCandidate;
+use crate::route_delay::delay_mw;
 use crate::route_marker::RouteMarker;
 use crate::route_match::RouteMatch;
+use crate::route_res_headers::set_str_headers;
 use crate::runtime_ctx::RuntimeCtx;
 use axum::body::Body;
 use axum::extract::{Request, State};
@@ -102,7 +103,7 @@ pub async fn try_one(
 
     debug!("{} candidates passed early checks", candidates.len());
 
-    let mut body: Option<Body> = Some(req.into_body());
+    let mut req_body: Option<Body> = Some(req.into_body());
 
     'find_candidates: for candidate in &candidates {
         let span = trace_span!("index", index = candidate.index);
@@ -110,9 +111,9 @@ pub async fn try_one(
 
         trace!(?parts);
 
-        let (next_body, control_flow) = candidate.try_exec(&mut body).await;
-        if next_body.is_some() {
-            body = next_body
+        let (next_req_body, control_flow) = candidate.try_exec(&mut req_body).await;
+        if next_req_body.is_some() {
+            req_body = next_req_body
         }
 
         if control_flow.is_break() {
@@ -165,23 +166,21 @@ pub async fn try_one(
             ))
         }
 
-        // decompress if needed
-        // if let Some(mirror_path) = &candidate.mirror {
-        //     method_router = method_router.layer(map_response(mapper));
-        //     method_router = method_router.layer(DecompressionLayer::new());
-        //     method_router = method_router.layer(middleware::from_fn_with_state(
-        //         mirror_path.to_owned(),
-        //         mirror_handler,
-        //     ));
-        //     method_router = com(method_router)
-        // }
+        if let Some(cors) = &candidate.cors {
+            method_router = method_router.layer(cors.as_layer())
+        }
 
-        let method_router: MethodRouter = optional_layers(method_router, &candidate.route.opts);
+        if let Some(res_headers) = &candidate.res_headers {
+            method_router = method_router.layer(map_response_with_state(
+                res_headers.headers().clone(),
+                set_str_headers,
+            ))
+        }
 
         let req_clone = match candidate.route.kind {
             RouteKind::Raw(_) => Request::from_parts(parts.clone(), Body::empty()),
             RouteKind::Proxy(_) => {
-                if let Some(body) = body.take() {
+                if let Some(body) = req_body.take() {
                     Request::from_parts(parts.clone(), body)
                 } else {
                     Request::from_parts(parts.clone(), Body::empty())
@@ -195,13 +194,12 @@ pub async fn try_one(
 
         match result {
             Ok(result) => match result.status().as_u16() {
-                // todo: this is way too simplistic, it should allow 404 being deliberately returned etc
+                // todo: this is way too simplistic, it should allow for a 404 being deliberately returned etc
                 404 | 405 => {
                     if let Some(fallback) = &candidate.route.fallback {
-                        let mr = to_method_router(&path, &fallback.kind, &ctx);
-                        let raw_out: MethodRouter = optional_layers(mr, &fallback.opts);
+                        let method_router = to_method_router(&path, &fallback.kind, &ctx);
                         let raw_fb = Request::from_parts(parts.clone(), Body::empty());
-                        return raw_out.oneshot(raw_fb).await.into_response();
+                        return method_router.oneshot(raw_fb).await.into_response();
                     }
                 }
                 _ => {

@@ -1,8 +1,5 @@
-use axum::extract::Query;
-use axum::response::IntoResponse;
 use bsnext_resp::builtin_strings::BuiltinStrings;
 use bsnext_resp::cache_opts::CacheOpts;
-use http::Uri;
 
 #[doc = include_str!("./query-params.md")]
 #[derive(Debug, serde::Deserialize)]
@@ -28,6 +25,7 @@ pub enum InjectParam {
 #[cfg(test)]
 mod test {
     use super::*;
+    use axum::extract::Query;
     use axum::http::Uri;
     #[test]
     fn test_deserializing() -> anyhow::Result<()> {

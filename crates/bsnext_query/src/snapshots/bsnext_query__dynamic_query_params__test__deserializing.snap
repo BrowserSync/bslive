@@ -1,0 +1,17 @@
+---
+source: crates/bsnext_query/src/dynamic_query_params.rs
+expression: query_with_named
+---
+DynamicQueryParams {
+    delay: Some(
+        2000,
+    ),
+    cache: Some(
+        Prevent,
+    ),
+    inject: Some(
+        BuiltinStrings(
+            JsConnector,
+        ),
+    ),
+}

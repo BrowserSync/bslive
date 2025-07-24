@@ -5,7 +5,7 @@ use bsnext_input::route::Route;
 use bsnext_query::dynamic_query_params::DynamicQueryParams;
 use bsnext_resp::cache_opts::CacheOpts;
 use http::header::{CACHE_CONTROL, EXPIRES, PRAGMA};
-use http::{HeaderName, HeaderValue, Uri};
+use http::{HeaderValue, Uri};
 
 #[derive(Debug, Clone)]
 pub struct CachePrevent {
@@ -39,12 +39,6 @@ impl RouteEffect for CachePrevent {
     }
 }
 
-impl CachePrevent {
-    pub fn headers(&self) -> Vec<(HeaderName, HeaderValue)> {
-        self.opts.as_headers()
-    }
-}
-
 pub async fn cache_control_layer(State(opts): State<CacheOpts>, mut res: Response) -> Response {
     let headers = vec![
         (
@@ -61,7 +55,7 @@ pub async fn cache_control_layer(State(opts): State<CacheOpts>, mut res: Respons
             }
         }
         CacheOpts::Default => {
-            for (name, value) in headers {
+            for (name, ..) in headers {
                 res.headers_mut().remove(name);
             }
         }
