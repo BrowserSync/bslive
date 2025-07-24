@@ -1,41 +1,30 @@
 use crate::handlers::proxy::{proxy_handler, ProxyConfig, RewriteKind};
-use crate::optional_layers::optional_layers;
 use crate::raw_loader::serve_raw_one;
+use crate::route_cache::cache_control_layer;
+use crate::route_candidate::RouteCandidate;
+use crate::route_delay::delay_mw;
+use crate::route_marker::RouteMarker;
+use crate::route_match::RouteMatch;
+use crate::route_res_headers::set_str_headers;
 use crate::runtime_ctx::RuntimeCtx;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::handler::Handler;
-use axum::middleware::{from_fn, map_response, Next};
+use axum::middleware::{from_fn, from_fn_with_state, map_response_with_state};
 use axum::response::IntoResponse;
 use axum::routing::{any, any_service, get_service, MethodRouter};
 use axum::{middleware, Extension, Router};
-use axum_extra::middleware::option_layer;
-use bsnext_guards::route_guard::RouteGuard;
 use bsnext_guards::{uri_extension, OuterUri};
-use bsnext_input::route::{ListOrSingle, ProxyRoute, Route, RouteKind};
-use bsnext_input::when_guard::{HasGuard, JsonGuard, JsonPropGuard, WhenBodyGuard, WhenGuard};
-use bsnext_resp::InjectHandling;
-use bytes::Bytes;
-use http::header::{ACCEPT, CONTENT_TYPE};
+use bsnext_input::route::{Route, RouteKind};
+use bsnext_resp::{response_modifications_layer, InjectHandling};
 use http::request::Parts;
-use http::uri::PathAndQuery;
-use http::{Method, Response, StatusCode, Uri};
-use http_body_util::BodyExt;
-use serde_json::Value;
+use http::{StatusCode, Uri};
 use std::collections::HashMap;
-use std::ffi::OsStr;
-use std::io;
-use std::ops::ControlFlow;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-use tokio::fs::{create_dir_all, File};
-use tokio::io::{AsyncWriteExt, BufWriter};
-use tokio_stream::wrappers::ReceiverStream;
-use tokio_stream::StreamExt;
+use std::path::PathBuf;
 use tower::ServiceExt;
 use tower_http::decompression::DecompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
-use tracing::{debug, error, trace, trace_span};
+use tracing::{debug, trace, trace_span};
 
 pub struct RouteMap {
     pub mapping: HashMap<String, Vec<Route>>,
@@ -96,7 +85,7 @@ pub async fn try_one(
     let span = trace_span!("try_one", outer_uri = ?outer_uri, path = path, local_uri = ?uri);
     let _g = span.enter();
 
-    let pq = outer_uri.path_and_query();
+    let path_and_query = outer_uri.path_and_query();
 
     trace!(?parts);
     debug!("will try {} candidate routes", routes.len());
@@ -107,81 +96,14 @@ pub async fn try_one(
         .filter(|(index, route)| {
             let span = trace_span!("early filter for candidates", index = index);
             let _g = span.enter();
-
-            trace!(?route.kind);
-
-            // early checks from parts only
-            let can_serve: bool = route
-                .when
-                .as_ref()
-                .map(|when| match &when {
-                    ListOrSingle::WhenOne(when) => match_one(when, &outer_uri, &path, pq, &parts),
-                    ListOrSingle::WhenMany(many) => many
-                        .iter()
-                        .all(|when| match_one(when, &outer_uri, &path, pq, &parts)),
-                })
-                .unwrap_or(true);
-
-            // if this routes wants to inspect the body, check it was a POST
-            let can_consume = match &route.when_body {
-                None => true,
-                Some(when_body) => {
-                    let consuming = NeedsJsonGuard(when_body).accept_req(&req, &outer_uri);
-                    trace!(route.when_body.json = consuming);
-                    consuming
-                }
-            };
-
-            trace!(?can_serve);
-            trace!(?can_consume);
-
-            if !can_serve || !can_consume {
-                return false;
-            }
-
-            true
+            RouteMatch(route).route_match(&req, &outer_uri, &path, path_and_query, &parts)
         })
-        .map(|(index, route)| {
-            let consume = route
-                .when_body
-                .as_ref()
-                .is_some_and(|body| NeedsJsonGuard(body).accept_req(&req, &outer_uri));
-
-            let css_req = req
-                .headers()
-                .get(ACCEPT)
-                .and_then(|h| h.to_str().ok())
-                .map(|c| c.contains("text/css"))
-                .unwrap_or(false);
-
-            let js_req = Path::new(req.uri().path())
-                .extension()
-                .is_some_and(|ext| ext == OsStr::new("js"));
-            let mirror = if (css_req || js_req) {
-                RouteHelper(&route).mirror().map(|v| v.to_path_buf())
-            } else {
-                None
-            };
-
-            let injections = route.opts.inject.as_injections();
-            let req_accepted = injections
-                .items
-                .iter()
-                .any(|item| item.accept_req(&req, &outer_uri));
-
-            RouteCandidate {
-                index,
-                consume,
-                route,
-                mirror,
-                inject: req_accepted,
-            }
-        })
+        .map(|(index, route)| RouteCandidate::for_route(index, route, &req, &uri, &outer_uri))
         .collect::<Vec<_>>();
 
     debug!("{} candidates passed early checks", candidates.len());
 
-    let mut body: Option<Body> = Some(req.into_body());
+    let mut req_body: Option<Body> = Some(req.into_body());
 
     'find_candidates: for candidate in &candidates {
         let span = trace_span!("index", index = candidate.index);
@@ -189,9 +111,9 @@ pub async fn try_one(
 
         trace!(?parts);
 
-        let (next_body, control_flow) = candidate.try_exec(&mut body).await;
-        if next_body.is_some() {
-            body = next_body
+        let (next_req_body, control_flow) = candidate.try_exec(&mut req_body).await;
+        if next_req_body.is_some() {
+            req_body = next_req_body
         }
 
         if control_flow.is_break() {
@@ -202,23 +124,63 @@ pub async fn try_one(
 
         let mut method_router = to_method_router(&path, &candidate.route.kind, &ctx);
 
-        // decompress if needed
-        if candidate.mirror.is_some() || candidate.inject {
+        // when a proxy needs injections
+        if let (Some(ref injections), true) = (&candidate.injections, candidate.will_proxy()) {
+            trace!(?injections);
+            method_router = method_router.layer(from_fn(RouteMarker::before_proxy));
             method_router = method_router.layer(DecompressionLayer::new());
+            method_router = method_router.layer(from_fn(RouteMarker::after_decompress));
+            method_router = method_router.layer(middleware::from_fn(response_modifications_layer));
+            method_router = method_router.layer(Extension(InjectHandling {
+                items: injections.items().clone(),
+            }));
         }
 
-        if let Some(mirror_path) = &candidate.mirror {
-            method_router = method_router.layer(middleware::from_fn_with_state(
-                mirror_path.to_owned(),
-                mirror_handler,
-            ));
+        // when a route needs injections, but it's not a proxy
+        if let (Some(ref injections), false) = (&candidate.injections, candidate.will_proxy()) {
+            trace!(?injections);
+            method_router = method_router.layer(middleware::from_fn(response_modifications_layer));
+            method_router = method_router.layer(Extension(InjectHandling {
+                items: injections.items().clone(),
+            }));
         }
 
-        let raw_out: MethodRouter = optional_layers(method_router, &candidate.route.opts);
+        // when a route needs compression
+        if let Some(compress) = &candidate.compress {
+            if compress.for_proxy() {
+                method_router = method_router.layer(compress.as_proxy_layer());
+            } else {
+                method_router = method_router.layer(compress.as_any_layer());
+            }
+        }
+
+        // when a route should incur an initial delay
+        if let Some(delay) = &candidate.delay {
+            method_router = method_router.layer(from_fn_with_state(delay.opts().clone(), delay_mw));
+        }
+
+        if let Some(cache) = &candidate.cache_prevent {
+            method_router = method_router.layer(map_response_with_state(
+                cache.opts().clone(),
+                cache_control_layer,
+            ))
+        }
+
+        if let Some(cors) = &candidate.cors {
+            method_router = method_router.layer(cors.as_layer())
+        }
+
+        if let Some(res_headers) = &candidate.res_headers {
+            method_router = method_router.layer(map_response_with_state(
+                res_headers.headers().clone(),
+                set_str_headers,
+            ))
+        }
+
         let req_clone = match candidate.route.kind {
             RouteKind::Raw(_) => Request::from_parts(parts.clone(), Body::empty()),
             RouteKind::Proxy(_) => {
-                if let Some(body) = body.take() {
+                if let Some(body) = req_body.take() {
                     Request::from_parts(parts.clone(), body)
                 } else {
                     Request::from_parts(parts.clone(), Body::empty())
@@ -228,17 +190,16 @@ pub async fn try_one(
         };
 
         // MAKE THE REQUEST
-        let result = raw_out.oneshot(req_clone).await;
+        let result = method_router.oneshot(req_clone).await;
 
         match result {
             Ok(result) => match result.status().as_u16() {
-                // todo: this is way too simplistic, it should allow 404 being deliberately returned etc
+                // todo: this is way too simplistic, it should allow for a 404 being deliberately returned etc
                 404 | 405 => {
                     if let Some(fallback) = &candidate.route.fallback {
-                        let mr = to_method_router(&path, &fallback.kind, &ctx);
-                        let raw_out: MethodRouter = optional_layers(mr, &fallback.opts);
+                        let method_router = to_method_router(&path, &fallback.kind, &ctx);
                         let raw_fb = Request::from_parts(parts.clone(), Body::empty());
-                        return raw_out.oneshot(raw_fb).await.into_response();
+                        return method_router.oneshot(raw_fb).await.into_response();
                     }
                 }
                 _ => {
@@ -259,56 +220,6 @@ pub async fn try_one(
 
     tracing::trace!("StatusCode::NOT_FOUND");
     StatusCode::NOT_FOUND.into_response()
-}
-
-struct RouteHelper<'a>(pub &'a Route);
-
-impl<'a> RouteHelper<'a> {
-    fn mirror(&self) -> Option<&Path> {
-        match &self.0.kind {
-            RouteKind::Proxy(ProxyRoute {
-                unstable_mirror, ..
-            }) => unstable_mirror.as_ref().map(|s| Path::new(s)),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct RouteCandidate<'a> {
-    index: usize,
-    route: &'a Route,
-    consume: bool,
-    mirror: Option<PathBuf>,
-    inject: bool,
-}
-
-impl RouteCandidate<'_> {
-    pub async fn try_exec(&self, body: &mut Option<Body>) -> (Option<Body>, ControlFlow<()>) {
-        if self.consume {
-            trace!("trying to collect body because candidate needs it");
-            match_json_body(body, self.route).await
-        } else {
-            (None, ControlFlow::Continue(()))
-        }
-    }
-}
-
-fn match_one(
-    when_guard: &WhenGuard,
-    outer_uri: &Uri,
-    path: &str,
-    pq: Option<&PathAndQuery>,
-    parts: &Parts,
-) -> bool {
-    match when_guard {
-        WhenGuard::Always => true,
-        WhenGuard::Never => false,
-        WhenGuard::ExactUri { exact_uri: true } => path == pq.map(|pq| pq.as_str()).unwrap_or("/"),
-        WhenGuard::ExactUri { exact_uri: false } => path != pq.map(|pq| pq.as_str()).unwrap_or("/"),
-        WhenGuard::Query { query } => QueryHasGuard(query).accept_req_parts(parts, outer_uri),
-        WhenGuard::Accept { accept } => AcceptHasGuard(accept).accept_req_parts(parts, outer_uri),
-    }
 }
 
 fn to_method_router(path: &str, route_kind: &RouteKind, ctx: &RuntimeCtx) -> MethodRouter {
@@ -352,245 +263,6 @@ fn to_method_router(path: &str, route_kind: &RouteKind, ctx: &RuntimeCtx) -> Met
                 }
             }
         }
-    }
-}
-
-async fn mirror_handler(
-    State(path): State<PathBuf>,
-    req: Request,
-    next: Next,
-) -> impl IntoResponse {
-    let (mut sender, receiver) = tokio::sync::mpsc::channel::<Result<Bytes, io::Error>>(100);
-    let as_stream = ReceiverStream::from(receiver);
-    let c = req.uri().clone();
-    let p = path.join(c.path().strip_prefix("/").unwrap());
-
-    let r = next.run(req).await;
-    let s = r.into_body().into_data_stream();
-
-    tokio::spawn(async move {
-        let s = s.throttle(Duration::from_millis(10));
-        tokio::pin!(s);
-        create_dir_all(&p.parent().unwrap()).await.unwrap();
-        let mut file = BufWriter::new(File::create(p).await.unwrap());
-
-        while let Some(Ok(b)) = s.next().await {
-            match file.write(&b).await {
-                Ok(_) => {}
-                Err(e) => error!(?e, "could not write"),
-            };
-            // match file.write("\n".as_bytes()).await {
-            //     Ok(_) => {}
-            //     Err(e) => error!(?e, "could not new line"),
-            // };
-            match file.flush().await {
-                Ok(_) => {}
-                Err(e) => error!(?e, "could not flush"),
-            };
-            match sender.send(Ok(b)).await {
-                Ok(_) => {}
-                Err(e) => {
-                    error!(?e, "sender was dropped before reading was finished");
-                    error!("will break");
-                    break;
-                }
-            };
-        }
-    });
-
-    Body::from_stream(as_stream).into_response()
-}
-
-struct QueryHasGuard<'a>(pub &'a HasGuard);
-
-impl RouteGuard for QueryHasGuard<'_> {
-    fn accept_req(&self, _req: &Request, _outer_uri: &Uri) -> bool {
-        true
-    }
-
-    fn accept_res<T>(&self, _res: &Response<T>, _outer_uri: &Uri) -> bool {
-        true
-    }
-
-    fn accept_req_parts(&self, parts: &Parts, _outer_uri: &Uri) -> bool {
-        let Some(query) = parts.uri.query() else {
-            return false;
-        };
-        match &self.0 {
-            HasGuard::Is { is } | HasGuard::Literal(is) => is == query,
-            HasGuard::Has { has } => query.contains(has),
-            HasGuard::NotHas { not_has } => !query.contains(not_has),
-        }
-    }
-}
-struct AcceptHasGuard<'a>(pub &'a HasGuard);
-
-impl RouteGuard for AcceptHasGuard<'_> {
-    fn accept_req(&self, _req: &Request, _outer_uri: &Uri) -> bool {
-        true
-    }
-
-    fn accept_res<T>(&self, _res: &Response<T>, _outer_uri: &Uri) -> bool {
-        true
-    }
-
-    fn accept_req_parts(&self, parts: &Parts, _outer_uri: &Uri) -> bool {
-        let Some(query) = parts.headers.get("accept") else {
-            return false;
-        };
-        let Ok(str) = std::str::from_utf8(query.as_bytes()) else {
-            tracing::error!("bytes incorrrect");
-            return false;
-        };
-        match &self.0 {
-            HasGuard::Literal(is) | HasGuard::Is { is } => is == str,
-            HasGuard::Has { has } => str.contains(has),
-            HasGuard::NotHas { not_has } => !str.contains(not_has),
-        }
-    }
-}
-
-struct NeedsJsonGuard<'a>(pub &'a ListOrSingle<WhenBodyGuard>);
-impl RouteGuard for NeedsJsonGuard<'_> {
-    #[tracing::instrument(skip_all, name = "NeedsJsonGuard.accept_req")]
-    fn accept_req(&self, req: &Request, _outer_uri: &Uri) -> bool {
-        let exec = match self.0 {
-            ListOrSingle::WhenOne(WhenBodyGuard::Json { .. }) => true,
-            ListOrSingle::WhenMany(items) => items
-                .iter()
-                .any(|item| matches!(item, WhenBodyGuard::Json { .. })),
-            _ => false,
-        };
-        trace!(?exec);
-        if !exec {
-            return false;
-        }
-        let headers = req.headers();
-        let method = req.method();
-        let json = headers.get(CONTENT_TYPE).is_some_and(|header| {
-            header
-                .to_str()
-                .ok()
-                .map(|h| h.contains("application/json"))
-                .unwrap_or(false)
-        });
-        trace!(?json, ?method, ?headers);
-        json && method == Method::POST
-    }
-
-    fn accept_res<T>(&self, _res: &Response<T>, _outer_uri: &Uri) -> bool {
-        true
-    }
-}
-
-impl NeedsJsonGuard<'_> {
-    pub fn match_body(&self, value: &Value) -> bool {
-        let matches: Vec<(&'_ WhenBodyGuard, bool)> = match self.0 {
-            ListOrSingle::WhenOne(one) => vec![(one, match_one_json(value, one))],
-            ListOrSingle::WhenMany(many) => many
-                .iter()
-                .map(|guard| (guard, match_one_json(value, guard)))
-                .collect(),
-        };
-        matches.iter().all(|(_item, result)| *result)
-    }
-}
-
-pub fn match_one_json(value: &Value, when_body_guard: &WhenBodyGuard) -> bool {
-    match when_body_guard {
-        WhenBodyGuard::Json { json } => match json {
-            JsonGuard::ArrayLast { items, last } => match value.pointer(items) {
-                Some(Value::Array(arr)) => match arr.last() {
-                    None => false,
-                    Some(last_item) => last.iter().all(|prop_guard| match prop_guard {
-                        JsonPropGuard::PathIs { path, is } => match last_item.pointer(path) {
-                            Some(Value::String(val_string)) => val_string == is,
-                            _ => false,
-                        },
-                        JsonPropGuard::PathHas { path, has } => match last_item.pointer(path) {
-                            Some(Value::String(val_string)) => val_string.contains(has),
-                            _ => false,
-                        },
-                    }),
-                },
-                _ => false,
-            },
-            JsonGuard::ArrayAny { items, any } => match value.pointer(items) {
-                Some(Value::Array(arr)) if arr.is_empty() => false,
-                Some(Value::Array(val)) => val
-                    .iter()
-                    .any(|val| any.iter().any(|prop_guard| match_prop(val, prop_guard))),
-                _ => false,
-            },
-            JsonGuard::ArrayAll { items, all } => match value.pointer(items) {
-                Some(Value::Array(arr)) if arr.is_empty() => false,
-                Some(Value::Array(arr)) => arr
-                    .iter()
-                    .any(|one_val| all.iter().all(|guard| match_prop(one_val, guard))),
-                _ => false,
-            },
-            JsonGuard::Path(pg) => match_prop(value, pg),
-        },
-        WhenBodyGuard::Never => false,
-    }
-}
-
-async fn match_json_body(
-    body: &mut Option<Body>,
-    route: &Route,
-) -> (Option<Body>, ControlFlow<()>) {
-    if let Some(inner_body) = body.take() {
-        let collected = inner_body.collect();
-        let bytes = match collected.await {
-            Ok(collected) => collected.to_bytes(),
-            Err(err) => {
-                tracing::error!(?err, "could not collect bytes...");
-                Bytes::new()
-            }
-        };
-
-        trace!("did collect {} bytes", bytes.len());
-
-        match serde_json::from_slice(bytes.iter().as_slice()) {
-            Ok(value) => {
-                let result = route
-                    .when_body
-                    .as_ref()
-                    .map(|when_body| NeedsJsonGuard(when_body).match_body(&value));
-                if result.is_some_and(|res| !res) {
-                    trace!("ignoring, `when_body` was present, but didn't match the guards");
-                    trace!("restoring body from clone");
-                    (Some(Body::from(bytes)), ControlFlow::Break(()))
-                } else {
-                    if result.is_some() {
-                        trace!("✅ when_body produced a valid match");
-                    } else {
-                        trace!("when_body didn't produce a value");
-                    }
-                    (Some(Body::from(bytes)), ControlFlow::Continue(()))
-                }
-            }
-            Err(err) => {
-                tracing::error!(?err, "could not deserialize into Value");
-                (Some(Body::from(bytes)), ControlFlow::Continue(()))
-            }
-        }
-    } else {
-        trace!("could not .take() body");
-        (None, ControlFlow::Continue(()))
-    }
-}
-
-pub fn match_prop(value: &Value, prop_guard: &JsonPropGuard) -> bool {
-    match prop_guard {
-        JsonPropGuard::PathIs { path, is } => match value.pointer(path) {
-            Some(Value::String(val_string)) => val_string == is,
-            _ => false,
-        },
-        JsonPropGuard::PathHas { path, has } => match value.pointer(path) {
-            Some(Value::String(val_string)) => val_string.contains(has),
-            _ => false,
-        },
     }
 }
 

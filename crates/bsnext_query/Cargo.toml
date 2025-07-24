@@ -1,0 +1,14 @@
+[package]
+name = "bsnext_query"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bsnext_resp = { path = "../bsnext_resp" }
+
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+insta = { workspace = true }
+anyhow = { workspace = true }
+http = { workspace = true }

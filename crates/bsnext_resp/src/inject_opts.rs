@@ -1,4 +1,4 @@
-use crate::builtin_strings::{BuiltinStringDef, BuiltinStrings};
+use crate::builtin_strings::BuiltinStringDef;
 use crate::inject_addition::InjectAddition;
 use crate::inject_replacement::InjectReplacement;
 use crate::injector_guard::ByteReplacer;
@@ -13,34 +13,6 @@ pub enum InjectOpts {
     Bool(bool),
     Item(InjectionItem),
     Items(Vec<InjectionItem>),
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Injections {
-    pub items: Vec<InjectionItem>,
-}
-
-impl InjectOpts {
-    pub fn as_injections(&self) -> Injections {
-        let items = match self {
-            InjectOpts::Bool(true) => {
-                vec![InjectionItem {
-                    inner: Injection::BsLive(BuiltinStringDef {
-                        name: BuiltinStrings::Connector,
-                    }),
-                    only: None,
-                }]
-            }
-            InjectOpts::Bool(false) => {
-                vec![]
-            }
-            InjectOpts::Items(items) if items.is_empty() => vec![],
-            // todo: is this too expensive?
-            InjectOpts::Items(items) => items.to_owned(),
-            InjectOpts::Item(item) => vec![item.to_owned()],
-        };
-        Injections { items }
-    }
 }
 
 impl Default for InjectOpts {

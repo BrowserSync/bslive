@@ -1,0 +1,13 @@
+---
+source: crates/bsnext_query/src/dynamic_query_params.rs
+expression: query_with_bool
+---
+DynamicQueryParams {
+    delay: None,
+    cache: None,
+    inject: Some(
+        Other(
+            "false",
+        ),
+    ),
+}
