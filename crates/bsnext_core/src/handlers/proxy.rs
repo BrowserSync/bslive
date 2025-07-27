@@ -1,13 +1,10 @@
 use anyhow::Context;
 use axum::body::Body;
 use axum::extract::Request;
-use axum::handler::Handler;
 use axum::response::{IntoResponse, Response};
 use axum::routing::any;
 use axum::Extension;
-use bsnext_guards::route_guard::RouteGuard;
 use bsnext_guards::OuterUri;
-use bsnext_resp::InjectHandling;
 use http::uri::{Parts, PathAndQuery};
 use http::{HeaderName, HeaderValue, StatusCode, Uri};
 use hyper_tls::HttpsConnector;
@@ -16,7 +13,6 @@ use hyper_util::client::legacy::Client;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use tower::ServiceExt;
-use tower_http::decompression::DecompressionLayer;
 use tracing::{trace_span, Instrument};
 
 #[derive(Debug, Clone)]
@@ -193,7 +189,6 @@ fn into_target_uri(
             v
         }
         (Some(target_only), None) => {
-            dbg!(&target_only);
             let path = target_only.path();
 
             let next = match req_query {

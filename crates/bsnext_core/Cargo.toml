@@ -18,6 +18,7 @@ bsnext_dto = { path = "../bsnext_dto" }
 bsnext_guards = { path = "../bsnext_guards" }
 bsnext_output = { path = "../bsnext_output" }
 bsnext_tracing = { path = "../bsnext_tracing" }
+bsnext_query = { path = "../bsnext_query" }
 
 axum-server = { version = "0.6.0", features = ["tls-rustls"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
@@ -46,6 +47,7 @@ serde_json = { workspace = true }
 bytes = { workspace = true }
 http = { workspace = true }
 log = "0.4.21"
+http-body = "1.0.0"
 
 [[example]]
 name = "abc"

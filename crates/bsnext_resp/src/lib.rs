@@ -23,7 +23,7 @@ use bsnext_guards::OuterUri;
 use http::header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE};
 use http::{Response, StatusCode};
 use http_body_util::BodyExt;
-use tracing::{span, Level};
+use tracing::{span, trace, Level};
 
 pub struct RespMod;
 
@@ -74,6 +74,8 @@ pub async fn response_modifications_layer(
         .filter(|item| item.accept_req(&req, &outer_uri))
         .collect();
 
+    trace!(?req_accepted);
+
     if req_accepted.is_empty() {
         return Ok(next.run(req).await.into_response());
     }
@@ -109,12 +111,15 @@ pub async fn response_modifications_layer(
     };
 
     let mut next = bytes;
-    for injection in &res_accepted {
-        if let Some(bytes) = injection.replace_bytes(&next, &res_headers, &req_headers) {
-            next = bytes
+    for (index, injection) in res_accepted.iter().enumerate() {
+        match injection.replace_bytes(&next, &res_headers, &req_headers) {
+            Some(bytes) => next = bytes,
+            None => tracing::debug!(?index, "could not write bytes"),
         }
     }
 
     parts.headers.insert(CONTENT_LENGTH, next.len().into());
+    trace!(?parts.headers);
+    // trace!(?next);
     Ok(Response::from_parts(parts, Body::from(next)))
 }

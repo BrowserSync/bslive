@@ -217,6 +217,12 @@ pub struct ProxyRoute {
     pub unstable_mirror: Option<String>,
 }
 
+impl ProxyRoute {
+    pub fn mirror(&self) -> Option<PathBuf> {
+        self.unstable_mirror.as_ref().map(PathBuf::from)
+    }
+}
+
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 struct Mirror {
     pub dir: String,

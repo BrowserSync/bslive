@@ -6,13 +6,13 @@ expression: "(parts2.headers, body2)"
     {
         "content-type": "text/plain",
         "content-length": "11",
+        "cache-control": "no-store, no-cache, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
         "vary": "origin, access-control-request-method, access-control-request-headers",
         "access-control-allow-origin": "localhost",
         "access-control-expose-headers": "*",
         "abc": "def",
-        "cache-control": "no-store, no-cache, must-revalidate",
-        "pragma": "no-cache",
-        "expires": "0",
     },
     "other route",
 )
