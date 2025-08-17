@@ -6,10 +6,12 @@ use crate::server::state::ServerState;
 use crate::servers_supervisor::get_servers_handler::{GetActiveServers, IncomingEvents};
 use actix::{Recipient, ResponseFuture};
 use actix_rt::Arbiter;
+use axum_server::tls_rustls::RustlsConfig;
 use bsnext_dto::internal::ServerError;
 use bsnext_input::server_config::ServerIdentity;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, TcpListener};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
 
@@ -86,7 +88,15 @@ impl actix::Handler<Listen> for ServerActor {
 
             tracing::trace!("trying to listen on {:?}", socket_addr);
 
-            let server = axum_server::bind(socket_addr)
+            // configure certificate and private key used by https
+            let config = RustlsConfig::from_pem(
+                include_bytes!("certs/_wildcard.bslive.test+5.pem").to_vec(),
+                include_bytes!("./certs/_wildcard.bslive.test+5-key.pem").to_vec(),
+            )
+            .await
+            .unwrap();
+
+            let server = axum_server::bind_rustls(socket_addr, config)
                 .handle(h1)
                 .serve(router.into_make_service_with_connect_info::<SocketAddr>());
 
