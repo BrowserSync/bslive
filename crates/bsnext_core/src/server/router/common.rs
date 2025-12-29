@@ -1,9 +1,7 @@
-use crate::server::router::make_router;
-use crate::server::state::ServerState;
-use std::net::SocketAddr;
-
 use crate::handler_stack::RouteMap;
 use crate::runtime_ctx::RuntimeCtx;
+use crate::server::router::make_router;
+use crate::server::state::ServerState;
 use axum::body::Body;
 use axum::extract::Request;
 use axum::middleware::{from_fn, Next};
@@ -14,9 +12,11 @@ use bsnext_input::server_config::ServerConfig;
 use bsnext_input::Input;
 use http::header::ACCEPT;
 use http::response::Parts;
-use http::HeaderValue;
+use http::{HeaderValue, Uri};
 use mime_guess::mime::TEXT_HTML;
-use std::sync::Arc;
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -31,6 +31,7 @@ pub fn into_state(val: ServerConfig) -> ServerState {
         routes: Arc::new(RwLock::new(val.combined_routes())),
         raw_router: Arc::new(RwLock::new(router)),
         client_config: Arc::new(RwLock::new(val.clients.clone())),
+        socket_addr: Arc::new(Mutex::new(None)),
         id: val.identity.as_id(),
         parent: None,
         evt_receiver: None,
@@ -112,6 +113,7 @@ pub fn header_pairs(parts: &Parts) -> Vec<(String, String)> {
 pub struct TestProxy {
     pub socker_addr: SocketAddr,
     pub http_addr: String,
+    pub uri: Uri,
     pub shutdown: tokio::sync::oneshot::Sender<()>,
     pub join_handle: JoinHandle<()>,
 }
@@ -151,10 +153,12 @@ pub async fn test_proxy(router: Router) -> anyhow::Result<TestProxy> {
 
     let addr = address_receiver.await?;
     let http_address = format!("http://{addr}");
+    let uri = Uri::from_str(&http_address).expect("must be valid here");
     Ok(TestProxy {
         socker_addr: addr,
         http_addr: http_address,
         shutdown: complete_sender,
         join_handle: handle,
+        uri,
     })
 }

@@ -147,6 +147,7 @@ pub async fn dynamic_router(
 
     raw_router
         .clone()
+        .layer(Extension(app.socket_addr.clone()))
         .layer(middleware::from_fn(tag_dynamic))
         .oneshot(req)
         .await

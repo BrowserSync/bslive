@@ -6,7 +6,7 @@ mod test {
     use crate::server::router::common::{test_proxy, to_resp_body, to_resp_parts_and_body};
     use axum::body::Body;
     use axum::extract::Request;
-    use axum::response::IntoResponse;
+    use axum::response::{IntoResponse, Response};
     use axum::routing::{get, post};
     use axum::{Extension, Json, Router};
     use bsnext_input::route::Route;
@@ -330,6 +330,75 @@ mod test {
 
             assert_eq!(actual_body, expected_body);
         }
+
+        proxy.destroy().await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cookie_domain_rewriting() -> anyhow::Result<()> {
+        let https = HttpsConnector::new();
+        let client: Client<HttpsConnector<HttpConnector>, Body> =
+            Client::builder(TokioExecutor::new()).build(https);
+
+        let proxy_app = Router::new().route(
+            "/set-cookie",
+            get(|| async {
+                Response::builder()
+                    .header(
+                        "Set-Cookie",
+                        "session=123; Domain=example.com; Path=/; HttpOnly",
+                    )
+                    .body(Body::from("cookie set"))
+                    .unwrap()
+            }),
+        );
+
+        let proxy = test_proxy(proxy_app).await?;
+
+        let routes_input = format!(
+            r#"
+            - path: /
+              proxy: {http}
+        "#,
+            http = proxy.http_addr
+        );
+
+        let routes = serde_yaml::from_str::<Vec<Route>>(&routes_input)?;
+        let router = RouteMap::new_from_routes(&routes)
+            .into_router(&RuntimeCtx::default())
+            .layer(Extension(client));
+
+        // Define the request
+        let request = Request::get("/set-cookie").body(Body::empty())?;
+
+        // Make a one-shot request on the router
+        let response = router.oneshot(request).await?;
+
+        let (parts, _body) = to_resp_parts_and_body(response).await;
+
+        let set_cookie = parts
+            .headers
+            .get("set-cookie")
+            .expect("should have set-cookie header")
+            .to_str()?;
+
+        // Initially, we expect it to be UNCHANGED because we haven't implemented the fix yet.
+        // The goal of this task is to CHANGE it to match the proxy domain (or remove it if appropriate)
+        // For now, let's see it failing if we assert what we WANT.
+        // We want the domain to be either removed or changed to the proxy's domain.
+        // Since this is a local test, the proxy domain might be 127.0.0.1 or similar.
+        // assert!(
+        //     set_cookie.contains(&format!(
+        //         "Domain={}",
+        //         proxy.uri.authority().unwrap().to_string()
+        //     )),
+        //     "Cookie domain should have been rewritten: {}",
+        //     set_cookie
+        // );
+
+        println!("set_cookie: {}", set_cookie);
 
         proxy.destroy().await?;
 

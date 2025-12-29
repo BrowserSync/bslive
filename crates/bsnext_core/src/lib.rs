@@ -10,7 +10,7 @@ mod match_json;
 pub mod meta;
 pub mod not_found;
 pub mod panic_handler;
-pub mod proxy_loader;
+pub mod proxy_loader_tests;
 pub mod raw_loader;
 mod route_cache;
 mod route_candidate;

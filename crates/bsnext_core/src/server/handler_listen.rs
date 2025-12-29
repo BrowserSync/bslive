@@ -4,13 +4,15 @@ use crate::server::actor::ServerActor;
 use crate::server::router::make_router;
 use crate::server::state::ServerState;
 use crate::servers_supervisor::get_servers_handler::{GetActiveServers, IncomingEvents};
-use actix::{Recipient, ResponseFuture};
+use actix::ActorFutureExt;
+use actix::{Recipient, ResponseActFuture, ResponseFuture, WrapFuture};
 use actix_rt::Arbiter;
 use bsnext_dto::internal::ServerError;
 use bsnext_input::server_config::ServerIdentity;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, TcpListener};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tokio::sync::{oneshot, RwLock};
 
 #[derive(actix::Message)]
@@ -22,13 +24,14 @@ pub struct Listen {
 }
 
 impl actix::Handler<Listen> for ServerActor {
-    type Result = ResponseFuture<Result<SocketAddr, ServerError>>;
+    type Result = ResponseActFuture<Self, Result<SocketAddr, ServerError>>;
 
     fn handle(&mut self, msg: Listen, _ctx: &mut Self::Context) -> Self::Result {
         let identity = self.config.identity.clone();
         tracing::trace!("actor started for {:?}", identity);
         let (send_complete, handle, client_sender) = self.install_signals();
         let (oneshot_send, oneshot_rec) = oneshot::channel();
+        let socket_addr = Arc::new(Mutex::new(None));
         let h1 = handle.clone();
         let h2 = handle.clone();
 
@@ -41,6 +44,7 @@ impl actix::Handler<Listen> for ServerActor {
             raw_router: Arc::new(RwLock::new(router)),
             runtime_ctx: msg.runtime_ctx,
             client_config: Arc::new(RwLock::new(self.config.clients.clone())),
+            socket_addr: socket_addr.clone(),
             id: self.config.identity.as_id(),
             parent: Some(msg.parent.clone()),
             evt_receiver: Some(msg.evt_receiver.clone()),
@@ -121,7 +125,7 @@ impl actix::Handler<Listen> for ServerActor {
 
         Arbiter::current().spawn(server);
 
-        Box::pin(async move {
+        let fut = async move {
             let listen_r = h2.listening().await;
 
             if let Some(socket_addr) = listen_r {
@@ -137,7 +141,21 @@ impl actix::Handler<Listen> for ServerActor {
                     Err(ServerError::Unknown(format!("{other:?}")))
                 }
             }
-        })
+        };
+
+        Box::pin(fut.into_actor(self).map(|res, act, ctx| {
+            if let Ok(addr) = res.as_ref() {
+                // let mut socket_addr = act.app_state..lock().unwrap();
+                // *socket_addr = Some(addr.clone());
+                let Some(s) = act.app_state.as_mut() else {
+                    return res;
+                };
+
+                let mut v = s.socket_addr.lock().unwrap();
+                *v = Some(addr.clone());
+            }
+            res
+        }))
     }
 }
 
@@ -146,18 +164,4 @@ pub fn get_available_port() -> Option<u16> {
         .and_then(|listener| listener.local_addr())
         .map(|socket_addr| socket_addr.port())
         .ok()
-}
-
-#[derive(actix::Message)]
-#[rtype(result = "()")]
-pub struct Listening {
-    addr: SocketAddr,
-}
-
-impl actix::Handler<Listening> for ServerActor {
-    type Result = ();
-
-    fn handle(&mut self, msg: Listening, _ctx: &mut Self::Context) -> Self::Result {
-        self.addr = Some(msg.addr);
-    }
 }

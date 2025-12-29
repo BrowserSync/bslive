@@ -6,7 +6,8 @@ use bsnext_dto::ClientEvent;
 use bsnext_input::client_config::ClientConfig;
 use bsnext_input::route::Route;
 use std::fmt::Formatter;
-use std::sync::Arc;
+use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 use tokio::sync::{broadcast, RwLock};
 
 #[derive(Clone)]
@@ -15,6 +16,7 @@ pub struct ServerState {
     pub runtime_ctx: RuntimeCtx,
     pub raw_router: Arc<RwLock<Router>>,
     pub client_config: Arc<RwLock<ClientConfig>>,
+    pub socket_addr: Arc<Mutex<Option<SocketAddr>>>,
     pub id: u64,
     pub parent: Option<Recipient<GetActiveServers>>,
     pub evt_receiver: Option<Recipient<IncomingEvents>>,

@@ -18,6 +18,7 @@ futures = "0.3.30"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 tower = { version = "0.4", features = ['steer', 'util'] }
 tower-http = { version = "0.6.0", features = ['trace', 'fs', 'compression-full', 'decompression-full', 'catch-panic', 'cors', 'timeout', 'set-header', ] }
+cookie = "0.18.1"
 tracing = { version = "0.1.35", default-features = false, features = ["std", "attributes"] }
 actix = "0.13.1"
 actix-rt = "2.9.0"

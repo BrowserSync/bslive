@@ -112,11 +112,11 @@ impl ServersSupervisor {
                         });
 
                 tracing::debug!("starting {:?} servers", start_jobs.len());
-                let fts = start_jobs.into_iter().map(|server_config| {
+                let startup_futures = start_jobs.into_iter().map(|server_config| {
                     let server = ServerActor::new_from_config(server_config.clone());
                     let actor_addr = server.start();
                     let actor_addr_c = actor_addr.clone();
-                    let c = server_config.clone();
+                    let config_clone = server_config.clone();
                     actor_addr
                         .send(Listen {
                             // todo: tie this to the input somehow?
@@ -124,10 +124,10 @@ impl ServersSupervisor {
                             parent: self_addr.clone().recipient(),
                             evt_receiver: self_addr.clone().recipient(),
                         })
-                        .map(|r| (r, c, actor_addr_c))
+                        .map(|listen_response| (listen_response, config_clone, actor_addr_c))
                 });
-                let results = join_all(fts).await;
-                let start_child_results = results.into_iter().map(|(r, c, addr)| match r {
+                let startup_results = join_all(startup_futures).await;
+                let start_child_results = startup_results.into_iter().map(|(r, c, addr)| match r {
                     Ok(Ok(socket_addr)) => {
                         let evt = ChildResult::Created(ChildCreated {
                             server_handler: ChildHandlerMinimal {

@@ -20,6 +20,7 @@ use bsnext_resp::{response_modifications_layer, InjectHandling};
 use http::request::Parts;
 use http::{StatusCode, Uri};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use tower::ServiceExt;
 use tower_http::decompression::DecompressionLayer;
@@ -231,6 +232,7 @@ fn to_method_router(path: &str, route_kind: &RouteKind, ctx: &RuntimeCtx) -> Met
                 path: path.to_string(),
                 headers: proxy.proxy_headers.clone().unwrap_or_default(),
                 rewrite_kind: RewriteKind::from(proxy.rewrite_uri),
+                socket_addr: None,
             };
             let proxy_with_decompression = proxy_handler.layer(Extension(proxy_config.clone()));
             any(proxy_with_decompression)
