@@ -1,6 +1,7 @@
-use crate::task::{AsActor, TaskCommand};
+use crate::as_actor::AsActor;
 use crate::task_group::TaskGroup;
 use crate::task_list::RunKind;
+use crate::task_trigger::TaskTrigger;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
@@ -46,11 +47,11 @@ impl actix::Actor for TaskGroupRunner {
     }
 }
 
-impl Handler<TaskCommand> for TaskGroupRunner {
+impl Handler<TaskTrigger> for TaskGroupRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
     #[tracing::instrument(skip_all, name = "Handler->TaskCommand->TaskGroupRunner")]
-    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
         let span = Span::current();
         let gg = Arc::new(span.clone());
         let ggg = gg.clone();

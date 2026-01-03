@@ -1,41 +1,41 @@
-use crate::task::TaskCommand;
+use crate::task_trigger::TaskTrigger;
 use actix::{Handler, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
 
 #[derive(Default, Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub struct ExtEventSender;
+pub struct ExternalEventSender;
 
-impl ExtEventSender {
+impl ExternalEventSender {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl actix::Actor for ExtEventSender {
+impl actix::Actor for ExternalEventSender {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        tracing::trace!(" started AnyEventSender");
+    }
 
     fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
         tracing::trace!(" ⏰ stopping AnyEventSender");
         Running::Stop
     }
-
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(" x stopped AnyEventSender");
     }
-    fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!(" started AnyEventSender");
-    }
 }
 
-impl Handler<TaskCommand> for ExtEventSender {
+impl Handler<TaskTrigger> for ExternalEventSender {
     type Result = ResponseFuture<TaskResult>;
 
-    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
         let comms = msg.comms();
         let sender = comms.any_event_sender.clone();
         let events: Vec<AnyEvent> = match msg {
-            TaskCommand::Changes { changes, .. } => {
+            TaskTrigger::FsChanges { changes, .. } => {
                 let as_strings = changes
                     .iter()
                     .map(|p| p.to_string_lossy().to_string())
@@ -47,7 +47,7 @@ impl Handler<TaskCommand> for ExtEventSender {
                     },
                 ))]
             }
-            TaskCommand::Exec { .. } => vec![],
+            TaskTrigger::Exec { .. } => vec![],
         };
         Box::pin(async move {
             for evt in events {

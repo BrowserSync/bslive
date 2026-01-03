@@ -1,4 +1,4 @@
-use crate::task::TaskCommand;
+use crate::task_trigger::TaskTrigger;
 use actix::ResponseFuture;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, ExitCode, InvocationId, TaskResult};
@@ -145,26 +145,26 @@ impl actix::Actor for ShCmd {
     type Context = actix::Context<Self>;
 }
 
-impl actix::Handler<TaskCommand> for ShCmd {
+impl actix::Handler<TaskTrigger> for ShCmd {
     type Result = ResponseFuture<TaskResult>;
 
-    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, trigger: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = self.sh.clone();
         let cmd = cmd.to_os_string();
         tracing::debug!("ShCmd: Will run... {:?}", cmd);
-        let any_event_sender = msg.comms().any_event_sender.clone();
-        let any_event_sender2 = msg.comms().any_event_sender.clone();
-        let reason = match &msg {
-            TaskCommand::Changes { changes, .. } => format!("{} files changed", changes.len()),
-            TaskCommand::Exec { .. } => "command executed".to_string(),
+        let any_event_sender = trigger.comms().any_event_sender.clone();
+        let any_event_sender2 = trigger.comms().any_event_sender.clone();
+        let reason = match &trigger {
+            TaskTrigger::FsChanges { changes, .. } => format!("{} files changed", changes.len()),
+            TaskTrigger::Exec { .. } => "command executed".to_string(),
         };
-        let files = match &msg {
-            TaskCommand::Changes { changes, .. } => changes
+        let files = match &trigger {
+            TaskTrigger::FsChanges { changes, .. } => changes
                 .iter()
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
-            TaskCommand::Exec { .. } => "NONE".to_string(),
+            TaskTrigger::Exec { .. } => "NONE".to_string(),
         };
 
         let sh_prefix = Arc::new(self.prefix());

@@ -1,13 +1,15 @@
 use crate::input_fs::from_input_path;
 use crate::path_monitor::PathMonitorMeta;
 use crate::path_watchable::PathWatchable;
-use crate::task::{Task, TaskCommand, TaskComms};
+use crate::task::Task;
 use crate::task_group::TaskGroup;
 use crate::task_list::{BsLiveTask, Runnable, TaskList};
-use crate::trigger_fs_task::TriggerFsTask;
+use crate::task_trigger::{TaskComms, TaskTrigger};
+use crate::trigger_fs_task::TriggerFsTaskEvent;
 use crate::{BsSystem, OverrideInput};
 use actix::AsyncContext;
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
+use bsnext_dto::archy::archy;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
@@ -27,9 +29,9 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
         let next = match msg {
             FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event),
             FsEventGrouping::BufferedChange(buff) => {
-                if let Some((task, cmd, runner)) = self.handle_buffered(buff) {
+                if let Some((task, task_trigger, task_list)) = self.handle_buffered(buff) {
                     tracing::debug!("will trigger task runner");
-                    ctx.notify(TriggerFsTask::new(task, cmd, runner));
+                    ctx.notify(TriggerFsTaskEvent::new(task, task_trigger, task_list));
                 }
                 None
             }
@@ -98,7 +100,7 @@ impl BsSystem {
     fn handle_buffered(
         &mut self,
         buf: BufferedChangeEvent,
-    ) -> Option<(Task, TaskCommand, TaskList)> {
+    ) -> Option<(Task, TaskTrigger, TaskList)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
@@ -125,9 +127,9 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let fs_event_runner = self.as_runner_for_fs_event(&change.fs_ctx);
+        let fs_triggered_task_list = self.as_runner_for_fs_event(&change.fs_ctx);
 
-        let cmd = TaskCommand::Changes {
+        let task_trigger = TaskTrigger::FsChanges {
             changes: paths,
             fs_event_context: change.fs_ctx,
             task_comms: self.task_comms(),
@@ -135,13 +137,17 @@ impl BsSystem {
         };
 
         // todo: use this example as a way to display a dry-run scenario
-        // let tree = runner.as_tree();
-        // let as_str = archy(&tree, None);
-        // println!("upcoming-->");
-        // println!("{as_str}");
-        let task_group = TaskGroup::from(fs_event_runner.clone());
+        let tree = fs_triggered_task_list.as_tree();
+        let as_str = archy(&tree, None);
+        println!("upcoming-->");
+        println!("{as_str}");
+        let task_group = TaskGroup::from(fs_triggered_task_list.clone());
 
-        Some((Task::Group(task_group), cmd, fs_event_runner))
+        Some((
+            Task::Group(task_group),
+            task_trigger,
+            fs_triggered_task_list,
+        ))
     }
 
     pub fn task_comms(&mut self) -> TaskComms {
@@ -245,7 +251,7 @@ impl BsSystem {
         custom_task_list.map(ToOwned::to_owned).unwrap_or_else(|| {
             TaskList::seq(&[
                 Runnable::BsLiveTask(BsLiveTask::NotifyServer),
-                Runnable::BsLiveTask(BsLiveTask::ExtEvent),
+                Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent),
             ])
         })
     }

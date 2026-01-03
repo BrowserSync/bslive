@@ -1,8 +1,9 @@
 use actix::{Actor, ActorFutureExt, Recipient, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
-use bsnext_system::task::{AsActor, TaskCommand, TaskComms};
+use bsnext_system::as_actor::AsActor;
 use bsnext_system::task_group::{DynItem, TaskGroup};
 use bsnext_system::task_group_runner::TaskGroupRunner;
+use bsnext_system::task_trigger::{TaskComms, TaskTrigger};
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
@@ -32,7 +33,7 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
 
     let task_result = addr
-        .send(TaskCommand::Changes {
+        .send(TaskTrigger::FsChanges {
             changes: vec![],
             fs_event_context: Default::default(),
             task_comms: TaskComms {
@@ -61,10 +62,10 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
     impl Actor for A {
         type Context = actix::Context<Self>;
     }
-    impl actix::Handler<TaskCommand> for A {
+    impl actix::Handler<TaskTrigger> for A {
         type Result = ResponseActFuture<Self, TaskResult>;
 
-        fn handle(&mut self, _msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, _msg: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
             let f = self.f.take().unwrap();
             Box::pin(
                 f.into_actor(self)
@@ -73,7 +74,7 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
         }
     }
     impl AsActor for A {
-        fn into_task_recipient(self: Box<Self>) -> Recipient<TaskCommand> {
+        fn into_task_recipient(self: Box<Self>) -> Recipient<TaskTrigger> {
             let a = self.start();
             a.recipient()
         }

@@ -21,7 +21,10 @@ pub enum DirError {
     #[error("could not change the process CWD to: {path}")]
     CannotMove { path: PathBuf },
     #[error("could not query the status")]
-    CannotQueryStatus { path: PathBuf },
+    CannotQueryStatus {
+        #[allow(unused)]
+        path: PathBuf,
+    },
     #[error("directory already exists, override with --force (dangerous) {path}")]
     Exists { path: PathBuf },
 }

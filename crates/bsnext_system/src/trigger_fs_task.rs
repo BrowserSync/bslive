@@ -1,5 +1,7 @@
-use crate::task::{AsActor, Task, TaskCommand};
+use crate::as_actor::AsActor;
+use crate::task::Task;
 use crate::task_list::TaskList;
+use crate::task_trigger::TaskTrigger;
 use crate::trigger_task::every_report;
 use crate::BsSystem;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
@@ -9,37 +11,41 @@ use std::collections::HashMap;
 
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
-pub struct TriggerFsTask {
+pub struct TriggerFsTaskEvent {
     task: Task,
-    cmd: TaskCommand,
-    runner: TaskList,
+    task_trigger: TaskTrigger,
+    task_list: TaskList,
 }
 
-impl TriggerFsTask {
-    pub fn new(task: Task, cmd: TaskCommand, runner: TaskList) -> Self {
-        Self { task, cmd, runner }
+impl TriggerFsTaskEvent {
+    pub fn new(task: Task, task_trigger: TaskTrigger, task_list: TaskList) -> Self {
+        Self {
+            task,
+            task_trigger,
+            task_list,
+        }
     }
 
-    pub fn cmd(&self) -> TaskCommand {
-        self.cmd.clone()
+    pub fn cmd(&self) -> TaskTrigger {
+        self.task_trigger.clone()
     }
 
     pub fn fs_ctx(&self) -> &FsEventContext {
-        match &self.cmd {
-            TaskCommand::Changes {
+        match &self.task_trigger {
+            TaskTrigger::FsChanges {
                 fs_event_context, ..
             } => fs_event_context,
-            TaskCommand::Exec { .. } => {
+            TaskTrigger::Exec { .. } => {
                 panic!("unreachable. It's a mistake to access fs_ctx here")
             }
         }
     }
 }
 
-impl Handler<TriggerFsTask> for BsSystem {
+impl Handler<TriggerFsTaskEvent> for BsSystem {
     type Result = ResponseActFuture<Self, ()>;
 
-    fn handle(&mut self, msg: TriggerFsTask, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TriggerFsTaskEvent, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
         let fs_ctx = msg.fs_ctx();
         let entry = self.tasks.get(fs_ctx);
@@ -50,12 +56,12 @@ impl Handler<TriggerFsTask> for BsSystem {
             return Box::pin(async {}.into_actor(self));
         }
 
-        self.tasks.insert(*fs_ctx, msg.runner.to_owned());
-        let task_id = msg.runner.as_id();
-        let cmd_recipient = Box::new(msg.task).into_task_recipient();
+        self.tasks.insert(*fs_ctx, msg.task_list.to_owned());
+        let task_id = msg.task_list.as_id();
+        let trigger_recipient = Box::new(msg.task).into_task_recipient();
 
         Box::pin(
-            cmd_recipient
+            trigger_recipient
                 .send(cmd)
                 .into_actor(self)
                 .map(move |resp, actor, _ctx| {

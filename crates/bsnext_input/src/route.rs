@@ -224,6 +224,7 @@ impl ProxyRoute {
 }
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[allow(unused)]
 struct Mirror {
     pub dir: String,
 }
@@ -500,14 +501,14 @@ pub enum BsLiveRunner {
     #[serde(rename = "notify-server")]
     NotifyServer,
     #[serde(rename = "ext-event")]
-    ExtEvent,
+    PublishExternalEvent,
 }
 
 impl Display for BsLiveRunner {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             BsLiveRunner::NotifyServer => write!(f, "BsLiveRunner::NotifyServer"),
-            BsLiveRunner::ExtEvent => write!(f, "BsLiveRunner::ExtEvent"),
+            BsLiveRunner::PublishExternalEvent => write!(f, "BsLiveRunner::ExtEvent"),
         }
     }
 }
@@ -552,13 +553,5 @@ impl WatcherDirs {
             WatcherDirs::Many(item) if !item.is_empty() => item.iter().map(PathBuf::from).collect(),
             WatcherDirs::Many(_) => vec![],
         }
-    }
-}
-
-impl MultiWatch {
-    pub fn add_task(&mut self, item: RunOptItem) {
-        let opts = self.opts.get_or_insert_default();
-        let list = opts.run.get_or_insert(vec![]);
-        list.push(item);
     }
 }

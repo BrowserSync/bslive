@@ -40,19 +40,24 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                     let run = to_task_list(&spec);
                     let route_path = r.path.as_str().to_owned();
 
-                    Some(RouteWatchable {
+                    let route_watchable = RouteWatchable {
                         server_identity: identity,
                         route_path,
                         dir: pb,
                         spec,
                         task_list: run,
-                    })
+                    };
+
+                    tracing::trace!(?route_watchable);
+
+                    Some(route_watchable)
                 })
         })
         .collect()
 }
 
 pub fn maybe_source_file(raw_route: &RawRoute) -> Option<&Path> {
+    // todo(Shane): support file: in more places for directly serving
     match raw_route {
         RawRoute::Sse {
             sse: SseOpts { body, .. },

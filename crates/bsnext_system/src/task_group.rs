@@ -1,5 +1,7 @@
-use crate::task::{AsActor, Task, TaskCommand};
+use crate::as_actor::AsActor;
+use crate::task::Task;
 use crate::task_list::{OverlappingOpts, RunKind, Runnable, SequenceOpts, TaskList};
+use crate::task_trigger::TaskTrigger;
 use actix::Recipient;
 use std::fmt::{Display, Formatter};
 
@@ -28,7 +30,7 @@ impl DynItem {
 }
 
 impl AsActor for DynItem {
-    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskCommand> {
+    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskTrigger> {
         self.task.into_task_recipient()
     }
 }

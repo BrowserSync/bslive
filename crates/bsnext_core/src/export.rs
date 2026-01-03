@@ -214,7 +214,7 @@ fn to_export_type((export_result, filepath): (ExportResult, PathBuf)) -> ExportT
     }
 }
 
-fn only_raw_entries(route: &Route) -> Option<ExportRequest> {
+fn only_raw_entries(route: &Route) -> Option<ExportRequest<'_>> {
     match &route.kind {
         RouteKind::Raw(..) => Some(ExportRequest {
             filepath: route.as_filepath(),

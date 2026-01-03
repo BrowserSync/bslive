@@ -1,5 +1,6 @@
-use crate::ext_event_sender::ExtEventSender;
-use crate::task::{AsActor, TaskCommand};
+use crate::as_actor::AsActor;
+use crate::external_event_sender::ExternalEventSender;
+use crate::task_trigger::TaskTrigger;
 use crate::tasks::notify_servers::NotifyServers;
 use crate::tasks::sh_cmd::ShCmd;
 use actix::{Actor, Recipient};
@@ -208,15 +209,15 @@ fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u
 }
 
 impl AsActor for Runnable {
-    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskCommand> {
+    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskTrigger> {
         match *self {
             Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
                 let s = NotifyServers::new();
                 let s = s.start();
                 s.recipient()
             }
-            Runnable::BsLiveTask(BsLiveTask::ExtEvent) => {
-                let actor = ExtEventSender::new();
+            Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent) => {
+                let actor = ExternalEventSender::new();
                 let addr = actor.start();
                 addr.recipient()
             }
@@ -239,14 +240,14 @@ pub enum Runnable {
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum BsLiveTask {
     NotifyServer,
-    ExtEvent,
+    PublishExternalEvent,
 }
 
 impl Display for BsLiveTask {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             BsLiveTask::NotifyServer => write!(f, "BsLiveTask::NotifyServer"),
-            BsLiveTask::ExtEvent => write!(f, "BsLiveTask::Group"),
+            BsLiveTask::PublishExternalEvent => write!(f, "BsLiveTask::PublishExternalEvent"),
         }
     }
 }
@@ -288,7 +289,9 @@ impl From<&RunOptItem> for Runnable {
         match value {
             RunOptItem::BsLive { bslive } => match bslive {
                 BsLiveRunner::NotifyServer => Self::BsLiveTask(BsLiveTask::NotifyServer),
-                BsLiveRunner::ExtEvent => Self::BsLiveTask(BsLiveTask::ExtEvent),
+                BsLiveRunner::PublishExternalEvent => {
+                    Self::BsLiveTask(BsLiveTask::PublishExternalEvent)
+                }
             },
             RunOptItem::Sh(sh) => Self::Sh(ShCmd::from(sh)),
             RunOptItem::ShImplicit(sh) => Self::Sh(ShCmd::new(sh.into())),

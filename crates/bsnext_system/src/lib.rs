@@ -7,9 +7,9 @@ use crate::any_watchable::to_any_watchables;
 use crate::monitor_path_watchables::MonitorPathWatchables;
 use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
-use crate::task::{Task, TaskCommand};
 use crate::task_group::TaskGroup;
 use crate::task_list::TaskList;
+use crate::task_trigger::TaskTrigger;
 use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
@@ -32,6 +32,7 @@ use start::start_kind::StartKind;
 use std::collections::HashMap;
 use std::future::ready;
 use std::path::PathBuf;
+use task::Task;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Receiver;
@@ -40,23 +41,24 @@ use trigger_task::TriggerTask;
 
 pub mod any_watchable;
 pub mod args;
+pub mod as_actor;
 pub mod cli;
 pub mod export;
-mod ext_event_sender;
+mod external_event_sender;
 mod handle_fs_event_grouping;
 pub mod input_fs;
 mod input_monitor;
-mod input_watchable;
 mod monitor_path_watchables;
 mod path_monitor;
 mod path_watchable;
 mod route_watchable;
 pub mod server_watchable;
 pub mod start;
-pub mod task;
+mod task;
 pub mod task_group;
 pub mod task_group_runner;
 pub mod task_list;
+pub mod task_trigger;
 pub mod tasks;
 mod trigger_fs_task;
 mod trigger_task;
@@ -230,18 +232,18 @@ impl BsSystem {
     }
 
     fn before(&mut self, input: &Input) -> (TriggerTask, Receiver<TaskReportAndTree>) {
-        let cmd = TaskCommand::Exec {
+        let trigger = TaskTrigger::Exec {
             invocation_id: 0,
             task_comms: self.task_comms(),
         };
 
         let all = input.before_run_opts();
         debug!("{} before tasks to execute", all.len());
-        let runner = TaskList::seq_from(&all);
-        let task_group = TaskGroup::from(runner.clone());
+        let task_list = TaskList::seq_from(&all);
+        let task_group = TaskGroup::from(task_list.clone());
         let task = Task::Group(task_group);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
-        (TriggerTask::new(task, cmd, runner, tx), rx)
+        (TriggerTask::new(task, trigger, task_list, tx), rx)
     }
 }
 

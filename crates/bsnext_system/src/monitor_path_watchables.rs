@@ -45,15 +45,19 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             let span = debug_span!("{}", index);
             let _guard = span.enter();
             let watchable_hash = any_watchable.as_id();
+            tracing::trace!(?watchable_hash);
 
             let fs_ctx_id = match any_watchable {
                 PathWatchable::Server(watchable) => watchable.server_identity.as_id(),
                 PathWatchable::Route(watchable) => watchable.server_identity.as_id(),
                 PathWatchable::Any(_) => watchable_hash,
             };
+            tracing::trace!(?fs_ctx_id);
 
             let fs_ctx = FsEventContext::new(fs_ctx_id, watchable_hash);
             let opts = any_watchable.spec_opts();
+            tracing::trace!(?opts);
+
             let duration = match opts {
                 Spec {
                     debounce: Some(DebounceDuration::Ms(ms)),
@@ -61,8 +65,11 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                 } => Duration::from_millis(*ms),
                 _ => Duration::from_millis(300),
             };
+            tracing::trace!(?duration);
 
             let debounce = Debounce::Buffered { duration };
+            tracing::trace!(?debounce);
+
             let monitor = PathMonitor::new(
                 ctx.address().recipient(),
                 debounce,
@@ -70,7 +77,10 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                 fs_ctx,
                 (*any_watchable).clone(),
             );
+
             let meta = PathMonitorMeta::from(&monitor);
+            tracing::trace!(?meta);
+
             let monitor = monitor.start();
 
             ctx.notify(InsertMonitor((*any_watchable).clone(), monitor, meta))
