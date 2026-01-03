@@ -1,5 +1,5 @@
 use crate::as_actor::AsActor;
-use crate::dyn_item::DynItem;
+use crate::task_entry::TaskEntry;
 use crate::task_group_runner::TaskGroupRunner;
 use crate::task_list::{OverlappingOpts, RunKind, Runnable, SequenceOpts, TaskList};
 use crate::task_trigger::TaskTrigger;
@@ -8,7 +8,7 @@ use actix::{Actor, Recipient};
 #[derive(Debug)]
 pub struct TaskGroup {
     run_kind: RunKind,
-    tasks: Vec<DynItem>,
+    tasks: Vec<TaskEntry>,
 }
 
 impl AsActor for TaskGroup {
@@ -26,20 +26,20 @@ impl From<TaskList> for TaskGroup {
             .tasks
             .into_iter()
             .enumerate()
-            .map(|(i, x)| -> DynItem {
+            .map(|(i, x)| -> TaskEntry {
                 let item_id = x.as_id_with(i as u64);
                 match x {
-                    Runnable::Many(runner) => DynItem {
+                    Runnable::Many(runner) => TaskEntry {
                         task: Box::new(TaskGroup::from(runner)),
                         id: item_id,
                     },
-                    _ => DynItem {
+                    _ => TaskEntry {
                         id: item_id,
                         task: Box::new(x),
                     },
                 }
             })
-            .collect::<Vec<DynItem>>();
+            .collect::<Vec<TaskEntry>>();
         match runner.run_kind {
             RunKind::Sequence { opts } => Self::seq(boxed_tasks, opts, top_id),
             RunKind::Overlapping { opts } => Self::all(boxed_tasks, opts, top_id),
@@ -51,16 +51,16 @@ impl TaskGroup {
     pub fn run_kind(&self) -> &RunKind {
         &self.run_kind
     }
-    pub fn tasks(self) -> Vec<DynItem> {
+    pub fn tasks(self) -> Vec<TaskEntry> {
         self.tasks
     }
-    pub fn seq(tasks: Vec<DynItem>, opts: SequenceOpts, _id: u64) -> Self {
+    pub fn seq(tasks: Vec<TaskEntry>, opts: SequenceOpts, _id: u64) -> Self {
         Self {
             run_kind: RunKind::Sequence { opts },
             tasks,
         }
     }
-    pub fn all(tasks: Vec<DynItem>, opts: OverlappingOpts, _id: u64) -> Self {
+    pub fn all(tasks: Vec<TaskEntry>, opts: OverlappingOpts, _id: u64) -> Self {
         Self {
             run_kind: RunKind::Overlapping { opts },
             tasks,
