@@ -70,7 +70,7 @@ pub(crate) struct BsSystem {
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
-    tasks: HashMap<FsEventContext, TaskList>,
+    task_list_mapping: HashMap<FsEventContext, TaskList>,
     cwd: Option<PathBuf>,
     start_context: Option<StartupContext>,
 }
@@ -137,7 +137,7 @@ impl BsSystem {
             any_event_sender: None,
             input_monitors: None,
             any_monitors: Default::default(),
-            tasks: Default::default(),
+            task_list_mapping: Default::default(),
             cwd: None,
             start_context: None,
         }

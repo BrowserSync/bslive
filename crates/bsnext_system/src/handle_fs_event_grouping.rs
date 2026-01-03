@@ -126,7 +126,7 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let fs_triggered_task_list = self.as_runner_for_fs_event(&change.fs_ctx);
+        let fs_triggered_task_list = self.task_list_for_fs_event(&change.fs_ctx);
 
         let task_trigger = TaskTrigger::FsChanges {
             changes: paths,
@@ -233,7 +233,7 @@ impl BsSystem {
     }
 
     #[tracing::instrument(skip_all)]
-    fn as_runner_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskList {
+    fn task_list_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskList {
         let Some(path_watchable) = self.path_watchable(fs_event_ctx) else {
             tracing::error!("did not find a matching monitor");
             return TaskList::seq(&[]);

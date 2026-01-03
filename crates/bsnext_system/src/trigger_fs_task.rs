@@ -48,7 +48,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
     fn handle(&mut self, msg: TriggerFsTaskEvent, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.cmd();
         let fs_ctx = msg.fs_ctx();
-        let entry = self.tasks.get(fs_ctx);
+        let entry = self.task_list_mapping.get(fs_ctx);
         let cloned_id = *fs_ctx;
 
         if let Some(entry) = entry {
@@ -56,7 +56,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
             return Box::pin(async {}.into_actor(self));
         }
 
-        self.tasks.insert(*fs_ctx, msg.task_list.to_owned());
+        self.task_list_mapping.insert(*fs_ctx, msg.task_list.to_owned());
         let task_id = msg.task_list.as_id();
         let trigger_recipient = Box::new(msg.task_group).into_task_recipient();
 
@@ -65,7 +65,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
                 .send(cmd)
                 .into_actor(self)
                 .map(move |resp, actor, _ctx| {
-                    let runner = actor.tasks.get(&cloned_id);
+                    let runner = actor.task_list_mapping.get(&cloned_id);
                     match (resp, runner) {
                         (Ok(result), Some(runner)) => {
                             let report = result.to_report(task_id);
@@ -84,7 +84,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
                             tracing::error!("something prevented message handling. {:?}", err);
                         }
                     }
-                    actor.tasks.remove(&cloned_id);
+                    actor.task_list_mapping.remove(&cloned_id);
                 }),
         )
     }
