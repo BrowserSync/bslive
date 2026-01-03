@@ -32,7 +32,6 @@ use start::start_kind::StartKind;
 use std::collections::HashMap;
 use std::future::ready;
 use std::path::PathBuf;
-use task::Task;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Receiver;
@@ -43,6 +42,7 @@ pub mod any_watchable;
 pub mod args;
 pub mod as_actor;
 pub mod cli;
+pub mod dyn_item;
 pub mod export;
 mod external_event_sender;
 mod handle_fs_event_grouping;
@@ -54,7 +54,6 @@ mod path_watchable;
 mod route_watchable;
 pub mod server_watchable;
 pub mod start;
-mod task;
 pub mod task_group;
 pub mod task_group_runner;
 pub mod task_list;
@@ -232,7 +231,7 @@ impl BsSystem {
     }
 
     fn before(&mut self, input: &Input) -> (TriggerTask, Receiver<TaskReportAndTree>) {
-        let trigger = TaskTrigger::Exec {
+        let task_trigger = TaskTrigger::Exec {
             invocation_id: 0,
             task_comms: self.task_comms(),
         };
@@ -241,9 +240,11 @@ impl BsSystem {
         debug!("{} before tasks to execute", all.len());
         let task_list = TaskList::seq_from(&all);
         let task_group = TaskGroup::from(task_list.clone());
-        let task = Task::Group(task_group);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
-        (TriggerTask::new(task, trigger, task_list, tx), rx)
+        (
+            TriggerTask::new(task_group, task_trigger, task_list, tx),
+            rx,
+        )
     }
 }
 

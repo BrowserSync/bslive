@@ -1,9 +1,9 @@
 use crate::as_actor::AsActor;
-use crate::task::Task;
+use crate::dyn_item::DynItem;
+use crate::task_group_runner::TaskGroupRunner;
 use crate::task_list::{OverlappingOpts, RunKind, Runnable, SequenceOpts, TaskList};
 use crate::task_trigger::TaskTrigger;
-use actix::Recipient;
-use std::fmt::{Display, Formatter};
+use actix::{Actor, Recipient};
 
 #[derive(Debug)]
 pub struct TaskGroup {
@@ -11,43 +11,13 @@ pub struct TaskGroup {
     tasks: Vec<DynItem>,
 }
 
-#[derive(Debug)]
-pub struct DynItem {
-    task: Box<dyn AsActor>,
-    id: u64,
-}
-
-impl Display for DynItem {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "DynItem")
-    }
-}
-
-impl DynItem {
-    pub fn new(t: Box<dyn AsActor>, id: u64) -> Self {
-        Self { id, task: t }
-    }
-}
-
-impl AsActor for DynItem {
+impl AsActor for TaskGroup {
     fn into_task_recipient(self: Box<Self>) -> Recipient<TaskTrigger> {
-        self.task.into_task_recipient()
+        let group_runner = TaskGroupRunner::new(*self);
+        let s = group_runner.start();
+        s.recipient()
     }
 }
-
-impl DynItem {
-    pub fn id(&self) -> u64 {
-        self.id
-    }
-}
-
-// impl Hash for TaskGroup {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         self.run_kind.hash(state);
-//         let ids = self.tasks.iter().map(|x| x.as_id()).collect::<Vec<_>>();
-//         ids.hash(state);
-//     }
-// }
 
 impl From<TaskList> for TaskGroup {
     fn from(runner: TaskList) -> Self {
@@ -60,7 +30,7 @@ impl From<TaskList> for TaskGroup {
                 let item_id = x.as_id_with(i as u64);
                 match x {
                     Runnable::Many(runner) => DynItem {
-                        task: Box::new(Task::Group(TaskGroup::from(runner))),
+                        task: Box::new(TaskGroup::from(runner)),
                         id: item_id,
                     },
                     _ => DynItem {

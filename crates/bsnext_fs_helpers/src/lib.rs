@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -21,10 +22,7 @@ pub enum DirError {
     #[error("could not change the process CWD to: {path}")]
     CannotMove { path: PathBuf },
     #[error("could not query the status")]
-    CannotQueryStatus {
-        #[allow(unused)]
-        path: PathBuf,
-    },
+    CannotQueryStatus { path: PathBuf },
     #[error("directory already exists, override with --force (dangerous) {path}")]
     Exists { path: PathBuf },
 }

@@ -1,5 +1,5 @@
 use crate::as_actor::AsActor;
-use crate::task::Task;
+use crate::task_group::TaskGroup;
 use crate::task_list::TaskList;
 use crate::task_trigger::TaskTrigger;
 use crate::trigger_task::every_report;
@@ -12,15 +12,15 @@ use std::collections::HashMap;
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
 pub struct TriggerFsTaskEvent {
-    task: Task,
+    task_group: TaskGroup,
     task_trigger: TaskTrigger,
     task_list: TaskList,
 }
 
 impl TriggerFsTaskEvent {
-    pub fn new(task: Task, task_trigger: TaskTrigger, task_list: TaskList) -> Self {
+    pub fn new(task_group: TaskGroup, task_trigger: TaskTrigger, task_list: TaskList) -> Self {
         Self {
-            task,
+            task_group,
             task_trigger,
             task_list,
         }
@@ -58,7 +58,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
 
         self.tasks.insert(*fs_ctx, msg.task_list.to_owned());
         let task_id = msg.task_list.as_id();
-        let trigger_recipient = Box::new(msg.task).into_task_recipient();
+        let trigger_recipient = Box::new(msg.task_group).into_task_recipient();
 
         Box::pin(
             trigger_recipient

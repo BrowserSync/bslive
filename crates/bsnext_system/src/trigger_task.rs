@@ -1,5 +1,5 @@
 use crate::as_actor::AsActor;
-use crate::task::Task;
+use crate::task_group::TaskGroup;
 use crate::task_list::TaskList;
 use crate::task_trigger::TaskTrigger;
 use crate::BsSystem;
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
 pub struct TriggerTask {
-    pub task: Task,
+    pub task_group: TaskGroup,
     pub task_list: TaskList,
     pub task_trigger: TaskTrigger,
     /// A one-shot sender channel to signal the completion of the task processing and provide the resulting task report and its tree structure.
@@ -25,13 +25,13 @@ pub struct TriggerTask {
 
 impl TriggerTask {
     pub fn new(
-        task: Task,
+        task_group: TaskGroup,
         task_trigger: TaskTrigger,
         task_list: TaskList,
         done: tokio::sync::oneshot::Sender<TaskReportAndTree>,
     ) -> Self {
         Self {
-            task,
+            task_group,
             task_trigger,
             task_list,
             done,
@@ -46,7 +46,7 @@ impl Handler<TriggerTask> for BsSystem {
         let cmd = msg.task_trigger;
         let runner = msg.task_list;
         let task_id = runner.as_id();
-        let cmd_recipient = Box::new(msg.task).into_task_recipient();
+        let cmd_recipient = Box::new(msg.task_group).into_task_recipient();
         let done = msg.done;
         Box::pin(cmd_recipient.send(cmd).into_actor(self).map(
             move |resp, actor, _ctx| match resp {

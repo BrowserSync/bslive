@@ -1,7 +1,6 @@
 use crate::input_fs::from_input_path;
 use crate::path_monitor::PathMonitorMeta;
 use crate::path_watchable::PathWatchable;
-use crate::task::Task;
 use crate::task_group::TaskGroup;
 use crate::task_list::{BsLiveTask, Runnable, TaskList};
 use crate::task_trigger::{TaskComms, TaskTrigger};
@@ -29,9 +28,9 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
         let next = match msg {
             FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event),
             FsEventGrouping::BufferedChange(buff) => {
-                if let Some((task, task_trigger, task_list)) = self.handle_buffered(buff) {
+                if let Some((task_group, task_trigger, task_list)) = self.handle_buffered(buff) {
                     tracing::debug!("will trigger task runner");
-                    ctx.notify(TriggerFsTaskEvent::new(task, task_trigger, task_list));
+                    ctx.notify(TriggerFsTaskEvent::new(task_group, task_trigger, task_list));
                 }
                 None
             }
@@ -100,7 +99,7 @@ impl BsSystem {
     fn handle_buffered(
         &mut self,
         buf: BufferedChangeEvent,
-    ) -> Option<(Task, TaskTrigger, TaskList)> {
+    ) -> Option<(TaskGroup, TaskTrigger, TaskList)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
@@ -141,10 +140,9 @@ impl BsSystem {
         let as_str = archy(&tree, None);
         println!("upcoming-->");
         println!("{as_str}");
-        let task_group = TaskGroup::from(fs_triggered_task_list.clone());
 
         Some((
-            Task::Group(task_group),
+            TaskGroup::from(fs_triggered_task_list.clone()),
             task_trigger,
             fs_triggered_task_list,
         ))
