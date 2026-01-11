@@ -136,10 +136,10 @@ impl BsSystem {
         };
 
         // todo: use this example as a way to display a dry-run scenario
-        let tree = fs_triggered_task_list.as_tree();
-        let as_str = archy(&tree, None);
-        println!("upcoming-->");
-        println!("{as_str}");
+        // let tree = fs_triggered_task_list.as_tree();
+        // let as_str = archy(&tree, None);
+        // println!("upcoming-->");
+        // println!("{as_str}");
 
         Some((
             TaskGroup::from(fs_triggered_task_list.clone()),

@@ -231,13 +231,13 @@ impl actix::Handler<TaskTrigger> for ShCmd {
                 }
             });
 
-            let sleep = tokio::time::sleep(max_duration);
+            let timeout = tokio::time::sleep(max_duration);
 
-            tokio::pin!(sleep);
+            tokio::pin!(timeout);
             let invocation_id = 0;
 
             let result: TaskResult = tokio::select! {
-                _ = &mut sleep => {
+                _ = &mut timeout => {
                     tracing::info!("⌛️ operation timed out");
                     TaskResult::timeout(InvocationId(invocation_id))
                 }

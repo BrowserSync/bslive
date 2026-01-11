@@ -51,7 +51,7 @@ impl Handler<TaskTrigger> for TaskGroupRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
     #[tracing::instrument(skip_all, name = "Handler->TaskCommand->TaskGroupRunner")]
-    fn handle(&mut self, msg: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, trigger: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
         let span = Span::current();
         let gg = Arc::new(span.clone());
         let ggg = gg.clone();
@@ -75,7 +75,7 @@ impl Handler<TaskTrigger> for TaskGroupRunner {
                     for (index, group_item) in group.tasks().into_iter().enumerate() {
                         let id = group_item.id();
                         let boxed_actor = Box::new(group_item).into_task_recipient();
-                        match boxed_actor.send(msg.clone()).await {
+                        match boxed_actor.send(trigger.clone()).await {
                             Ok(result) => {
                                 let is_ok = result.is_ok();
                                 done.push((index, result.to_report(id)));
@@ -101,12 +101,12 @@ impl Handler<TaskTrigger> for TaskGroupRunner {
                         let id = as_actor.id();
                         let actor = Box::new(as_actor).into_task_recipient();
                         let jh = tokio::spawn({
-                            let msg_clon = msg.clone();
+                            let trigger_clone = trigger.clone();
                             let semaphore = sem.clone();
                             async move {
                                 let _permit = semaphore.acquire().await.unwrap();
                                 let msg_response = actor
-                                    .send(msg_clon)
+                                    .send(trigger_clone)
                                     .map(move |task_result| (index, id, task_result))
                                     .await;
                                 drop(_permit);
