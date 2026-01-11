@@ -26,25 +26,8 @@ pub enum StartKind {
 }
 
 impl StartKind {
+    #[tracing::instrument(name = "from_args")]
     pub fn from_args(fs_opts: &FsOpts, input_opts: &InputOpts, cmd: &StartCommand) -> Self {
-        // todo: re-implement example command
-        // if let Some(example) = args.example {
-        //     return StartKind::FromExample(StartFromExample {
-        //         example,
-        //         write_input: args.write,
-        //         port: args.port,
-        //         temp: args.temp,
-        //         name: args.name.clone(),
-        //         target_kind: args
-        //             .target
-        //             .as_ref()
-        //             .map(ToOwned::to_owned)
-        //             .unwrap_or_default(),
-        //         dir: args.dir.clone(),
-        //         force: args.force,
-        //     });
-        // }
-
         // todo: make the addition of a proxy + route opts easier?
         if cmd.trailing.is_empty() {
             tracing::debug!("0 trailing, {} inputs", input_opts.input.len());
@@ -71,6 +54,11 @@ impl StartKind {
                 })
             }
         } else {
+            tracing::debug!(
+                "{} trailing, {} inputs",
+                cmd.trailing.len(),
+                input_opts.input.len()
+            );
             StartKind::FromTrailingArgs(StartFromTrailingArgs {
                 paths: cmd.trailing.clone(),
                 write_input: fs_opts.write,

@@ -10,7 +10,7 @@ pub async fn start_system(
     cwd: PathBuf,
     start_kind: StartKind,
     events_sender: tokio::sync::mpsc::Sender<AnyEvent>,
-) -> Result<BsSystemApi, StartupError> {
+) -> Result<Option<BsSystemApi>, StartupError> {
     let (tx, rx) = oneshot::channel();
     let system = BsSystem::new();
     let sys_addr = system.start();
@@ -26,10 +26,16 @@ pub async fn start_system(
 
     match sys_addr.send(start).await {
         Ok(Ok(DidStart::Started(..))) => {
+            tracing::debug!("DidStart::Started");
             let api = BsSystemApi {
                 sys_address: sys_addr,
                 handle: rx,
             };
+            Ok(Some(api))
+        }
+        Ok(Ok(DidStart::WillExit)) => {
+            tracing::debug!("DidStart::WillExit");
+            Ok(None)
         }
         Ok(Err(e)) => Err(e),
         Err(e) => {

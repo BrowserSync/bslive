@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Receiver;
-use tracing::debug;
+use tracing::{debug, Instrument, Span};
 use trigger_task::TriggerTask;
 
 pub mod any_watchable;
@@ -51,6 +51,7 @@ mod monitor_path_watchables;
 mod path_monitor;
 mod path_watchable;
 mod route_watchable;
+pub mod run;
 pub mod server_watchable;
 pub mod start;
 pub mod task_entry;
@@ -62,7 +63,6 @@ pub mod tasks;
 mod trigger_fs_task;
 mod trigger_task;
 pub mod watch;
-pub mod run;
 
 #[derive(Debug)]
 pub(crate) struct BsSystem {
@@ -303,7 +303,7 @@ impl Handler<StopSystem> for BsSystem {
     }
 }
 
-#[derive(actix::Message)]
+#[derive(Debug, actix::Message)]
 #[rtype(result = "Result<DidStart, StartupError>")]
 pub struct Start {
     pub kind: StartKind,
@@ -315,6 +315,7 @@ pub struct Start {
 impl Handler<Start> for BsSystem {
     type Result = ResponseActFuture<Self, Result<DidStart, StartupError>>;
 
+    #[tracing::instrument(name = "BsSystem->Start", skip(self, msg, ctx))]
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
         self.any_event_sender = Some(msg.events_sender.clone());
         self.cwd = Some(msg.cwd);
@@ -342,7 +343,7 @@ impl Handler<Start> for BsSystem {
                 let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
                 let input_clone2 = input.clone();
                 let addr = ctx.address();
-                let jobs = setup_jobs(addr, input.clone());
+                let jobs = setup_jobs(addr, input.clone()).instrument(Span::current());
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
@@ -369,12 +370,12 @@ impl Handler<Start> for BsSystem {
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
                         let res = res?;
+                        debug!("✅ setup jobs completed");
                         let errored = ChildResult::first_server_error(&res.child_results);
                         if let Some(server_error) = errored {
                             debug!("errored: {:?}", errored);
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        actor.accept_watchables(&input_clone2);
                         if will_exit {
                             Ok(DidStart::WillExit)
                         } else {

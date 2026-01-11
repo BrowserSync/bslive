@@ -56,7 +56,8 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
             return Box::pin(async {}.into_actor(self));
         }
 
-        self.task_list_mapping.insert(*fs_ctx, msg.task_list.to_owned());
+        self.task_list_mapping
+            .insert(*fs_ctx, msg.task_list.to_owned());
         let task_id = msg.task_list.as_id();
         let trigger_recipient = Box::new(msg.task_group).into_task_recipient();
 
