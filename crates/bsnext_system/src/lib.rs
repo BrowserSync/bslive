@@ -364,6 +364,7 @@ impl Handler<Start> for BsSystem {
                 let addr = ctx.address();
                 let input_clone2 = input.clone();
                 let jobs = setup_jobs(addr, input.clone());
+                let will_exit = input.servers.is_empty() && input.watchers.is_empty();
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
@@ -374,7 +375,12 @@ impl Handler<Start> for BsSystem {
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
                         actor.accept_watchables(&input_clone2);
-                        Ok(DidStart::Started(res.servers))
+                        if will_exit {
+                            Ok(DidStart::WillExit)
+                        } else {
+                            actor.accept_watchables(&input_clone2);
+                            Ok(DidStart::Started(res.servers))
+                        }
                     },
                 ))
             }

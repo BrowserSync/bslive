@@ -352,6 +352,7 @@ pub struct ActiveServer {
 #[derive(Debug)]
 pub enum DidStart {
     Started(GetActiveServersResponse),
+    WillExit,
 }
 
 #[derive(Debug, thiserror::Error)]

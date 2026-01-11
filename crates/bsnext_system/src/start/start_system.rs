@@ -30,7 +30,6 @@ pub async fn start_system(
                 sys_address: sys_addr,
                 handle: rx,
             };
-            Ok(api)
         }
         Ok(Err(e)) => Err(e),
         Err(e) => {
