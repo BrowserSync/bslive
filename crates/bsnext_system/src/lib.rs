@@ -62,6 +62,7 @@ pub mod tasks;
 mod trigger_fs_task;
 mod trigger_task;
 pub mod watch;
+pub mod run;
 
 #[derive(Debug)]
 pub(crate) struct BsSystem {

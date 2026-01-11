@@ -6,7 +6,7 @@ use crate::start::start_command::StartCommand;
 use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
-use bsnext_input::route::MultiWatch;
+use bsnext_input::route::{MultiWatch, RunOptItem, ShRunOptItem};
 use bsnext_input::Input;
 use bsnext_output::OutputWriters;
 use bsnext_tracing::{init_tracing, LineNumberOption, OutputFormat, WriteOption};
@@ -14,6 +14,8 @@ use clap::Parser;
 use std::env::current_dir;
 use std::ffi::OsString;
 use std::path::PathBuf;
+use crate::task_list::Runnable::Sh;
+use crate::tasks::sh_cmd::ShCmd;
 
 /// The typical lifecycle when ran from a CLI environment
 pub async fn from_args<I, T>(itr: I) -> Result<(), anyhow::Error>
@@ -100,6 +102,17 @@ where
             let mut input = Input::default();
             let multi = MultiWatch::from(watch);
             input.watchers.push(multi);
+            let start_kind = StartKind::FromInput(StartFromInput { input });
+            start_stdout_wrapper(start_kind, cwd, writer).await
+        }
+        SubCommands::Run(run) => {
+            let mut input = Input::default();
+            for sh in run.sh_commands_implicit {
+                input.run.push(RunOptItem::ShImplicit(sh.clone()));
+            }
+            for sh in run.sh_commands {
+                input.run.push(RunOptItem::Sh(ShRunOptItem::new(&sh)));
+            }
             let start_kind = StartKind::FromInput(StartFromInput { input });
             start_stdout_wrapper(start_kind, cwd, writer).await
         }

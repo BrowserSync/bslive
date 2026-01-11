@@ -33,6 +33,8 @@ pub struct Input {
     pub servers: Vec<server_config::ServerConfig>,
     #[serde(default)]
     pub watchers: Vec<MultiWatch>,
+    #[serde(default)]
+    pub run: Vec<RunOptItem>,
 }
 
 impl Input {
@@ -43,6 +45,8 @@ impl Input {
         }
     }
     pub fn before_run_opts(&self) -> Vec<RunOptItem> {
+        let run_tasks = self.run.iter().map(|x| x.clone());
+
         let root_tasks = self
             .watchers
             .iter()
@@ -78,7 +82,8 @@ impl Input {
             })
             .map(BeforeRunOptItem::into_run_opt);
 
-        root_tasks
+        run_tasks
+            .chain(root_tasks)
             .chain(startup_server_tasks)
             .chain(route_startup_tasks)
             .collect::<Vec<_>>()

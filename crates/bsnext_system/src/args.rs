@@ -4,6 +4,7 @@ use bsnext_core::export::ExportCommand;
 use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
 use bsnext_example::ExampleCommand;
 use bsnext_tracing::OutputFormat;
+use crate::run::RunCommand;
 // bslive route --path=/ --dir=
 
 #[derive(clap::Parser, Clone, Debug)]
@@ -62,6 +63,7 @@ impl Args {
             Some(SubCommands::Watch(WatchCommand { logging, .. })) => logging,
             Some(SubCommands::Start(StartCommand { logging, .. })) => logging,
             Some(SubCommands::Export(ExportCommand { logging, .. })) => logging,
+            Some(SubCommands::Run(RunCommand { logging, .. })) => logging,
             _ => &self.logging,
         }
     }
@@ -70,6 +72,7 @@ impl Args {
             Some(SubCommands::Watch(WatchCommand { format, .. })) => format.to_owned(),
             Some(SubCommands::Start(StartCommand { format, .. })) => format.to_owned(),
             Some(SubCommands::Export(ExportCommand { format, .. })) => format.to_owned(),
+            Some(SubCommands::Run(RunCommand { format, .. })) => format.to_owned(),
             _ => self.format,
         }
     }
@@ -85,4 +88,6 @@ pub enum SubCommands {
     Example(ExampleCommand),
     /// Just use file watching
     Watch(WatchCommand),
+    /// Just run tasks
+    Run(RunCommand),
 }
