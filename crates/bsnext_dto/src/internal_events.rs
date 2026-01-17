@@ -1,5 +1,8 @@
 use crate::archy::archy;
-use crate::internal::{ChildResult, InternalEvents, InternalEventsDTO, TaskReportAndTree};
+use crate::internal::{
+    ChildResult, InternalEvents, InternalEventsDTO, TaskAction, TaskActionVariant,
+    TaskReportAndTree,
+};
 use crate::{GetActiveServersResponseDTO, InputErrorDTO, ServerIdentityDTO};
 use bsnext_input::InputError;
 use bsnext_output::OutputWriterTrait;
@@ -42,6 +45,9 @@ impl OutputWriterTrait for InternalEvents {
 
                 // tracing::trace!("will handle !result.is_ok()");
             }
+            InternalEvents::TaskAction(_) => {
+                todo!("implement task action reporting")
+            }
         }
         Ok(())
     }
@@ -77,6 +83,15 @@ impl OutputWriterTrait for InternalEvents {
                     write!(sink, "{s}")?;
                 }
             }
+            InternalEvents::TaskAction(TaskAction { action, .. }) => match action {
+                TaskActionVariant::Started { tree } => {
+                    todo!("how to report tasks here?")
+                    // let s = archy(tree, None);
+                    // write!(sink, "{s}")?;
+                }
+                TaskActionVariant::Complete => {}
+                TaskActionVariant::Error => {}
+            },
         }
         Ok(())
     }

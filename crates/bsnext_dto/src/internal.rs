@@ -21,12 +21,35 @@ pub enum InternalEvents {
     InputError(InputError),
     StartupError(StartupError),
     TaskReport(TaskReportAndTree),
+    TaskAction(TaskAction),
 }
 
 #[derive(Debug, Clone)]
 pub struct TaskReportAndTree {
     pub report: TaskReport,
     pub tree: ArchyNode,
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskAction {
+    pub id: u64,
+    pub action: TaskActionVariant,
+}
+
+#[derive(Debug, Clone)]
+pub enum TaskActionVariant {
+    Started { tree: ArchyNode },
+    Complete,
+    Error,
+}
+
+impl TaskActionVariant {
+    pub fn started(id: u64, tree: ArchyNode) -> AnyEvent {
+        AnyEvent::Internal(InternalEvents::TaskAction(TaskAction {
+            id,
+            action: TaskActionVariant::Started { tree },
+        }))
+    }
 }
 
 #[derive(Debug)]
