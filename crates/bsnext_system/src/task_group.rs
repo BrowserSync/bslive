@@ -2,7 +2,7 @@ use crate::as_actor::AsActor;
 use crate::task_entry::TaskEntry;
 use crate::task_group_runner::TaskGroupRunner;
 use crate::task_list::{OverlappingOpts, RunKind, Runnable, SequenceOpts, TaskList};
-use crate::task_trigger::TaskTrigger;
+use crate::tasks::sh_cmd::OneTask;
 use actix::{Actor, Recipient};
 
 #[derive(Debug)]
@@ -12,7 +12,7 @@ pub struct TaskGroup {
 }
 
 impl AsActor for TaskGroup {
-    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskTrigger> {
+    fn into_task_recipient(self: Box<Self>) -> Recipient<OneTask> {
         let group_runner = TaskGroupRunner::new(*self);
         let s = group_runner.start();
         s.recipient()

@@ -8,31 +8,27 @@ use tokio::sync::mpsc::Sender;
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "TaskResult")]
-pub enum TaskTrigger {
+pub struct TaskTrigger {
+    pub variant: TaskTriggerVariant,
+    pub comms: TaskComms,
+    pub invocation_id: u64,
+}
+
+#[derive(Debug, Clone)]
+pub enum TaskTriggerVariant {
     FsChanges {
         changes: Vec<PathBuf>,
         fs_event_context: FsEventContext,
-        task_comms: TaskComms,
-        invocation_id: u64,
     },
-    Exec {
-        task_comms: TaskComms,
-        invocation_id: u64,
-    },
+    Exec,
 }
 
 impl TaskTrigger {
     pub fn comms(&self) -> &TaskComms {
-        match self {
-            TaskTrigger::FsChanges { task_comms, .. } => task_comms,
-            TaskTrigger::Exec { task_comms, .. } => task_comms,
-        }
+        &self.comms
     }
     pub fn id(&self) -> u64 {
-        match self {
-            TaskTrigger::FsChanges { invocation_id, .. } => *invocation_id,
-            TaskTrigger::Exec { invocation_id, .. } => *invocation_id,
-        }
+        self.invocation_id
     }
 }
 

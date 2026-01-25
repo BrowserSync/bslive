@@ -1,4 +1,5 @@
-use crate::task_trigger::TaskTrigger;
+use crate::task_trigger::TaskTriggerVariant;
+use crate::tasks::sh_cmd::OneTask;
 use actix::{Actor, Handler, ResponseFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::{InvocationId, TaskResult};
@@ -24,17 +25,17 @@ impl Actor for NotifyServers {
     }
 }
 
-impl Handler<TaskTrigger> for NotifyServers {
+impl Handler<OneTask> for NotifyServers {
     type Result = ResponseFuture<TaskResult>;
 
-    fn handle(&mut self, msg: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, OneTask(_id, trigger): OneTask, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("NotifyServers::TaskCommand");
-        let comms = msg.comms();
+        let comms = trigger.comms();
         let Some(sender) = comms.servers_recip.clone() else {
             todo!("cannot get here?")
         };
-        match msg {
-            TaskTrigger::FsChanges {
+        match trigger.variant {
+            TaskTriggerVariant::FsChanges {
                 changes,
                 fs_event_context,
                 ..
@@ -42,7 +43,7 @@ impl Handler<TaskTrigger> for NotifyServers {
                 paths: changes.clone(),
                 ctx: fs_event_context,
             }),
-            TaskTrigger::Exec { .. } => {
+            TaskTriggerVariant::Exec { .. } => {
                 todo!("I cannot accept this")
             }
         }

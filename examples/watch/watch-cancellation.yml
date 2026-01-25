@@ -1,0 +1,12 @@
+servers:
+  - name: 'watch-cancellation'
+    routes:
+      - path: /
+        dir: examples/watch/src/index.html
+        watch:
+          debounce:
+            ms: 0
+          run:
+            - all:
+                - sh: "echo 'starting failing task' && sleep 0.1 && exit 1"
+                - sh: "node examples/graceful-exit.js"

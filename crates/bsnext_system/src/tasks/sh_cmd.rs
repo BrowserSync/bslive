@@ -1,4 +1,4 @@
-use crate::task_trigger::TaskTrigger;
+use crate::task_trigger::{TaskTrigger, TaskTriggerVariant};
 use actix::ResponseFuture;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, ExitCode, InvocationId, TaskResult};
@@ -145,26 +145,32 @@ impl actix::Actor for ShCmd {
     type Context = actix::Context<Self>;
 }
 
-impl actix::Handler<TaskTrigger> for ShCmd {
+#[derive(actix::Message, Debug, Clone)]
+#[rtype(result = "TaskResult")]
+pub struct OneTask(pub u64, pub TaskTrigger);
+
+impl actix::Handler<OneTask> for ShCmd {
     type Result = ResponseFuture<TaskResult>;
 
-    fn handle(&mut self, trigger: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, OneTask(id, trigger): OneTask, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = self.sh.clone();
         let cmd = cmd.to_os_string();
-        tracing::debug!("ShCmd: Will run... {:?}", cmd);
+        tracing::debug!(?id, "ShCmd: Will run... {:?}", cmd);
         let any_event_sender = trigger.comms().any_event_sender.clone();
         let any_event_sender2 = trigger.comms().any_event_sender.clone();
-        let reason = match &trigger {
-            TaskTrigger::FsChanges { changes, .. } => format!("{} files changed", changes.len()),
-            TaskTrigger::Exec { .. } => "command executed".to_string(),
+        let reason = match &trigger.variant {
+            TaskTriggerVariant::FsChanges { changes, .. } => {
+                format!("{} files changed", changes.len())
+            }
+            TaskTriggerVariant::Exec { .. } => "command executed".to_string(),
         };
-        let files = match &trigger {
-            TaskTrigger::FsChanges { changes, .. } => changes
+        let files = match &trigger.variant {
+            TaskTriggerVariant::FsChanges { changes, .. } => changes
                 .iter()
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
-            TaskTrigger::Exec { .. } => "NONE".to_string(),
+            TaskTriggerVariant::Exec { .. } => "NONE".to_string(),
         };
 
         let sh_prefix = Arc::new(self.prefix());
@@ -206,6 +212,7 @@ impl actix::Handler<TaskTrigger> for ShCmd {
                 while let Ok(Some(line)) = stdout_reader.next_line().await {
                     match any_event_sender
                         .send(AnyEvent::External(ExternalEventsDTO::stdout_line(
+                            id,
                             line,
                             (*sh_prefix).clone(),
                         )))
@@ -220,6 +227,7 @@ impl actix::Handler<TaskTrigger> for ShCmd {
                 while let Ok(Some(line)) = stderr_reader.next_line().await {
                     match any_event_sender2
                         .send(AnyEvent::External(ExternalEventsDTO::stderr_line(
+                            id,
                             line,
                             (*sh_prefix_2).clone(),
                         )))

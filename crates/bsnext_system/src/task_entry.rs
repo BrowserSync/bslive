@@ -1,5 +1,5 @@
 use crate::as_actor::AsActor;
-use crate::task_trigger::TaskTrigger;
+use crate::tasks::sh_cmd::OneTask;
 use actix::Recipient;
 use std::fmt::{Display, Formatter};
 
@@ -31,7 +31,7 @@ impl TaskEntry {
 }
 
 impl AsActor for TaskEntry {
-    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskTrigger> {
+    fn into_task_recipient(self: Box<Self>) -> Recipient<OneTask> {
         self.task.into_task_recipient()
     }
 }

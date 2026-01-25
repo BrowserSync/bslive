@@ -1,0 +1,2 @@
+run:
+  - sh: echo 'start' && echo 'yo' && exit 1

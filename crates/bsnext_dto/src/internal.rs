@@ -1,5 +1,8 @@
 use crate::archy::ArchyNode;
-use crate::external_events::ExternalEventsDTO;
+use crate::external_events::{
+    ExternalEventsDTO, InvocationIdDTO, TaskActionDTO, TaskActionStageDTO, TaskReportDTO,
+    TaskResultDTO, TaskStatusDTO,
+};
 use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
@@ -20,7 +23,6 @@ pub enum InternalEvents {
     },
     InputError(InputError),
     StartupError(StartupError),
-    TaskReport(TaskReportAndTree),
     TaskAction(TaskAction),
 }
 
@@ -33,22 +35,63 @@ pub struct TaskReportAndTree {
 #[derive(Debug, Clone)]
 pub struct TaskAction {
     pub id: u64,
-    pub action: TaskActionVariant,
+    pub stage: TaskActionStage,
 }
 
 #[derive(Debug, Clone)]
-pub enum TaskActionVariant {
+pub enum TaskActionStage {
     Started { tree: ArchyNode },
-    Complete,
+    Ended { tree: ArchyNode, report: TaskReport },
     Error,
 }
 
-impl TaskActionVariant {
+impl TaskActionStage {
     pub fn started(id: u64, tree: ArchyNode) -> AnyEvent {
-        AnyEvent::Internal(InternalEvents::TaskAction(TaskAction {
-            id,
-            action: TaskActionVariant::Started { tree },
-        }))
+        // let action = TaskAction {
+        //     id,
+        //     stage: TaskActionStage::Started { tree },
+        // };
+        let dto = TaskActionDTO {
+            id: id.to_string(),
+            stage: TaskActionStageDTO::Started { tree },
+        };
+        AnyEvent::External(ExternalEventsDTO::TaskAction(dto))
+    }
+    pub fn complete(id: u64, tree: ArchyNode, report: TaskReport) -> AnyEvent {
+        let dto = TaskActionDTO {
+            id: id.to_string(),
+            stage: TaskActionStageDTO::Ended {
+                tree,
+                report: TaskReportDTO::from(report),
+            },
+        };
+        AnyEvent::External(ExternalEventsDTO::TaskAction(dto))
+    }
+}
+
+impl From<TaskReport> for TaskReportDTO {
+    fn from(value: TaskReport) -> Self {
+        TaskReportDTO {
+            id: value.id.to_string(),
+            result: TaskResultDTO::from(value.result),
+        }
+    }
+}
+
+impl From<TaskResult> for TaskResultDTO {
+    fn from(value: TaskResult) -> Self {
+        TaskResultDTO {
+            invocation_id: InvocationIdDTO(value.invocation_id.0.to_string()),
+            status: match value.status {
+                TaskStatus::Ok(_) => TaskStatusDTO::Ok,
+                TaskStatus::Err(e) => TaskStatusDTO::Err(e.to_string()),
+            },
+            task_reports: value
+                .task_reports
+                .into_iter()
+                .map(TaskReportDTO::from)
+                .collect(),
+        }
     }
 }
 

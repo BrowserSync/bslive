@@ -1,7 +1,7 @@
 use crate::as_actor::AsActor;
 use crate::task_group::TaskGroup;
 use crate::task_list::RunKind;
-use crate::task_trigger::TaskTrigger;
+use crate::tasks::sh_cmd::OneTask;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
@@ -47,11 +47,11 @@ impl actix::Actor for TaskGroupRunner {
     }
 }
 
-impl Handler<TaskTrigger> for TaskGroupRunner {
+impl Handler<OneTask> for TaskGroupRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
     #[tracing::instrument(skip_all, name = "Handler->TaskCommand->TaskGroupRunner")]
-    fn handle(&mut self, trigger: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, OneTask(id, trigger): OneTask, _ctx: &mut Self::Context) -> Self::Result {
         let span = Span::current();
         let gg = Arc::new(span.clone());
         let ggg = gg.clone();
@@ -62,7 +62,7 @@ impl Handler<TaskTrigger> for TaskGroupRunner {
             todo!("how to handle a concurrent request here?");
         };
 
-        debug!("  └── {} tasks in group", group.len());
+        debug!("  └── {} tasks in group id: {id}", group.len());
         debug!("  └── {:?} group run_kind", group.run_kind());
 
         let expected_len = group.len();
@@ -75,7 +75,9 @@ impl Handler<TaskTrigger> for TaskGroupRunner {
                     for (index, group_item) in group.tasks().into_iter().enumerate() {
                         let id = group_item.id();
                         let boxed_actor = Box::new(group_item).into_task_recipient();
-                        match boxed_actor.send(trigger.clone()).await {
+                        let one_task = OneTask(id, trigger.clone());
+
+                        match boxed_actor.send(one_task).await {
                             Ok(result) => {
                                 let is_ok = result.is_ok();
                                 done.push((index, result.to_report(id)));
@@ -84,7 +86,7 @@ impl Handler<TaskTrigger> for TaskGroupRunner {
                                         "index {index} completed, will move to next text in seq"
                                     );
                                 } else if exit_on_failure {
-                                    debug!("stopping after index {index} id: {id} ran, because it did not complete successfully.");
+                                    debug!("❌ stopping after index {index} id: {id} ran, because it did not complete successfully.");
                                     break;
                                 } else {
                                     debug!("continuing after failure, because of config");
@@ -101,12 +103,12 @@ impl Handler<TaskTrigger> for TaskGroupRunner {
                         let id = as_actor.id();
                         let actor = Box::new(as_actor).into_task_recipient();
                         let jh = tokio::spawn({
-                            let trigger_clone = trigger.clone();
                             let semaphore = sem.clone();
+                            let one_task = OneTask(id, trigger.clone());
                             async move {
                                 let _permit = semaphore.acquire().await.unwrap();
                                 let msg_response = actor
-                                    .send(trigger_clone)
+                                    .send(one_task)
                                     .map(move |task_result| (index, id, task_result))
                                     .await;
                                 drop(_permit);

@@ -2,11 +2,10 @@ use crate::as_actor::AsActor;
 use crate::task_group::TaskGroup;
 use crate::task_list::TaskList;
 use crate::task_trigger::TaskTrigger;
+use crate::tasks::sh_cmd::OneTask;
 use crate::BsSystem;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
-use bsnext_dto::internal::{
-    AnyEvent, InternalEvents, TaskAction, TaskActionVariant, TaskReport, TaskReportAndTree,
-};
+use bsnext_dto::internal::{TaskActionStage, TaskReport, TaskReportAndTree};
 use std::collections::HashMap;
 
 /// A struct representing a message to trigger a specific task in the system.
@@ -52,12 +51,13 @@ impl Handler<TriggerTask> for BsSystem {
         let done = msg.done;
         let comms = cmd.comms().clone();
         let tree = task_list.as_tree();
+        let trigger = OneTask(task_id, cmd);
         let with_start = async move {
             let _sent = comms
                 .any_event_sender
-                .send(TaskActionVariant::started(task_id, tree))
+                .send(TaskActionStage::started(task_id, tree))
                 .await;
-            cmd_recipient.send(cmd).await
+            cmd_recipient.send(trigger).await
         };
         let next = with_start
             .into_actor(self)
@@ -68,10 +68,11 @@ impl Handler<TriggerTask> for BsSystem {
                     every_report(&mut e, &report);
 
                     let tree = task_list.as_tree_with_results(&e);
-                    let report_and_tree = TaskReportAndTree { report, tree };
-                    actor.publish_any_event(AnyEvent::Internal(InternalEvents::TaskReport(
-                        report_and_tree.clone(),
-                    )));
+                    let report_and_tree = TaskReportAndTree {
+                        report: report.clone(),
+                        tree: tree.clone(),
+                    };
+                    actor.publish_any_event(TaskActionStage::complete(task_id, tree, report));
                     match done.send(report_and_tree) {
                         Ok(_) => tracing::debug!("did finish initial"),
                         Err(_) => tracing::error!("could not send"),

@@ -1,11 +1,12 @@
 use crate::as_actor::AsActor;
 use crate::task_group::TaskGroup;
 use crate::task_list::TaskList;
-use crate::task_trigger::TaskTrigger;
+use crate::task_trigger::{TaskTrigger, TaskTriggerVariant};
+use crate::tasks::sh_cmd::OneTask;
 use crate::trigger_task::every_report;
 use crate::BsSystem;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
-use bsnext_dto::internal::{AnyEvent, InternalEvents, TaskReportAndTree};
+use bsnext_dto::internal::TaskActionStage;
 use bsnext_fs::FsEventContext;
 use std::collections::HashMap;
 
@@ -31,11 +32,11 @@ impl TriggerFsTaskEvent {
     }
 
     pub fn fs_ctx(&self) -> &FsEventContext {
-        match &self.task_trigger {
-            TaskTrigger::FsChanges {
+        match &self.task_trigger.variant {
+            TaskTriggerVariant::FsChanges {
                 fs_event_context, ..
             } => fs_event_context,
-            TaskTrigger::Exec { .. } => {
+            TaskTriggerVariant::Exec { .. } => {
                 panic!("unreachable. It's a mistake to access fs_ctx here")
             }
         }
@@ -46,7 +47,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
     type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, msg: TriggerFsTaskEvent, _ctx: &mut Self::Context) -> Self::Result {
-        let cmd = msg.cmd();
+        let trigger = msg.cmd();
         let fs_ctx = msg.fs_ctx();
         let entry = self.task_list_mapping.get(fs_ctx);
         let cloned_id = *fs_ctx;
@@ -60,10 +61,11 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
             .insert(*fs_ctx, msg.task_list.to_owned());
         let task_id = msg.task_list.as_id();
         let trigger_recipient = Box::new(msg.task_group).into_task_recipient();
+        let one_task = OneTask(task_id, trigger);
 
         Box::pin(
             trigger_recipient
-                .send(cmd)
+                .send(one_task)
                 .into_actor(self)
                 .map(move |resp, actor, _ctx| {
                     let runner = actor.task_list_mapping.get(&cloned_id);
@@ -74,8 +76,8 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
                             every_report(&mut e, &report);
 
                             let tree = runner.as_tree_with_results(&e);
-                            actor.publish_any_event(AnyEvent::Internal(
-                                InternalEvents::TaskReport(TaskReportAndTree { report, tree }),
+                            actor.publish_any_event(TaskActionStage::complete(
+                                task_id, tree, report,
                             ));
                         }
                         (Ok(_), _) => {

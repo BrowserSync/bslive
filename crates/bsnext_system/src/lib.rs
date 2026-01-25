@@ -9,7 +9,7 @@ use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
 use crate::task_group::TaskGroup;
 use crate::task_list::TaskList;
-use crate::task_trigger::TaskTrigger;
+use crate::task_trigger::{TaskTrigger, TaskTriggerVariant};
 use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
@@ -232,9 +232,11 @@ impl BsSystem {
     }
 
     fn before(&mut self, input: &Input) -> (TriggerTask, Receiver<TaskReportAndTree>) {
-        let task_trigger = TaskTrigger::Exec {
+        let variant = TaskTriggerVariant::Exec;
+        let trigger = TaskTrigger {
             invocation_id: 0,
-            task_comms: self.task_comms(),
+            comms: self.task_comms(),
+            variant: variant,
         };
 
         let all = input.before_run_opts();
@@ -242,10 +244,7 @@ impl BsSystem {
         let task_list = TaskList::seq_from(&all);
         let task_group = TaskGroup::from(task_list.clone());
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
-        (
-            TriggerTask::new(task_group, task_trigger, task_list, tx),
-            rx,
-        )
+        (TriggerTask::new(task_group, trigger, task_list, tx), rx)
     }
 }
 

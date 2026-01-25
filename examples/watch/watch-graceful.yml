@@ -1,0 +1,13 @@
+servers:
+  - name: 'graceful-exit'
+    routes:
+      - path: /
+        dir: examples/watch/src
+        watch:
+          debounce:
+            ms: 0
+          run:
+            - sh:
+                sh: "node examples/graceful-exit.js"
+                timeout_ms: 1000
+                grace_ms: 3000

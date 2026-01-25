@@ -3,12 +3,11 @@ use crate::path_monitor::PathMonitorMeta;
 use crate::path_watchable::PathWatchable;
 use crate::task_group::TaskGroup;
 use crate::task_list::{BsLiveTask, Runnable, TaskList};
-use crate::task_trigger::{TaskComms, TaskTrigger};
+use crate::task_trigger::{TaskComms, TaskTrigger, TaskTriggerVariant};
 use crate::trigger_fs_task::TriggerFsTaskEvent;
 use crate::{BsSystem, OverrideInput};
 use actix::AsyncContext;
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
-use bsnext_dto::archy::archy;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
@@ -128,10 +127,13 @@ impl BsSystem {
 
         let fs_triggered_task_list = self.task_list_for_fs_event(&change.fs_ctx);
 
-        let task_trigger = TaskTrigger::FsChanges {
+        let variant = TaskTriggerVariant::FsChanges {
             changes: paths,
             fs_event_context: change.fs_ctx,
-            task_comms: self.task_comms(),
+        };
+        let task_trigger = TaskTrigger {
+            variant,
+            comms: self.task_comms(),
             invocation_id: 0,
         };
 

@@ -21,6 +21,13 @@ var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
 })(EventLevel || {});
 
 // schema.ts
+var invocationIdDTOSchema = z.string();
+var archyNodeSchema = z.lazy(
+  () => z.object({
+    label: z.string(),
+    nodes: z.array(archyNodeSchema)
+  })
+);
 var logLevelDTOSchema = z.nativeEnum(LogLevelDTO);
 var clientConfigDTOSchema = z.object({
   log_level: logLevelDTOSchema
@@ -167,16 +174,28 @@ var serversChangedDTOSchema = z.object({
   servers_resp: getActiveServersResponseDTOSchema
 });
 var stderrLineDTOSchema = z.object({
+  task_id: z.string(),
   line: z.string(),
   prefix: z.string().optional()
 });
 var stdoutLineDTOSchema = z.object({
+  task_id: z.string(),
   line: z.string(),
   prefix: z.string().optional()
 });
 var stoppedWatchingDTOSchema = z.object({
   paths: z.array(z.string())
 });
+var taskStatusDTOSchema = z.union([
+  z.object({
+    kind: z.literal("Ok"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Err"),
+    payload: z.string()
+  })
+]);
 var watchingDTOSchema = z.object({
   paths: z.array(z.string()),
   debounce: debounceDTOSchema
@@ -310,41 +329,88 @@ var serverDescSchema = z.object({
   routes: z.array(routeDTOSchema),
   id: z.string()
 });
-var externalEventsDTOSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("ServersChanged"),
-    payload: serversChangedDTOSchema
-  }),
-  z.object({
-    kind: z.literal("Watching"),
-    payload: watchingDTOSchema
-  }),
-  z.object({
-    kind: z.literal("WatchingStopped"),
-    payload: stoppedWatchingDTOSchema
-  }),
-  z.object({
-    kind: z.literal("FileChanged"),
-    payload: fileChangedDTOSchema
-  }),
-  z.object({
-    kind: z.literal("FilesChanged"),
-    payload: filesChangedDTOSchema
-  }),
-  z.object({
-    kind: z.literal("InputFileChanged"),
-    payload: fileChangedDTOSchema
-  }),
-  z.object({
-    kind: z.literal("InputAccepted"),
-    payload: inputAcceptedDTOSchema
-  }),
-  z.object({
-    kind: z.literal("OutputLine"),
-    payload: outputLineDTOSchema
+var taskActionStageDTOSchema = z.lazy(
+  () => z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("Started"),
+      payload: z.object({
+        tree: archyNodeSchema
+      })
+    }),
+    z.object({
+      kind: z.literal("Ended"),
+      payload: z.object({
+        tree: archyNodeSchema,
+        report: taskReportDTOSchema
+      })
+    }),
+    z.object({
+      kind: z.literal("Error"),
+      payload: z.undefined().optional()
+    })
+  ])
+);
+var taskReportDTOSchema = z.lazy(
+  () => z.object({
+    result: taskResultDTOSchema,
+    id: z.string()
   })
-]);
+);
+var taskActionDTOSchema = z.lazy(
+  () => z.object({
+    id: z.string(),
+    stage: taskActionStageDTOSchema
+  })
+);
+var taskResultDTOSchema = z.lazy(
+  () => z.object({
+    status: taskStatusDTOSchema,
+    invocation_id: invocationIdDTOSchema,
+    task_reports: z.array(taskReportDTOSchema)
+  })
+);
+var externalEventsDTOSchema = z.lazy(
+  () => z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("ServersChanged"),
+      payload: serversChangedDTOSchema
+    }),
+    z.object({
+      kind: z.literal("Watching"),
+      payload: watchingDTOSchema
+    }),
+    z.object({
+      kind: z.literal("WatchingStopped"),
+      payload: stoppedWatchingDTOSchema
+    }),
+    z.object({
+      kind: z.literal("FileChanged"),
+      payload: fileChangedDTOSchema
+    }),
+    z.object({
+      kind: z.literal("FilesChanged"),
+      payload: filesChangedDTOSchema
+    }),
+    z.object({
+      kind: z.literal("InputFileChanged"),
+      payload: fileChangedDTOSchema
+    }),
+    z.object({
+      kind: z.literal("InputAccepted"),
+      payload: inputAcceptedDTOSchema
+    }),
+    z.object({
+      kind: z.literal("OutputLine"),
+      payload: outputLineDTOSchema
+    }),
+    z.object({
+      kind: z.literal("TaskAction"),
+      payload: taskActionDTOSchema
+    })
+  ])
+);
 export {
+  archyNodeSchema,
   changeDTOSchema,
   changeKindSchema,
   clientConfigDTOSchema,
@@ -360,6 +426,7 @@ export {
   inputAcceptedDTOSchema,
   inputErrorDTOSchema,
   internalEventsDTOSchema,
+  invocationIdDTOSchema,
   logLevelDTOSchema,
   outputLineDTOSchema,
   routeDTOSchema,
@@ -376,5 +443,10 @@ export {
   stderrLineDTOSchema,
   stdoutLineDTOSchema,
   stoppedWatchingDTOSchema,
+  taskActionDTOSchema,
+  taskActionStageDTOSchema,
+  taskReportDTOSchema,
+  taskResultDTOSchema,
+  taskStatusDTOSchema,
   watchingDTOSchema
 };

@@ -1,4 +1,5 @@
-use crate::task_trigger::TaskTrigger;
+use crate::task_trigger::TaskTriggerVariant;
+use crate::tasks::sh_cmd::OneTask;
 use actix::{Handler, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
@@ -28,14 +29,14 @@ impl actix::Actor for ExternalEventSender {
     }
 }
 
-impl Handler<TaskTrigger> for ExternalEventSender {
+impl Handler<OneTask> for ExternalEventSender {
     type Result = ResponseFuture<TaskResult>;
 
-    fn handle(&mut self, msg: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
-        let comms = msg.comms();
+    fn handle(&mut self, OneTask(_id, trigger): OneTask, _ctx: &mut Self::Context) -> Self::Result {
+        let comms = trigger.comms();
         let sender = comms.any_event_sender.clone();
-        let events: Vec<AnyEvent> = match msg {
-            TaskTrigger::FsChanges { changes, .. } => {
+        let events: Vec<AnyEvent> = match trigger.variant {
+            TaskTriggerVariant::FsChanges { changes, .. } => {
                 let as_strings = changes
                     .iter()
                     .map(|p| p.to_string_lossy().to_string())
@@ -47,7 +48,7 @@ impl Handler<TaskTrigger> for ExternalEventSender {
                     },
                 ))]
             }
-            TaskTrigger::Exec { .. } => vec![],
+            TaskTriggerVariant::Exec { .. } => vec![],
         };
         Box::pin(async move {
             for evt in events {

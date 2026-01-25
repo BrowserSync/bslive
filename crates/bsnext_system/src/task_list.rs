@@ -1,8 +1,7 @@
 use crate::as_actor::AsActor;
 use crate::external_event_sender::ExternalEventSender;
-use crate::task_trigger::TaskTrigger;
 use crate::tasks::notify_servers::NotifyServers;
-use crate::tasks::sh_cmd::ShCmd;
+use crate::tasks::sh_cmd::{OneTask, ShCmd};
 use actix::{Actor, Recipient};
 use bsnext_dto::archy::ArchyNode;
 use bsnext_dto::internal::TaskReport;
@@ -209,7 +208,7 @@ fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u
 }
 
 impl AsActor for Runnable {
-    fn into_task_recipient(self: Box<Self>) -> Recipient<TaskTrigger> {
+    fn into_task_recipient(self: Box<Self>) -> Recipient<OneTask> {
         match *self {
             Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
                 let s = NotifyServers::new();

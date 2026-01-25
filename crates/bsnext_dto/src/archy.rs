@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter};
+use typeshare::typeshare;
 
+#[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ArchyNode {
     pub label: String,
@@ -50,13 +52,21 @@ impl Display for Token {
     }
 }
 
+pub enum Prefix<'a> {
+    None,
+    Str(&'a str),
+}
+
 /// This is a port of https://www.npmjs.com/package/archy
 /// Note: absolutely zero attempts at performance optimizations were made here.
 /// This code is not in any kind of hot path
 ///
-pub fn archy(obj: &ArchyNode, line_prefix: Option<&str>) -> String {
+pub fn archy(obj: &ArchyNode, line_prefix: Prefix) -> String {
     type T = Token;
-    let line_prefix = line_prefix.unwrap_or("");
+    let line_prefix = match line_prefix {
+        Prefix::None => "",
+        Prefix::Str(str) => str,
+    };
 
     let this_row_prefix = if obj.nodes.is_empty() {
         T::Gap
@@ -94,7 +104,7 @@ pub fn archy(obj: &ArchyNode, line_prefix: Option<&str>) -> String {
                 T::Hori
             );
             let branch = format!("{}{}", if more { T::T } else { T::Hori }, T::Gap);
-            let subtree = archy(node, Some(&inner_prefix));
+            let subtree = archy(node, Prefix::Str(&inner_prefix));
             let line_prefix_len = line_prefix.char_indices().count();
             let subtree_sliced = subtree
                 .char_indices()
@@ -124,7 +134,7 @@ mod tests {
     #[test]
     fn test_archy_single_node() {
         let node = ArchyNode::new("Root");
-        let result = archy(&node, None);
+        let result = archy(&node, Prefix::None);
         let expected = String::from("Root\n");
         assert_eq!(result, expected);
     }
@@ -135,7 +145,7 @@ mod tests {
         root.nodes.push(ArchyNode::new("Child 1"));
         root.nodes.push(ArchyNode::new("Child 2"));
 
-        let result = archy(&root, None);
+        let result = archy(&root, Prefix::None);
         let expected = "\
 Root
 ├── Child 1
@@ -153,7 +163,7 @@ Root
         root.nodes.push(child1);
         root.nodes.push(ArchyNode::new("Child 2"));
 
-        let result = archy(&root, None);
+        let result = archy(&root, Prefix::None);
         let expected = "\
 Root
 ├─┬ Child 1

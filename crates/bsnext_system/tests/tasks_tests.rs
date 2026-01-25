@@ -4,7 +4,9 @@ use bsnext_system::as_actor::AsActor;
 use bsnext_system::task_entry::TaskEntry;
 use bsnext_system::task_group::TaskGroup;
 use bsnext_system::task_group_runner::TaskGroupRunner;
-use bsnext_system::task_trigger::{TaskComms, TaskTrigger};
+use bsnext_system::task_trigger::{TaskComms, TaskTrigger, TaskTriggerVariant};
+use bsnext_system::tasks::sh_cmd::OneTask;
+use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
@@ -32,19 +34,21 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
     let addr = task_group_runner.start();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
-
-    let task_result = addr
-        .send(TaskTrigger::FsChanges {
+    let trigger = TaskTrigger {
+        variant: TaskTriggerVariant::FsChanges {
             changes: vec![],
             fs_event_context: Default::default(),
-            task_comms: TaskComms {
-                servers_recip: None,
-                any_event_sender: tx,
-            },
-            invocation_id: 0,
-        })
-        .await
-        .unwrap();
+        },
+        comms: TaskComms {
+            servers_recip: None,
+            any_event_sender: tx,
+        },
+        invocation_id: 0,
+    };
+    let id = 0;
+    let one_task = OneTask(0, trigger);
+
+    let task_result = addr.send(one_task).await.unwrap();
     let _evt = rx.recv().await;
     assert_eq!(task_result.task_reports.len(), 2);
     Ok(())
@@ -63,10 +67,14 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
     impl Actor for A {
         type Context = actix::Context<Self>;
     }
-    impl actix::Handler<TaskTrigger> for A {
+    impl actix::Handler<OneTask> for A {
         type Result = ResponseActFuture<Self, TaskResult>;
 
-        fn handle(&mut self, _msg: TaskTrigger, _ctx: &mut Self::Context) -> Self::Result {
+        fn handle(
+            &mut self,
+            OneTask(id, trigger): OneTask,
+            _ctx: &mut Self::Context,
+        ) -> Self::Result {
             let f = self.f.take().unwrap();
             Box::pin(
                 f.into_actor(self)
@@ -75,7 +83,7 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
         }
     }
     impl AsActor for A {
-        fn into_task_recipient(self: Box<Self>) -> Recipient<TaskTrigger> {
+        fn into_task_recipient(self: Box<Self>) -> Recipient<OneTask> {
             let a = self.start();
             a.recipient()
         }
