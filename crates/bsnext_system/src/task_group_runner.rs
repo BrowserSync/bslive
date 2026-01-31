@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::select;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, trace, Span};
+use tracing::{debug, trace, Instrument, Span};
 
 /// Represents a task group runner responsible for managing and executing a set of tasks.
 ///
@@ -65,8 +65,7 @@ impl Handler<OneTask> for TaskGroupRunner {
             todo!("how to handle a concurrent request here?");
         };
 
-        debug!(group.len = group.len(), "  └── tasks in group");
-        debug!(group.kind = ?group.run_kind(), "  └── group run_kind");
+        tracing::info!(group.len = group.len(), group.kind = ?group.run_kind());
 
         let expected_len = group.len();
         let future = async move {
@@ -127,11 +126,12 @@ impl Handler<OneTask> for TaskGroupRunner {
                                     return (index, id, Ok::<_, _>(v));
                                 };
                                 let _permit = semaphore.acquire().await.unwrap();
-                                let msg_response = actor
+                                let task_run = actor
                                     .send(one_task)
+                                    .instrument(Span::current())
                                     .map(move |task_result| (index, id, task_result));
                                 let output = select! {
-                                    result = msg_response => {
+                                    result = task_run => {
                                         match (&result, fail_early) {
                                             ((_, _, Ok(res)), CancelOthers::True) if !res.is_ok() => {
                                                 debug!("cancelling group because CancelOthers::True");
@@ -147,6 +147,7 @@ impl Handler<OneTask> for TaskGroupRunner {
                                         result
                                     }
                                     _ = child_token.cancelled() => {
+                                        debug!("child_token was cancelled");
                                         let v = TaskResult::cancelled();
                                         (index, id, Ok::<_, _>(v))
                                     }

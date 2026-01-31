@@ -22,6 +22,7 @@ pub struct ShCmd {
     name: Option<String>,
     output: ShCmdOutput,
     timeout: ShDuration,
+    id: Option<String>,
 }
 
 impl Display for ShCmd {
@@ -60,6 +61,7 @@ impl ShCmd {
             name: None,
             output: Default::default(),
             timeout: Default::default(),
+            id: None,
         }
     }
     pub fn named(cmd: OsString, name: impl Into<String>) -> Self {
@@ -68,6 +70,7 @@ impl ShCmd {
             name: Some(name.into()),
             output: Default::default(),
             timeout: Default::default(),
+            id: None,
         }
     }
 
@@ -144,6 +147,22 @@ impl Deref for Cmd {
 
 impl actix::Actor for ShCmd {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        tracing::trace!(
+            sqid = self.id,
+            actor.name = "ShCmd",
+            actor.lifecyle = "started"
+        );
+    }
+
+    fn stopped(&mut self, ctx: &mut Self::Context) {
+        tracing::trace!(
+            sqid = self.id,
+            actor.name = "ShCmd",
+            actor.lifecyle = "stopped"
+        );
+    }
 }
 
 #[derive(actix::Message, Debug, Clone)]
@@ -164,10 +183,11 @@ impl actix::Handler<OneTask> for ShCmd {
 
     #[tracing::instrument(skip_all, name = "ShCmd", fields(id=one.sqid()))]
     fn handle(&mut self, one: OneTask, _ctx: &mut Self::Context) -> Self::Result {
+        self.id = Some(one.sqid());
         let cmd = self.sh.clone();
         let OneTask(id, trigger) = one;
         let cmd = cmd.to_os_string();
-        tracing::debug!("Will run... {:?}", cmd);
+        tracing::info!("Will run... {:?}", cmd);
         let any_event_sender = trigger.comms().any_event_sender.clone();
         let any_event_sender2 = trigger.comms().any_event_sender.clone();
         let reason = match &trigger.variant {
@@ -205,7 +225,9 @@ impl actix::Handler<OneTask> for ShCmd {
                 .stderr(Stdio::piped())
                 .spawn()
                 .expect("command failed to spawn?");
+
             let pid = child.id();
+            tracing::debug!(?pid);
 
             let stdout = child
                 .stdout
@@ -221,6 +243,7 @@ impl actix::Handler<OneTask> for ShCmd {
             let mut stderr_reader = BufReader::new(stderr).lines();
 
             let h = tokio::spawn(async move {
+                tracing::debug!(?pid, "reading stdout");
                 while let Ok(Some(line)) = stdout_reader.next_line().await {
                     match any_event_sender
                         .send(AnyEvent::External(ExternalEventsDTO::stdout_line(
@@ -235,7 +258,9 @@ impl actix::Handler<OneTask> for ShCmd {
                     }
                 }
             }.instrument(Span::current()));
+
             let h2 = tokio::spawn(async move {
+                tracing::debug!(?pid, "reading stderr");
                 while let Ok(Some(line)) = stderr_reader.next_line().await {
                     match any_event_sender2
                         .send(AnyEvent::External(ExternalEventsDTO::stderr_line(
@@ -262,7 +287,7 @@ impl actix::Handler<OneTask> for ShCmd {
                     TaskResult::timeout(InvocationId(invocation_id))
                 }
                 out = child.wait() => {
-                    tracing::info!("✅ operation ended");
+                    tracing::info!("child waited");
                     match out {
                         Ok(exit) => match exit.code() {
                            Some(0) => TaskResult::ok(InvocationId(invocation_id)),
@@ -290,7 +315,7 @@ impl actix::Handler<OneTask> for ShCmd {
                 Err(e) => tracing::trace!("failed waiting for stderr {e}"),
             };
 
-            tracing::debug!("✅ Run (+cleanup) complete");
+            tracing::info!("✅ complete");
 
             result
         }.instrument(Span::current());
