@@ -1,8 +1,9 @@
-use crate::task_trigger::{TaskTrigger, TaskTriggerVariant};
 use actix::ResponseFuture;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, ExitCode, InvocationId, TaskResult};
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
+use bsnext_task::invocation::Invocation;
+use bsnext_task::task_trigger::TaskTriggerSource;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
@@ -165,45 +166,32 @@ impl actix::Actor for ShCmd {
     }
 }
 
-#[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "TaskResult")]
-pub struct OneTask(pub u64, pub TaskTrigger);
-
-impl OneTask {
-    pub fn sqid(&self) -> String {
-        let sqids = sqids::Sqids::default();
-        sqids
-            .encode(&[self.0])
-            .unwrap_or_else(|_| self.0.to_string())
-    }
-}
-
-impl actix::Handler<OneTask> for ShCmd {
+impl actix::Handler<Invocation> for ShCmd {
     type Result = ResponseFuture<TaskResult>;
 
-    #[tracing::instrument(skip_all, name = "ShCmd", fields(id=one.sqid()))]
-    fn handle(&mut self, one: OneTask, _ctx: &mut Self::Context) -> Self::Result {
-        let sqid = one.sqid();
+    #[tracing::instrument(skip_all, name = "ShCmd", fields(id=invocation.sqid()))]
+    fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
+        let sqid = invocation.sqid();
         self.id = Some(sqid.clone());
         let cmd = self.sh.clone();
-        let OneTask(id, trigger) = one;
+        let Invocation(id, trigger) = invocation;
         let cmd = cmd.to_os_string();
         tracing::info!("Will run... {:?}", cmd);
         let any_event_sender = trigger.comms().any_event_sender.clone();
         let any_event_sender2 = trigger.comms().any_event_sender.clone();
         let reason = match &trigger.variant {
-            TaskTriggerVariant::FsChanges { changes, .. } => {
+            TaskTriggerSource::FsChanges { changes, .. } => {
                 format!("{} files changed", changes.len())
             }
-            TaskTriggerVariant::Exec { .. } => "command executed".to_string(),
+            TaskTriggerSource::Exec { .. } => "command executed".to_string(),
         };
         let files = match &trigger.variant {
-            TaskTriggerVariant::FsChanges { changes, .. } => changes
+            TaskTriggerSource::FsChanges { changes, .. } => changes
                 .iter()
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
-            TaskTriggerVariant::Exec { .. } => "NONE".to_string(),
+            TaskTriggerSource::Exec { .. } => "NONE".to_string(),
         };
 
         let sh_prefix = Arc::new(self.prefix(sqid));

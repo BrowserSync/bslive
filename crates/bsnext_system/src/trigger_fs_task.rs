@@ -1,13 +1,13 @@
-use crate::as_actor::AsActor;
-use crate::task_group::TaskGroup;
-use crate::task_list::TaskList;
-use crate::task_trigger::{TaskTrigger, TaskTriggerVariant};
-use crate::tasks::sh_cmd::OneTask;
+use crate::tasks::task_list::TaskList;
 use crate::trigger_task::every_report;
 use crate::BsSystem;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::TaskActionStage;
 use bsnext_fs::FsEventContext;
+use bsnext_task::as_actor::AsActor;
+use bsnext_task::invocation::Invocation;
+use bsnext_task::task_group::TaskGroup;
+use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use std::collections::HashMap;
 
 #[derive(actix::Message, Debug)]
@@ -33,10 +33,10 @@ impl TriggerFsTaskEvent {
 
     pub fn fs_ctx(&self) -> &FsEventContext {
         match &self.task_trigger.variant {
-            TaskTriggerVariant::FsChanges {
+            TaskTriggerSource::FsChanges {
                 fs_event_context, ..
             } => fs_event_context,
-            TaskTriggerVariant::Exec { .. } => {
+            TaskTriggerSource::Exec { .. } => {
                 panic!("unreachable. It's a mistake to access fs_ctx here")
             }
         }
@@ -61,7 +61,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
             .insert(*fs_ctx, msg.task_list.to_owned());
         let task_id = msg.task_list.as_id();
         let trigger_recipient = Box::new(msg.task_group).into_task_recipient();
-        let one_task = OneTask(task_id, trigger);
+        let one_task = Invocation(task_id, trigger);
 
         Box::pin(
             trigger_recipient

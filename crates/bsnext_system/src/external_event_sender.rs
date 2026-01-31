@@ -1,8 +1,8 @@
-use crate::task_trigger::TaskTriggerVariant;
-use crate::tasks::sh_cmd::OneTask;
 use actix::{Handler, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
+use bsnext_task::invocation::Invocation;
+use bsnext_task::task_trigger::TaskTriggerSource;
 
 #[derive(Default, Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct ExternalEventSender;
@@ -29,14 +29,18 @@ impl actix::Actor for ExternalEventSender {
     }
 }
 
-impl Handler<OneTask> for ExternalEventSender {
+impl Handler<Invocation> for ExternalEventSender {
     type Result = ResponseFuture<TaskResult>;
 
-    fn handle(&mut self, OneTask(_id, trigger): OneTask, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        Invocation(_id, trigger): Invocation,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
         let comms = trigger.comms();
         let sender = comms.any_event_sender.clone();
         let events: Vec<AnyEvent> = match trigger.variant {
-            TaskTriggerVariant::FsChanges { changes, .. } => {
+            TaskTriggerSource::FsChanges { changes, .. } => {
                 let as_strings = changes
                     .iter()
                     .map(|p| p.to_string_lossy().to_string())
@@ -48,7 +52,7 @@ impl Handler<OneTask> for ExternalEventSender {
                     },
                 ))]
             }
-            TaskTriggerVariant::Exec { .. } => vec![],
+            TaskTriggerSource::Exec { .. } => vec![],
         };
         Box::pin(async move {
             for evt in events {

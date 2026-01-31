@@ -1,13 +1,13 @@
-use crate::as_actor::AsActor;
-use crate::external_event_sender::ExternalEventSender;
-use crate::tasks::notify_servers::NotifyServers;
-use crate::tasks::sh_cmd::{OneTask, ShCmd};
-use actix::{Actor, Recipient};
+use crate::tasks::bs_live_task::BsLiveTask;
+use crate::tasks::sh_cmd::ShCmd;
+use crate::tasks::{append, append_with_reports, Runnable};
 use bsnext_dto::archy::ArchyNode;
 use bsnext_dto::internal::TaskReport;
 use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
+use bsnext_task::task_entry::TaskEntry;
+use bsnext_task::task_group::TaskGroup;
+use bsnext_task::{OverlappingOpts, RunKind, SequenceOpts};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 /// Represents a collection of tasks that can be run, categorized by their execution type (`RunKind`).
@@ -32,69 +32,15 @@ pub struct TaskList {
 
 impl TreeDisplay for TaskList {
     fn as_tree_label(&self, parent: u64) -> String {
-        let _id = self.as_id_with(parent);
+        let sqid = self.as_sqid(parent);
         match &self.run_kind {
-            RunKind::Sequence { .. } => format!("Seq: {} task(s)", self.tasks.len()),
+            RunKind::Sequence { .. } => format!("[{sqid}] Seq: {} task(s)", self.tasks.len()),
             RunKind::Overlapping { opts } => format!(
-                "Overlapping {} task(s) (max concurrency: {})",
+                "[{sqid}] Overlapping {} task(s) (max concurrency: {})",
                 self.tasks.len(),
                 opts.max_concurrent_items
             ),
         }
-    }
-}
-
-/// The `RunKind` enum represents the type of execution or arrangement of a set of operations or elements.
-/// It provides two distinct variants: `Sequence` and `Overlapping`.
-///
-/// ## Variants
-///
-/// - `Sequence`:
-///   Represents a straightforward sequential arrangement or execution.
-///   Operations or elements will proceed one after another in the specified order.
-///
-/// - `Overlapping`:
-///   Represents an overlapping arrangement where operations or elements can overlap or run concurrently,
-///   based on specific options provided.
-///
-///   - `opts`: A field of type `OverlappingOpts` that contains the configuration or parameters
-///     dictating the behavior of overlapping operations.
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub enum RunKind {
-    Sequence { opts: SequenceOpts },
-    Overlapping { opts: OverlappingOpts },
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub struct OverlappingOpts {
-    pub max_concurrent_items: u8,
-    pub exit_on_failure: bool,
-}
-
-impl OverlappingOpts {
-    pub fn new(max_concurrent_items: u8, exit_on_failure: bool) -> Self {
-        Self {
-            max_concurrent_items,
-            exit_on_failure,
-        }
-    }
-}
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub struct SequenceOpts {
-    pub exit_on_failure: bool,
-}
-
-impl Default for SequenceOpts {
-    fn default() -> Self {
-        Self {
-            exit_on_failure: true,
-        }
-    }
-}
-
-impl SequenceOpts {
-    pub fn new(exit_on_failure: bool) -> Self {
-        Self { exit_on_failure }
     }
 }
 
@@ -146,6 +92,11 @@ impl TaskList {
 }
 
 impl TaskList {
+    pub fn as_sqid(&self, parent: u64) -> String {
+        let sqids = sqids::Sqids::default();
+        let sqid = sqids.encode(&[parent]).unwrap();
+        sqid.get(0..6).unwrap_or(&sqid).to_string()
+    }
     pub fn as_tree(&self) -> ArchyNode {
         let label = self.as_tree_label(0);
         let mut first = ArchyNode::new(&label);
@@ -162,95 +113,6 @@ impl TaskList {
         let mut first = ArchyNode::new(&label);
         append_with_reports(&mut first, &self.tasks, hm);
         first
-    }
-}
-
-fn append(archy: &mut ArchyNode, tasks: &[Runnable]) {
-    for (i, x) in tasks.iter().enumerate() {
-        let label = x.as_tree_label(i as u64);
-        match x {
-            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label)),
-            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label)),
-            Runnable::Many(runner) => {
-                let mut next = ArchyNode::new(&label);
-                append(&mut next, &runner.tasks);
-                archy.nodes.push(next);
-            }
-        }
-    }
-}
-
-fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u64, TaskReport>) {
-    for (i, runnable) in tasks.iter().enumerate() {
-        let id = runnable.as_id_with(i as u64);
-        let sqid = runnable.as_sqid(id);
-        let label = match hm.get(&id) {
-            None => format!("− {}", runnable.as_tree_label(i as u64)),
-            Some(report) => {
-                if runnable.is_group() {
-                    runnable.as_tree_label(i as u64)
-                } else {
-                    format!(
-                        "[{sqid}] {} {}",
-                        if report.is_ok() { "✅" } else { "❌" },
-                        runnable.as_tree_label(i as u64)
-                    )
-                }
-            }
-        };
-        match runnable {
-            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label)),
-            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label)),
-            Runnable::Many(runner) => {
-                let mut next = ArchyNode::new(&label);
-                append_with_reports(&mut next, &runner.tasks, hm);
-                archy.nodes.push(next);
-            }
-        }
-    }
-}
-
-impl AsActor for Runnable {
-    fn into_task_recipient(self: Box<Self>) -> Recipient<OneTask> {
-        match *self {
-            Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
-                let s = NotifyServers::new();
-                let s = s.start();
-                s.recipient()
-            }
-            Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent) => {
-                let actor = ExternalEventSender::new();
-                let addr = actor.start();
-                addr.recipient()
-            }
-            Runnable::Sh(sh) => {
-                let s = sh.start();
-                s.recipient()
-            }
-            Runnable::Many(_) => unreachable!("The conversion to Task happens elsewhere"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub enum Runnable {
-    BsLiveTask(BsLiveTask),
-    Sh(ShCmd),
-    Many(TaskList),
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub enum BsLiveTask {
-    NotifyServer,
-    PublishExternalEvent,
-}
-
-impl Display for BsLiveTask {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BsLiveTask::NotifyServer => write!(f, "BsLiveTask::NotifyServer"),
-            BsLiveTask::PublishExternalEvent => write!(f, "BsLiveTask::PublishExternalEvent"),
-        }
     }
 }
 
@@ -329,4 +191,28 @@ impl From<RunOptItem> for Runnable {
 
 pub trait TreeDisplay {
     fn as_tree_label(&self, parent: u64) -> String;
+}
+
+impl From<TaskList> for TaskGroup {
+    fn from(runner: TaskList) -> Self {
+        let top_id = runner.as_id();
+        let boxed_tasks = runner
+            .tasks
+            .into_iter()
+            .enumerate()
+            .map(|(i, x)| -> TaskEntry {
+                let item_id = x.as_id_with(i as u64);
+                match x {
+                    Runnable::Many(runner) => {
+                        TaskEntry::new(Box::new(TaskGroup::from(runner)), item_id)
+                    }
+                    _ => TaskEntry::new(Box::new(x), item_id),
+                }
+            })
+            .collect::<Vec<TaskEntry>>();
+        match runner.run_kind {
+            RunKind::Sequence { opts } => Self::seq(boxed_tasks, opts, top_id),
+            RunKind::Overlapping { opts } => Self::all(boxed_tasks, opts, top_id),
+        }
+    }
 }

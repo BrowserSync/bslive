@@ -7,9 +7,7 @@ use crate::any_watchable::to_any_watchables;
 use crate::monitor_path_watchables::MonitorPathWatchables;
 use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
-use crate::task_group::TaskGroup;
-use crate::task_list::TaskList;
-use crate::task_trigger::{TaskTrigger, TaskTriggerVariant};
+use crate::tasks::task_list::TaskList;
 use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
@@ -25,6 +23,8 @@ use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError}
 use bsnext_fs::{FsEvent, FsEventContext, FsEventGrouping};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::{Input, InputCtx};
+use bsnext_task::task_group::TaskGroup;
+use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use input_monitor::{InputMonitor, MonitorInput};
 use route_watchable::to_route_watchables;
 use server_watchable::to_server_watchables;
@@ -40,7 +40,6 @@ use trigger_task::TriggerTask;
 
 pub mod any_watchable;
 pub mod args;
-pub mod as_actor;
 pub mod cli;
 pub mod export;
 mod external_event_sender;
@@ -54,11 +53,6 @@ mod route_watchable;
 pub mod run;
 pub mod server_watchable;
 pub mod start;
-pub mod task_entry;
-pub mod task_group;
-pub mod task_group_runner;
-pub mod task_list;
-pub mod task_trigger;
 pub mod tasks;
 mod trigger_fs_task;
 mod trigger_task;
@@ -232,7 +226,7 @@ impl BsSystem {
     }
 
     fn before(&mut self, input: &Input) -> (TriggerTask, Receiver<TaskReportAndTree>) {
-        let variant = TaskTriggerVariant::Exec;
+        let variant = TaskTriggerSource::Exec;
         let trigger = TaskTrigger {
             invocation_id: 0,
             comms: self.task_comms(),
@@ -343,18 +337,24 @@ impl Handler<Start> for BsSystem {
                 let input_clone2 = input.clone();
                 let addr = ctx.address();
                 let jobs = setup_jobs(addr, input.clone()).instrument(Span::current());
+                let will_exit = input.servers.is_empty() && input.watchers.is_empty();
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
                         let SetupOk { servers, .. } = res.map_err(StartupError::Any)?;
-                        ctx.notify(MonitorInput {
-                            path: path.clone(),
-                            cwd: actor.cwd.clone().unwrap(),
-                            input_ctx,
-                        });
-                        // todo: where to better sequence these side-effects?
-                        actor.accept_watchables(&input_clone2);
-                        Ok(DidStart::Started(servers))
+                        debug!("✅ setup jobs completed");
+                        if will_exit {
+                            Ok(DidStart::WillExit)
+                        } else {
+                            ctx.notify(MonitorInput {
+                                path: path.clone(),
+                                cwd: actor.cwd.clone().unwrap(),
+                                input_ctx,
+                            });
+                            // todo: where to better sequence these side-effects?
+                            actor.accept_watchables(&input_clone2);
+                            Ok(DidStart::Started(servers))
+                        }
                     },
                 ))
             }

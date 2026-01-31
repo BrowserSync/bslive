@@ -1,9 +1,9 @@
 use crate::input_fs::from_input_path;
 use crate::path_monitor::PathMonitorMeta;
 use crate::path_watchable::PathWatchable;
-use crate::task_group::TaskGroup;
-use crate::task_list::{BsLiveTask, Runnable, TaskList};
-use crate::task_trigger::{TaskComms, TaskTrigger, TaskTriggerVariant};
+use crate::tasks::bs_live_task::BsLiveTask;
+use crate::tasks::task_list::TaskList;
+use crate::tasks::Runnable;
 use crate::trigger_fs_task::TriggerFsTaskEvent;
 use crate::{BsSystem, OverrideInput};
 use actix::AsyncContext;
@@ -16,6 +16,8 @@ use bsnext_fs::{
     PathDescriptionOwned, PathEvent,
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
+use bsnext_task::task_group::TaskGroup;
+use bsnext_task::task_trigger::{TaskComms, TaskTrigger, TaskTriggerSource};
 use tracing::{debug_span, info};
 
 impl actix::Handler<FsEventGrouping> for BsSystem {
@@ -127,7 +129,7 @@ impl BsSystem {
 
         let fs_triggered_task_list = self.task_list_for_fs_event(&change.fs_ctx);
 
-        let variant = TaskTriggerVariant::FsChanges {
+        let variant = TaskTriggerSource::FsChanges {
             changes: paths,
             fs_event_context: change.fs_ctx,
         };
@@ -156,10 +158,7 @@ impl BsSystem {
         else {
             todo!("must have these senders...?");
         };
-        TaskComms::new(
-            any_event_sender.clone(),
-            Some(servers_addr.clone().recipient()),
-        )
+        TaskComms::new(any_event_sender.clone())
     }
 
     fn handle_any_change(

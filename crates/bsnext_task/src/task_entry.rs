@@ -1,5 +1,5 @@
 use crate::as_actor::AsActor;
-use crate::tasks::sh_cmd::OneTask;
+use crate::invocation::Invocation;
 use actix::Recipient;
 use std::fmt::{Display, Formatter};
 
@@ -14,8 +14,8 @@ use std::fmt::{Display, Formatter};
 /// eventually be run as a task.
 #[derive(Debug)]
 pub struct TaskEntry {
-    pub task: Box<dyn AsActor>,
-    pub id: u64,
+    task: Box<dyn AsActor>,
+    id: u64,
 }
 
 impl Display for TaskEntry {
@@ -31,7 +31,7 @@ impl TaskEntry {
 }
 
 impl AsActor for TaskEntry {
-    fn into_task_recipient(self: Box<Self>) -> Recipient<OneTask> {
+    fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
         self.task.into_task_recipient()
     }
 }

@@ -194,6 +194,10 @@ var taskStatusDTOSchema = z.union([
   z.object({
     kind: z.literal("Err"),
     payload: z.string()
+  }),
+  z.object({
+    kind: z.literal("Cancelled"),
+    payload: z.undefined().optional()
   })
 ]);
 var watchingDTOSchema = z.object({

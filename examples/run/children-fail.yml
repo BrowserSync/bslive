@@ -1,0 +1,12 @@
+run:
+  - opts:
+      max: 3
+      exit_on_fail: true
+    all:
+      - sh: "echo 'Start A' && sleep 0.3 && echo 'End A' && sleep 0.3 && exit 1"
+      - seq:
+          - sh: "echo level 2"
+          - seq:
+              - sh: "echo level 3"
+              - seq:
+                  - sh: "echo level 4"

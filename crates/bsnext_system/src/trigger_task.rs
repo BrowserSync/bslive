@@ -1,11 +1,11 @@
-use crate::as_actor::AsActor;
-use crate::task_group::TaskGroup;
-use crate::task_list::TaskList;
-use crate::task_trigger::TaskTrigger;
-use crate::tasks::sh_cmd::OneTask;
+use crate::tasks::task_list::TaskList;
 use crate::BsSystem;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::{TaskActionStage, TaskReport, TaskReportAndTree};
+use bsnext_task::as_actor::AsActor;
+use bsnext_task::invocation::Invocation;
+use bsnext_task::task_group::TaskGroup;
+use bsnext_task::task_trigger::TaskTrigger;
 use std::collections::HashMap;
 
 /// A struct representing a message to trigger a specific task in the system.
@@ -51,7 +51,7 @@ impl Handler<TriggerTask> for BsSystem {
         let done = msg.done;
         let comms = cmd.comms().clone();
         let tree = task_list.as_tree();
-        let trigger = OneTask(task_id, cmd);
+        let trigger = Invocation(task_id, cmd);
         let with_start = async move {
             let _sent = comms
                 .any_event_sender

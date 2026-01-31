@@ -4,3 +4,11 @@ version = "0.22.1"
 edition = "2024"
 
 [dependencies]
+bsnext_dto = { path = "../bsnext_dto" }
+bsnext_fs = { path = "../bsnext_fs" }
+actix = { workspace = true }
+tokio = { workspace = true }
+futures-util = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+sqids = { workspace = true }

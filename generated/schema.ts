@@ -210,6 +210,10 @@ export const taskStatusDTOSchema = z.union([
         kind: z.literal("Err"),
         payload: z.string(),
     }),
+    z.object({
+        kind: z.literal("Cancelled"),
+        payload: z.undefined().optional(),
+    }),
 ]);
 
 export const watchingDTOSchema = z.object({

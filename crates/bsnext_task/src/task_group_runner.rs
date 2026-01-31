@@ -1,7 +1,7 @@
+use crate::RunKind;
 use crate::as_actor::AsActor;
+use crate::invocation::Invocation;
 use crate::task_group::TaskGroup;
-use crate::task_list::RunKind;
-use crate::tasks::sh_cmd::OneTask;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::select;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, trace, Instrument, Span};
+use tracing::{Instrument, Span, debug};
 
 /// Represents a task group runner responsible for managing and executing a set of tasks.
 ///
@@ -49,12 +49,13 @@ impl actix::Actor for TaskGroupRunner {
     }
 }
 
-impl Handler<OneTask> for TaskGroupRunner {
+impl Handler<Invocation> for TaskGroupRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
-    #[tracing::instrument(skip_all, name = "OneTask", fields(id = one.sqid()))]
-    fn handle(&mut self, one: OneTask, _ctx: &mut Self::Context) -> Self::Result {
-        let OneTask(id, trigger) = one;
+    #[tracing::instrument(skip_all, name = "Invocation", fields(id = invocation.sqid()))]
+    fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
+        let sqid = invocation.sqid();
+        let Invocation(id, trigger) = invocation;
         let span = Span::current();
         let gg = Arc::new(span.clone());
         let ggg = gg.clone();
@@ -65,7 +66,15 @@ impl Handler<OneTask> for TaskGroupRunner {
             todo!("how to handle a concurrent request here?");
         };
 
-        tracing::info!(group.len = group.len(), group.kind = ?group.run_kind());
+        let exit_on_failure = group.exit_on_failure();
+
+        dbg!(&sqid);
+        tracing::info!(
+            group.sqid = sqid,
+            group.len = group.len(),
+            group.kind = ?group.run_kind(),
+            group.exit_on_failure = exit_on_failure,
+        );
 
         let expected_len = group.len();
         let future = async move {
@@ -73,11 +82,11 @@ impl Handler<OneTask> for TaskGroupRunner {
             let _e = ggg.enter();
             match group.run_kind() {
                 RunKind::Sequence { opts } => {
-                    let exit_on_failure = opts.exit_on_failure;
                     for (index, group_item) in group.tasks().into_iter().enumerate() {
                         let id = group_item.id();
                         let boxed_actor = Box::new(group_item).into_task_recipient();
-                        let one_task = OneTask(id, trigger.clone());
+                        let one_task = Invocation(id, trigger.clone());
+                        let sqid = one_task.sqid();
 
                         match boxed_actor.send(one_task).await {
                             Ok(result) => {
@@ -88,7 +97,9 @@ impl Handler<OneTask> for TaskGroupRunner {
                                         "index {index} completed, will move to next text in seq"
                                     );
                                 } else if exit_on_failure {
-                                    debug!("❌ stopping after index {index} id: {id} ran, because it did not complete successfully.");
+                                    debug!(
+                                        "❌ stopping after index {index} sqid: {sqid} ran, because it did not complete successfully."
+                                    );
                                     break;
                                 } else {
                                     debug!("continuing after failure, because of config");
@@ -119,7 +130,7 @@ impl Handler<OneTask> for TaskGroupRunner {
                         let actor = Box::new(as_actor).into_task_recipient();
                         let jh = tokio::spawn({
                             let semaphore = sem.clone();
-                            let one_task = OneTask(id, trigger.clone());
+                            let one_task = Invocation(id, trigger.clone());
                             async move {
                                 if child_token.is_cancelled() {
                                     let v = TaskResult::cancelled();
@@ -197,12 +208,18 @@ impl Handler<OneTask> for TaskGroupRunner {
                 .map(Clone::clone)
                 .collect::<Vec<_>>();
 
-            debug!(result.all_good = all_good, result.all_ran = all_ran);
+            debug!(
+                result.sqid = sqid,
+                result.all_good = all_good,
+                result.all_ran = all_ran,
+                result.exit_on_failure = exit_on_failure
+            );
 
-            match (all_ran, all_good) {
-                (true, true) => TaskResult::ok_tasks(InvocationId(0), reports),
-                (true, false) => TaskResult::err_tasks(InvocationId(0), failed_only, reports),
-                (false, _) => TaskResult::err_partial_tasks(
+            match (all_ran, all_good, exit_on_failure) {
+                (true, true, _) => TaskResult::ok_tasks(InvocationId(0), reports),
+                (true, false, true) => TaskResult::err_tasks(InvocationId(0), failed_only, reports),
+                (true, false, false) => TaskResult::ok_tasks(InvocationId(0), reports),
+                (false, _, _) => TaskResult::err_partial_tasks(
                     InvocationId(0),
                     reports,
                     ExpectedLen(expected_len),

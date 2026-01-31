@@ -18,8 +18,10 @@ bsnext_fs_helpers = { path = "../bsnext_fs_helpers" }
 bsnext_dto = { path = "../bsnext_dto" }
 bsnext_example = { path = "../bsnext_example" }
 bsnext_output = { path = "../bsnext_output" }
+bsnext_task = { path = "../bsnext_task" }
 rand = "0.8.5"
 kill_tree = { workspace = true }
+sqids = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
@@ -32,8 +34,6 @@ tempfile = { workspace = true }
 globset = { workspace = true }
 futures-util = { workspace = true }
 futures = "0.3.30"
-tokio-util = "0.7.11"
-sqids = "0.4.2"
 
 [dev-dependencies]
 insta = { workspace = true }

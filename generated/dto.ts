@@ -171,7 +171,8 @@ export interface TaskActionDTO {
 
 export type TaskStatusDTO = 
 	| { kind: "Ok", payload?: undefined }
-	| { kind: "Err", payload: string };
+	| { kind: "Err", payload: string }
+	| { kind: "Cancelled", payload?: undefined };
 
 export interface TaskResultDTO {
 	status: TaskStatusDTO;

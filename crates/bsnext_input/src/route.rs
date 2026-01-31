@@ -430,7 +430,17 @@ impl RunAll {
 )]
 pub struct RunAllOpts {
     pub max: u8,
+    #[serde(default)]
     pub exit_on_fail: bool,
+}
+
+impl RunAllOpts {
+    pub fn max(max: u8) -> Self {
+        Self {
+            max,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for RunAllOpts {
