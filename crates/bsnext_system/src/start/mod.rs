@@ -4,9 +4,11 @@ use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_output::stdout::StdoutTarget;
 use bsnext_output::OutputWriters;
 use std::future::Future;
+use std::os::unix::process::parent_id;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
+use tracing::{trace_span, Instrument};
 
 pub mod start_command;
 pub mod start_kind;
@@ -19,7 +21,7 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
         let stderr = &mut std::io::stderr();
         let mut sink = StdoutTarget::new(stdout, stderr);
         while let Some(evt) = events_receiver.recv().await {
-            tracing::trace!(?evt);
+            tracing::trace!(parent: None, ?evt, "stdout_channel recv()");
             let result = match evt {
                 AnyEvent::Internal(int) => writer.write_evt(&int, &mut sink.output()),
                 AnyEvent::External(ext) => writer.write_evt(&ext, &mut sink.output()),

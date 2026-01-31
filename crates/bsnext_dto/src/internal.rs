@@ -85,6 +85,7 @@ impl From<TaskResult> for TaskResultDTO {
             status: match value.status {
                 TaskStatus::Ok(_) => TaskStatusDTO::Ok,
                 TaskStatus::Err(e) => TaskStatusDTO::Err(e.to_string()),
+                TaskStatus::Cancelled => TaskStatusDTO::Cancelled,
             },
             task_reports: value
                 .task_reports
@@ -204,6 +205,7 @@ pub enum PatchError {
 #[derive(Debug, Clone)]
 pub enum TaskStatus {
     Ok(TaskOk),
+    Cancelled,
     Err(TaskError),
 }
 
@@ -260,11 +262,22 @@ pub struct TaskResult {
     pub task_reports: Vec<TaskReport>,
 }
 
+impl TaskResult {
+    pub fn cancelled() -> Self {
+        Self {
+            task_reports: vec![],
+            status: TaskStatus::Cancelled,
+            invocation_id: InvocationId(0),
+        }
+    }
+}
+
 impl Display for TaskResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.status {
             TaskStatus::Ok(_s) => write!(f, "✅"),
             TaskStatus::Err(err) => write!(f, "❌, {err}"),
+            TaskStatus::Cancelled => write!(f, "[cancelled]"),
         }
     }
 }
@@ -299,12 +312,6 @@ impl TaskResult {
             status: TaskStatus::Ok(TaskOk),
             invocation_id: id,
             task_reports: vec![],
-        }
-    }
-    pub fn err(&self) -> Option<&TaskError> {
-        match &self.status {
-            TaskStatus::Ok(_) => None,
-            TaskStatus::Err(e) => Some(e),
         }
     }
     pub fn is_ok(&self) -> bool {

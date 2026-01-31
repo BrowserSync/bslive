@@ -1,0 +1,7 @@
+run:
+  - all:
+      - sh: "echo 'starting failing task' && sleep 1 && exit 1"
+      - sh: "node examples/graceful-exit.js"
+    opts:
+      exit_on_fail: true
+      max: 10

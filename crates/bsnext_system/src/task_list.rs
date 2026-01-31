@@ -68,12 +68,14 @@ pub enum RunKind {
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct OverlappingOpts {
     pub max_concurrent_items: u8,
+    pub exit_on_failure: bool,
 }
 
 impl OverlappingOpts {
-    pub fn new(max_concurrent_items: u8) -> Self {
+    pub fn new(max_concurrent_items: u8, exit_on_failure: bool) -> Self {
         Self {
             max_concurrent_items,
+            exit_on_failure,
         }
     }
 }
@@ -298,6 +300,7 @@ impl From<&RunOptItem> for Runnable {
                 let items: Vec<_> = all.iter().map(Runnable::from).collect();
                 let opts = OverlappingOpts {
                     max_concurrent_items: run_all_opts.max,
+                    exit_on_failure: run_all_opts.exit_on_fail,
                 };
                 Self::Many(TaskList::all(&items, opts))
             }

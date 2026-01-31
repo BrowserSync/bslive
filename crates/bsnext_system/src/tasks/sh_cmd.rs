@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tracing::{Instrument, Span};
 
 pub const DEFAULT_TERMINAL_OUTPUT_PREFIX: &str = "[run]";
 
@@ -149,13 +150,24 @@ impl actix::Actor for ShCmd {
 #[rtype(result = "TaskResult")]
 pub struct OneTask(pub u64, pub TaskTrigger);
 
+impl OneTask {
+    pub fn sqid(&self) -> String {
+        let sqids = sqids::Sqids::default();
+        sqids
+            .encode(&[self.0])
+            .unwrap_or_else(|_| self.0.to_string())
+    }
+}
+
 impl actix::Handler<OneTask> for ShCmd {
     type Result = ResponseFuture<TaskResult>;
 
-    fn handle(&mut self, OneTask(id, trigger): OneTask, _ctx: &mut Self::Context) -> Self::Result {
+    #[tracing::instrument(skip_all, name = "ShCmd", fields(id=one.sqid()))]
+    fn handle(&mut self, one: OneTask, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = self.sh.clone();
+        let OneTask(id, trigger) = one;
         let cmd = cmd.to_os_string();
-        tracing::debug!(?id, "ShCmd: Will run... {:?}", cmd);
+        tracing::debug!("Will run... {:?}", cmd);
         let any_event_sender = trigger.comms().any_event_sender.clone();
         let any_event_sender2 = trigger.comms().any_event_sender.clone();
         let reason = match &trigger.variant {
@@ -222,7 +234,7 @@ impl actix::Handler<OneTask> for ShCmd {
                         Err(_) => tracing::error!("could not send stdout line"),
                     }
                 }
-            });
+            }.instrument(Span::current()));
             let h2 = tokio::spawn(async move {
                 while let Ok(Some(line)) = stderr_reader.next_line().await {
                     match any_event_sender2
@@ -233,19 +245,19 @@ impl actix::Handler<OneTask> for ShCmd {
                         )))
                         .await
                     {
-                        Ok(_) => tracing::trace!("did forward stdout line"),
-                        Err(_) => tracing::error!("could not send stdout line"),
+                        Ok(_) => tracing::trace!("did forward stderr line"),
+                        Err(_) => tracing::error!("could not send stderr line"),
                     }
                 }
-            });
+            }.instrument(Span::current()));
 
-            let timeout = tokio::time::sleep(max_duration);
+            let deadline = tokio::time::sleep(max_duration);
 
-            tokio::pin!(timeout);
+            tokio::pin!(deadline);
             let invocation_id = 0;
 
             let result: TaskResult = tokio::select! {
-                _ = &mut timeout => {
+                _ = &mut deadline => {
                     tracing::info!("⌛️ operation timed out");
                     TaskResult::timeout(InvocationId(invocation_id))
                 }
@@ -281,7 +293,7 @@ impl actix::Handler<OneTask> for ShCmd {
             tracing::debug!("✅ Run (+cleanup) complete");
 
             result
-        };
+        }.instrument(Span::current());
         Box::pin(fut)
     }
 }

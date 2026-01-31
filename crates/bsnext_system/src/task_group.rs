@@ -30,8 +30,8 @@ impl From<TaskList> for TaskGroup {
                 let item_id = x.as_id_with(i as u64);
                 match x {
                     Runnable::Many(runner) => TaskEntry {
-                        task: Box::new(TaskGroup::from(runner)),
                         id: item_id,
+                        task: Box::new(TaskGroup::from(runner)),
                     },
                     _ => TaskEntry {
                         id: item_id,

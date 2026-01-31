@@ -2,12 +2,14 @@ use crate::as_actor::AsActor;
 use crate::task_group::TaskGroup;
 use crate::task_list::RunKind;
 use crate::tasks::sh_cmd::OneTask;
-use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
+use actix::{ActorFutureExt, Handler, MailboxError, ResponseActFuture, Running, WrapFuture};
 use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
 use std::sync::Arc;
+use tokio::select;
 use tokio::sync::Semaphore;
-use tracing::{debug, Span};
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, trace, Span};
 
 /// Represents a task group runner responsible for managing and executing a set of tasks.
 ///
@@ -36,22 +38,23 @@ impl actix::Actor for TaskGroupRunner {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!(actor.lifecycle = "started", "TaskGroupRunner")
+        tracing::trace!(actor.name = "TaskGroupRunner", actor.lifecycle = "started")
     }
     fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        tracing::trace!(" ⏰ stopping TaskGroupRunner {}", self.done);
+        tracing::trace!(actor.name = "TaskGroupRunner", " ⏰ stopping {}", self.done);
         Running::Stop
     }
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!(" x stopped TaskGroupRunner")
+        tracing::trace!(actor.name = "TaskGroupRunner", " x stopped")
     }
 }
 
 impl Handler<OneTask> for TaskGroupRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
-    #[tracing::instrument(skip_all, name = "Handler->TaskCommand->TaskGroupRunner")]
-    fn handle(&mut self, OneTask(id, trigger): OneTask, _ctx: &mut Self::Context) -> Self::Result {
+    #[tracing::instrument(skip_all, name = "OneTask", fields(id = one.sqid()))]
+    fn handle(&mut self, one: OneTask, _ctx: &mut Self::Context) -> Self::Result {
+        let OneTask(id, trigger) = one;
         let span = Span::current();
         let gg = Arc::new(span.clone());
         let ggg = gg.clone();
@@ -62,8 +65,8 @@ impl Handler<OneTask> for TaskGroupRunner {
             todo!("how to handle a concurrent request here?");
         };
 
-        debug!("  └── {} tasks in group id: {id}", group.len());
-        debug!("  └── {:?} group run_kind", group.run_kind());
+        debug!(group.len = group.len(), "  └── tasks in group");
+        debug!(group.kind = ?group.run_kind(), "  └── group run_kind");
 
         let expected_len = group.len();
         let future = async move {
@@ -97,22 +100,59 @@ impl Handler<OneTask> for TaskGroupRunner {
                     }
                 }
                 RunKind::Overlapping { opts } => {
+                    #[derive(Clone, Copy)]
+                    enum CancelOthers {
+                        True,
+                        False,
+                    };
+                    let fail_early = if opts.exit_on_failure {
+                        CancelOthers::True
+                    } else {
+                        CancelOthers::False
+                    };
+                    let token = CancellationToken::new();
                     let sem = Arc::new(Semaphore::new(opts.max_concurrent_items as usize));
                     let mut jhs = Vec::new();
                     for (index, as_actor) in group.tasks().into_iter().enumerate() {
+                        let parent_token = token.clone();
+                        let child_token = parent_token.child_token();
                         let id = as_actor.id();
                         let actor = Box::new(as_actor).into_task_recipient();
                         let jh = tokio::spawn({
                             let semaphore = sem.clone();
                             let one_task = OneTask(id, trigger.clone());
                             async move {
+                                if child_token.is_cancelled() {
+                                    let v = TaskResult::cancelled();
+                                    return (index, id, Ok::<_, _>(v));
+                                };
                                 let _permit = semaphore.acquire().await.unwrap();
                                 let msg_response = actor
                                     .send(one_task)
-                                    .map(move |task_result| (index, id, task_result))
-                                    .await;
+                                    .map(move |task_result| (index, id, task_result));
+                                let output = select! {
+                                    result = msg_response => {
+                                        match (&result, fail_early) {
+                                            ((_, _, Ok(res)), CancelOthers::True) if !res.is_ok() => {
+                                                debug!("cancelling group because CancelOthers::True");
+                                                parent_token.cancel();
+                                            }
+                                            ((_, _, Ok(res)), CancelOthers::False) if !res.is_ok() => {
+                                                debug!("NOT cancelling group because CancelOthers::False");
+                                            }
+                                            _ => {
+                                                todo!("how does this occur?")
+                                            }
+                                        }
+                                        result
+                                    }
+                                    _ = child_token.cancelled() => {
+                                        let v = TaskResult::cancelled();
+                                        (index, id, Ok::<_, _>(v))
+                                    }
+                                };
                                 drop(_permit);
-                                msg_response
+                                output
                             }
                         });
                         jhs.push(jh);

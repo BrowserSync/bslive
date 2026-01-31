@@ -70,6 +70,7 @@ pub struct TaskResultDTO {
 pub enum TaskStatusDTO {
     Ok,
     Err(String),
+    Cancelled,
 }
 
 #[typeshare]

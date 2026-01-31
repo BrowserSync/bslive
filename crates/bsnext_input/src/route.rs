@@ -430,11 +430,15 @@ impl RunAll {
 )]
 pub struct RunAllOpts {
     pub max: u8,
+    pub exit_on_fail: bool,
 }
 
 impl Default for RunAllOpts {
     fn default() -> Self {
-        Self { max: 5 }
+        Self {
+            max: 5,
+            exit_on_fail: false,
+        }
     }
 }
 
