@@ -206,9 +206,17 @@ pub fn print_input_file_changed<W: Write>(w: &mut W, evt: &FileChangedDTO) -> an
 pub fn print_stdout_line<W: Write>(w: &mut W, line: &StdoutLineDTO) -> anyhow::Result<()> {
     match &line.prefix {
         None => writeln!(w, "{}", line.line)?,
-        Some(prefix) => writeln!(w, "\x1b[2m{}\x1b[0m {}", prefix, line.line)?,
+        Some(prefix) => {
+            let color = hash(&prefix) % 256;
+            writeln!(w, "\x1b[38;5;{}m{}\x1b[0m {}", color, prefix, line.line)?
+        }
     }
     Ok(())
+}
+
+fn hash(s: &str) -> u32 {
+    s.bytes()
+        .fold(0u32, |acc, b| acc.wrapping_add(b as u32).wrapping_mul(31))
 }
 
 pub fn print_stderr_line<W: Write>(w: &mut W, line: &StderrLineDTO) -> anyhow::Result<()> {

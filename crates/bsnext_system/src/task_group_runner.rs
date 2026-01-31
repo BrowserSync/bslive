@@ -2,7 +2,7 @@ use crate::as_actor::AsActor;
 use crate::task_group::TaskGroup;
 use crate::task_list::RunKind;
 use crate::tasks::sh_cmd::OneTask;
-use actix::{ActorFutureExt, Handler, MailboxError, ResponseActFuture, Running, WrapFuture};
+use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
 use std::sync::Arc;
@@ -140,8 +140,11 @@ impl Handler<OneTask> for TaskGroupRunner {
                                             ((_, _, Ok(res)), CancelOthers::False) if !res.is_ok() => {
                                                 debug!("NOT cancelling group because CancelOthers::False");
                                             }
-                                            _ => {
-                                                todo!("how does this occur?")
+                                            ((_, _, Ok(res)), _) => {
+                                                debug!("doing nothing {:?}", res);
+                                            }
+                                            ((_, _, Err(e)), _a) => {
+                                                todo!("how does this occur? {:?}", e)
                                             }
                                         }
                                         result

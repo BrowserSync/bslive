@@ -90,11 +90,11 @@ impl ShCmd {
         self.name.as_ref().map(ToOwned::to_owned)
     }
 
-    pub fn prefix(&self) -> Option<String> {
+    pub fn prefix(&self, sqid: String) -> Option<String> {
         match &self.output {
             ShCmdOutput::None => None,
             ShCmdOutput::DefaultNamed => match &self.name {
-                None => Some(DEFAULT_TERMINAL_OUTPUT_PREFIX.to_string()),
+                None => Some(format!("[{}]", sqid.get(0..6).unwrap_or(&sqid))),
                 Some(sn_name) => Some(sn_name.clone()),
             },
             ShCmdOutput::CustomNamed(name) => Some(name.clone()),
@@ -183,7 +183,8 @@ impl actix::Handler<OneTask> for ShCmd {
 
     #[tracing::instrument(skip_all, name = "ShCmd", fields(id=one.sqid()))]
     fn handle(&mut self, one: OneTask, _ctx: &mut Self::Context) -> Self::Result {
-        self.id = Some(one.sqid());
+        let sqid = one.sqid();
+        self.id = Some(sqid.clone());
         let cmd = self.sh.clone();
         let OneTask(id, trigger) = one;
         let cmd = cmd.to_os_string();
@@ -205,7 +206,7 @@ impl actix::Handler<OneTask> for ShCmd {
             TaskTriggerVariant::Exec { .. } => "NONE".to_string(),
         };
 
-        let sh_prefix = Arc::new(self.prefix());
+        let sh_prefix = Arc::new(self.prefix(sqid));
         let sh_prefix_2 = sh_prefix.clone();
         let max_duration = self.timeout.duration().to_owned();
 

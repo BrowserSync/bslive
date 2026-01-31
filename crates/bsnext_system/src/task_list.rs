@@ -183,6 +183,7 @@ fn append(archy: &mut ArchyNode, tasks: &[Runnable]) {
 fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u64, TaskReport>) {
     for (i, runnable) in tasks.iter().enumerate() {
         let id = runnable.as_id_with(i as u64);
+        let sqid = runnable.as_sqid(id);
         let label = match hm.get(&id) {
             None => format!("− {}", runnable.as_tree_label(i as u64)),
             Some(report) => {
@@ -190,7 +191,7 @@ fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u
                     runnable.as_tree_label(i as u64)
                 } else {
                     format!(
-                        "{} {}",
+                        "[{sqid}] {} {}",
                         if report.is_ok() { "✅" } else { "❌" },
                         runnable.as_tree_label(i as u64)
                     )
@@ -271,6 +272,11 @@ impl Runnable {
         self.hash(&mut hasher);
         parent.hash(&mut hasher);
         hasher.finish()
+    }
+    pub fn as_sqid(&self, id: u64) -> String {
+        let sqids = sqids::Sqids::default();
+        let sqid = sqids.encode(&[id]).unwrap_or_else(|_| id.to_string());
+        sqid.get(0..6).map(String::from).unwrap_or(sqid)
     }
 }
 

@@ -1,7 +1,15 @@
 run:
   - all:
-      - sh: "echo 'starting failing task' && sleep 1 && exit 1"
+      - sh: "echo 'starting failing task' && sleep 2 && exit 1"
       - sh: "node examples/graceful-exit.js"
+      - sh: |
+          #!/bin/bash
+            i=0
+            while true; do
+            echo $i
+            ((i++))
+            sleep 1
+          done
     opts:
       exit_on_fail: true
       max: 10
