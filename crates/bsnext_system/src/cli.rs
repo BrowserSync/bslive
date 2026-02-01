@@ -49,7 +49,7 @@ where
         line_opts,
     );
 
-    tracing::debug!("{:#?}", args);
+    tracing::debug!("{:?}", args);
 
     let format_clone = format;
 

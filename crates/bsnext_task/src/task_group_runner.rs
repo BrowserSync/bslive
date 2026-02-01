@@ -55,7 +55,7 @@ impl Handler<Invocation> for TaskGroupRunner {
     #[tracing::instrument(skip_all, name = "Invocation", fields(id = invocation.sqid()))]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
-        let Invocation(id, trigger) = invocation;
+        let Invocation(_id, trigger) = invocation;
         let span = Span::current();
         let gg = Arc::new(span.clone());
         let ggg = gg.clone();
@@ -68,7 +68,6 @@ impl Handler<Invocation> for TaskGroupRunner {
 
         let exit_on_failure = group.exit_on_failure();
 
-        dbg!(&sqid);
         tracing::info!(
             group.sqid = sqid,
             group.len = group.len(),
@@ -81,7 +80,7 @@ impl Handler<Invocation> for TaskGroupRunner {
             let mut done: Vec<(usize, TaskReport)> = vec![];
             let _e = ggg.enter();
             match group.run_kind() {
-                RunKind::Sequence { opts } => {
+                RunKind::Sequence { opts: _ } => {
                     for (index, group_item) in group.tasks().into_iter().enumerate() {
                         let id = group_item.id();
                         let boxed_actor = Box::new(group_item).into_task_recipient();
@@ -114,7 +113,7 @@ impl Handler<Invocation> for TaskGroupRunner {
                     enum CancelOthers {
                         True,
                         False,
-                    };
+                    }
                     let fail_early = if opts.exit_on_failure {
                         CancelOthers::True
                     } else {

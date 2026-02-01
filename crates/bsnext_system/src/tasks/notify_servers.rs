@@ -1,15 +1,17 @@
-use actix::{Actor, Handler, ResponseFuture};
+use actix::{Actor, Addr, Handler, ResponseFuture};
+use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_dto::internal::{InvocationId, TaskResult};
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_trigger::TaskTriggerSource;
 
-#[derive(Default)]
-pub struct NotifyServers {}
+pub struct NotifyServers {
+    addr: Addr<ServersSupervisor>,
+}
 
 impl NotifyServers {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(addr: Addr<ServersSupervisor>) -> Self {
+        Self { addr }
     }
 }
 
@@ -34,24 +36,35 @@ impl Handler<Invocation> for NotifyServers {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         tracing::debug!("NotifyServers::TaskCommand");
-        let comms = trigger.comms();
-        todo!("NotifyServers::TaskCommand");
-        // let Some(sender) = comms.servers_recip.clone() else {
-        //     todo!("cannot get here?")
-        // };
-        // match trigger.variant {
-        //     TaskTriggerSource::FsChanges {
-        //         changes,
-        //         fs_event_context,
-        //         ..
-        //     } => sender.do_send(FilesChanged {
-        //         paths: changes.clone(),
-        //         ctx: fs_event_context,
-        //     }),
-        //     TaskTriggerSource::Exec { .. } => {
-        //         todo!("I cannot accept this")
-        //     }
-        // }
+        let addr = self.addr.clone();
+        match trigger.variant {
+            TaskTriggerSource::FsChanges {
+                changes,
+                fs_event_context,
+                ..
+            } => addr.do_send(FilesChanged {
+                paths: changes.clone(),
+                ctx: fs_event_context,
+            }),
+            TaskTriggerSource::Exec { .. } => {
+                todo!("I cannot accept this")
+            }
+        }
+        Box::pin(async { TaskResult::ok(InvocationId(0)) })
+    }
+}
+
+pub struct NotifyServersNoOp;
+impl Actor for NotifyServersNoOp {
+    type Context = actix::Context<Self>;
+}
+impl Handler<Invocation> for NotifyServersNoOp {
+    type Result = ResponseFuture<TaskResult>;
+    fn handle(
+        &mut self,
+        Invocation(_id, _trigger): Invocation,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
         Box::pin(async { TaskResult::ok(InvocationId(0)) })
     }
 }

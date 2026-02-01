@@ -1,11 +1,11 @@
 use actix::{Actor, ActorFutureExt, Recipient, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
-use bsnext_system::task_trigger::{TaskComms, TaskTrigger, TaskTriggerSource};
-use bsnext_system::tasks::invocation::Invocation;
 use bsnext_task::as_actor::AsActor;
+use bsnext_task::invocation::Invocation;
 use bsnext_task::task_entry::TaskEntry;
 use bsnext_task::task_group::TaskGroup;
 use bsnext_task::task_group_runner::TaskGroupRunner;
+use bsnext_task::task_trigger::{TaskComms, TaskTrigger, TaskTriggerSource};
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
@@ -40,7 +40,6 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
             fs_event_context: Default::default(),
         },
         comms: TaskComms {
-            servers_recip: None,
             any_event_sender: tx,
         },
         invocation_id: 0,

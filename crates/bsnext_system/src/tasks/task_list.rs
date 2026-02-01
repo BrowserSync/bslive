@@ -1,9 +1,9 @@
-use crate::tasks::bs_live_task::BsLiveTask;
-use crate::tasks::sh_cmd::ShCmd;
-use crate::tasks::{append, append_with_reports, Runnable};
+use crate::tasks::{append, append_with_reports, Comms, Runnable, RunnableWithComms};
+use actix::Addr;
+use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
 use bsnext_dto::internal::TaskReport;
-use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
+use bsnext_input::route::RunOptItem;
 use bsnext_task::task_entry::TaskEntry;
 use bsnext_task::task_group::TaskGroup;
 use bsnext_task::{OverlappingOpts, RunKind, SequenceOpts};
@@ -116,32 +116,6 @@ impl TaskList {
     }
 }
 
-impl Runnable {
-    pub fn is_group(&self) -> bool {
-        match self {
-            Runnable::BsLiveTask(_) => false,
-            Runnable::Sh(_) => false,
-            Runnable::Many(_) => true,
-        }
-    }
-    pub fn as_id(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        hasher.finish()
-    }
-    pub fn as_id_with(&self, parent: u64) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        parent.hash(&mut hasher);
-        hasher.finish()
-    }
-    pub fn as_sqid(&self, id: u64) -> String {
-        let sqids = sqids::Sqids::default();
-        let sqid = sqids.encode(&[id]).unwrap_or_else(|_| id.to_string());
-        sqid.get(0..6).map(String::from).unwrap_or(sqid)
-    }
-}
-
 impl TreeDisplay for Runnable {
     fn as_tree_label(&self, parent: u64) -> String {
         let id = self.as_id_with(parent);
@@ -153,66 +127,39 @@ impl TreeDisplay for Runnable {
     }
 }
 
-impl From<&RunOptItem> for Runnable {
-    fn from(value: &RunOptItem) -> Self {
-        match value {
-            RunOptItem::BsLive { bslive } => match bslive {
-                BsLiveRunner::NotifyServer => Self::BsLiveTask(BsLiveTask::NotifyServer),
-                BsLiveRunner::PublishExternalEvent => {
-                    Self::BsLiveTask(BsLiveTask::PublishExternalEvent)
-                }
-            },
-            RunOptItem::Sh(sh) => Self::Sh(ShCmd::from(sh)),
-            RunOptItem::ShImplicit(sh) => Self::Sh(ShCmd::new(sh.into())),
-            RunOptItem::All(RunAll { all, run_all_opts }) => {
-                let items: Vec<_> = all.iter().map(Runnable::from).collect();
-                let opts = OverlappingOpts {
-                    max_concurrent_items: run_all_opts.max,
-                    exit_on_failure: run_all_opts.exit_on_fail,
-                };
-                Self::Many(TaskList::all(&items, opts))
-            }
-            RunOptItem::Seq(RunSeq { seq, seq_opts }) => {
-                let items: Vec<_> = seq.iter().map(Runnable::from).collect();
-                let opts = SequenceOpts {
-                    exit_on_failure: seq_opts.exit_on_fail,
-                };
-                Self::Many(TaskList::seq_opts(&items, opts))
-            }
-        }
-    }
-}
-
-impl From<RunOptItem> for Runnable {
-    fn from(value: RunOptItem) -> Self {
-        Runnable::from(&value)
-    }
-}
-
 pub trait TreeDisplay {
     fn as_tree_label(&self, parent: u64) -> String;
 }
 
-impl From<TaskList> for TaskGroup {
-    fn from(runner: TaskList) -> Self {
-        let top_id = runner.as_id();
-        let boxed_tasks = runner
+impl TaskList {
+    pub fn to_task_group(self, servers_addr: Option<Addr<ServersSupervisor>>) -> TaskGroup {
+        let top_id = self.as_id();
+        let boxed_tasks = self
             .tasks
             .into_iter()
             .enumerate()
             .map(|(i, x)| -> TaskEntry {
                 let item_id = x.as_id_with(i as u64);
                 match x {
-                    Runnable::Many(runner) => {
-                        TaskEntry::new(Box::new(TaskGroup::from(runner)), item_id)
+                    Runnable::Many(runner) => TaskEntry::new(
+                        Box::new(runner.to_task_group(servers_addr.clone())),
+                        item_id,
+                    ),
+                    _ => {
+                        let with_ctx = RunnableWithComms {
+                            ctx: Comms {
+                                servers_addr: servers_addr.clone(),
+                            },
+                            runnable: x,
+                        };
+                        TaskEntry::new(Box::new(with_ctx), item_id)
                     }
-                    _ => TaskEntry::new(Box::new(x), item_id),
                 }
             })
             .collect::<Vec<TaskEntry>>();
-        match runner.run_kind {
-            RunKind::Sequence { opts } => Self::seq(boxed_tasks, opts, top_id),
-            RunKind::Overlapping { opts } => Self::all(boxed_tasks, opts, top_id),
+        match self.run_kind {
+            RunKind::Sequence { opts } => TaskGroup::seq(boxed_tasks, opts, top_id),
+            RunKind::Overlapping { opts } => TaskGroup::all(boxed_tasks, opts, top_id),
         }
     }
 }

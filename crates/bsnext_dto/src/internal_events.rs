@@ -1,4 +1,3 @@
-use crate::archy::{archy, Prefix};
 use crate::internal::{
     ChildResult, InternalEvents, InternalEventsDTO, TaskAction, TaskActionStage,
 };
@@ -30,11 +29,11 @@ impl OutputWriterTrait for InternalEvents {
                     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             }
             InternalEvents::TaskAction(TaskAction { stage: action, .. }) => match action {
-                TaskActionStage::Started { tree } => {
+                TaskActionStage::Started { tree: _ } => {
                     // writeln!(sink, "{}", serde_json::to_string(&action)?)
                     //     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
                 }
-                TaskActionStage::Ended { report, .. } => {
+                TaskActionStage::Ended { report: _, .. } => {
                     // let s = archy(tree, Prefix::None);
                     // write!(sink, "{s}")?;
                     // let as_json = InternalEventsDTO::TaskReport {
@@ -75,11 +74,13 @@ impl OutputWriterTrait for InternalEvents {
                 writeln!(sink, "{err}")?;
             }
             InternalEvents::TaskAction(TaskAction { stage: action, .. }) => match action {
-                TaskActionStage::Started { tree } => {
+                TaskActionStage::Started { tree: _ } => {
                     // let s = archy(tree, Prefix::None);
                     // write!(sink, "{s}")?;
                 }
-                TaskActionStage::Ended { tree, report, .. } => {
+                TaskActionStage::Ended {
+                    tree: _, report: _, ..
+                } => {
                     // let s = archy(tree, Prefix::None);
                     // write!(sink, "{s}")?;
                 }

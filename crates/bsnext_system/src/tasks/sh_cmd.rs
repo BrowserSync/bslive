@@ -149,7 +149,7 @@ impl Deref for Cmd {
 impl actix::Actor for ShCmd {
     type Context = actix::Context<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(
             sqid = self.id,
             actor.name = "ShCmd",
@@ -157,7 +157,7 @@ impl actix::Actor for ShCmd {
         );
     }
 
-    fn stopped(&mut self, ctx: &mut Self::Context) {
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(
             sqid = self.id,
             actor.name = "ShCmd",

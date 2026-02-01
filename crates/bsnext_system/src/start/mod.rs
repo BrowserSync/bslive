@@ -4,11 +4,9 @@ use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_output::stdout::StdoutTarget;
 use bsnext_output::OutputWriters;
 use std::future::Future;
-use std::os::unix::process::parent_id;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use tracing::{trace_span, Instrument};
 
 pub mod start_command;
 pub mod start_kind;

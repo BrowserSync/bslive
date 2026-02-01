@@ -1,14 +1,18 @@
 use crate::external_event_sender::ExternalEventSender;
-use crate::tasks::notify_servers::NotifyServers;
+use crate::tasks::notify_servers::{NotifyServers, NotifyServersNoOp};
 use crate::tasks::sh_cmd::ShCmd;
 use crate::tasks::task_list::{TaskList, TreeDisplay};
-use actix::{Actor, Recipient};
+use actix::{Actor, Addr, Recipient};
 use bs_live_task::BsLiveTask;
+use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
 use bsnext_dto::internal::TaskReport;
+use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
+use bsnext_task::{OverlappingOpts, SequenceOpts};
 use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub mod bs_live_task;
 pub mod notify_servers;
@@ -22,14 +26,32 @@ pub enum Runnable {
     Many(TaskList),
 }
 
-impl AsActor for Runnable {
+#[derive(Debug)]
+pub struct RunnableWithComms {
+    runnable: Runnable,
+    ctx: Comms,
+}
+
+#[derive(Debug, Clone)]
+pub struct Comms {
+    servers_addr: Option<Addr<ServersSupervisor>>,
+}
+
+impl AsActor for RunnableWithComms {
     fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
-        match *self {
-            Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
-                let s = NotifyServers::new();
-                let s = s.start();
-                s.recipient()
-            }
+        match self.runnable {
+            Runnable::BsLiveTask(BsLiveTask::NotifyServer) => match self.ctx.servers_addr {
+                None => {
+                    let s = NotifyServersNoOp;
+                    let s = s.start();
+                    s.recipient()
+                }
+                Some(addr) => {
+                    let s = NotifyServers::new(addr.clone());
+                    let s = s.start();
+                    s.recipient()
+                }
+            },
             Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent) => {
                 let actor = ExternalEventSender::new();
                 let addr = actor.start();
@@ -86,5 +108,67 @@ fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u
                 archy.nodes.push(next);
             }
         }
+    }
+}
+
+impl Runnable {
+    pub fn is_group(&self) -> bool {
+        match self {
+            Runnable::BsLiveTask(_) => false,
+            Runnable::Sh(_) => false,
+            Runnable::Many(_) => true,
+        }
+    }
+    pub fn as_id(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
+    pub fn as_id_with(&self, parent: u64) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        parent.hash(&mut hasher);
+        hasher.finish()
+    }
+    pub fn as_sqid(&self, id: u64) -> String {
+        let sqids = sqids::Sqids::default();
+        let sqid = sqids.encode(&[id]).unwrap_or_else(|_| id.to_string());
+        sqid.get(0..6).map(String::from).unwrap_or(sqid)
+    }
+}
+
+impl From<&RunOptItem> for Runnable {
+    fn from(value: &RunOptItem) -> Self {
+        match value {
+            RunOptItem::BsLive { bslive } => match bslive {
+                BsLiveRunner::NotifyServer => Self::BsLiveTask(BsLiveTask::NotifyServer),
+                BsLiveRunner::PublishExternalEvent => {
+                    Self::BsLiveTask(BsLiveTask::PublishExternalEvent)
+                }
+            },
+            RunOptItem::Sh(sh) => Self::Sh(ShCmd::from(sh)),
+            RunOptItem::ShImplicit(sh) => Self::Sh(ShCmd::new(sh.into())),
+            RunOptItem::All(RunAll { all, run_all_opts }) => {
+                let items: Vec<_> = all.iter().map(Runnable::from).collect();
+                let opts = OverlappingOpts {
+                    max_concurrent_items: run_all_opts.max,
+                    exit_on_failure: run_all_opts.exit_on_fail,
+                };
+                Self::Many(TaskList::all(&items, opts))
+            }
+            RunOptItem::Seq(RunSeq { seq, seq_opts }) => {
+                let items: Vec<_> = seq.iter().map(Runnable::from).collect();
+                let opts = SequenceOpts {
+                    exit_on_failure: seq_opts.exit_on_fail,
+                };
+                Self::Many(TaskList::seq_opts(&items, opts))
+            }
+        }
+    }
+}
+
+impl From<RunOptItem> for Runnable {
+    fn from(value: RunOptItem) -> Self {
+        Runnable::from(&value)
     }
 }

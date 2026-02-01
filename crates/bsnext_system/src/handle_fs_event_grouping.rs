@@ -146,16 +146,16 @@ impl BsSystem {
         // println!("{as_str}");
 
         Some((
-            TaskGroup::from(fs_triggered_task_list.clone()),
+            fs_triggered_task_list
+                .clone()
+                .to_task_group(self.servers_addr.clone()),
             task_trigger,
             fs_triggered_task_list,
         ))
     }
 
     pub fn task_comms(&mut self) -> TaskComms {
-        let (Some(any_event_sender), Some(servers_addr)) =
-            (&self.any_event_sender, &self.servers_addr)
-        else {
+        let Some(any_event_sender) = &self.any_event_sender else {
             todo!("must have these senders...?");
         };
         TaskComms::new(any_event_sender.clone())

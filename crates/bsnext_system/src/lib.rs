@@ -23,7 +23,6 @@ use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError}
 use bsnext_fs::{FsEvent, FsEventContext, FsEventGrouping};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::{Input, InputCtx};
-use bsnext_task::task_group::TaskGroup;
 use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use input_monitor::{InputMonitor, MonitorInput};
 use route_watchable::to_route_watchables;
@@ -236,7 +235,7 @@ impl BsSystem {
         let all = input.before_run_opts();
         debug!("{} before tasks to execute", all.len());
         let task_list = TaskList::seq_from(&all);
-        let task_group = TaskGroup::from(task_list.clone());
+        let task_group = task_list.clone().to_task_group(None);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
         (TriggerTask::new(task_group, trigger, task_list, tx), rx)
     }

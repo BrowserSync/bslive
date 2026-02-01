@@ -230,15 +230,19 @@ pub fn print_stderr_line<W: Write>(w: &mut W, line: &StderrLineDTO) -> anyhow::R
 pub fn print_task_action<W: Write>(w: &mut W, action_dto: &TaskActionDTO) -> anyhow::Result<()> {
     // let id = action_dto.id;
     match &action_dto.stage {
-        TaskActionStageDTO::Started { tree } => {
+        TaskActionStageDTO::Started { tree: _ } => {
             // configure if we announce starts?
             // let s = archy(tree, Prefix::None);
             // write!(w, "{s}")?;
         }
-        TaskActionStageDTO::Ended { report, tree } => {
-            let s = archy(tree, Prefix::None);
-            write!(w, "{s}")?;
-        }
+        TaskActionStageDTO::Ended { report, tree } => match report.result.status {
+            TaskStatusDTO::Ok => {}
+            TaskStatusDTO::Err(_) => {
+                let s = archy(tree, Prefix::None);
+                write!(w, "{s}")?;
+            }
+            TaskStatusDTO::Cancelled => {}
+        },
         TaskActionStageDTO::Error => {}
     }
     Ok(())
