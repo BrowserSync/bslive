@@ -8,7 +8,7 @@ use tokio::sync::mpsc::Sender;
 #[rtype(result = "TaskResult")]
 pub struct TaskTrigger {
     pub variant: TaskTriggerSource,
-    pub comms: TaskComms,
+    comms: TaskComms,
     pub invocation_id: u64,
 }
 
@@ -22,6 +22,13 @@ pub enum TaskTriggerSource {
 }
 
 impl TaskTrigger {
+    pub fn new(variant: TaskTriggerSource, comms: TaskComms, invocation_id: u64) -> Self {
+        Self {
+            variant,
+            comms,
+            invocation_id,
+        }
+    }
     pub fn comms(&self) -> &TaskComms {
         &self.comms
     }

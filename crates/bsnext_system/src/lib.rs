@@ -225,18 +225,18 @@ impl BsSystem {
     }
 
     fn before(&mut self, input: &Input) -> (InvokeScope, Receiver<TaskReportAndTree>) {
-        let trigger = TaskTrigger {
-            invocation_id: 0,
-            comms: self.task_comms(),
-            variant: TaskTriggerSource::Exec,
-        };
+        let comms = self.task_comms();
+        let trigger = TaskTrigger::new(TaskTriggerSource::Exec, comms.clone(), 0);
 
         let all = input.before_run_opts();
         debug!("{} before tasks to execute", all.len());
         let task_list = TaskSpec::seq_from(&all);
         let task_group = task_list.clone().to_task_group(None);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
-        (InvokeScope::new(task_group, trigger, task_list, tx), rx)
+        (
+            InvokeScope::new(task_group, trigger, task_list, comms, tx),
+            rx,
+        )
     }
 }
 

@@ -6,7 +6,7 @@ use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_scope_runner::TaskScopeRunner;
-use bsnext_task::task_trigger::TaskTrigger;
+use bsnext_task::task_trigger::{TaskComms, TaskTrigger};
 use std::collections::HashMap;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -21,6 +21,7 @@ use tokio_stream::wrappers::ReceiverStream;
 pub struct InvokeScope {
     pub task_scope: TaskScope,
     pub task_spec: TaskSpec,
+    pub comms: TaskComms,
     pub task_trigger: TaskTrigger,
     /// A one-shot sender channel to signal the completion of the task processing and provide the resulting task report and its tree structure.
     pub done: tokio::sync::oneshot::Sender<TaskReportAndTree>,
@@ -31,12 +32,14 @@ impl InvokeScope {
         task_group: TaskScope,
         task_trigger: TaskTrigger,
         task_spec: TaskSpec,
+        comms: TaskComms,
         done: tokio::sync::oneshot::Sender<TaskReportAndTree>,
     ) -> Self {
         Self {
             task_scope: task_group,
             task_trigger,
             task_spec,
+            comms,
             done,
         }
     }

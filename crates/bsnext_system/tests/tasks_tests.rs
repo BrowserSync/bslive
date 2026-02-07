@@ -34,17 +34,15 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
     let addr = task_group_runner.start();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
-    let trigger = TaskTrigger {
-        variant: TaskTriggerSource::FsChanges {
-            changes: vec![],
-            fs_event_context: Default::default(),
-        },
-        comms: TaskComms {
-            any_event_sender: tx,
-        },
-        invocation_id: 0,
+    let variant = TaskTriggerSource::FsChanges {
+        changes: vec![],
+        fs_event_context: Default::default(),
+    };
+    let comms = TaskComms {
+        any_event_sender: tx,
     };
     let id = 0;
+    let trigger = TaskTrigger::new(variant, comms, id);
     let one_task = Invocation(0, trigger);
 
     let task_result = addr.send(one_task).await.unwrap();
