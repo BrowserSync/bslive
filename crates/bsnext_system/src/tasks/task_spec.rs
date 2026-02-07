@@ -1,4 +1,4 @@
-use crate::tasks::{append, append_with_reports, Comms, Index, Runnable, RunnableWithComms};
+use crate::tasks::{append_with_reports, Comms, Index, Runnable, RunnableWithComms};
 use crate::BsSystem;
 use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
@@ -97,7 +97,8 @@ impl TaskSpec {
     pub fn as_tree(&self) -> ArchyNode {
         let label = self.as_tree_label(Index(0));
         let mut first = ArchyNode::new(&label);
-        append(&mut first, &self.tasks);
+        let empty = HashMap::default();
+        append_with_reports(&mut first, &self.tasks, &empty);
         first
     }
     pub fn as_tree_with_results(&self, hm: &HashMap<u64, TaskReport>) -> ArchyNode {

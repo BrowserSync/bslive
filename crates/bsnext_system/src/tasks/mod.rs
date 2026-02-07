@@ -73,26 +73,11 @@ impl AsActor for RunnableWithComms {
     }
 }
 
-fn append(archy: &mut ArchyNode, tasks: &[Runnable]) {
-    for (position_index, runnable) in tasks.iter().enumerate() {
-        let label = runnable.as_tree_label(Index(position_index as u64));
-        match runnable {
-            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label)),
-            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label)),
-            Runnable::Many(runner) => {
-                let mut next = ArchyNode::new(&label);
-                append(&mut next, &runner.tasks);
-                archy.nodes.push(next);
-            }
-        }
-    }
-}
-
 fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u64, TaskReport>) {
     for (index_position, runnable) in tasks.iter().enumerate() {
         let id = runnable.as_id_with(Index(index_position as u64));
         let sqid = runnable.as_sqid(id);
-        let label = match hm.get(&id) {
+        let label_with_id = match hm.get(&id) {
             None => format!(
                 "[{sqid}] − {}",
                 runnable.as_tree_label(Index(index_position as u64))
@@ -109,11 +94,25 @@ fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u
                 }
             }
         };
+        let raw_label = match hm.get(&id) {
+            None => format!("{}", runnable.as_tree_label(Index(index_position as u64))),
+            Some(report) => {
+                if runnable.is_group() {
+                    runnable.as_tree_label(Index(index_position as u64))
+                } else {
+                    format!(
+                        "{} {}",
+                        if report.is_ok() { "✅" } else { "❌" },
+                        runnable.as_tree_label(Index(index_position as u64))
+                    )
+                }
+            }
+        };
         match runnable {
-            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label)),
-            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label)),
+            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
+            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
             Runnable::Many(runner) => {
-                let mut next = ArchyNode::new(&label);
+                let mut next = ArchyNode::new(&raw_label);
                 append_with_reports(&mut next, &runner.tasks, hm);
                 archy.nodes.push(next);
             }

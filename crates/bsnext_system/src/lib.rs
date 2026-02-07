@@ -15,6 +15,7 @@ use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, Servers
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
+use bsnext_dto::archy::{archy, Prefix};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{
     AnyEvent, ChildResult, InitialTaskError, InternalEvents, ServerError, TaskReportAndTree,
@@ -232,6 +233,11 @@ impl BsSystem {
         let comms = self.task_comms();
         let all = input.before_run_opts();
         let task_spec = TaskSpec::seq_from(&all);
+
+        todo!("decide when to print this?");
+        // let tree = task_spec.as_tree();
+        // let next = archy(&tree, Prefix::None);
+        // print!("{next}");
 
         let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
 

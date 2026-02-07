@@ -37,17 +37,11 @@ impl RunCommand {
         {
             let span = tracing::debug_span!("adding sh_commands commands from cli");
             let _enter = span.enter();
-            let len = self.sh_commands.len();
             for (index, sh) in self.sh_commands.iter().enumerate() {
                 tracing::info!(index = index, sh = sh);
-                let named = if len == 1 {
-                    "[sh]".to_string()
-                } else {
-                    format!("[sh: {index}]")
-                };
                 list_of_commands.push(RunOptItem::Sh(ShRunOptItem {
                     sh: sh.clone(),
-                    name: Some(named),
+                    name: None,
                     prefix: None,
                 }));
             }
@@ -55,17 +49,11 @@ impl RunCommand {
         {
             let span = tracing::debug_span!("adding sh_commands commands from cli");
             let _enter = span.enter();
-            let len = self.sh_commands_implicit.len();
             for (index, sh) in self.sh_commands_implicit.iter().enumerate() {
                 tracing::info!(index = index, sh = sh);
-                let named = if len == 1 {
-                    "[sh-trailing]".to_string()
-                } else {
-                    format!("[sh-trailing: {index}]")
-                };
                 list_of_commands.push(RunOptItem::Sh(ShRunOptItem {
                     sh: sh.clone(),
-                    name: Some(named),
+                    name: None,
                     prefix: None,
                 }));
             }
