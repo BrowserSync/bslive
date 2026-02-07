@@ -16,21 +16,21 @@ use tracing::{Instrument, Span, debug};
 
 /// Represents a task group runner responsible for managing and executing a set of tasks.
 ///
-/// The `TaskGroupRunner` struct is used to handle task groups and their execution lifecycle.
-/// It maintains the state of execution and the associated `TaskGroup`.
+/// The `TaskScopeRunner` struct is used to handle task groups and their execution lifecycle.
+/// It maintains the state of execution and the associated `TaskScope`.
 ///
 /// # Fields
 ///
 /// * `done` - A boolean flag indicating whether the task group has finished execution.
-/// * `task_group` - An `Option` containing the `TaskGroup` instance that this runner manages.
+/// * `task_scope` - An `Option` containing the `TaskScope` instance that this runner manages.
 pub struct TaskScopeRunner {
     task_scope: Option<TaskScope>,
 }
 
 impl TaskScopeRunner {
-    pub fn new(task_group: TaskScope) -> Self {
+    pub fn new(task_scope: TaskScope) -> Self {
         Self {
-            task_scope: Some(task_group),
+            task_scope: Some(task_scope),
         }
     }
 }
@@ -39,14 +39,14 @@ impl actix::Actor for TaskScopeRunner {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!(actor.name = "TaskGroupRunner", actor.lifecycle = "started")
+        tracing::trace!(actor.name = "TaskScopeRunner", actor.lifecycle = "started")
     }
     fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        tracing::trace!(actor.name = "TaskGroupRunner", " ⏰ stopping");
+        tracing::trace!(actor.name = "TaskScopeRunner", " ⏰ stopping");
         Running::Stop
     }
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!(actor.name = "TaskGroupRunner", " x stopped")
+        tracing::trace!(actor.name = "TaskScopeRunner", " x stopped")
     }
 }
 

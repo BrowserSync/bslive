@@ -9,7 +9,7 @@ pub struct ServerWatchable {
     pub server_identity: ServerIdentity,
     pub dirs: Vec<PathBuf>,
     pub spec: Spec,
-    pub task_list: Option<TaskSpec>,
+    pub task_spec: Option<TaskSpec>,
 }
 
 pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
@@ -18,14 +18,14 @@ pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
         .iter()
         .flat_map(|server_config| {
             server_config.watchers.iter().map(|watcher| {
-                let task_list = watcher.opts.as_ref().and_then(to_task_list);
+                let task_spec = watcher.opts.as_ref().and_then(to_task_spec);
                 let path_bufs = watcher.dirs.as_pathbufs();
 
                 ServerWatchable {
                     server_identity: server_config.identity.clone(),
                     dirs: path_bufs,
                     spec: watcher.opts.clone().unwrap_or_default(),
-                    task_list,
+                    task_spec,
                 }
             })
         })
@@ -37,7 +37,7 @@ pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
 ///  
 /// Creates a runner that executes tasks strictly one after another to match user
 /// expectations when defining task lists in declarative formats (yaml/json).
-pub fn to_task_list(spec: &Spec) -> Option<TaskSpec> {
+pub fn to_task_spec(spec: &Spec) -> Option<TaskSpec> {
     // if the 'run' key was given, it's a list of steps.
     let run = spec.run.as_ref()?;
 

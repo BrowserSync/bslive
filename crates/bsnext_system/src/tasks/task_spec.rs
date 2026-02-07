@@ -117,9 +117,9 @@ impl TreeDisplay for Runnable {
         match self {
             Runnable::BsLiveTask(item) => format!("{}{}", "Runnable::BsLiveTask", item),
             Runnable::Sh(sh) => format!("{} {}", "Runnable::Sh", sh),
-            Runnable::Many(task_list) => {
+            Runnable::Many(task_spec) => {
                 let id = self.as_id_with(index);
-                task_list.as_tree_label(Index(id))
+                task_spec.as_tree_label(Index(id))
             }
         }
     }
@@ -130,7 +130,7 @@ pub trait TreeDisplay {
 }
 
 impl TaskSpec {
-    pub fn to_task_group(self, servers_addr: Option<Addr<ServersSupervisor>>) -> TaskScope {
+    pub fn to_task_scope(self, servers_addr: Option<Addr<ServersSupervisor>>) -> TaskScope {
         let parent_id = self.as_id();
         let inner_tasks = self
             .tasks
@@ -139,8 +139,8 @@ impl TaskSpec {
             .map(|(index_position, runnable)| -> TaskEntry {
                 let item_id = runnable.as_id_with(Index(index_position as u64));
                 match runnable {
-                    Runnable::Many(runner) => TaskEntry::new(
-                        Box::new(runner.to_task_group(servers_addr.clone())),
+                    Runnable::Many(task_spec) => TaskEntry::new(
+                        Box::new(task_spec.to_task_scope(servers_addr.clone())),
                         item_id,
                     ),
                     _ => {

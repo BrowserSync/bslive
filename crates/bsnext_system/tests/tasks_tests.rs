@@ -12,7 +12,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 #[actix_rt::test]
-async fn test_task_group_runner() -> anyhow::Result<()> {
+async fn test_task_scope_runner() -> anyhow::Result<()> {
     let tasks: Vec<_> = vec![
         TaskEntry::new(
             mock_f(async {
@@ -29,9 +29,9 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
             2,
         ),
     ];
-    let task_group = TaskScope::seq(tasks, Default::default(), 0);
-    let task_group_runner = TaskScopeRunner::new(task_group);
-    let addr = task_group_runner.start();
+    let task_scope = TaskScope::seq(tasks, Default::default(), 0);
+    let task_scope_runner = TaskScopeRunner::new(task_scope);
+    let addr = task_scope_runner.start();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
     let variant = TaskTriggerSource::FsChanges {

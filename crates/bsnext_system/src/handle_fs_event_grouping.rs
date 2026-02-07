@@ -29,9 +29,9 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
         let next = match msg {
             FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event),
             FsEventGrouping::BufferedChange(buff) => {
-                if let Some((task_group, task_trigger, task_list)) = self.handle_buffered(buff) {
+                if let Some((task_scope, task_trigger, task_spec)) = self.handle_buffered(buff) {
                     tracing::debug!("will trigger task runner");
-                    ctx.notify(TriggerFsTaskEvent::new(task_group, task_trigger, task_list));
+                    ctx.notify(TriggerFsTaskEvent::new(task_scope, task_trigger, task_spec));
                 }
                 None
             }
@@ -127,7 +127,7 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let fs_triggered_task_list = self.task_list_for_fs_event(&change.fs_ctx);
+        let fs_triggered_task_spec = self.task_spec_for_fs_event(&change.fs_ctx);
 
         let variant = TaskTriggerSource::FsChanges {
             changes: paths,
@@ -136,18 +136,12 @@ impl BsSystem {
 
         let task_trigger = TaskTrigger::new(variant, 0);
 
-        // todo: use this example as a way to display a dry-run scenario
-        // let tree = fs_triggered_task_list.as_tree();
-        // let as_str = archy(&tree, None);
-        // println!("upcoming-->");
-        // println!("{as_str}");
-
         Some((
-            fs_triggered_task_list
+            fs_triggered_task_spec
                 .clone()
-                .to_task_group(self.servers_addr.clone()),
+                .to_task_scope(self.servers_addr.clone()),
             task_trigger,
-            fs_triggered_task_list,
+            fs_triggered_task_spec,
         ))
     }
 
@@ -231,7 +225,7 @@ impl BsSystem {
     }
 
     #[tracing::instrument(skip_all)]
-    fn task_list_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskSpec {
+    fn task_spec_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskSpec {
         let Some(path_watchable) = self.path_watchable(fs_event_ctx) else {
             tracing::error!("did not find a matching monitor");
             return TaskSpec::seq(&[]);
@@ -240,11 +234,11 @@ impl BsSystem {
         info!("matching monitor, path_watchable: {}", path_watchable);
         info!("matching fs_event_ctx: {:?}", fs_event_ctx);
 
-        let custom_task_list = path_watchable.task_list();
-        if custom_task_list.is_none() {
+        let custom_task_spec = path_watchable.task_spec();
+        if custom_task_spec.is_none() {
             info!("no custom tasks given, NotifyServer + ExtEvent will be defaults");
         }
-        custom_task_list.map(ToOwned::to_owned).unwrap_or_else(|| {
+        custom_task_spec.map(ToOwned::to_owned).unwrap_or_else(|| {
             TaskSpec::seq(&[
                 Runnable::BsLiveTask(BsLiveTask::NotifyServer),
                 Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent),

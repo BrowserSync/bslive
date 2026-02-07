@@ -66,11 +66,11 @@ impl PathWatchable {
         hasher.finish()
     }
 
-    pub fn task_list(&self) -> Option<&TaskSpec> {
+    pub fn task_spec(&self) -> Option<&TaskSpec> {
         match self {
-            PathWatchable::Server(server) => server.task_list.as_ref(),
-            PathWatchable::Route(route) => route.task_list.as_ref(),
-            PathWatchable::Any(any) => any.task_list.as_ref(),
+            PathWatchable::Server(server) => server.task_spec.as_ref(),
+            PathWatchable::Route(route) => route.task_spec.as_ref(),
+            PathWatchable::Any(any) => any.task_spec.as_ref(),
         }
     }
 }

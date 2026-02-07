@@ -64,7 +64,7 @@ pub(crate) struct BsSystem {
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
-    task_list_mapping: HashMap<FsEventContext, TaskSpec>,
+    task_spec_mapping: HashMap<FsEventContext, TaskSpec>,
     cwd: Option<PathBuf>,
     start_context: Option<StartupContext>,
 }
@@ -131,7 +131,7 @@ impl BsSystem {
             any_event_sender: None,
             input_monitors: None,
             any_monitors: Default::default(),
-            task_list_mapping: Default::default(),
+            task_spec_mapping: Default::default(),
             cwd: None,
             start_context: None,
         }
@@ -230,11 +230,11 @@ impl BsSystem {
 
         let all = input.before_run_opts();
         debug!("{} before tasks to execute", all.len());
-        let task_list = TaskSpec::seq_from(&all);
-        let task_group = task_list.clone().to_task_group(None);
+        let task_spec = TaskSpec::seq_from(&all);
+        let task_scope = task_spec.clone().to_task_scope(None);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
         (
-            InvokeScope::new(task_group, trigger, task_list, comms, tx),
+            InvokeScope::new(task_scope, trigger, task_spec, comms, tx),
             rx,
         )
     }

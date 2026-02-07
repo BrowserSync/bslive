@@ -5,7 +5,6 @@ use bsnext_dto::internal::{TaskActionStage, TaskReport, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_scope::TaskScope;
-use bsnext_task::task_scope_runner::TaskScopeRunner;
 use bsnext_task::task_trigger::{TaskComms, TaskTrigger};
 use std::collections::HashMap;
 use tokio_stream::wrappers::ReceiverStream;
@@ -29,14 +28,14 @@ pub struct InvokeScope {
 
 impl InvokeScope {
     pub fn new(
-        task_group: TaskScope,
+        task_scope: TaskScope,
         task_trigger: TaskTrigger,
         task_spec: TaskSpec,
         comms: TaskComms,
         done: tokio::sync::oneshot::Sender<TaskReportAndTree>,
     ) -> Self {
         Self {
-            task_scope: task_group,
+            task_scope,
             task_trigger,
             task_spec,
             comms,
@@ -54,9 +53,9 @@ struct InsertOutputStream {
 
 impl actix::Handler<InsertOutputStream> for BsSystem {
     type Result = ();
-    fn handle(&mut self, msg: InsertOutputStream, ctx: &mut Self::Context) -> Self::Result {
-        let InsertOutputStream { id, rx } = msg;
-        let stream = ReceiverStream::new(rx);
+    fn handle(&mut self, msg: InsertOutputStream, _ctx: &mut Self::Context) -> Self::Result {
+        let InsertOutputStream { id: _, rx } = msg;
+        let _stream = ReceiverStream::new(rx);
         // <Self as StreamHandler<String>>::add_stream(stream, ctx);
         // dbg!("got it?");
         // self.channels.insert(id, tx);
@@ -68,13 +67,13 @@ impl Handler<InvokeScope> for BsSystem {
 
     fn handle(&mut self, msg: InvokeScope, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.task_trigger;
-        let task_list = msg.task_spec;
-        let task_id = task_list.as_id();
+        let task_spec = msg.task_spec;
+        let task_id = task_spec.as_id();
 
         let top_level_scope = Box::new(msg.task_scope).into_task_recipient();
         let done = msg.done;
         let comms = msg.comms.clone();
-        let tree = task_list.as_tree();
+        let tree = task_spec.as_tree();
         let invocation = Invocation {
             id: task_id,
             trigger: cmd,
@@ -95,7 +94,7 @@ impl Handler<InvokeScope> for BsSystem {
                     let mut e = HashMap::new();
                     every_report(&mut e, &report);
 
-                    let tree = task_list.as_tree_with_results(&e);
+                    let tree = task_spec.as_tree_with_results(&e);
                     let report_and_tree = TaskReportAndTree {
                         report: report.clone(),
                         tree: tree.clone(),
