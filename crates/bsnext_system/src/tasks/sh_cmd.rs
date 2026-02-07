@@ -174,7 +174,7 @@ impl actix::Handler<Invocation> for ShCmd {
         let sqid = invocation.sqid();
         self.id = Some(sqid.clone());
         let cmd = self.sh.clone();
-        let Invocation { id, trigger } = invocation;
+        let Invocation { id, trigger, .. } = invocation;
         let cmd = cmd.to_os_string();
         tracing::info!("Will run... {:?}", cmd);
         // let any_event_sender = comms.any_event_sender.clone();

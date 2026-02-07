@@ -64,10 +64,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
 
         let trigger_recipient = Box::new(msg.task_scope).into_task_recipient();
         // let comms = self.task_comms();
-        let one_task = Invocation {
-            id: task_id,
-            trigger,
-        };
+        let one_task = Invocation::new(task_id, trigger);
 
         Box::pin(
             trigger_recipient

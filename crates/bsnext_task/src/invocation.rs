@@ -1,5 +1,6 @@
 use crate::task_report::TaskResult;
 use crate::task_trigger::TaskTrigger;
+use std::fmt::Debug;
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "TaskResult")]

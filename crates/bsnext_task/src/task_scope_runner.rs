@@ -88,10 +88,7 @@ impl Handler<Invocation> for TaskScopeRunner {
                         let (tx, rx) = tokio::sync::mpsc::channel::<String>(100);
 
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
-                        let one_task = Invocation {
-                            id,
-                            trigger: trigger.clone(),
-                        };
+                        let one_task = Invocation::new(id, trigger.clone());
                         let sqid = one_task.sqid();
 
                         match boxed_actor.send(one_task).await {
@@ -136,10 +133,7 @@ impl Handler<Invocation> for TaskScopeRunner {
                         let actor = Box::new(as_actor).into_task_recipient();
                         let jh = tokio::spawn({
                             let semaphore = sem.clone();
-                            let one_task = Invocation {
-                                id,
-                                trigger: trigger.clone(),
-                            };
+                            let one_task = Invocation::new(id, trigger.clone());
                             async move {
                                 if child_token.is_cancelled() {
                                     let v = TaskResult::cancelled();

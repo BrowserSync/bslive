@@ -72,7 +72,7 @@ impl Handler<InvokeScope> for BsSystem {
     type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, msg: InvokeScope, _ctx: &mut Self::Context) -> Self::Result {
-        let cmd = msg.task_trigger;
+        let task_trigger = msg.task_trigger;
         let task_spec = msg.task_spec;
         let task_id = task_spec.as_id();
 
@@ -80,10 +80,7 @@ impl Handler<InvokeScope> for BsSystem {
         let done = msg.done;
         let comms = msg.comms.clone();
         let tree = task_spec.as_tree();
-        let invocation = Invocation {
-            id: task_id,
-            trigger: cmd,
-        };
+        let invocation = Invocation::new(task_id, task_trigger);
         let with_start = async move {
             let _sent = comms
                 .any_event_sender

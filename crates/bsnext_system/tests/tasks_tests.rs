@@ -45,7 +45,7 @@ async fn test_task_scope_runner() -> anyhow::Result<()> {
     let id = 0;
     let trigger = TaskTrigger::new(variant, id);
 
-    let one_task = Invocation { id: 0, trigger };
+    let one_task = Invocation::new(0, trigger);
 
     let task_result = addr.send(one_task).await.unwrap();
     let _evt = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await;
