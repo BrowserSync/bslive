@@ -7,7 +7,7 @@ use crate::any_watchable::to_any_watchables;
 use crate::monitor_path_watchables::MonitorPathWatchables;
 use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
-use crate::tasks::task_list::TaskList;
+use crate::tasks::task_spec::TaskSpec;
 use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
@@ -64,7 +64,7 @@ pub(crate) struct BsSystem {
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
-    task_list_mapping: HashMap<FsEventContext, TaskList>,
+    task_list_mapping: HashMap<FsEventContext, TaskSpec>,
     cwd: Option<PathBuf>,
     start_context: Option<StartupContext>,
 }
@@ -225,16 +225,15 @@ impl BsSystem {
     }
 
     fn before(&mut self, input: &Input) -> (TriggerTask, Receiver<TaskReportAndTree>) {
-        let variant = TaskTriggerSource::Exec;
         let trigger = TaskTrigger {
             invocation_id: 0,
             comms: self.task_comms(),
-            variant: variant,
+            variant: TaskTriggerSource::Exec,
         };
 
         let all = input.before_run_opts();
         debug!("{} before tasks to execute", all.len());
-        let task_list = TaskList::seq_from(&all);
+        let task_list = TaskSpec::seq_from(&all);
         let task_group = task_list.clone().to_task_group(None);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
         (TriggerTask::new(task_group, trigger, task_list, tx), rx)

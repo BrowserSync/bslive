@@ -1,10 +1,10 @@
-use crate::tasks::task_list::TaskList;
+use crate::tasks::task_spec::TaskSpec;
 use crate::BsSystem;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::{TaskActionStage, TaskReport, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::task_group::TaskGroup;
+use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::TaskTrigger;
 use std::collections::HashMap;
 
@@ -17,8 +17,8 @@ use std::collections::HashMap;
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
 pub struct TriggerTask {
-    pub task_group: TaskGroup,
-    pub task_list: TaskList,
+    pub task_group: TaskScope,
+    pub task_list: TaskSpec,
     pub task_trigger: TaskTrigger,
     /// A one-shot sender channel to signal the completion of the task processing and provide the resulting task report and its tree structure.
     pub done: tokio::sync::oneshot::Sender<TaskReportAndTree>,
@@ -26,9 +26,9 @@ pub struct TriggerTask {
 
 impl TriggerTask {
     pub fn new(
-        task_group: TaskGroup,
+        task_group: TaskScope,
         task_trigger: TaskTrigger,
-        task_list: TaskList,
+        task_list: TaskSpec,
         done: tokio::sync::oneshot::Sender<TaskReportAndTree>,
     ) -> Self {
         Self {
@@ -47,6 +47,7 @@ impl Handler<TriggerTask> for BsSystem {
         let cmd = msg.task_trigger;
         let task_list = msg.task_list;
         let task_id = task_list.as_id();
+
         let cmd_recipient = Box::new(msg.task_group).into_task_recipient();
         let done = msg.done;
         let comms = cmd.comms().clone();

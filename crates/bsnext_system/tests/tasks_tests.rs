@@ -3,8 +3,8 @@ use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_entry::TaskEntry;
-use bsnext_task::task_group::TaskGroup;
-use bsnext_task::task_group_runner::TaskGroupRunner;
+use bsnext_task::task_scope::TaskScope;
+use bsnext_task::task_scope_runner::TaskScopeRunner;
 use bsnext_task::task_trigger::{TaskComms, TaskTrigger, TaskTriggerSource};
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
@@ -29,8 +29,8 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
             2,
         ),
     ];
-    let task_group = TaskGroup::seq(tasks, Default::default(), 0);
-    let task_group_runner = TaskGroupRunner::new(task_group);
+    let task_group = TaskScope::seq(tasks, Default::default(), 0);
+    let task_group_runner = TaskScopeRunner::new(task_group);
     let addr = task_group_runner.start();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);

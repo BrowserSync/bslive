@@ -1,4 +1,4 @@
-use crate::tasks::task_list::TaskList;
+use crate::tasks::task_spec::TaskSpec;
 use crate::trigger_task::every_report;
 use crate::BsSystem;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
@@ -6,20 +6,20 @@ use bsnext_dto::internal::TaskActionStage;
 use bsnext_fs::FsEventContext;
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::task_group::TaskGroup;
+use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use std::collections::HashMap;
 
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
 pub struct TriggerFsTaskEvent {
-    task_group: TaskGroup,
+    task_group: TaskScope,
     task_trigger: TaskTrigger,
-    task_list: TaskList,
+    task_list: TaskSpec,
 }
 
 impl TriggerFsTaskEvent {
-    pub fn new(task_group: TaskGroup, task_trigger: TaskTrigger, task_list: TaskList) -> Self {
+    pub fn new(task_group: TaskScope, task_trigger: TaskTrigger, task_list: TaskSpec) -> Self {
         Self {
             task_group,
             task_trigger,
@@ -60,6 +60,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
         self.task_list_mapping
             .insert(*fs_ctx, msg.task_list.to_owned());
         let task_id = msg.task_list.as_id();
+
         let trigger_recipient = Box::new(msg.task_group).into_task_recipient();
         let one_task = Invocation(task_id, trigger);
 
@@ -70,12 +71,12 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
                 .map(move |resp, actor, _ctx| {
                     let runner = actor.task_list_mapping.get(&cloned_id);
                     match (resp, runner) {
-                        (Ok(result), Some(runner)) => {
+                        (Ok(result), Some(task_list)) => {
                             let report = result.to_report(task_id);
                             let mut e = HashMap::new();
                             every_report(&mut e, &report);
 
-                            let tree = runner.as_tree_with_results(&e);
+                            let tree = task_list.as_tree_with_results(&e);
                             actor.publish_any_event(TaskActionStage::complete(
                                 task_id, tree, report,
                             ));

@@ -1,7 +1,7 @@
 use crate::external_event_sender::ExternalEventSender;
 use crate::tasks::notify_servers::{NotifyServers, NotifyServersNoOp};
 use crate::tasks::sh_cmd::ShCmd;
-use crate::tasks::task_list::{TaskList, TreeDisplay};
+use crate::tasks::task_spec::{TaskSpec, TreeDisplay};
 use actix::{Actor, Addr, Recipient};
 use bs_live_task::BsLiveTask;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
@@ -17,13 +17,13 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 pub mod bs_live_task;
 pub mod notify_servers;
 pub mod sh_cmd;
-pub mod task_list;
+pub mod task_spec;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum Runnable {
     BsLiveTask(BsLiveTask),
     Sh(ShCmd),
-    Many(TaskList),
+    Many(TaskSpec),
 }
 
 #[derive(Debug)]
@@ -67,9 +67,9 @@ impl AsActor for RunnableWithComms {
 }
 
 fn append(archy: &mut ArchyNode, tasks: &[Runnable]) {
-    for (i, x) in tasks.iter().enumerate() {
-        let label = x.as_tree_label(i as u64);
-        match x {
+    for (position_index, runnable) in tasks.iter().enumerate() {
+        let label = runnable.as_tree_label(Index(position_index as u64));
+        match runnable {
             Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label)),
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label)),
             Runnable::Many(runner) => {
@@ -82,19 +82,22 @@ fn append(archy: &mut ArchyNode, tasks: &[Runnable]) {
 }
 
 fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u64, TaskReport>) {
-    for (i, runnable) in tasks.iter().enumerate() {
-        let id = runnable.as_id_with(i as u64);
+    for (index_position, runnable) in tasks.iter().enumerate() {
+        let id = runnable.as_id_with(Index(index_position as u64));
         let sqid = runnable.as_sqid(id);
         let label = match hm.get(&id) {
-            None => format!("[{sqid}] − {}", runnable.as_tree_label(i as u64)),
+            None => format!(
+                "[{sqid}] − {}",
+                runnable.as_tree_label(Index(index_position as u64))
+            ),
             Some(report) => {
                 if runnable.is_group() {
-                    runnable.as_tree_label(i as u64)
+                    runnable.as_tree_label(Index(index_position as u64))
                 } else {
                     format!(
                         "[{sqid}] {} {}",
                         if report.is_ok() { "✅" } else { "❌" },
-                        runnable.as_tree_label(i as u64)
+                        runnable.as_tree_label(Index(index_position as u64))
                     )
                 }
             }
@@ -124,10 +127,10 @@ impl Runnable {
         self.hash(&mut hasher);
         hasher.finish()
     }
-    pub fn as_id_with(&self, parent: u64) -> u64 {
+    pub fn as_id_with(&self, Index(index): Index) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
-        parent.hash(&mut hasher);
+        index.hash(&mut hasher);
         hasher.finish()
     }
     pub fn as_sqid(&self, id: u64) -> String {
@@ -136,6 +139,8 @@ impl Runnable {
         sqid.get(0..6).map(String::from).unwrap_or(sqid)
     }
 }
+
+pub struct Index(pub u64);
 
 impl From<&RunOptItem> for Runnable {
     fn from(value: &RunOptItem) -> Self {
@@ -154,14 +159,14 @@ impl From<&RunOptItem> for Runnable {
                     max_concurrent_items: run_all_opts.max,
                     exit_on_failure: run_all_opts.exit_on_fail,
                 };
-                Self::Many(TaskList::all(&items, opts))
+                Self::Many(TaskSpec::all(&items, opts))
             }
             RunOptItem::Seq(RunSeq { seq, seq_opts }) => {
                 let items: Vec<_> = seq.iter().map(Runnable::from).collect();
                 let opts = SequenceOpts {
                     exit_on_failure: seq_opts.exit_on_fail,
                 };
-                Self::Many(TaskList::seq_opts(&items, opts))
+                Self::Many(TaskSpec::seq_opts(&items, opts))
             }
         }
     }

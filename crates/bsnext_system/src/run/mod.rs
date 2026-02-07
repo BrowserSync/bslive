@@ -20,6 +20,9 @@ pub struct RunCommand {
     /// run top-level tasks concurrently
     #[arg(long = "all")]
     pub all: bool,
+    /// just print the task tree
+    #[arg(long = "dry")]
+    pub dry: bool,
     /// output format
     #[arg(short, long, value_enum, default_value_t)]
     pub format: OutputFormat,

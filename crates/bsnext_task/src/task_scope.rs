@@ -1,25 +1,25 @@
 use crate::as_actor::AsActor;
 use crate::invocation::Invocation;
 use crate::task_entry::TaskEntry;
-use crate::task_group_runner::TaskGroupRunner;
+use crate::task_scope_runner::TaskScopeRunner;
 use crate::{OverlappingOpts, RunKind, SequenceOpts};
 use actix::{Actor, Recipient};
 
 #[derive(Debug)]
-pub struct TaskGroup {
+pub struct TaskScope {
     run_kind: RunKind,
     tasks: Vec<TaskEntry>,
 }
 
-impl AsActor for TaskGroup {
+impl AsActor for TaskScope {
     fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
-        let group_runner = TaskGroupRunner::new(*self);
+        let group_runner = TaskScopeRunner::new(*self);
         let s = group_runner.start();
         s.recipient()
     }
 }
 
-impl TaskGroup {
+impl TaskScope {
     pub fn run_kind(&self) -> &RunKind {
         &self.run_kind
     }

@@ -1,8 +1,8 @@
 pub mod as_actor;
 pub mod invocation;
 pub mod task_entry;
-pub mod task_group;
-pub mod task_group_runner;
+pub mod task_scope;
+pub mod task_scope_runner;
 pub mod task_trigger;
 
 /// The `RunKind` enum represents the type of execution or arrangement of a set of operations or elements.

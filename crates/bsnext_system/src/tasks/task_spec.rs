@@ -1,11 +1,11 @@
-use crate::tasks::{append, append_with_reports, Comms, Runnable, RunnableWithComms};
+use crate::tasks::{append, append_with_reports, Comms, Index, Runnable, RunnableWithComms};
 use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
 use bsnext_dto::internal::TaskReport;
 use bsnext_input::route::RunOptItem;
 use bsnext_task::task_entry::TaskEntry;
-use bsnext_task::task_group::TaskGroup;
+use bsnext_task::task_scope::TaskScope;
 use bsnext_task::{OverlappingOpts, RunKind, SequenceOpts};
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -25,14 +25,14 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 ///   A vector containing the individual tasks to be executed. Each task is represented as an instance of the `Runnable` struct.
 ///
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub struct TaskList {
+pub struct TaskSpec {
     pub run_kind: RunKind,
     pub tasks: Vec<Runnable>,
 }
 
-impl TreeDisplay for TaskList {
-    fn as_tree_label(&self, parent: u64) -> String {
-        let sqid = self.as_sqid(parent);
+impl TreeDisplay for TaskSpec {
+    fn as_tree_label(&self, Index(index): Index) -> String {
+        let sqid = self.as_sqid(index);
         match &self.run_kind {
             RunKind::Sequence { .. } => format!("[{sqid}] Seq: {} task(s)", self.tasks.len()),
             RunKind::Overlapping { opts } => format!(
@@ -44,7 +44,7 @@ impl TreeDisplay for TaskList {
     }
 }
 
-impl TaskList {
+impl TaskSpec {
     pub fn all(p0: &[Runnable], opts: OverlappingOpts) -> Self {
         Self {
             run_kind: RunKind::Overlapping { opts },
@@ -74,10 +74,6 @@ impl TaskList {
         }
     }
 
-    pub fn add(&mut self, r: Runnable) {
-        self.tasks.push(r);
-    }
-
     pub fn as_id(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
@@ -91,14 +87,14 @@ impl TaskList {
     }
 }
 
-impl TaskList {
+impl TaskSpec {
     pub fn as_sqid(&self, parent: u64) -> String {
         let sqids = sqids::Sqids::default();
         let sqid = sqids.encode(&[parent]).unwrap();
         sqid.get(0..6).unwrap_or(&sqid).to_string()
     }
     pub fn as_tree(&self) -> ArchyNode {
-        let label = self.as_tree_label(0);
+        let label = self.as_tree_label(Index(0));
         let mut first = ArchyNode::new(&label);
         append(&mut first, &self.tasks);
         first
@@ -108,7 +104,7 @@ impl TaskList {
         let r = hm.get(&self.as_id());
         let label = match r {
             None => "missing".to_string(),
-            Some(_) => self.as_tree_label(0),
+            Some(_) => self.as_tree_label(Index(0)),
         };
         let mut first = ArchyNode::new(&label);
         append_with_reports(&mut first, &self.tasks, hm);
@@ -117,30 +113,32 @@ impl TaskList {
 }
 
 impl TreeDisplay for Runnable {
-    fn as_tree_label(&self, parent: u64) -> String {
-        let id = self.as_id_with(parent);
+    fn as_tree_label(&self, index: Index) -> String {
         match self {
             Runnable::BsLiveTask(item) => format!("{}{}", "Runnable::BsLiveTask", item),
             Runnable::Sh(sh) => format!("{} {}", "Runnable::Sh", sh),
-            Runnable::Many(runner) => runner.as_tree_label(id),
+            Runnable::Many(task_list) => {
+                let id = self.as_id_with(index);
+                task_list.as_tree_label(Index(id))
+            }
         }
     }
 }
 
 pub trait TreeDisplay {
-    fn as_tree_label(&self, parent: u64) -> String;
+    fn as_tree_label(&self, index: Index) -> String;
 }
 
-impl TaskList {
-    pub fn to_task_group(self, servers_addr: Option<Addr<ServersSupervisor>>) -> TaskGroup {
-        let top_id = self.as_id();
-        let boxed_tasks = self
+impl TaskSpec {
+    pub fn to_task_group(self, servers_addr: Option<Addr<ServersSupervisor>>) -> TaskScope {
+        let parent_id = self.as_id();
+        let inner_tasks = self
             .tasks
             .into_iter()
             .enumerate()
-            .map(|(i, x)| -> TaskEntry {
-                let item_id = x.as_id_with(i as u64);
-                match x {
+            .map(|(index_position, runnable)| -> TaskEntry {
+                let item_id = runnable.as_id_with(Index(index_position as u64));
+                match runnable {
                     Runnable::Many(runner) => TaskEntry::new(
                         Box::new(runner.to_task_group(servers_addr.clone())),
                         item_id,
@@ -150,7 +148,7 @@ impl TaskList {
                             ctx: Comms {
                                 servers_addr: servers_addr.clone(),
                             },
-                            runnable: x,
+                            runnable,
                         };
                         TaskEntry::new(Box::new(with_ctx), item_id)
                     }
@@ -158,8 +156,8 @@ impl TaskList {
             })
             .collect::<Vec<TaskEntry>>();
         match self.run_kind {
-            RunKind::Sequence { opts } => TaskGroup::seq(boxed_tasks, opts, top_id),
-            RunKind::Overlapping { opts } => TaskGroup::all(boxed_tasks, opts, top_id),
+            RunKind::Sequence { opts } => TaskScope::seq(inner_tasks, opts, parent_id),
+            RunKind::Overlapping { opts } => TaskScope::all(inner_tasks, opts, parent_id),
         }
     }
 }

@@ -2,7 +2,7 @@ use crate::input_fs::from_input_path;
 use crate::path_monitor::PathMonitorMeta;
 use crate::path_watchable::PathWatchable;
 use crate::tasks::bs_live_task::BsLiveTask;
-use crate::tasks::task_list::TaskList;
+use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
 use crate::trigger_fs_task::TriggerFsTaskEvent;
 use crate::{BsSystem, OverrideInput};
@@ -16,7 +16,7 @@ use bsnext_fs::{
     PathDescriptionOwned, PathEvent,
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use bsnext_task::task_group::TaskGroup;
+use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::{TaskComms, TaskTrigger, TaskTriggerSource};
 use tracing::{debug_span, info};
 
@@ -100,7 +100,7 @@ impl BsSystem {
     fn handle_buffered(
         &mut self,
         buf: BufferedChangeEvent,
-    ) -> Option<(TaskGroup, TaskTrigger, TaskList)> {
+    ) -> Option<(TaskScope, TaskTrigger, TaskSpec)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
@@ -234,10 +234,10 @@ impl BsSystem {
     }
 
     #[tracing::instrument(skip_all)]
-    fn task_list_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskList {
+    fn task_list_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskSpec {
         let Some(path_watchable) = self.path_watchable(fs_event_ctx) else {
             tracing::error!("did not find a matching monitor");
-            return TaskList::seq(&[]);
+            return TaskSpec::seq(&[]);
         };
 
         info!("matching monitor, path_watchable: {}", path_watchable);
@@ -248,7 +248,7 @@ impl BsSystem {
             info!("no custom tasks given, NotifyServer + ExtEvent will be defaults");
         }
         custom_task_list.map(ToOwned::to_owned).unwrap_or_else(|| {
-            TaskList::seq(&[
+            TaskSpec::seq(&[
                 Runnable::BsLiveTask(BsLiveTask::NotifyServer),
                 Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent),
             ])

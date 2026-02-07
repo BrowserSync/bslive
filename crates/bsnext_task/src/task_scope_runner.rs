@@ -1,7 +1,7 @@
 use crate::RunKind;
 use crate::as_actor::AsActor;
 use crate::invocation::Invocation;
-use crate::task_group::TaskGroup;
+use crate::task_scope::TaskScope;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
@@ -20,21 +20,21 @@ use tracing::{Instrument, Span, debug};
 ///
 /// * `done` - A boolean flag indicating whether the task group has finished execution.
 /// * `task_group` - An `Option` containing the `TaskGroup` instance that this runner manages.
-pub struct TaskGroupRunner {
+pub struct TaskScopeRunner {
     done: bool,
-    task_group: Option<TaskGroup>,
+    task_scope: Option<TaskScope>,
 }
 
-impl TaskGroupRunner {
-    pub fn new(task_group: TaskGroup) -> Self {
+impl TaskScopeRunner {
+    pub fn new(task_group: TaskScope) -> Self {
         Self {
-            task_group: Some(task_group),
+            task_scope: Some(task_group),
             done: false,
         }
     }
 }
 
-impl actix::Actor for TaskGroupRunner {
+impl actix::Actor for TaskScopeRunner {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
@@ -49,7 +49,7 @@ impl actix::Actor for TaskGroupRunner {
     }
 }
 
-impl Handler<Invocation> for TaskGroupRunner {
+impl Handler<Invocation> for TaskScopeRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
     #[tracing::instrument(skip_all, name = "Invocation", fields(id = invocation.sqid()))]
@@ -62,7 +62,7 @@ impl Handler<Invocation> for TaskGroupRunner {
 
         debug!(done = self.done);
 
-        let Some(group) = self.task_group.take() else {
+        let Some(group) = self.task_scope.take() else {
             todo!("how to handle a concurrent request here?");
         };
 

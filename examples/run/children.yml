@@ -6,5 +6,5 @@ run:
           - sh: "node examples/graceful-exit.js"
         opts:
           exit_on_fail: false
-      - sh: echo "does not fail!" && exit 1
+      - sh: echo "does fail!!!" && exit 1
 
