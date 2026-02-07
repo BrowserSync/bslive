@@ -1,11 +1,17 @@
+use crate::tasks::task_comms::TaskComms;
 use crate::tasks::task_spec::TaskSpec;
 use crate::BsSystem;
-use actix::{ActorFutureExt, Handler, ResponseActFuture, StreamHandler, WrapFuture};
-use bsnext_dto::internal::{TaskActionStage, TaskReport, TaskReportAndTree};
+use actix::ActorFutureExt;
+use actix::Handler;
+use actix::ResponseActFuture;
+use actix::StreamHandler;
+use actix::WrapFuture;
+use bsnext_dto::internal::{TaskActionStage, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
+use bsnext_task::task_report::TaskReport;
 use bsnext_task::task_scope::TaskScope;
-use bsnext_task::task_trigger::{TaskComms, TaskTrigger};
+use bsnext_task::task_trigger::TaskTrigger;
 use std::collections::HashMap;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -77,7 +83,6 @@ impl Handler<InvokeScope> for BsSystem {
         let invocation = Invocation {
             id: task_id,
             trigger: cmd,
-            comms: comms.clone(),
         };
         let with_start = async move {
             let _sent = comms

@@ -2,6 +2,7 @@ use crate::input_fs::from_input_path;
 use crate::path_monitor::PathMonitorMeta;
 use crate::path_watchable::PathWatchable;
 use crate::tasks::bs_live_task::BsLiveTask;
+use crate::tasks::task_comms::TaskComms;
 use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
 use crate::trigger_fs_task::TriggerFsTaskEvent;
@@ -17,7 +18,7 @@ use bsnext_fs::{
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 use bsnext_task::task_scope::TaskScope;
-use bsnext_task::task_trigger::{TaskComms, TaskTrigger, TaskTriggerSource};
+use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use tracing::{debug_span, info};
 
 impl actix::Handler<FsEventGrouping> for BsSystem {

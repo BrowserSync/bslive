@@ -6,10 +6,10 @@ use actix::{Actor, Addr, Recipient};
 use bs_live_task::BsLiveTask;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
-use bsnext_dto::internal::TaskReport;
 use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
+use bsnext_task::task_report::TaskReport;
 use bsnext_task::{OverlappingOpts, SequenceOpts};
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -17,6 +17,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 pub mod bs_live_task;
 pub mod notify_servers;
 pub mod sh_cmd;
+pub mod task_comms;
 pub mod task_spec;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]

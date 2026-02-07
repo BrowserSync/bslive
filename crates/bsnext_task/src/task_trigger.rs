@@ -1,8 +1,7 @@
-use bsnext_dto::internal::{AnyEvent, TaskResult};
+use crate::task_report::TaskResult;
 use bsnext_fs::FsEventContext;
 use std::fmt::Debug;
 use std::path::PathBuf;
-use tokio::sync::mpsc::Sender;
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "TaskResult")]
@@ -29,18 +28,5 @@ impl TaskTrigger {
     }
     pub fn id(&self) -> u64 {
         self.invocation_id
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct TaskComms {
-    pub any_event_sender: Sender<AnyEvent>,
-}
-
-impl TaskComms {
-    pub fn new(p0: Sender<AnyEvent>) -> TaskComms {
-        Self {
-            any_event_sender: p0,
-        }
     }
 }

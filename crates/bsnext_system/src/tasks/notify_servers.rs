@@ -1,8 +1,8 @@
 use actix::{Actor, Addr, Handler, ResponseFuture};
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
-use bsnext_dto::internal::{InvocationId, TaskResult};
 use bsnext_task::invocation::Invocation;
+use bsnext_task::task_report::{InvocationId, TaskResult};
 use bsnext_task::task_trigger::TaskTriggerSource;
 
 pub struct NotifyServers {

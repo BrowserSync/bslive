@@ -1,16 +1,13 @@
 use crate::RunKind;
 use crate::as_actor::AsActor;
 use crate::invocation::Invocation;
+use crate::task_report::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use crate::task_scope::TaskScope;
-use actix::fut::future::Map;
-use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, StreamHandler, WrapFuture};
-use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
+use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use futures_util::FutureExt;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::select;
 use tokio::sync::Semaphore;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span, debug};
 
@@ -56,7 +53,7 @@ impl Handler<Invocation> for TaskScopeRunner {
     #[tracing::instrument(skip_all, name = "Invocation", fields(id = invocation.sqid()))]
     fn handle(&mut self, invocation: Invocation, ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
-        let Invocation { trigger, comms, .. } = invocation;
+        let Invocation { trigger, .. } = invocation;
         let span = Span::current();
         let gg = Arc::new(span.clone());
         let ggg = gg.clone();
@@ -94,7 +91,6 @@ impl Handler<Invocation> for TaskScopeRunner {
                         let one_task = Invocation {
                             id,
                             trigger: trigger.clone(),
-                            comms: comms.clone(),
                         };
                         let sqid = one_task.sqid();
 
@@ -143,7 +139,6 @@ impl Handler<Invocation> for TaskScopeRunner {
                             let one_task = Invocation {
                                 id,
                                 trigger: trigger.clone(),
-                                comms: comms.clone(),
                             };
                             async move {
                                 if child_token.is_cancelled() {

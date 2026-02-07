@@ -10,6 +10,7 @@ bsnext_input = { path = "../bsnext_input" }
 bsnext_fs = { path = "../bsnext_fs" }
 bsnext_tracing = { path = "../bsnext_tracing" }
 bsnext_output = { path = "../bsnext_output" }
+bsnext_task = { path = "../bsnext_task" }
 
 serde = { workspace = true }
 thiserror = { workspace = true }

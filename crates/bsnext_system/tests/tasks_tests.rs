@@ -1,15 +1,16 @@
 use actix::{Actor, ActorFutureExt, Recipient, ResponseActFuture, WrapFuture};
-use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
+use bsnext_dto::internal::AnyEvent;
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_entry::TaskEntry;
+use bsnext_task::task_report::{InvocationId, TaskResult};
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_scope_runner::TaskScopeRunner;
-use bsnext_task::task_trigger::{TaskComms, TaskTrigger, TaskTriggerSource};
-use std::any::Any;
+use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
+use std::time::Duration;
 
 #[actix_rt::test]
 async fn test_task_scope_runner() -> anyhow::Result<()> {
@@ -38,20 +39,16 @@ async fn test_task_scope_runner() -> anyhow::Result<()> {
         changes: vec![],
         fs_event_context: Default::default(),
     };
-    let comms = TaskComms {
-        any_event_sender: tx,
-    };
+    // let comms = TaskComms {
+    //     any_event_sender: tx,
+    // };
     let id = 0;
     let trigger = TaskTrigger::new(variant, id);
 
-    let one_task = Invocation {
-        id: 0,
-        trigger,
-        comms,
-    };
+    let one_task = Invocation { id: 0, trigger };
 
     let task_result = addr.send(one_task).await.unwrap();
-    let _evt = rx.recv().await;
+    let _evt = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await;
     assert_eq!(task_result.task_reports.len(), 2);
     Ok(())
 }

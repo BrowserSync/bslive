@@ -1,8 +1,8 @@
 use actix::ResponseFuture;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::{AnyEvent, ExitCode, InvocationId, TaskResult};
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
 use bsnext_task::invocation::Invocation;
+use bsnext_task::task_report::{ExitCode, InvocationId, TaskResult};
 use bsnext_task::task_trigger::TaskTriggerSource;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
@@ -174,11 +174,11 @@ impl actix::Handler<Invocation> for ShCmd {
         let sqid = invocation.sqid();
         self.id = Some(sqid.clone());
         let cmd = self.sh.clone();
-        let Invocation { id, trigger, comms } = invocation;
+        let Invocation { id, trigger } = invocation;
         let cmd = cmd.to_os_string();
         tracing::info!("Will run... {:?}", cmd);
-        let any_event_sender = comms.any_event_sender.clone();
-        let any_event_sender2 = comms.any_event_sender.clone();
+        // let any_event_sender = comms.any_event_sender.clone();
+        // let any_event_sender2 = comms.any_event_sender.clone();
         let reason = match &trigger.variant {
             TaskTriggerSource::FsChanges { changes, .. } => {
                 format!("{} files changed", changes.len())
@@ -234,34 +234,36 @@ impl actix::Handler<Invocation> for ShCmd {
             let h = tokio::spawn(async move {
                 tracing::debug!(?pid, "reading stdout");
                 while let Ok(Some(line)) = stdout_reader.next_line().await {
-                    match any_event_sender
-                        .send(AnyEvent::External(ExternalEventsDTO::stdout_line(
-                            id,
-                            line,
-                            (*sh_prefix).clone(),
-                        )))
-                        .await
-                    {
-                        Ok(_) => tracing::trace!("did forward stdout line"),
-                        Err(_) => tracing::error!("could not send stdout line"),
-                    }
+                    todo!("forward stdout loine")
+                    // match any_event_sender
+                    //     .send(AnyEvent::External(ExternalEventsDTO::stdout_line(
+                    //         id,
+                    //         line,
+                    //         (*sh_prefix).clone(),
+                    //     )))
+                    //     .await
+                    // {
+                    //     Ok(_) => tracing::trace!("did forward stdout line"),
+                    //     Err(_) => tracing::error!("could not send stdout line"),
+                    // }
                 }
             }.instrument(Span::current()));
 
             let h2 = tokio::spawn(async move {
                 tracing::debug!(?pid, "reading stderr");
                 while let Ok(Some(line)) = stderr_reader.next_line().await {
-                    match any_event_sender2
-                        .send(AnyEvent::External(ExternalEventsDTO::stderr_line(
-                            id,
-                            line,
-                            (*sh_prefix_2).clone(),
-                        )))
-                        .await
-                    {
-                        Ok(_) => tracing::trace!("did forward stderr line"),
-                        Err(_) => tracing::error!("could not send stderr line"),
-                    }
+                    todo!("forward sterr loine")
+                    // match any_event_sender2
+                    //     .send(AnyEvent::External(ExternalEventsDTO::stderr_line(
+                    //         id,
+                    //         line,
+                    //         (*sh_prefix_2).clone(),
+                    //     )))
+                    //     .await
+                    // {
+                    //     Ok(_) => tracing::trace!("did forward stderr line"),
+                    //     Err(_) => tracing::error!("could not send stderr line"),
+                    // }
                 }
             }.instrument(Span::current()));
 

@@ -2,9 +2,9 @@ use crate::tasks::{append, append_with_reports, Comms, Index, Runnable, Runnable
 use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
-use bsnext_dto::internal::TaskReport;
 use bsnext_input::route::RunOptItem;
 use bsnext_task::task_entry::TaskEntry;
+use bsnext_task::task_report::TaskReport;
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::{OverlappingOpts, RunKind, SequenceOpts};
 use std::collections::HashMap;

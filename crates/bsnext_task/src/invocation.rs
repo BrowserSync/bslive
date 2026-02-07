@@ -1,17 +1,16 @@
-use crate::task_trigger::{TaskComms, TaskTrigger};
-use bsnext_dto::internal::TaskResult;
+use crate::task_report::TaskResult;
+use crate::task_trigger::TaskTrigger;
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "TaskResult")]
 pub struct Invocation {
     pub id: u64,
     pub trigger: TaskTrigger,
-    pub comms: TaskComms,
 }
 
 impl Invocation {
-    pub fn new(id: u64, trigger: TaskTrigger, comms: TaskComms) -> Self {
-        Self { id, trigger, comms }
+    pub fn new(id: u64, trigger: TaskTrigger) -> Self {
+        Self { id, trigger }
     }
     pub fn sqid(&self) -> String {
         let sqids = sqids::Sqids::default();
