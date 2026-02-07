@@ -174,11 +174,11 @@ impl actix::Handler<Invocation> for ShCmd {
         let sqid = invocation.sqid();
         self.id = Some(sqid.clone());
         let cmd = self.sh.clone();
-        let Invocation(id, trigger) = invocation;
+        let Invocation { id, trigger, comms } = invocation;
         let cmd = cmd.to_os_string();
         tracing::info!("Will run... {:?}", cmd);
-        let any_event_sender = trigger.comms().any_event_sender.clone();
-        let any_event_sender2 = trigger.comms().any_event_sender.clone();
+        let any_event_sender = comms.any_event_sender.clone();
+        let any_event_sender2 = comms.any_event_sender.clone();
         let reason = match &trigger.variant {
             TaskTriggerSource::FsChanges { changes, .. } => {
                 format!("{} files changed", changes.len())

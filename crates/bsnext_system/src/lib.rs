@@ -226,7 +226,7 @@ impl BsSystem {
 
     fn before(&mut self, input: &Input) -> (InvokeScope, Receiver<TaskReportAndTree>) {
         let comms = self.task_comms();
-        let trigger = TaskTrigger::new(TaskTriggerSource::Exec, comms.clone(), 0);
+        let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
 
         let all = input.before_run_opts();
         debug!("{} before tasks to execute", all.len());

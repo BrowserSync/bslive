@@ -73,9 +73,13 @@ impl Handler<InvokeScope> for BsSystem {
 
         let top_level_scope = Box::new(msg.task_scope).into_task_recipient();
         let done = msg.done;
-        let comms = cmd.comms().clone();
+        let comms = msg.comms.clone();
         let tree = task_list.as_tree();
-        let invocation = Invocation(task_id, cmd);
+        let invocation = Invocation {
+            id: task_id,
+            trigger: cmd,
+            comms: comms.clone(),
+        };
         let with_start = async move {
             let _sent = comms
                 .any_event_sender

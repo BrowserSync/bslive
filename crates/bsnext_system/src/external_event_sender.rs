@@ -32,14 +32,10 @@ impl actix::Actor for ExternalEventSender {
 impl Handler<Invocation> for ExternalEventSender {
     type Result = ResponseFuture<TaskResult>;
 
-    fn handle(
-        &mut self,
-        Invocation(_id, trigger): Invocation,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let comms = trigger.comms();
+    fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
+        let comms = invocation.comms;
         let sender = comms.any_event_sender.clone();
-        let events: Vec<AnyEvent> = match trigger.variant {
+        let events: Vec<AnyEvent> = match invocation.trigger.variant {
             TaskTriggerSource::FsChanges { changes, .. } => {
                 let as_strings = changes
                     .iter()

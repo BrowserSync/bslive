@@ -32,7 +32,7 @@ impl Handler<Invocation> for NotifyServers {
 
     fn handle(
         &mut self,
-        Invocation(_id, trigger): Invocation,
+        Invocation { trigger, .. }: Invocation,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         tracing::debug!("NotifyServers::TaskCommand");
@@ -60,11 +60,7 @@ impl Actor for NotifyServersNoOp {
 }
 impl Handler<Invocation> for NotifyServersNoOp {
     type Result = ResponseFuture<TaskResult>;
-    fn handle(
-        &mut self,
-        Invocation(_id, _trigger): Invocation,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, _invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         Box::pin(async { TaskResult::ok(InvocationId(0)) })
     }
 }

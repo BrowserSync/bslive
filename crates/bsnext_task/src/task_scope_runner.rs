@@ -56,7 +56,7 @@ impl Handler<Invocation> for TaskScopeRunner {
     #[tracing::instrument(skip_all, name = "Invocation", fields(id = invocation.sqid()))]
     fn handle(&mut self, invocation: Invocation, ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
-        let Invocation(_id, trigger) = invocation;
+        let Invocation { trigger, comms, .. } = invocation;
         let span = Span::current();
         let gg = Arc::new(span.clone());
         let ggg = gg.clone();
@@ -91,7 +91,11 @@ impl Handler<Invocation> for TaskScopeRunner {
                         let (tx, rx) = tokio::sync::mpsc::channel::<String>(100);
 
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
-                        let one_task = Invocation(id, trigger.clone());
+                        let one_task = Invocation {
+                            id,
+                            trigger: trigger.clone(),
+                            comms: comms.clone(),
+                        };
                         let sqid = one_task.sqid();
 
                         match boxed_actor.send(one_task).await {
@@ -136,7 +140,11 @@ impl Handler<Invocation> for TaskScopeRunner {
                         let actor = Box::new(as_actor).into_task_recipient();
                         let jh = tokio::spawn({
                             let semaphore = sem.clone();
-                            let one_task = Invocation(id, trigger.clone());
+                            let one_task = Invocation {
+                                id,
+                                trigger: trigger.clone(),
+                                comms: comms.clone(),
+                            };
                             async move {
                                 if child_token.is_cancelled() {
                                     let v = TaskResult::cancelled();

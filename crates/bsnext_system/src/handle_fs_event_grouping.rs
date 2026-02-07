@@ -134,7 +134,7 @@ impl BsSystem {
             fs_event_context: change.fs_ctx,
         };
 
-        let task_trigger = TaskTrigger::new(variant, self.task_comms(), 0);
+        let task_trigger = TaskTrigger::new(variant, 0);
 
         // todo: use this example as a way to display a dry-run scenario
         // let tree = fs_triggered_task_list.as_tree();

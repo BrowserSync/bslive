@@ -42,8 +42,13 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
         any_event_sender: tx,
     };
     let id = 0;
-    let trigger = TaskTrigger::new(variant, comms, id);
-    let one_task = Invocation(0, trigger);
+    let trigger = TaskTrigger::new(variant, id);
+
+    let one_task = Invocation {
+        id: 0,
+        trigger,
+        comms,
+    };
 
     let task_result = addr.send(one_task).await.unwrap();
     let _evt = rx.recv().await;
@@ -69,7 +74,7 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
 
         fn handle(
             &mut self,
-            Invocation(id, trigger): Invocation,
+            Invocation { id, trigger, .. }: Invocation,
             _ctx: &mut Self::Context,
         ) -> Self::Result {
             let f = self.f.take().unwrap();
