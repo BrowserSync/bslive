@@ -15,7 +15,7 @@ impl AsActor for TaskScope {
     fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
         let group_runner = TaskScopeRunner::new(*self);
         let s = group_runner.start();
-        s.recipient()
+        s.recipient::<Invocation>()
     }
 }
 
@@ -24,7 +24,7 @@ impl TaskScope {
         &self.run_kind
     }
     pub fn exit_on_failure(&self) -> bool {
-        match self.run_kind() {
+        match &self.run_kind {
             RunKind::Sequence {
                 opts: SequenceOpts { exit_on_failure },
             } => *exit_on_failure,

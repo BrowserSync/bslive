@@ -2,12 +2,15 @@ use crate::RunKind;
 use crate::as_actor::AsActor;
 use crate::invocation::Invocation;
 use crate::task_scope::TaskScope;
-use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
+use actix::fut::future::Map;
+use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, StreamHandler, WrapFuture};
 use bsnext_dto::internal::{ExpectedLen, InvocationId, TaskReport, TaskResult};
 use futures_util::FutureExt;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::select;
 use tokio::sync::Semaphore;
+use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span, debug};
 
@@ -21,7 +24,6 @@ use tracing::{Instrument, Span, debug};
 /// * `done` - A boolean flag indicating whether the task group has finished execution.
 /// * `task_group` - An `Option` containing the `TaskGroup` instance that this runner manages.
 pub struct TaskScopeRunner {
-    done: bool,
     task_scope: Option<TaskScope>,
 }
 
@@ -29,7 +31,6 @@ impl TaskScopeRunner {
     pub fn new(task_group: TaskScope) -> Self {
         Self {
             task_scope: Some(task_group),
-            done: false,
         }
     }
 }
@@ -41,7 +42,7 @@ impl actix::Actor for TaskScopeRunner {
         tracing::trace!(actor.name = "TaskGroupRunner", actor.lifecycle = "started")
     }
     fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
-        tracing::trace!(actor.name = "TaskGroupRunner", " ⏰ stopping {}", self.done);
+        tracing::trace!(actor.name = "TaskGroupRunner", " ⏰ stopping");
         Running::Stop
     }
     fn stopped(&mut self, _ctx: &mut Self::Context) {
@@ -53,37 +54,43 @@ impl Handler<Invocation> for TaskScopeRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
     #[tracing::instrument(skip_all, name = "Invocation", fields(id = invocation.sqid()))]
-    fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, invocation: Invocation, ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
         let Invocation(_id, trigger) = invocation;
         let span = Span::current();
         let gg = Arc::new(span.clone());
         let ggg = gg.clone();
 
-        debug!(done = self.done);
-
         let Some(group) = self.task_scope.take() else {
             todo!("how to handle a concurrent request here?");
         };
 
         let exit_on_failure = group.exit_on_failure();
+        let expected_len = group.len();
+        let run_kind = group.run_kind().clone();
+        let tasks = group.tasks();
 
         tracing::info!(
             group.sqid = sqid,
-            group.len = group.len(),
-            group.kind = ?group.run_kind(),
+            group.len = expected_len,
+            group.kind = ?run_kind,
             group.exit_on_failure = exit_on_failure,
         );
 
-        let expected_len = group.len();
         let future = async move {
             let mut done: Vec<(usize, TaskReport)> = vec![];
             let _e = ggg.enter();
-            match group.run_kind() {
+            // let inner = channels;
+            match run_kind {
                 RunKind::Sequence { opts: _ } => {
-                    for (index, group_item) in group.tasks().into_iter().enumerate() {
-                        let id = group_item.id();
-                        let boxed_actor = Box::new(group_item).into_task_recipient();
+                    for (index, task_entry) in tasks.into_iter().enumerate() {
+                        let id = task_entry.id();
+                        // let Some(channel) = channels.get(&id) else {
+                        //     todo!("unreachable")
+                        // };
+                        let (tx, rx) = tokio::sync::mpsc::channel::<String>(100);
+
+                        let boxed_actor = Box::new(task_entry).into_task_recipient();
                         let one_task = Invocation(id, trigger.clone());
                         let sqid = one_task.sqid();
 
@@ -122,7 +129,7 @@ impl Handler<Invocation> for TaskScopeRunner {
                     let token = CancellationToken::new();
                     let sem = Arc::new(Semaphore::new(opts.max_concurrent_items as usize));
                     let mut jhs = Vec::new();
-                    for (index, as_actor) in group.tasks().into_iter().enumerate() {
+                    for (index, as_actor) in tasks.into_iter().enumerate() {
                         let parent_token = token.clone();
                         let child_token = parent_token.child_token();
                         let id = as_actor.id();
@@ -192,7 +199,6 @@ impl Handler<Invocation> for TaskScopeRunner {
             done
         };
         Box::pin(future.into_actor(self).map(move |res, actor, _ctx| {
-            actor.done = true;
             let _e = gg.enter();
             debug!("actual len: {}", res.len());
             debug!("expected len: {}", expected_len);

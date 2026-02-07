@@ -40,4 +40,9 @@ impl TaskEntry {
     pub fn id(&self) -> u64 {
         self.id
     }
+    pub fn sqid(&self) -> String {
+        let sqids = sqids::Sqids::default();
+        let sqid = sqids.encode(&[self.id]).unwrap();
+        sqid.get(0..6).unwrap_or(&sqid).to_string()
+    }
 }

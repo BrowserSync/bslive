@@ -1,5 +1,5 @@
+use crate::invoke_scope::every_report;
 use crate::tasks::task_spec::TaskSpec;
-use crate::trigger_task::every_report;
 use crate::BsSystem;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::TaskActionStage;

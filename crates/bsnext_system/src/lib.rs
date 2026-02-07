@@ -25,6 +25,7 @@ use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::{Input, InputCtx};
 use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use input_monitor::{InputMonitor, MonitorInput};
+use invoke_scope::InvokeScope;
 use route_watchable::to_route_watchables;
 use server_watchable::to_server_watchables;
 use start::start_kind::StartKind;
@@ -35,7 +36,6 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Receiver;
 use tracing::{debug, Instrument, Span};
-use trigger_task::TriggerTask;
 
 pub mod any_watchable;
 pub mod args;
@@ -45,6 +45,7 @@ mod external_event_sender;
 mod handle_fs_event_grouping;
 pub mod input_fs;
 mod input_monitor;
+mod invoke_scope;
 mod monitor_path_watchables;
 mod path_monitor;
 mod path_watchable;
@@ -54,7 +55,6 @@ pub mod server_watchable;
 pub mod start;
 pub mod tasks;
 mod trigger_fs_task;
-mod trigger_task;
 pub mod watch;
 
 #[derive(Debug)]
@@ -224,7 +224,7 @@ impl BsSystem {
         }
     }
 
-    fn before(&mut self, input: &Input) -> (TriggerTask, Receiver<TaskReportAndTree>) {
+    fn before(&mut self, input: &Input) -> (InvokeScope, Receiver<TaskReportAndTree>) {
         let trigger = TaskTrigger {
             invocation_id: 0,
             comms: self.task_comms(),
@@ -236,7 +236,7 @@ impl BsSystem {
         let task_list = TaskSpec::seq_from(&all);
         let task_group = task_list.clone().to_task_group(None);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
-        (TriggerTask::new(task_group, trigger, task_list, tx), rx)
+        (InvokeScope::new(task_group, trigger, task_list, tx), rx)
     }
 }
 

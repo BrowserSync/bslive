@@ -1,12 +1,14 @@
 use crate::tasks::task_spec::TaskSpec;
 use crate::BsSystem;
-use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
+use actix::{ActorFutureExt, Handler, ResponseActFuture, StreamHandler, WrapFuture};
 use bsnext_dto::internal::{TaskActionStage, TaskReport, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_scope::TaskScope;
+use bsnext_task::task_scope_runner::TaskScopeRunner;
 use bsnext_task::task_trigger::TaskTrigger;
 use std::collections::HashMap;
+use tokio_stream::wrappers::ReceiverStream;
 
 /// A struct representing a message to trigger a specific task in the system.
 /// This message will be handled by an actor in the Actix framework.
@@ -16,49 +18,67 @@ use std::collections::HashMap;
 /// - `#[rtype(result = "()")]`: Specifies that the actor handling this message does not need to return any result.
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
-pub struct TriggerTask {
-    pub task_group: TaskScope,
-    pub task_list: TaskSpec,
+pub struct InvokeScope {
+    pub task_scope: TaskScope,
+    pub task_spec: TaskSpec,
     pub task_trigger: TaskTrigger,
     /// A one-shot sender channel to signal the completion of the task processing and provide the resulting task report and its tree structure.
     pub done: tokio::sync::oneshot::Sender<TaskReportAndTree>,
 }
 
-impl TriggerTask {
+impl InvokeScope {
     pub fn new(
         task_group: TaskScope,
         task_trigger: TaskTrigger,
-        task_list: TaskSpec,
+        task_spec: TaskSpec,
         done: tokio::sync::oneshot::Sender<TaskReportAndTree>,
     ) -> Self {
         Self {
-            task_group,
+            task_scope: task_group,
             task_trigger,
-            task_list,
+            task_spec,
             done,
         }
     }
 }
 
-impl Handler<TriggerTask> for BsSystem {
+#[derive(actix::Message)]
+#[rtype(result = "()")]
+struct InsertOutputStream {
+    id: usize,
+    rx: tokio::sync::mpsc::Receiver<String>,
+}
+
+impl actix::Handler<InsertOutputStream> for BsSystem {
+    type Result = ();
+    fn handle(&mut self, msg: InsertOutputStream, ctx: &mut Self::Context) -> Self::Result {
+        let InsertOutputStream { id, rx } = msg;
+        let stream = ReceiverStream::new(rx);
+        // <Self as StreamHandler<String>>::add_stream(stream, ctx);
+        // dbg!("got it?");
+        // self.channels.insert(id, tx);
+    }
+}
+
+impl Handler<InvokeScope> for BsSystem {
     type Result = ResponseActFuture<Self, ()>;
 
-    fn handle(&mut self, msg: TriggerTask, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: InvokeScope, _ctx: &mut Self::Context) -> Self::Result {
         let cmd = msg.task_trigger;
-        let task_list = msg.task_list;
+        let task_list = msg.task_spec;
         let task_id = task_list.as_id();
 
-        let cmd_recipient = Box::new(msg.task_group).into_task_recipient();
+        let top_level_scope = Box::new(msg.task_scope).into_task_recipient();
         let done = msg.done;
         let comms = cmd.comms().clone();
         let tree = task_list.as_tree();
-        let trigger = Invocation(task_id, cmd);
+        let invocation = Invocation(task_id, cmd);
         let with_start = async move {
             let _sent = comms
                 .any_event_sender
                 .send(TaskActionStage::started(task_id, tree))
                 .await;
-            cmd_recipient.send(trigger).await
+            top_level_scope.send(invocation).await
         };
         let next = with_start
             .into_actor(self)
