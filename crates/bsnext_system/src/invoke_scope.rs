@@ -1,12 +1,12 @@
 use crate::tasks::task_comms::TaskComms;
 use crate::tasks::task_spec::TaskSpec;
 use crate::BsSystem;
-use actix::ActorFutureExt;
 use actix::Handler;
 use actix::ResponseActFuture;
 use actix::StreamHandler;
 use actix::WrapFuture;
-use bsnext_dto::internal::{TaskActionStage, TaskReportAndTree};
+use actix::{ActorFutureExt, ResponseFuture};
+use bsnext_dto::internal::{AnyEvent, TaskActionStage, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_report::TaskReport;
@@ -50,21 +50,57 @@ impl InvokeScope {
     }
 }
 
-#[derive(actix::Message)]
-#[rtype(result = "()")]
-struct InsertOutputStream {
-    id: usize,
-    rx: tokio::sync::mpsc::Receiver<String>,
+pub struct TaggedEvent {
+    event: AnyEvent,
+    id: u64,
 }
 
-impl actix::Handler<InsertOutputStream> for BsSystem {
-    type Result = ();
-    fn handle(&mut self, msg: InsertOutputStream, _ctx: &mut Self::Context) -> Self::Result {
-        let InsertOutputStream { id: _, rx } = msg;
-        let _stream = ReceiverStream::new(rx);
-        // <Self as StreamHandler<String>>::add_stream(stream, ctx);
-        // dbg!("got it?");
-        // self.channels.insert(id, tx);
+impl TaggedEvent {
+    pub fn sqid(&self) -> String {
+        let sqids = sqids::Sqids::default();
+        let sqid = sqids.encode(&[self.id]).unwrap();
+        sqid.get(0..6).unwrap_or(&sqid).to_string()
+    }
+}
+
+impl TaggedEvent {
+    pub fn new(id: u64, event: AnyEvent) -> TaggedEvent {
+        Self { event, id }
+    }
+}
+
+pub struct OutputStream {
+    pub sender: tokio::sync::mpsc::Sender<TaggedEvent>,
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "OutputStream")]
+pub struct RequestEventSender {
+    pub id: u64,
+}
+
+impl Handler<RequestEventSender> for BsSystem {
+    type Result = ResponseFuture<OutputStream>;
+
+    fn handle(&mut self, _msg: RequestEventSender, ctx: &mut Self::Context) -> Self::Result {
+        let (tx, rx) = tokio::sync::mpsc::channel::<TaggedEvent>(100);
+        let stream = ReceiverStream::new(rx);
+        <Self as StreamHandler<TaggedEvent>>::add_stream(stream, ctx);
+        Box::pin(async move { OutputStream { sender: tx } })
+    }
+}
+
+impl actix::StreamHandler<TaggedEvent> for BsSystem {
+    fn handle(&mut self, item: TaggedEvent, _ctx: &mut Self::Context) {
+        self.publish_any_event(item.event)
+    }
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        tracing::trace!("stream started");
+    }
+
+    fn finished(&mut self, _ctx: &mut Self::Context) {
+        tracing::trace!("stream ended!");
     }
 }
 

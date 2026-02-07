@@ -46,7 +46,7 @@ impl Handler<Invocation> for NotifyServers {
                 paths: changes.clone(),
                 ctx: fs_event_context,
             }),
-            TaskTriggerSource::Exec { .. } => {
+            TaskTriggerSource::Exec => {
                 todo!("I cannot accept this")
             }
         }

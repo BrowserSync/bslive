@@ -1,4 +1,5 @@
 use crate::tasks::{append, append_with_reports, Comms, Index, Runnable, RunnableWithComms};
+use crate::BsSystem;
 use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
@@ -130,7 +131,11 @@ pub trait TreeDisplay {
 }
 
 impl TaskSpec {
-    pub fn to_task_scope(self, servers_addr: Option<Addr<ServersSupervisor>>) -> TaskScope {
+    pub fn to_task_scope(
+        self,
+        servers_addr: Option<Addr<ServersSupervisor>>,
+        sys_addr: Addr<BsSystem>,
+    ) -> TaskScope {
         let parent_id = self.as_id();
         let inner_tasks = self
             .tasks
@@ -140,13 +145,14 @@ impl TaskSpec {
                 let item_id = runnable.as_id_with(Index(index_position as u64));
                 match runnable {
                     Runnable::Many(task_spec) => TaskEntry::new(
-                        Box::new(task_spec.to_task_scope(servers_addr.clone())),
+                        Box::new(task_spec.to_task_scope(servers_addr.clone(), sys_addr.clone())),
                         item_id,
                     ),
                     _ => {
                         let with_ctx = RunnableWithComms {
                             ctx: Comms {
                                 servers_addr: servers_addr.clone(),
+                                sys: sys_addr.clone(),
                             },
                             runnable,
                         };

@@ -58,7 +58,7 @@ mod trigger_fs_task;
 pub mod watch;
 
 #[derive(Debug)]
-pub(crate) struct BsSystem {
+pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
@@ -224,7 +224,11 @@ impl BsSystem {
         }
     }
 
-    fn before(&mut self, input: &Input) -> (InvokeScope, Receiver<TaskReportAndTree>) {
+    fn before(
+        &mut self,
+        input: &Input,
+        addr: Addr<BsSystem>,
+    ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
         let comms = self.task_comms();
         let all = input.before_run_opts();
         let task_spec = TaskSpec::seq_from(&all);
@@ -232,7 +236,7 @@ impl BsSystem {
         let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
 
         debug!("{} before tasks to execute", all.len());
-        let task_scope = task_spec.clone().to_task_scope(None);
+        let task_scope = task_spec.clone().to_task_scope(None, addr);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
         (
             InvokeScope::new(task_scope, trigger, task_spec, comms, tx),
@@ -553,7 +557,8 @@ impl actix::Handler<ResolveInitialTasks> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "Handler->ResolveInitialTasks->BsSystem")]
     fn handle(&mut self, msg: ResolveInitialTasks, ctx: &mut Self::Context) -> Self::Result {
-        let (next, rx) = self.before(&msg.input);
+        let addr = ctx.address();
+        let (next, rx) = self.before(&msg.input, addr);
         ctx.notify(next);
 
         Box::pin(async move {

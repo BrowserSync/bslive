@@ -51,7 +51,7 @@ impl Handler<Invocation> for TaskScopeRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
     #[tracing::instrument(skip_all, name = "Invocation", fields(id = invocation.sqid()))]
-    fn handle(&mut self, invocation: Invocation, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
         let Invocation { trigger, .. } = invocation;
         let span = Span::current();
@@ -82,11 +82,6 @@ impl Handler<Invocation> for TaskScopeRunner {
                 RunKind::Sequence { opts: _ } => {
                     for (index, task_entry) in tasks.into_iter().enumerate() {
                         let id = task_entry.id();
-                        // let Some(channel) = channels.get(&id) else {
-                        //     todo!("unreachable")
-                        // };
-                        let (tx, rx) = tokio::sync::mpsc::channel::<String>(100);
-
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
                         let one_task = Invocation::new(id, trigger.clone());
                         let sqid = one_task.sqid();
@@ -195,7 +190,7 @@ impl Handler<Invocation> for TaskScopeRunner {
             };
             done
         };
-        Box::pin(future.into_actor(self).map(move |res, actor, _ctx| {
+        Box::pin(future.into_actor(self).map(move |res, _actor, _ctx| {
             let _e = gg.enter();
             debug!("actual len: {}", res.len());
             debug!("expected len: {}", expected_len);

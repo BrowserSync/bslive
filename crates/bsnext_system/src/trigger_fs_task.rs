@@ -36,7 +36,7 @@ impl TriggerFsTaskEvent {
             TaskTriggerSource::FsChanges {
                 fs_event_context, ..
             } => fs_event_context,
-            TaskTriggerSource::Exec { .. } => {
+            TaskTriggerSource::Exec => {
                 panic!("unreachable. It's a mistake to access fs_ctx here")
             }
         }

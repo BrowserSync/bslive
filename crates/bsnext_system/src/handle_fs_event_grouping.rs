@@ -7,7 +7,7 @@ use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
 use crate::trigger_fs_task::TriggerFsTaskEvent;
 use crate::{BsSystem, OverrideInput};
-use actix::AsyncContext;
+use actix::{Addr, AsyncContext};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
@@ -25,12 +25,15 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
     type Result = ();
 
     fn handle(&mut self, msg: FsEventGrouping, ctx: &mut Self::Context) -> Self::Result {
+        let addr = ctx.address();
         let span = debug_span!("Handler->FsEventGrouping->BsSystem");
         let _guard = span.enter();
         let next = match msg {
             FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event),
             FsEventGrouping::BufferedChange(buff) => {
-                if let Some((task_scope, task_trigger, task_spec)) = self.handle_buffered(buff) {
+                if let Some((task_scope, task_trigger, task_spec)) =
+                    self.handle_buffered(buff, addr)
+                {
                     tracing::debug!("will trigger task runner");
                     ctx.notify(TriggerFsTaskEvent::new(task_scope, task_trigger, task_spec));
                 }
@@ -101,6 +104,7 @@ impl BsSystem {
     fn handle_buffered(
         &mut self,
         buf: BufferedChangeEvent,
+        addr: Addr<BsSystem>,
     ) -> Option<(TaskScope, TaskTrigger, TaskSpec)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 
@@ -140,7 +144,7 @@ impl BsSystem {
         Some((
             fs_triggered_task_spec
                 .clone()
-                .to_task_scope(self.servers_addr.clone()),
+                .to_task_scope(self.servers_addr.clone(), addr),
             task_trigger,
             fs_triggered_task_spec,
         ))

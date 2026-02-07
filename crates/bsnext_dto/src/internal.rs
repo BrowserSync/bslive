@@ -7,7 +7,6 @@ use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError}
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
 use bsnext_task::task_report::{TaskReport, TaskResult, TaskStatus};
-use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use typeshare::typeshare;
 

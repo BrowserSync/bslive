@@ -207,7 +207,7 @@ pub fn print_stdout_line<W: Write>(w: &mut W, line: &StdoutLineDTO) -> anyhow::R
     match &line.prefix {
         None => writeln!(w, "{}", line.line)?,
         Some(prefix) => {
-            let color = hash(&prefix) % 256;
+            let color = hash(prefix) % 256;
             writeln!(w, "\x1b[38;5;{}m{}\x1b[0m {}", color, prefix, line.line)?
         }
     }

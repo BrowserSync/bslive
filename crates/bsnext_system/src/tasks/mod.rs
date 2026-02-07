@@ -1,7 +1,8 @@
-use crate::external_event_sender::ExternalEventSender;
+use crate::external_event_sender::ExternalEventSenderWithLogging;
 use crate::tasks::notify_servers::{NotifyServers, NotifyServersNoOp};
-use crate::tasks::sh_cmd::ShCmd;
+use crate::tasks::sh_cmd::{ShCmd, ShCmdWithLogging};
 use crate::tasks::task_spec::{TaskSpec, TreeDisplay};
+use crate::BsSystem;
 use actix::{Actor, Addr, Recipient};
 use bs_live_task::BsLiveTask;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
@@ -36,6 +37,7 @@ pub struct RunnableWithComms {
 #[derive(Debug, Clone)]
 pub struct Comms {
     servers_addr: Option<Addr<ServersSupervisor>>,
+    sys: Addr<BsSystem>,
 }
 
 impl AsActor for RunnableWithComms {
@@ -54,13 +56,17 @@ impl AsActor for RunnableWithComms {
                 }
             },
             Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent) => {
-                let actor = ExternalEventSender::new();
+                let actor = ExternalEventSenderWithLogging::new(self.ctx.sys.recipient());
                 let addr = actor.start();
                 addr.recipient()
             }
             Runnable::Sh(sh) => {
-                let s = sh.start();
-                s.recipient()
+                let with_logging = ShCmdWithLogging {
+                    cmd: sh,
+                    request: self.ctx.sys.recipient(),
+                };
+                let actor_address = with_logging.start();
+                actor_address.recipient()
             }
             Runnable::Many(_) => unreachable!("The conversion to Task happens elsewhere"),
         }

@@ -34,7 +34,7 @@ async fn test_task_scope_runner() -> anyhow::Result<()> {
     let task_scope_runner = TaskScopeRunner::new(task_scope);
     let addr = task_scope_runner.start();
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
+    let (_tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
     let variant = TaskTriggerSource::FsChanges {
         changes: vec![],
         fs_event_context: Default::default(),
@@ -69,11 +69,7 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
     impl actix::Handler<Invocation> for A {
         type Result = ResponseActFuture<Self, TaskResult>;
 
-        fn handle(
-            &mut self,
-            Invocation { id, trigger, .. }: Invocation,
-            _ctx: &mut Self::Context,
-        ) -> Self::Result {
+        fn handle(&mut self, _invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
             let f = self.f.take().unwrap();
             Box::pin(
                 f.into_actor(self)

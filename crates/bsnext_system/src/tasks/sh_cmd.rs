@@ -1,5 +1,7 @@
-use actix::ResponseFuture;
+use crate::invoke_scope::{RequestEventSender, TaggedEvent};
+use actix::{Recipient, ResponseFuture};
 use bsnext_dto::external_events::ExternalEventsDTO;
+use bsnext_dto::internal::AnyEvent;
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_report::{ExitCode, InvocationId, TaskResult};
@@ -24,6 +26,11 @@ pub struct ShCmd {
     output: ShCmdOutput,
     timeout: ShDuration,
     id: Option<String>,
+}
+
+pub struct ShCmdWithLogging {
+    pub cmd: ShCmd,
+    pub request: Recipient<RequestEventSender>,
 }
 
 impl Display for ShCmd {
@@ -65,19 +72,6 @@ impl ShCmd {
             id: None,
         }
     }
-    pub fn named(cmd: OsString, name: impl Into<String>) -> Self {
-        Self {
-            sh: Cmd(cmd),
-            name: Some(name.into()),
-            output: Default::default(),
-            timeout: Default::default(),
-            id: None,
-        }
-    }
-
-    // pub fn from_opt(run_opt: &RunOptItem) -> {
-    //
-    // }
 
     pub fn named_prefix(&mut self, name: impl Into<String>) {
         self.output = ShCmdOutput::CustomNamed(name.into());
@@ -146,12 +140,12 @@ impl Deref for Cmd {
     }
 }
 
-impl actix::Actor for ShCmd {
+impl actix::Actor for ShCmdWithLogging {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(
-            sqid = self.id,
+            sqid = self.cmd.id,
             actor.name = "ShCmd",
             actor.lifecyle = "started"
         );
@@ -159,21 +153,21 @@ impl actix::Actor for ShCmd {
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(
-            sqid = self.id,
+            sqid = self.cmd.id,
             actor.name = "ShCmd",
             actor.lifecyle = "stopped"
         );
     }
 }
 
-impl actix::Handler<Invocation> for ShCmd {
+impl actix::Handler<Invocation> for ShCmdWithLogging {
     type Result = ResponseFuture<TaskResult>;
 
     #[tracing::instrument(skip_all, name = "ShCmd", fields(id=invocation.sqid()))]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
-        self.id = Some(sqid.clone());
-        let cmd = self.sh.clone();
+        self.cmd.id = Some(sqid.clone());
+        let cmd = self.cmd.sh.clone();
         let Invocation { id, trigger, .. } = invocation;
         let cmd = cmd.to_os_string();
         tracing::info!("Will run... {:?}", cmd);
@@ -185,20 +179,28 @@ impl actix::Handler<Invocation> for ShCmd {
             }
             TaskTriggerSource::Exec { .. } => "command executed".to_string(),
         };
+
         let files = match &trigger.variant {
             TaskTriggerSource::FsChanges { changes, .. } => changes
                 .iter()
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
-            TaskTriggerSource::Exec { .. } => "NONE".to_string(),
+            TaskTriggerSource::Exec => "NONE".to_string(),
         };
 
-        let sh_prefix = Arc::new(self.prefix(sqid));
+        let sh_prefix = Arc::new(self.cmd.prefix(sqid));
         let sh_prefix_2 = sh_prefix.clone();
-        let max_duration = self.timeout.duration().to_owned();
+        let max_duration = self.cmd.timeout.duration().to_owned();
+        let addr = self.request.clone();
 
         let fut = async move {
+            let Ok(output) = addr.send(RequestEventSender { id }).await else {
+                todo!("can this actually fail?");
+            };
+            let sender = output.sender.clone();
+            let sender2 = output.sender.clone();
+
             let mut child = Command::new("sh")
                 .kill_on_drop(true)
                 .arg("-c")
@@ -234,36 +236,34 @@ impl actix::Handler<Invocation> for ShCmd {
             let h = tokio::spawn(async move {
                 tracing::debug!(?pid, "reading stdout");
                 while let Ok(Some(line)) = stdout_reader.next_line().await {
-                    todo!("forward stdout loine")
-                    // match any_event_sender
-                    //     .send(AnyEvent::External(ExternalEventsDTO::stdout_line(
-                    //         id,
-                    //         line,
-                    //         (*sh_prefix).clone(),
-                    //     )))
-                    //     .await
-                    // {
-                    //     Ok(_) => tracing::trace!("did forward stdout line"),
-                    //     Err(_) => tracing::error!("could not send stdout line"),
-                    // }
+                    match sender
+                        .send(TaggedEvent::new(id, AnyEvent::External(ExternalEventsDTO::stdout_line(
+                            id,
+                            line,
+                            (*sh_prefix).clone(),
+                        ))))
+                        .await
+                    {
+                        Ok(_) => tracing::trace!("did forward stdout line"),
+                        Err(_) => tracing::error!("could not send stdout line"),
+                    }
                 }
             }.instrument(Span::current()));
 
             let h2 = tokio::spawn(async move {
                 tracing::debug!(?pid, "reading stderr");
                 while let Ok(Some(line)) = stderr_reader.next_line().await {
-                    todo!("forward sterr loine")
-                    // match any_event_sender2
-                    //     .send(AnyEvent::External(ExternalEventsDTO::stderr_line(
-                    //         id,
-                    //         line,
-                    //         (*sh_prefix_2).clone(),
-                    //     )))
-                    //     .await
-                    // {
-                    //     Ok(_) => tracing::trace!("did forward stderr line"),
-                    //     Err(_) => tracing::error!("could not send stderr line"),
-                    // }
+                    match sender2
+                        .send(TaggedEvent::new(id, AnyEvent::External(ExternalEventsDTO::stderr_line(
+                            id,
+                            line,
+                            (*sh_prefix_2).clone(),
+                        ))))
+                        .await
+                    {
+                        Ok(_) => tracing::trace!("did forward stderr line"),
+                        Err(_) => tracing::error!("could not send stderr line"),
+                    }
                 }
             }.instrument(Span::current()));
 
