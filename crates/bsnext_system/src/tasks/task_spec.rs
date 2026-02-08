@@ -66,12 +66,12 @@ impl TaskSpec {
             tasks: p0.to_vec(),
         }
     }
-    pub fn seq_from(p0: &[RunOptItem]) -> Self {
+    pub fn seq_from(run_items: &[RunOptItem]) -> Self {
         Self {
             run_kind: RunKind::Sequence {
                 opts: SequenceOpts::default(),
             },
-            tasks: p0.iter().map(Runnable::from).collect(),
+            tasks: run_items.iter().map(Runnable::from).collect(),
         }
     }
 

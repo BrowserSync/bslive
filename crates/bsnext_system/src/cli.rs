@@ -3,6 +3,7 @@ use crate::args::{Args, SubCommands};
 use crate::export::export_cmd;
 use crate::start;
 use crate::start::start_command::StartCommand;
+use crate::start::start_kind::run_from_input::RunFromInput;
 use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
@@ -105,7 +106,14 @@ where
         }
         SubCommands::Run(run) => {
             let input = run.as_input();
-            let start_kind = StartKind::FromInput(StartFromInput { input });
+            tracing::debug!(run.trailing = ?run.trailing);
+            tracing::debug!(run.sh = ?run.sh_commands);
+            let named = if run.trailing.is_empty() {
+                vec!["default".to_string()]
+            } else {
+                run.trailing
+            };
+            let start_kind = StartKind::Run(RunFromInput::new(input, named));
             start_stdout_wrapper(start_kind, cwd, writer).await
         }
     }

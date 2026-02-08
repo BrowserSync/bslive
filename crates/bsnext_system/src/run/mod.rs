@@ -1,3 +1,5 @@
+pub mod resolve_run;
+
 use bsnext_core::shared_args::LoggingOpts;
 use bsnext_input::route::{RunAll, RunOptItem, RunSeq, ShRunOptItem};
 use bsnext_input::Input;
@@ -7,7 +9,7 @@ use tracing::instrument;
 #[derive(Debug, Clone, clap::Parser)]
 pub struct RunCommand {
     /// commands to run
-    pub sh_commands_implicit: Vec<String>,
+    pub trailing: Vec<String>,
     /// commands to run
     #[arg(long = "sh")]
     pub sh_commands: Vec<String>,
@@ -46,26 +48,16 @@ impl RunCommand {
                 }));
             }
         }
-        {
-            let span = tracing::debug_span!("adding sh_commands commands from cli");
-            let _enter = span.enter();
-            for (index, sh) in self.sh_commands_implicit.iter().enumerate() {
-                tracing::info!(index = index, sh = sh);
-                list_of_commands.push(RunOptItem::Sh(ShRunOptItem {
-                    sh: sh.clone(),
-                    name: None,
-                    prefix: None,
-                }));
-            }
-        }
 
+        let mut items = vec![];
         if self.all {
             let run_all = RunAll::new(list_of_commands);
-            input.run.push(RunOptItem::All(run_all));
+            items.push(RunOptItem::All(run_all));
         } else {
             let run_seq = RunSeq::new(list_of_commands);
-            input.run.push(RunOptItem::Seq(run_seq));
+            items.push(RunOptItem::Seq(run_seq));
         }
+        input.run.insert("default".to_string(), items);
 
         input
     }

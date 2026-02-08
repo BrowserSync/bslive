@@ -4,6 +4,7 @@ use crate::startup::StartupContext;
 use crate::yml::YamlError;
 use bsnext_fs_helpers::{DirError, FsWriteError};
 use miette::JSONReportHandler;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Display, Formatter};
 use std::net::AddrParseError;
 use std::path::{Path, PathBuf};
@@ -34,7 +35,7 @@ pub struct Input {
     #[serde(default)]
     pub watchers: Vec<MultiWatch>,
     #[serde(default)]
-    pub run: Vec<RunOptItem>,
+    pub run: BTreeMap<String, Vec<RunOptItem>>,
 }
 
 impl Input {
@@ -45,8 +46,6 @@ impl Input {
         }
     }
     pub fn before_run_opts(&self) -> Vec<RunOptItem> {
-        let run_tasks = self.run.iter().map(|x| x.clone());
-
         let root_tasks = self
             .watchers
             .iter()
@@ -82,8 +81,7 @@ impl Input {
             })
             .map(BeforeRunOptItem::into_run_opt);
 
-        run_tasks
-            .chain(root_tasks)
+        root_tasks
             .chain(startup_server_tasks)
             .chain(route_startup_tasks)
             .collect::<Vec<_>>()

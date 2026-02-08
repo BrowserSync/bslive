@@ -1,12 +1,13 @@
 use actix::{
     Actor, ActorContext, ActorFutureExt, Addr, AsyncContext, Handler, ResponseActFuture,
-    ResponseFuture, Running, WrapFuture,
+    ResponseFuture, Running, WrapFuture, WrapStream,
 };
 
 use crate::any_watchable::to_any_watchables;
 use crate::monitor_path_watchables::MonitorPathWatchables;
 use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
+use crate::run::resolve_run::ResolveRunTasks;
 use crate::tasks::task_spec::TaskSpec;
 use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
@@ -36,7 +37,7 @@ use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Receiver;
-use tracing::{debug, Instrument, Span};
+use tracing::{debug, debug_span, Instrument, Span};
 
 pub mod any_watchable;
 pub mod args;
@@ -234,7 +235,6 @@ impl BsSystem {
         let all = input.before_run_opts();
         let task_spec = TaskSpec::seq_from(&all);
 
-        todo!("decide when to print this?");
         // let tree = task_spec.as_tree();
         // let next = archy(&tree, Prefix::None);
         // print!("{next}");
@@ -248,6 +248,19 @@ impl BsSystem {
             InvokeScope::new(task_scope, trigger, task_spec, comms, tx),
             rx,
         )
+    }
+
+    fn run_only(
+        &mut self,
+        addr: Addr<BsSystem>,
+        spec: TaskSpec,
+    ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
+        let comms = self.task_comms();
+        let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
+
+        let task_scope = spec.clone().to_task_scope(None, addr);
+        let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
+        (InvokeScope::new(task_scope, trigger, spec, comms, tx), rx)
     }
 }
 
@@ -264,11 +277,21 @@ async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupO
     })
 }
 
+async fn run_jobs(addr: Addr<BsSystem>, input: Input, named: Vec<String>) -> anyhow::Result<RunOk> {
+    let report_and_tree = addr.send(ResolveRunTasks::new(input, named)).await??;
+    Ok(RunOk { report_and_tree })
+}
+
 struct SetupOk {
     servers: GetActiveServersResponse,
     #[allow(dead_code)]
     report_and_tree: TaskReportAndTree,
     child_results: Vec<ChildResult>,
+}
+
+struct RunOk {
+    #[allow(dead_code)]
+    report_and_tree: TaskReportAndTree,
 }
 
 impl Actor for BsSystem {
@@ -346,24 +369,19 @@ impl Handler<Start> for BsSystem {
                 let input_clone2 = input.clone();
                 let addr = ctx.address();
                 let jobs = setup_jobs(addr, input.clone()).instrument(Span::current());
-                let will_exit = input.servers.is_empty() && input.watchers.is_empty();
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
                         let SetupOk { servers, .. } = res.map_err(StartupError::Any)?;
                         debug!("✅ setup jobs completed");
-                        if will_exit {
-                            Ok(DidStart::WillExit)
-                        } else {
-                            ctx.notify(MonitorInput {
-                                path: path.clone(),
-                                cwd: actor.cwd.clone().unwrap(),
-                                input_ctx,
-                            });
-                            // todo: where to better sequence these side-effects?
-                            actor.accept_watchables(&input_clone2);
-                            Ok(DidStart::Started(servers))
-                        }
+                        ctx.notify(MonitorInput {
+                            path: path.clone(),
+                            cwd: actor.cwd.clone().unwrap(),
+                            input_ctx,
+                        });
+                        // todo: where to better sequence these side-effects?
+                        actor.accept_watchables(&input_clone2);
+                        Ok(DidStart::Started(servers))
                     },
                 ))
             }
@@ -373,7 +391,6 @@ impl Handler<Start> for BsSystem {
                 let addr = ctx.address();
                 let input_clone2 = input.clone();
                 let jobs = setup_jobs(addr, input.clone());
-                let will_exit = input.servers.is_empty() && input.watchers.is_empty();
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
@@ -384,12 +401,8 @@ impl Handler<Start> for BsSystem {
                             debug!("errored: {:?}", errored);
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        if will_exit {
-                            Ok(DidStart::WillExit)
-                        } else {
-                            actor.accept_watchables(&input_clone2);
-                            Ok(DidStart::Started(res.servers))
-                        }
+                        actor.accept_watchables(&input_clone2);
+                        Ok(DidStart::Started(res.servers))
                     },
                 ))
             }
@@ -403,6 +416,13 @@ impl Handler<Start> for BsSystem {
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
                 let f = ready(Ok(DidStart::Started(Default::default()))).into_actor(self);
                 Box::pin(f)
+            }
+            Ok(SystemStartArgs::RunOnly { input, named }) => {
+                let addr = ctx.address();
+                let jobs = run_jobs(addr, input.clone(), named);
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<RunOk, anyhow::Error>, actor, _ctx| Ok(DidStart::WillExit),
+                ))
             }
             Err(e) => {
                 let f = ready(Err(StartupError::InputError(*e))).into_actor(self);

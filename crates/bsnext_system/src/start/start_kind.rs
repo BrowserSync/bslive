@@ -1,4 +1,5 @@
 use crate::start::start_command::StartCommand;
+use crate::start::start_kind::run_from_input::RunFromInput;
 use crate::start::start_kind::start_from_example::StartFromExample;
 use crate::start::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
 use crate::start::start_kind::start_from_paths::StartFromTrailingArgs;
@@ -12,6 +13,7 @@ use bsnext_input::InputWriter;
 use bsnext_input::{Input, InputError};
 use std::path::{Path, PathBuf};
 
+pub mod run_from_input;
 pub mod start_from_example;
 pub mod start_from_inputs;
 pub mod start_from_paths;
@@ -19,6 +21,7 @@ pub mod start_from_paths;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum StartKind {
+    Run(RunFromInput),
     FromInput(StartFromInput),
     FromInputPaths(StartFromInputPaths),
     FromExample(StartFromExample),
@@ -83,6 +86,7 @@ impl SystemStart for StartKind {
             StartKind::FromExample(from_example) => from_example.input(ctx),
             StartKind::FromTrailingArgs(from_trailing_args) => from_trailing_args.input(ctx),
             StartKind::FromInput(from_inputs) => from_inputs.input(ctx),
+            StartKind::Run(run_from_input) => run_from_input.input(ctx),
         }
     }
 }

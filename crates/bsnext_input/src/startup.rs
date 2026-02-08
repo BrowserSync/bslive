@@ -42,6 +42,10 @@ pub enum SystemStartArgs {
         path: PathBuf,
         input_error: InputError,
     },
+    RunOnly {
+        input: Input,
+        named: Vec<String>,
+    },
 }
 
 pub trait SystemStart {

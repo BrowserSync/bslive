@@ -1,10 +1,11 @@
 run:
-  - description: An example where a sub-set of tasks are allowed to fail, but don't cause the entire tree to fail
-    seq:
-      - seq:
-          - sh: echo "does not fail!" && exit 1
-          - sh: "node examples/graceful-exit.js"
-        opts:
-          exit_on_fail: false
-      - sh: echo "does fail!!!" && exit 1
+  default:
+    - description: An example where a sub-set of tasks are allowed to fail, but don't cause the entire tree to fail
+      seq:
+        - seq:
+            - sh: echo "does not fail!" && exit 1
+            - sh: "node examples/graceful-exit.js"
+          opts:
+            exit_on_fail: false
+        - sh: echo "does fail!!!" && exit 1
 
