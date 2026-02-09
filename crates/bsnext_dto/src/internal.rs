@@ -7,6 +7,7 @@ use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError}
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
 use bsnext_task::task_report::{TaskReport, TaskResult, TaskStatus};
+use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use typeshare::typeshare;
 
@@ -187,9 +188,47 @@ pub enum ServerError {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, thiserror::Error)]
+pub struct Expected(pub Vec<String>);
+
+impl Display for Expected {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.0
+                .iter()
+                .map(|x| format!("\"{}\"", x))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, thiserror::Error)]
+pub struct Available(pub Vec<String>);
+
+impl Display for Available {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.0
+                .iter()
+                .map(|x| format!("\"{}\"", x))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, thiserror::Error)]
 pub enum InitialTaskError {
     #[error("initial tasks did not complete, as determined from report. TODO: access report here for better errors")]
     FailedReport,
+    #[error("Task(s) {expected} not found. Available: {available}")]
+    MissingTask {
+        expected: Expected,
+        available: Available,
+    },
     #[error("initial tasks did not complete, for an unknown reason")]
     FailedUnknown,
 }

@@ -421,7 +421,10 @@ impl Handler<Start> for BsSystem {
                 let addr = ctx.address();
                 let jobs = run_jobs(addr, input.clone(), named);
                 Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<RunOk, anyhow::Error>, actor, _ctx| Ok(DidStart::WillExit),
+                    move |res: Result<RunOk, anyhow::Error>, actor, _ctx| match res {
+                        Ok(_) => Ok(DidStart::WillExit),
+                        Err(err) => Err(StartupError::Any(err.into())),
+                    },
                 ))
             }
             Err(e) => {
