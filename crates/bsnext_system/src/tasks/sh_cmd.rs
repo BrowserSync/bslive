@@ -1,5 +1,7 @@
 use crate::invoke_scope::{RequestEventSender, TaggedEvent};
-use actix::{Recipient, ResponseFuture};
+use crate::tasks::IntoRecipient;
+use crate::BsSystem;
+use actix::{Actor, Addr, Recipient, ResponseFuture};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
@@ -28,9 +30,20 @@ pub struct ShCmd {
     id: Option<String>,
 }
 
-pub struct ShCmdWithLogging {
-    pub cmd: ShCmd,
-    pub request: Recipient<RequestEventSender>,
+struct ShCmdWithLogging {
+    cmd: ShCmd,
+    request: Recipient<RequestEventSender>,
+}
+
+impl IntoRecipient for ShCmd {
+    fn into_recipient(self, addr: &Addr<BsSystem>) -> Recipient<Invocation> {
+        let with_logging = ShCmdWithLogging {
+            cmd: self,
+            request: addr.clone().recipient(),
+        };
+        let actor_address = with_logging.start();
+        actor_address.recipient()
+    }
 }
 
 impl Display for ShCmd {

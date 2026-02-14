@@ -1,6 +1,6 @@
 use crate::external_event_sender::ExternalEventSenderWithLogging;
 use crate::tasks::notify_servers::{NotifyServers, NotifyServersNoOp};
-use crate::tasks::sh_cmd::{ShCmd, ShCmdWithLogging};
+use crate::tasks::sh_cmd::ShCmd;
 use crate::tasks::task_spec::{TaskSpec, TreeDisplay};
 use crate::BsSystem;
 use actix::{Actor, Addr, Recipient};
@@ -40,6 +40,10 @@ pub struct Comms {
     sys: Addr<BsSystem>,
 }
 
+pub trait IntoRecipient {
+    fn into_recipient(self: Self, addr: &Addr<BsSystem>) -> Recipient<Invocation>;
+}
+
 impl AsActor for RunnableWithComms {
     fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
         match self.runnable {
@@ -60,14 +64,7 @@ impl AsActor for RunnableWithComms {
                 let addr = actor.start();
                 addr.recipient()
             }
-            Runnable::Sh(sh) => {
-                let with_logging = ShCmdWithLogging {
-                    cmd: sh,
-                    request: self.ctx.sys.recipient(),
-                };
-                let actor_address = with_logging.start();
-                actor_address.recipient()
-            }
+            Runnable::Sh(sh) => sh.into_recipient(&self.ctx.sys),
             Runnable::Many(_) => unreachable!("The conversion to Task happens elsewhere"),
         }
     }

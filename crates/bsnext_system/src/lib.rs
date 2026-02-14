@@ -16,7 +16,6 @@ use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, Servers
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
-use bsnext_dto::archy::{archy, Prefix};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{
     AnyEvent, ChildResult, InitialTaskError, InternalEvents, ServerError, TaskReportAndTree,
@@ -37,7 +36,7 @@ use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Receiver;
-use tracing::{debug, debug_span, Instrument, Span};
+use tracing::{debug, Instrument, Span};
 
 pub mod any_watchable;
 pub mod args;
@@ -421,7 +420,7 @@ impl Handler<Start> for BsSystem {
                 let addr = ctx.address();
                 let jobs = run_jobs(addr, input.clone(), named);
                 Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<RunOk, anyhow::Error>, actor, _ctx| match res {
+                    move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
                         Ok(_) => Ok(DidStart::WillExit),
                         Err(err) => Err(StartupError::Any(err.into())),
                     },
