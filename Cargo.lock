@@ -544,6 +544,7 @@ dependencies = [
  "bsnext_fs",
  "bsnext_input",
  "bsnext_output",
+ "bsnext_task",
  "bsnext_tracing",
  "miette",
  "serde",
@@ -717,6 +718,7 @@ dependencies = [
  "bsnext_js",
  "bsnext_md",
  "bsnext_output",
+ "bsnext_task",
  "bsnext_tracing",
  "bsnext_yaml",
  "clap",
@@ -731,13 +733,23 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-stream",
- "tokio-util",
  "tracing",
 ]
 
 [[package]]
 name = "bsnext_task"
 version = "0.22.1"
+dependencies = [
+ "actix",
+ "bsnext_fs",
+ "futures-util",
+ "sqids",
+ "thiserror 1.0.60",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+]
 
 [[package]]
 name = "bsnext_tracing"
