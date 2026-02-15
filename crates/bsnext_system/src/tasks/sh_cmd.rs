@@ -214,9 +214,18 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
             let sender = output.sender.clone();
             let sender2 = output.sender.clone();
 
-            let mut child = Command::new("sh")
+            let mut command = if cfg!(target_os = "windows") {
+                let mut c = Command::new("cmd");
+                c.arg("/C");
+                c
+            } else {
+                let mut c = Command::new("sh");
+                c.arg("-c");
+                c
+            };
+
+            let mut child = command
                 .kill_on_drop(true)
-                .arg("-c")
                 .arg(cmd)
                 .env("TERM", "xterm-256color")
                 .env("CLICOLOR_FORCE", "1")
