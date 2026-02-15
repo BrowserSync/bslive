@@ -1,6 +1,6 @@
 {
   "name": "@browsersync/bslive-darwin-x64",
-  "version": "0.21.2",
+  "version": "0.22.0",
   "os": [
     "darwin"
   ],
