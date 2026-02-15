@@ -53,7 +53,8 @@
     "name": "bslive",
     "triples": {
       "additional": [
-        "aarch64-apple-darwin"
+        "aarch64-apple-darwin",
+        "aarch64-pc-windows-msvc"
       ]
     }
   },

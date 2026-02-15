@@ -31,6 +31,9 @@ jobs:
           - host: windows-latest
             target: x86_64-pc-windows-msvc
             build: npm run build -- --target x86_64-pc-windows-msvc
+          - host: windows-latest
+            target: aarch64-pc-windows-msvc
+            build: npm run build -- --target aarch64-pc-windows-msvc
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
     steps:
