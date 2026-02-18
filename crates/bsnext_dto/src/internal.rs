@@ -25,6 +25,9 @@ pub enum InternalEvents {
     InputError(InputError),
     StartupError(StartupError),
     TaskAction(TaskAction),
+    TaskSpecDisplay {
+        tree: ArchyNode,
+    },
 }
 
 #[derive(Debug, Clone)]

@@ -33,6 +33,15 @@ pub struct OverlappingOpts {
     pub exit_on_failure: bool,
 }
 
+impl Default for OverlappingOpts {
+    fn default() -> Self {
+        Self {
+            max_concurrent_items: 5,
+            exit_on_failure: true,
+        }
+    }
+}
+
 impl OverlappingOpts {
     pub fn new(max_concurrent_items: u8, exit_on_failure: bool) -> Self {
         Self {

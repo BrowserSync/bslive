@@ -7,7 +7,7 @@ use crate::any_watchable::to_any_watchables;
 use crate::monitor_path_watchables::MonitorPathWatchables;
 use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
-use crate::run::resolve_run::ResolveRunTasks;
+use crate::run::resolve_run::{InvokeRunTasks, ResolveRunTasks};
 use crate::tasks::task_spec::TaskSpec;
 use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
@@ -16,15 +16,20 @@ use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, Servers
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
+use bsnext_dto::archy::{ArchyNode, Prefix};
 use bsnext_dto::external_events::ExternalEventsDTO;
+use bsnext_dto::internal::InternalEvents::TaskSpecDisplay;
 use bsnext_dto::internal::{
     AnyEvent, ChildResult, InitialTaskError, InternalEvents, ServerError, TaskReportAndTree,
 };
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
 use bsnext_fs::{FsEvent, FsEventContext, FsEventGrouping};
-use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::startup::{
+    RunMode, StartupContext, SystemStart, SystemStartArgs, TopLevelRunMode,
+};
 use bsnext_input::{Input, InputCtx};
 use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
+use bsnext_task::RunKind;
 use input_monitor::{InputMonitor, MonitorInput};
 use invoke_scope::InvokeScope;
 use route_watchable::to_route_watchables;
@@ -276,9 +281,34 @@ async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupO
     })
 }
 
-async fn run_jobs(addr: Addr<BsSystem>, input: Input, named: Vec<String>) -> anyhow::Result<RunOk> {
-    let report_and_tree = addr.send(ResolveRunTasks::new(input, named)).await??;
+async fn run_jobs(
+    addr: Addr<BsSystem>,
+    input: Input,
+    named: Vec<String>,
+    top_level_run_mode: TopLevelRunMode,
+) -> anyhow::Result<RunOk> {
+    let spec_output = addr
+        .send(ResolveRunTasks::new(input, named, top_level_run_mode))
+        .await??;
+    let report_and_tree = addr
+        .send(InvokeRunTasks::new(spec_output.task_spec))
+        .await??;
+
     Ok(RunOk { report_and_tree })
+}
+
+async fn print_jobs(
+    addr: Addr<BsSystem>,
+    input: Input,
+    named: Vec<String>,
+    top_level_run_mode: TopLevelRunMode,
+) -> anyhow::Result<RunDryOk> {
+    let spec_output = addr
+        .send(ResolveRunTasks::new(input, named, top_level_run_mode))
+        .await??;
+    let spec = spec_output.task_spec;
+    let tree = spec.as_tree();
+    Ok(RunDryOk { tree, spec })
 }
 
 struct SetupOk {
@@ -291,6 +321,12 @@ struct SetupOk {
 struct RunOk {
     #[allow(dead_code)]
     report_and_tree: TaskReportAndTree,
+}
+
+struct RunDryOk {
+    #[allow(dead_code)]
+    tree: ArchyNode,
+    spec: TaskSpec,
 }
 
 impl Actor for BsSystem {
@@ -416,12 +452,35 @@ impl Handler<Start> for BsSystem {
                 let f = ready(Ok(DidStart::Started(Default::default()))).into_actor(self);
                 Box::pin(f)
             }
-            Ok(SystemStartArgs::RunOnly { input, named }) => {
+            Ok(SystemStartArgs::RunOnly {
+                input,
+                named,
+                run_mode: RunMode::Exec,
+                top_level_run_mode,
+            }) => {
                 let addr = ctx.address();
-                let jobs = run_jobs(addr, input.clone(), named);
+                let jobs = run_jobs(addr, input.clone(), named, top_level_run_mode);
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
                         Ok(_) => Ok(DidStart::WillExit),
+                        Err(err) => Err(StartupError::Any(err.into())),
+                    },
+                ))
+            }
+            Ok(SystemStartArgs::RunOnly {
+                input,
+                named,
+                run_mode: RunMode::Dry,
+                top_level_run_mode,
+            }) => {
+                let addr = ctx.address();
+                let jobs = print_jobs(addr, input.clone(), named, top_level_run_mode);
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<RunDryOk, anyhow::Error>, actor, _ctx| match res {
+                        Ok(RunDryOk { tree, spec: _ }) => {
+                            actor.publish_any_event(AnyEvent::Internal(TaskSpecDisplay { tree }));
+                            Ok(DidStart::WillExit)
+                        }
                         Err(err) => Err(StartupError::Any(err.into())),
                     },
                 ))

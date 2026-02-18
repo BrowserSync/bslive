@@ -74,6 +74,26 @@ impl TaskSpec {
             tasks: run_items.iter().map(Runnable::from).collect(),
         }
     }
+    pub fn all_from(run_items: &[RunOptItem]) -> Self {
+        Self {
+            run_kind: RunKind::Overlapping {
+                opts: OverlappingOpts::default(),
+            },
+            tasks: run_items.iter().map(Runnable::from).collect(),
+        }
+    }
+    pub fn seq_from_opts(run_items: &[RunOptItem], opts: SequenceOpts) -> Self {
+        Self {
+            run_kind: RunKind::Sequence { opts },
+            tasks: run_items.iter().map(Runnable::from).collect(),
+        }
+    }
+    pub fn all_from_opts(run_items: &[RunOptItem], opts: OverlappingOpts) -> Self {
+        Self {
+            run_kind: RunKind::Overlapping { opts },
+            tasks: run_items.iter().map(Runnable::from).collect(),
+        }
+    }
 
     pub fn as_id(&self) -> u64 {
         let mut hasher = DefaultHasher::new();

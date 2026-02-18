@@ -1,3 +1,4 @@
+#![deny(clippy::print_stdout, clippy::print_stderr)]
 pub mod server;
 pub mod servers_supervisor;
 

@@ -48,7 +48,9 @@ impl RunCommand {
                 }));
             }
         }
-
+        if list_of_commands.is_empty() {
+            return input;
+        };
         let mut items = vec![];
         if self.all {
             let run_all = RunAll::new(list_of_commands);
@@ -58,7 +60,6 @@ impl RunCommand {
             items.push(RunOptItem::Seq(run_seq));
         }
         input.run.insert("default".to_string(), items);
-
         input
     }
 }
