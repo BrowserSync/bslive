@@ -6,7 +6,7 @@ import {
     externalEventsDTOSchema,
     getActiveServersResponseDTOSchema,
     internalEventsDTOSchema,
-    outputLineDTOSchema
+    outputLineDTOSchema,
 } from "../generated/schema.js";
 import { clearInterval } from "node:timers";
 
@@ -26,17 +26,17 @@ const messageSchema = z.discriminatedUnion("kind", [
         kind: z.literal("ready"),
         urls: z.object({
             local: z.string(),
-            ui: z.string()
+            ui: z.string(),
         }),
-        cwd: z.string()
-    })
+        cwd: z.string(),
+    }),
 ]);
 type Msg = z.infer<typeof messageSchema>;
 const inputSchema = z.object({
-    input: z.string()
+    input: z.string(),
 });
 const cliInputSchema = z.object({
-    args: z.array(z.string())
+    args: z.array(z.string()),
 });
 
 export function cli(input: z.infer<typeof cliInputSchema>) {
@@ -53,9 +53,9 @@ export const test = base.extend<{
     run: {
         waitForOutput: (
             kind: z.infer<typeof either>["kind"],
-            count?: number
+            count?: number,
         ) => Promise<z.infer<typeof either>[]>;
-    },
+    };
     bs: {
         url: string;
         cwd: string;
@@ -70,10 +70,10 @@ export const test = base.extend<{
         didOutput: (kind: z.infer<typeof either>["kind"]) => Promise<boolean>;
         waitForOutput: (
             kind: z.infer<typeof either>["kind"],
-            count?: number
+            count?: number,
         ) => Promise<z.infer<typeof either>[]>;
         outputLines: (
-            count?: number
+            count?: number,
         ) => Promise<z.infer<typeof outputLineDTOSchema>["payload"][]>;
         api: (kind: "events") => string;
         // next: (args: NextArgs) => Promise<string[]>;
@@ -99,7 +99,7 @@ export const test = base.extend<{
 
         let child = fork(file, combined_args, {
             cwd,
-            stdio: "pipe"
+            stdio: "pipe",
         });
 
         const lines: string[] = [];
@@ -117,17 +117,17 @@ export const test = base.extend<{
                         failedMessages.push(line);
                         const loose = z.object({
                             kind: z.string(),
-                            payload: z.record(z.any())
+                            payload: z.record(z.any()),
                         });
                         const parsed = loose.safeParse(json);
                         if (parsed.error) {
                             console.log(
-                                "cannot continue - probably an unsupported type"
+                                "cannot continue - probably an unsupported type",
                             );
                         } else {
                             if (parsed.data.kind === "OutputLine") {
                                 const tryOutput = outputLineDTOSchema.safeParse(
-                                    parsed.data.payload
+                                    parsed.data.payload,
                                 );
                                 console.log(tryOutput.error);
                             }
@@ -170,7 +170,7 @@ export const test = base.extend<{
         await use({
             waitForOutput(
                 kind: z.infer<typeof either>["kind"],
-                count = 1
+                count = 1,
             ): Promise<z.infer<typeof either>[]> {
                 return new Promise((resolve, reject) => {
                     let start = Date.now();
@@ -182,7 +182,7 @@ export const test = base.extend<{
                             return;
                         }
                         const matched = parsedMessages.filter(
-                            (x) => x.kind === kind
+                            (x) => x.kind === kind,
                         );
                         if (matched.length >= count) {
                             resolve(matched);
@@ -191,7 +191,7 @@ export const test = base.extend<{
                         }
                     }, 50);
                 });
-            }
+            },
         });
 
         child.kill("SIGTERM");
@@ -219,7 +219,7 @@ export const test = base.extend<{
 
         let child = fork(file, combined_args, {
             cwd,
-            stdio: "pipe"
+            stdio: "pipe",
         });
 
         const lines: string[] = [];
@@ -237,17 +237,17 @@ export const test = base.extend<{
                         failedMessages.push(line);
                         const loose = z.object({
                             kind: z.string(),
-                            payload: z.record(z.any())
+                            payload: z.record(z.any()),
                         });
                         const parsed = loose.safeParse(json);
                         if (parsed.error) {
                             console.log(
-                                "cannot continue - probably an unsupported type"
+                                "cannot continue - probably an unsupported type",
                             );
                         } else {
                             if (parsed.data.kind === "OutputLine") {
                                 const tryOutput = outputLineDTOSchema.safeParse(
-                                    parsed.data.payload
+                                    parsed.data.payload,
                                 );
                                 console.log(tryOutput.error);
                             }
@@ -335,7 +335,7 @@ export const test = base.extend<{
             },
             waitForOutput(
                 kind: z.infer<typeof either>["kind"],
-                count = 1
+                count = 1,
             ): Promise<z.infer<typeof either>[]> {
                 return new Promise((resolve, reject) => {
                     let start = Date.now();
@@ -347,7 +347,7 @@ export const test = base.extend<{
                             return;
                         }
                         const matched = parsedMessages.filter(
-                            (x) => x.kind === kind
+                            (x) => x.kind === kind,
                         );
                         if (matched.length >= count) {
                             resolve(matched);
@@ -358,7 +358,7 @@ export const test = base.extend<{
                 });
             },
             outputLines(
-                count: number = 1
+                count: number = 1,
             ): Promise<z.infer<typeof outputLineDTOSchema>["payload"][]> {
                 return new Promise((resolve, reject) => {
                     let start = Date.now();
@@ -366,13 +366,13 @@ export const test = base.extend<{
                     let int = setInterval(() => {
                         if (Date.now() - start > max) {
                             reject(
-                                new Error(`timed out waiting for OutputLine`)
+                                new Error(`timed out waiting for OutputLine`),
                             );
                             clearInterval(int);
                             return;
                         }
                         const matched = parsedMessages.filter(
-                            (x) => x.kind === "OutputLine"
+                            (x) => x.kind === "OutputLine",
                         );
                         if (matched.length >= count) {
                             resolve(matched.map((x) => x.payload.payload));
@@ -395,7 +395,7 @@ export const test = base.extend<{
                 });
                 if (!server) {
                     throw new Error(
-                        "server not found with name: " + server_name
+                        "server not found with name: " + server_name,
                     );
                 }
                 const url = new URL(path, server.url);
@@ -411,13 +411,13 @@ export const test = base.extend<{
             stdout,
             touch: (path: string) => {
                 touchFile(join(cwd, path));
-            }
+            },
         });
 
         child.kill("SIGTERM");
 
         await closed;
-    }
+    },
 });
 
 function touchFile(filePath: string) {
@@ -429,7 +429,7 @@ export function installMockHandler() {
         calls: [],
         record: (...args) => {
             window.__playwright?.calls?.push(args);
-        }
+        },
     };
 }
 
