@@ -56,8 +56,32 @@ test.describe(
     () => {
         test("running 2 commands on cli", async ({ run }) => {
             // bs.stdout
-            const lines = await run.waitForOutput("OutputLine", 2);
-            console.log(JSON.stringify(lines, null, 2));
+            const lines = await run.waitForOutput("TaskTreeDisplay", 1);
+            expect(lines).toStrictEqual([
+                {
+                    "kind": "TaskTreeDisplay",
+                    "payload": {
+                        "tree": {
+                            "label": "[bM] Seq: 1 task(s)",
+                            "nodes": [
+                                {
+                                    "label": "[mp6u7r] Seq: 2 task(s)",
+                                    "nodes": [
+                                        {
+                                            "label": "[pW6OUa] − Runnable::Sh echo 'dry-t1'",
+                                            "nodes": []
+                                        },
+                                        {
+                                            "label": "[K4AiCF] − Runnable::Sh echo 'dry-t2'",
+                                            "nodes": []
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]);
         });
     }
 );

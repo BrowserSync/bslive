@@ -1,12 +1,10 @@
 use crate::tasks::task_spec::TaskSpec;
 use crate::BsSystem;
 use actix::{AsyncContext, ResponseFuture};
-use bsnext_dto::archy::{archy, Prefix};
 use bsnext_dto::internal::{Available, Expected, InitialTaskError, TaskReportAndTree};
 use bsnext_input::route::RunOptItem;
 use bsnext_input::startup::TopLevelRunMode;
 use bsnext_input::Input;
-use bsnext_task::RunKind;
 use std::collections::HashMap;
 
 #[derive(actix::Message)]
@@ -36,7 +34,7 @@ impl actix::Handler<ResolveRunTasks> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "ResolveRunTasks")]
     fn handle(&mut self, msg: ResolveRunTasks, ctx: &mut Self::Context) -> Self::Result {
-        let addr = ctx.address();
+        let _addr = ctx.address();
         tracing::debug!(run.lookup.keys = ?msg.named);
         tracing::debug!(run.lookup.available = ?msg.input.run.keys());
         #[derive(Debug)]

@@ -94,10 +94,11 @@ impl StartKind {
         let input = maybe_input
             .input(&Default::default())
             .and_then(|def| match def {
-                SystemStartArgs::PathWithInput { input, path } => Ok(Some(input)),
-                SystemStartArgs::PathWithInvalidInput { path, input_error } => {
-                    Err(Box::new(input_error))
-                }
+                SystemStartArgs::PathWithInput { input, path: _ } => Ok(Some(input)),
+                SystemStartArgs::PathWithInvalidInput {
+                    path: _,
+                    input_error,
+                } => Err(Box::new(input_error)),
                 SystemStartArgs::InputOnly { .. } => Ok(None),
                 SystemStartArgs::RunOnly { .. } => Ok(None),
             })?;

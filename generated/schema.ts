@@ -341,6 +341,12 @@ export const internalEventsDTOSchema = z.discriminatedUnion("kind", [
             id: z.string(),
         }),
     }),
+    z.object({
+        kind: z.literal("TaskTreeDisplay"),
+        payload: z.object({
+            tree: archyNodeSchema,
+        }),
+    }),
 ]);
 
 export const startupEventDTOSchema = z.discriminatedUnion("kind", [

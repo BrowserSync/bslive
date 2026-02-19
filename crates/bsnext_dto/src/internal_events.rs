@@ -46,7 +46,8 @@ impl OutputWriterTrait for InternalEvents {
                 TaskActionStage::Error => {}
             },
             InternalEvents::TaskSpecDisplay { tree } => {
-                writeln!(sink, "{}", serde_json::to_string(&tree)?)
+                let evt = InternalEventsDTO::TaskTreeDisplay { tree: tree.clone() };
+                writeln!(sink, "{}", serde_json::to_string(&evt)?)
                     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             }
         }

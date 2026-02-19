@@ -252,6 +252,9 @@ export type InternalEventsDTO =
 	| { kind: "ServersChanged", payload: GetActiveServersResponseDTO }
 	| { kind: "TaskReport", payload: {
 	id: string;
+}}
+	| { kind: "TaskTreeDisplay", payload: {
+	tree: ArchyNode;
 }};
 
 /** @discriminator kind */

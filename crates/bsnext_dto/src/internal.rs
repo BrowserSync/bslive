@@ -113,6 +113,7 @@ pub enum StartupEvent {
 pub enum InternalEventsDTO {
     ServersChanged(GetActiveServersResponseDTO),
     TaskReport { id: String },
+    TaskTreeDisplay { tree: ArchyNode },
 }
 
 #[derive(Debug, Clone)]
