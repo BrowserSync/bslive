@@ -1,3 +1,4 @@
+use crate::archy::{archy, ArchyNode, Prefix};
 use crate::{
     FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, OutputLineDTO, ServerIdentityDTO,
     ServersChangedDTO, StderrLineDTO, StdoutLineDTO, StoppedWatchingDTO, WatchingDTO,
@@ -20,14 +21,76 @@ pub enum ExternalEventsDTO {
     InputFileChanged(FileChangedDTO),
     InputAccepted(InputAcceptedDTO),
     OutputLine(OutputLineDTO),
+    TaskAction(TaskActionDTO),
 }
 
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TaskActionDTO {
+    pub id: String,
+    pub stage: TaskActionStageDTO,
+}
+
+/// @discriminator kind
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "kind", content = "payload")]
+pub enum TaskActionStageDTO {
+    Started {
+        tree: ArchyNode,
+    },
+    Ended {
+        tree: ArchyNode,
+        report: TaskReportDTO,
+    },
+    Error,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TaskReportDTO {
+    pub result: TaskResultDTO,
+    pub id: String,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TaskResultDTO {
+    #[allow(dead_code)]
+    pub status: TaskStatusDTO,
+    #[allow(dead_code)]
+    pub invocation_id: InvocationIdDTO,
+    #[allow(dead_code)]
+    pub task_reports: Vec<TaskReportDTO>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "kind", content = "payload")]
+pub enum TaskStatusDTO {
+    Ok,
+    Err(String),
+    Cancelled,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct InvocationIdDTO(pub String);
+
 impl ExternalEventsDTO {
-    pub fn stdout_line(line: String, prefix: Option<String>) -> Self {
-        Self::OutputLine(crate::OutputLineDTO::Stdout(StdoutLineDTO { line, prefix }))
+    pub fn stdout_line(task_id: u64, line: String, prefix: Option<String>) -> Self {
+        Self::OutputLine(crate::OutputLineDTO::Stdout(StdoutLineDTO {
+            task_id: task_id.to_string(),
+            line,
+            prefix,
+        }))
     }
-    pub fn stderr_line(line: String, prefix: Option<String>) -> Self {
-        Self::OutputLine(crate::OutputLineDTO::Stderr(StderrLineDTO { line, prefix }))
+    pub fn stderr_line(task_id: u64, line: String, prefix: Option<String>) -> Self {
+        Self::OutputLine(crate::OutputLineDTO::Stderr(StderrLineDTO {
+            task_id: task_id.to_string(),
+            line,
+            prefix,
+        }))
     }
 }
 
@@ -60,6 +123,7 @@ impl OutputWriterTrait for ExternalEventsDTO {
             ExternalEventsDTO::OutputLine(OutputLineDTO::Stderr(stderr)) => {
                 print_stderr_line(sink, stderr)
             }
+            ExternalEventsDTO::TaskAction(action) => print_task_action(sink, action),
         }
     }
 }
@@ -142,15 +206,44 @@ pub fn print_input_file_changed<W: Write>(w: &mut W, evt: &FileChangedDTO) -> an
 pub fn print_stdout_line<W: Write>(w: &mut W, line: &StdoutLineDTO) -> anyhow::Result<()> {
     match &line.prefix {
         None => writeln!(w, "{}", line.line)?,
-        Some(prefix) => writeln!(w, "\x1b[2m{}\x1b[0m {}", prefix, line.line)?,
+        Some(prefix) => {
+            let color = hash(prefix) % 256;
+            writeln!(w, "\x1b[38;5;{}m{}\x1b[0m {}", color, prefix, line.line)?
+        }
     }
     Ok(())
+}
+
+fn hash(s: &str) -> u32 {
+    s.bytes()
+        .fold(0u32, |acc, b| acc.wrapping_add(b as u32).wrapping_mul(31))
 }
 
 pub fn print_stderr_line<W: Write>(w: &mut W, line: &StderrLineDTO) -> anyhow::Result<()> {
     match &line.prefix {
         None => writeln!(w, "{}", line.line)?,
         Some(prefix) => writeln!(w, "\x1b[1;31m{}\x1b[0m {}", prefix, line.line)?,
+    }
+    Ok(())
+}
+
+pub fn print_task_action<W: Write>(w: &mut W, action_dto: &TaskActionDTO) -> anyhow::Result<()> {
+    // let id = action_dto.id;
+    match &action_dto.stage {
+        TaskActionStageDTO::Started { tree: _ } => {
+            // configure if we announce starts?
+            // let s = archy(tree, Prefix::None);
+            // write!(w, "{s}")?;
+        }
+        TaskActionStageDTO::Ended { report, tree } => match report.result.status {
+            TaskStatusDTO::Ok => {}
+            TaskStatusDTO::Err(_) => {
+                let s = archy(tree, Prefix::None);
+                write!(w, "{s}")?;
+            }
+            TaskStatusDTO::Cancelled => {}
+        },
+        TaskActionStageDTO::Error => {}
     }
     Ok(())
 }

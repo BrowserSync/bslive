@@ -162,7 +162,7 @@ fn test_watch_opts_run_all_max_concurrency() {
                     RunOptItem::Sh(ShRunOptItem::new("echo 3")),
                     RunOptItem::Sh(ShRunOptItem::new("echo 4")),
                 ],
-                RunAllOpts { max: 10 },
+                RunAllOpts::max(10),
             )),
         ]),
         ..Default::default()

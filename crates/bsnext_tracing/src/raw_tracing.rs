@@ -44,7 +44,6 @@ pub fn init_tracing_subscriber(
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)
                 .with_writer(file)
-                .with_thread_names(true)
                 .with_target(false)
                 .with_file(include_lines)
                 .with_line_number(include_lines)

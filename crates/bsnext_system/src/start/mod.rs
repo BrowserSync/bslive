@@ -19,7 +19,7 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
         let stderr = &mut std::io::stderr();
         let mut sink = StdoutTarget::new(stdout, stderr);
         while let Some(evt) = events_receiver.recv().await {
-            tracing::trace!(?evt);
+            tracing::trace!(parent: None, ?evt, "stdout_channel recv()");
             let result = match evt {
                 AnyEvent::Internal(int) => writer.write_evt(&int, &mut sink.output()),
                 AnyEvent::External(ext) => writer.write_evt(&ext, &mut sink.output()),
@@ -44,10 +44,11 @@ pub async fn with_sender(
     let startup = start_system(cwd, start_kind, events_sender).await;
     match startup {
         // If the startup was successful, keep hold of the handle to keep the system running
-        Ok(api) => match api.handle.await {
+        Ok(Some(api)) => match api.handle.await {
             Ok(..) => Ok(()),
             Err(er) => Err(anyhow::anyhow!("{}", er)),
         },
+        Ok(None) => Ok(()),
         Err(err) => {
             let as_str = err.to_string();
             let _ = ecc

@@ -1,5 +1,5 @@
-use crate::server_watchable::to_task_list;
-use crate::task_list::TaskList;
+use crate::server_watchable::to_task_spec;
+use crate::tasks::task_spec::TaskSpec;
 use bsnext_input::route::Spec;
 use bsnext_input::Input;
 use std::path::PathBuf;
@@ -8,7 +8,7 @@ use std::path::PathBuf;
 pub struct AnyWatchable {
     pub dirs: Vec<PathBuf>,
     pub spec: Spec,
-    pub task_list: Option<TaskList>,
+    pub task_spec: Option<TaskSpec>,
 }
 
 pub fn to_any_watchables(input: &Input) -> Vec<AnyWatchable> {
@@ -16,13 +16,13 @@ pub fn to_any_watchables(input: &Input) -> Vec<AnyWatchable> {
         .watchers
         .iter()
         .map(|watcher| {
-            let runner = watcher.opts.as_ref().and_then(to_task_list);
+            let task_spec = watcher.opts.as_ref().and_then(to_task_spec);
             let path_bufs = watcher.dirs.as_pathbufs();
 
             AnyWatchable {
                 dirs: path_bufs,
                 spec: watcher.opts.clone().unwrap_or_default(),
-                task_list: runner,
+                task_spec,
             }
         })
         .collect()

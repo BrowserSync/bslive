@@ -1,15 +1,14 @@
 use actix::{
     Actor, ActorContext, ActorFutureExt, Addr, AsyncContext, Handler, ResponseActFuture,
-    ResponseFuture, Running, WrapFuture,
+    ResponseFuture, Running, WrapFuture, WrapStream,
 };
 
 use crate::any_watchable::to_any_watchables;
 use crate::monitor_path_watchables::MonitorPathWatchables;
 use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
-use crate::task::{Task, TaskCommand};
-use crate::task_group::TaskGroup;
-use crate::task_list::TaskList;
+use crate::run::resolve_run::{InvokeRunTasks, ResolveRunTasks};
+use crate::tasks::task_spec::TaskSpec;
 use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;
 use bsnext_core::server::handler_routes_updated::RoutesUpdated;
@@ -17,15 +16,21 @@ use bsnext_core::servers_supervisor::actor::{ChildHandler, ChildStopped, Servers
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
 use bsnext_core::servers_supervisor::input_changed_handler::InputChanged;
 use bsnext_core::servers_supervisor::start_handler::ChildCreatedInsert;
+use bsnext_dto::archy::ArchyNode;
 use bsnext_dto::external_events::ExternalEventsDTO;
+use bsnext_dto::internal::InternalEvents::TaskSpecDisplay;
 use bsnext_dto::internal::{
     AnyEvent, ChildResult, InitialTaskError, InternalEvents, ServerError, TaskReportAndTree,
 };
 use bsnext_dto::{ActiveServer, DidStart, GetActiveServersResponse, StartupError};
 use bsnext_fs::{FsEvent, FsEventContext, FsEventGrouping};
-use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::startup::{
+    RunMode, StartupContext, SystemStart, SystemStartArgs, TopLevelRunMode,
+};
 use bsnext_input::{Input, InputCtx};
+use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use input_monitor::{InputMonitor, MonitorInput};
+use invoke_scope::InvokeScope;
 use route_watchable::to_route_watchables;
 use server_watchable::to_server_watchables;
 use start::start_kind::StartKind;
@@ -35,41 +40,36 @@ use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Receiver;
-use tracing::debug;
-use trigger_task::TriggerTask;
+use tracing::{debug, Instrument, Span};
 
 pub mod any_watchable;
 pub mod args;
 pub mod cli;
 pub mod export;
-mod ext_event_sender;
+mod external_event_sender;
 mod handle_fs_event_grouping;
 pub mod input_fs;
 mod input_monitor;
-mod input_watchable;
+mod invoke_scope;
 mod monitor_path_watchables;
 mod path_monitor;
 mod path_watchable;
 mod route_watchable;
+pub mod run;
 pub mod server_watchable;
 pub mod start;
-pub mod task;
-pub mod task_group;
-pub mod task_group_runner;
-pub mod task_list;
 pub mod tasks;
 mod trigger_fs_task;
-mod trigger_task;
 pub mod watch;
 
 #[derive(Debug)]
-pub(crate) struct BsSystem {
+pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
     any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
-    tasks: HashMap<FsEventContext, TaskList>,
+    task_spec_mapping: HashMap<FsEventContext, TaskSpec>,
     cwd: Option<PathBuf>,
     start_context: Option<StartupContext>,
 }
@@ -136,7 +136,7 @@ impl BsSystem {
             any_event_sender: None,
             input_monitors: None,
             any_monitors: Default::default(),
-            tasks: Default::default(),
+            task_spec_mapping: Default::default(),
             cwd: None,
             start_context: None,
         }
@@ -229,19 +229,41 @@ impl BsSystem {
         }
     }
 
-    fn before(&mut self, input: &Input) -> (TriggerTask, Receiver<TaskReportAndTree>) {
-        let cmd = TaskCommand::Exec {
-            invocation_id: 0,
-            task_comms: self.task_comms(),
-        };
-
+    fn before(
+        &mut self,
+        input: &Input,
+        addr: Addr<BsSystem>,
+    ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
+        let comms = self.task_comms();
         let all = input.before_run_opts();
+        let task_spec = TaskSpec::seq_from(&all);
+
+        // let tree = task_spec.as_tree();
+        // let next = archy(&tree, Prefix::None);
+        // print!("{next}");
+
+        let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
+
         debug!("{} before tasks to execute", all.len());
-        let runner = TaskList::seq_from(&all);
-        let task_group = TaskGroup::from(runner.clone());
-        let task = Task::Group(task_group);
+        let task_scope = task_spec.clone().to_task_scope(None, addr);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
-        (TriggerTask::new(task, cmd, runner, tx), rx)
+        (
+            InvokeScope::new(task_scope, trigger, task_spec, comms, tx),
+            rx,
+        )
+    }
+
+    fn run_only(
+        &mut self,
+        addr: Addr<BsSystem>,
+        spec: TaskSpec,
+    ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
+        let comms = self.task_comms();
+        let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
+
+        let task_scope = spec.clone().to_task_scope(None, addr);
+        let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
+        (InvokeScope::new(task_scope, trigger, spec, comms, tx), rx)
     }
 }
 
@@ -258,11 +280,52 @@ async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupO
     })
 }
 
+async fn run_jobs(
+    addr: Addr<BsSystem>,
+    input: Input,
+    named: Vec<String>,
+    top_level_run_mode: TopLevelRunMode,
+) -> anyhow::Result<RunOk> {
+    let spec_output = addr
+        .send(ResolveRunTasks::new(input, named, top_level_run_mode))
+        .await??;
+    let report_and_tree = addr
+        .send(InvokeRunTasks::new(spec_output.task_spec))
+        .await??;
+
+    Ok(RunOk { report_and_tree })
+}
+
+async fn print_jobs(
+    addr: Addr<BsSystem>,
+    input: Input,
+    named: Vec<String>,
+    top_level_run_mode: TopLevelRunMode,
+) -> anyhow::Result<RunDryOk> {
+    let spec_output = addr
+        .send(ResolveRunTasks::new(input, named, top_level_run_mode))
+        .await??;
+    let spec = spec_output.task_spec;
+    let tree = spec.as_tree();
+    Ok(RunDryOk { tree, spec })
+}
+
 struct SetupOk {
     servers: GetActiveServersResponse,
     #[allow(dead_code)]
     report_and_tree: TaskReportAndTree,
     child_results: Vec<ChildResult>,
+}
+
+struct RunOk {
+    #[allow(dead_code)]
+    report_and_tree: TaskReportAndTree,
+}
+
+struct RunDryOk {
+    #[allow(dead_code)]
+    tree: ArchyNode,
+    spec: TaskSpec,
 }
 
 impl Actor for BsSystem {
@@ -299,7 +362,7 @@ impl Handler<StopSystem> for BsSystem {
     }
 }
 
-#[derive(actix::Message)]
+#[derive(Debug, actix::Message)]
 #[rtype(result = "Result<DidStart, StartupError>")]
 pub struct Start {
     pub kind: StartKind,
@@ -311,6 +374,7 @@ pub struct Start {
 impl Handler<Start> for BsSystem {
     type Result = ResponseActFuture<Self, Result<DidStart, StartupError>>;
 
+    #[tracing::instrument(name = "BsSystem->Start", skip(self, msg, ctx))]
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
         self.any_event_sender = Some(msg.events_sender.clone());
         self.cwd = Some(msg.cwd);
@@ -338,11 +402,12 @@ impl Handler<Start> for BsSystem {
                 let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
                 let input_clone2 = input.clone();
                 let addr = ctx.address();
-                let jobs = setup_jobs(addr, input.clone());
+                let jobs = setup_jobs(addr, input.clone()).instrument(Span::current());
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
                         let SetupOk { servers, .. } = res.map_err(StartupError::Any)?;
+                        debug!("✅ setup jobs completed");
                         ctx.notify(MonitorInput {
                             path: path.clone(),
                             cwd: actor.cwd.clone().unwrap(),
@@ -364,6 +429,7 @@ impl Handler<Start> for BsSystem {
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
                         let res = res?;
+                        debug!("✅ setup jobs completed");
                         let errored = ChildResult::first_server_error(&res.child_results);
                         if let Some(server_error) = errored {
                             debug!("errored: {:?}", errored);
@@ -384,6 +450,39 @@ impl Handler<Start> for BsSystem {
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
                 let f = ready(Ok(DidStart::Started(Default::default()))).into_actor(self);
                 Box::pin(f)
+            }
+            Ok(SystemStartArgs::RunOnly {
+                input,
+                named,
+                run_mode: RunMode::Exec,
+                top_level_run_mode,
+            }) => {
+                let addr = ctx.address();
+                let jobs = run_jobs(addr, input.clone(), named, top_level_run_mode);
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
+                        Ok(_) => Ok(DidStart::WillExit),
+                        Err(err) => Err(StartupError::Any(err.into())),
+                    },
+                ))
+            }
+            Ok(SystemStartArgs::RunOnly {
+                input,
+                named,
+                run_mode: RunMode::Dry,
+                top_level_run_mode,
+            }) => {
+                let addr = ctx.address();
+                let jobs = print_jobs(addr, input.clone(), named, top_level_run_mode);
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<RunDryOk, anyhow::Error>, actor, _ctx| match res {
+                        Ok(RunDryOk { tree, spec: _ }) => {
+                            actor.publish_any_event(AnyEvent::Internal(TaskSpecDisplay { tree }));
+                            Ok(DidStart::WillExit)
+                        }
+                        Err(err) => Err(StartupError::Any(err.into())),
+                    },
+                ))
             }
             Err(e) => {
                 let f = ready(Err(StartupError::InputError(*e))).into_actor(self);
@@ -544,7 +643,8 @@ impl actix::Handler<ResolveInitialTasks> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "Handler->ResolveInitialTasks->BsSystem")]
     fn handle(&mut self, msg: ResolveInitialTasks, ctx: &mut Self::Context) -> Self::Result {
-        let (next, rx) = self.before(&msg.input);
+        let addr = ctx.address();
+        let (next, rx) = self.before(&msg.input, addr);
         ctx.notify(next);
 
         Box::pin(async move {

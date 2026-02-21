@@ -4,7 +4,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use crate::any_watchable::AnyWatchable;
 use crate::route_watchable::RouteWatchable;
 use crate::server_watchable::ServerWatchable;
-use crate::task_list::TaskList;
+use crate::tasks::task_spec::TaskSpec;
 use bsnext_input::route::Spec;
 use std::path::Path;
 
@@ -66,11 +66,11 @@ impl PathWatchable {
         hasher.finish()
     }
 
-    pub fn task_list(&self) -> Option<&TaskList> {
+    pub fn task_spec(&self) -> Option<&TaskSpec> {
         match self {
-            PathWatchable::Server(server) => server.task_list.as_ref(),
-            PathWatchable::Route(route) => route.task_list.as_ref(),
-            PathWatchable::Any(any) => any.task_list.as_ref(),
+            PathWatchable::Server(server) => server.task_spec.as_ref(),
+            PathWatchable::Route(route) => route.task_spec.as_ref(),
+            PathWatchable::Any(any) => any.task_spec.as_ref(),
         }
     }
 }

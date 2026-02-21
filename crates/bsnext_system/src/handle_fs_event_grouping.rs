@@ -1,12 +1,13 @@
 use crate::input_fs::from_input_path;
 use crate::path_monitor::PathMonitorMeta;
 use crate::path_watchable::PathWatchable;
-use crate::task::{Task, TaskCommand, TaskComms};
-use crate::task_group::TaskGroup;
-use crate::task_list::{BsLiveTask, Runnable, TaskList};
-use crate::trigger_fs_task::TriggerFsTask;
+use crate::tasks::bs_live_task::BsLiveTask;
+use crate::tasks::task_comms::TaskComms;
+use crate::tasks::task_spec::TaskSpec;
+use crate::tasks::Runnable;
+use crate::trigger_fs_task::TriggerFsTaskEvent;
 use crate::{BsSystem, OverrideInput};
-use actix::AsyncContext;
+use actix::{Addr, AsyncContext};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
@@ -16,20 +17,25 @@ use bsnext_fs::{
     PathDescriptionOwned, PathEvent,
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
+use bsnext_task::task_scope::TaskScope;
+use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use tracing::{debug_span, info};
 
 impl actix::Handler<FsEventGrouping> for BsSystem {
     type Result = ();
 
     fn handle(&mut self, msg: FsEventGrouping, ctx: &mut Self::Context) -> Self::Result {
+        let addr = ctx.address();
         let span = debug_span!("Handler->FsEventGrouping->BsSystem");
         let _guard = span.enter();
         let next = match msg {
             FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event),
             FsEventGrouping::BufferedChange(buff) => {
-                if let Some((task, cmd, runner)) = self.handle_buffered(buff) {
+                if let Some((task_scope, task_trigger, task_spec)) =
+                    self.handle_buffered(buff, addr)
+                {
                     tracing::debug!("will trigger task runner");
-                    ctx.notify(TriggerFsTask::new(task, cmd, runner));
+                    ctx.notify(TriggerFsTaskEvent::new(task_scope, task_trigger, task_spec));
                 }
                 None
             }
@@ -98,7 +104,8 @@ impl BsSystem {
     fn handle_buffered(
         &mut self,
         buf: BufferedChangeEvent,
-    ) -> Option<(Task, TaskCommand, TaskList)> {
+        addr: Addr<BsSystem>,
+    ) -> Option<(TaskScope, TaskTrigger, TaskSpec)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
@@ -125,35 +132,29 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let fs_event_runner = self.as_runner_for_fs_event(&change.fs_ctx);
+        let fs_triggered_task_spec = self.task_spec_for_fs_event(&change.fs_ctx);
 
-        let cmd = TaskCommand::Changes {
+        let variant = TaskTriggerSource::FsChanges {
             changes: paths,
             fs_event_context: change.fs_ctx,
-            task_comms: self.task_comms(),
-            invocation_id: 0,
         };
 
-        // todo: use this example as a way to display a dry-run scenario
-        // let tree = runner.as_tree();
-        // let as_str = archy(&tree, None);
-        // println!("upcoming-->");
-        // println!("{as_str}");
-        let task_group = TaskGroup::from(fs_event_runner.clone());
+        let task_trigger = TaskTrigger::new(variant, 0);
 
-        Some((Task::Group(task_group), cmd, fs_event_runner))
+        Some((
+            fs_triggered_task_spec
+                .clone()
+                .to_task_scope(self.servers_addr.clone(), addr),
+            task_trigger,
+            fs_triggered_task_spec,
+        ))
     }
 
     pub fn task_comms(&mut self) -> TaskComms {
-        let (Some(any_event_sender), Some(servers_addr)) =
-            (&self.any_event_sender, &self.servers_addr)
-        else {
+        let Some(any_event_sender) = &self.any_event_sender else {
             todo!("must have these senders...?");
         };
-        TaskComms::new(
-            any_event_sender.clone(),
-            Some(servers_addr.clone().recipient()),
-        )
+        TaskComms::new(any_event_sender.clone())
     }
 
     fn handle_any_change(
@@ -229,23 +230,23 @@ impl BsSystem {
     }
 
     #[tracing::instrument(skip_all)]
-    fn as_runner_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskList {
+    fn task_spec_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskSpec {
         let Some(path_watchable) = self.path_watchable(fs_event_ctx) else {
             tracing::error!("did not find a matching monitor");
-            return TaskList::seq(&[]);
+            return TaskSpec::seq(&[]);
         };
 
         info!("matching monitor, path_watchable: {}", path_watchable);
         info!("matching fs_event_ctx: {:?}", fs_event_ctx);
 
-        let custom_task_list = path_watchable.task_list();
-        if custom_task_list.is_none() {
+        let custom_task_spec = path_watchable.task_spec();
+        if custom_task_spec.is_none() {
             info!("no custom tasks given, NotifyServer + ExtEvent will be defaults");
         }
-        custom_task_list.map(ToOwned::to_owned).unwrap_or_else(|| {
-            TaskList::seq(&[
+        custom_task_spec.map(ToOwned::to_owned).unwrap_or_else(|| {
+            TaskSpec::seq(&[
                 Runnable::BsLiveTask(BsLiveTask::NotifyServer),
-                Runnable::BsLiveTask(BsLiveTask::ExtEvent),
+                Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent),
             ])
         })
     }

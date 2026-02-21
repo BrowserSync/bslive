@@ -1,5 +1,5 @@
-use crate::server_watchable::to_task_list;
-use crate::task_list::TaskList;
+use crate::server_watchable::to_task_spec;
+use crate::tasks::task_spec::TaskSpec;
 use bsnext_input::route::{DirRoute, FilterKind, RawRoute, RouteKind, Spec, SseOpts};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::watch_opts::WatchOpts;
@@ -12,7 +12,7 @@ pub struct RouteWatchable {
     pub route_path: String,
     pub dir: PathBuf,
     pub spec: Spec,
-    pub task_list: Option<TaskList>,
+    pub task_spec: Option<TaskSpec>,
 }
 
 pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
@@ -37,22 +37,27 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                     let identity = server_config.identity.clone();
 
                     let spec = to_spec(&r.opts.watch);
-                    let run = to_task_list(&spec);
+                    let run = to_task_spec(&spec);
                     let route_path = r.path.as_str().to_owned();
 
-                    Some(RouteWatchable {
+                    let route_watchable = RouteWatchable {
                         server_identity: identity,
                         route_path,
                         dir: pb,
                         spec,
-                        task_list: run,
-                    })
+                        task_spec: run,
+                    };
+
+                    tracing::trace!(?route_watchable);
+
+                    Some(route_watchable)
                 })
         })
         .collect()
 }
 
 pub fn maybe_source_file(raw_route: &RawRoute) -> Option<&Path> {
+    // todo(Shane): support file: in more places for directly serving
     match raw_route {
         RawRoute::Sse {
             sse: SseOpts { body, .. },

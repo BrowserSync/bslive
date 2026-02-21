@@ -31,6 +31,10 @@ pub async fn main() -> Result<(), anyhow::Error> {
         .await
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
+    let Some(api) = api else {
+        unreachable!("failed if we get here")
+    };
+
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         if let Err(e) = api.stop().await {

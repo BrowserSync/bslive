@@ -1,23 +1,28 @@
 use actix::{Actor, ActorFutureExt, Recipient, ResponseActFuture, WrapFuture};
-use bsnext_dto::internal::{AnyEvent, InvocationId, TaskResult};
-use bsnext_system::task::{AsActor, TaskCommand, TaskComms};
-use bsnext_system::task_group::{DynItem, TaskGroup};
-use bsnext_system::task_group_runner::TaskGroupRunner;
+use bsnext_dto::internal::AnyEvent;
+use bsnext_task::as_actor::AsActor;
+use bsnext_task::invocation::Invocation;
+use bsnext_task::task_entry::TaskEntry;
+use bsnext_task::task_report::{InvocationId, TaskResult};
+use bsnext_task::task_scope::TaskScope;
+use bsnext_task::task_scope_runner::TaskScopeRunner;
+use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
+use std::time::Duration;
 
 #[actix_rt::test]
-async fn test_task_group_runner() -> anyhow::Result<()> {
+async fn test_task_scope_runner() -> anyhow::Result<()> {
     let tasks: Vec<_> = vec![
-        DynItem::new(
+        TaskEntry::new(
             mock_f(async {
                 println!("did run");
                 ()
             }),
             1,
         ),
-        DynItem::new(
+        TaskEntry::new(
             mock_f(async {
                 println!("did run 2");
                 ()
@@ -25,25 +30,25 @@ async fn test_task_group_runner() -> anyhow::Result<()> {
             2,
         ),
     ];
-    let task_group = TaskGroup::seq(tasks, Default::default(), 0);
-    let task_group_runner = TaskGroupRunner::new(task_group);
-    let addr = task_group_runner.start();
+    let task_scope = TaskScope::seq(tasks, Default::default(), 0);
+    let task_scope_runner = TaskScopeRunner::new(task_scope);
+    let addr = task_scope_runner.start();
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
+    let (_tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
+    let variant = TaskTriggerSource::FsChanges {
+        changes: vec![],
+        fs_event_context: Default::default(),
+    };
+    // let comms = TaskComms {
+    //     any_event_sender: tx,
+    // };
+    let id = 0;
+    let trigger = TaskTrigger::new(variant, id);
 
-    let task_result = addr
-        .send(TaskCommand::Changes {
-            changes: vec![],
-            fs_event_context: Default::default(),
-            task_comms: TaskComms {
-                servers_recip: None,
-                any_event_sender: tx,
-            },
-            invocation_id: 0,
-        })
-        .await
-        .unwrap();
-    let _evt = rx.recv().await;
+    let one_task = Invocation::new(0, trigger);
+
+    let task_result = addr.send(one_task).await.unwrap();
+    let _evt = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await;
     assert_eq!(task_result.task_reports.len(), 2);
     Ok(())
 }
@@ -61,10 +66,10 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
     impl Actor for A {
         type Context = actix::Context<Self>;
     }
-    impl actix::Handler<TaskCommand> for A {
+    impl actix::Handler<Invocation> for A {
         type Result = ResponseActFuture<Self, TaskResult>;
 
-        fn handle(&mut self, _msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, _invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
             let f = self.f.take().unwrap();
             Box::pin(
                 f.into_actor(self)
@@ -73,7 +78,7 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
         }
     }
     impl AsActor for A {
-        fn into_task_recipient(self: Box<Self>) -> Recipient<TaskCommand> {
+        fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
             let a = self.start();
             a.recipient()
         }

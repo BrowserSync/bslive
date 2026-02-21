@@ -1,4 +1,6 @@
+use crate::run::RunCommand;
 use crate::start::start_command::StartCommand;
+use crate::start::start_kind::run_from_input::RunFromInput;
 use crate::start::start_kind::start_from_example::StartFromExample;
 use crate::start::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
 use crate::start::start_kind::start_from_paths::StartFromTrailingArgs;
@@ -6,12 +8,15 @@ use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_fs_helpers::{fs_write_str, FsWriteError, WriteMode};
 use bsnext_input::route::{CorsOpts, Opts, Route};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
-use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::startup::{
+    RunMode, StartupContext, SystemStart, SystemStartArgs, TopLevelRunMode,
+};
 use bsnext_input::target::TargetKind;
 use bsnext_input::InputWriter;
 use bsnext_input::{Input, InputError};
 use std::path::{Path, PathBuf};
 
+pub mod run_from_input;
 pub mod start_from_example;
 pub mod start_from_inputs;
 pub mod start_from_paths;
@@ -19,6 +24,7 @@ pub mod start_from_paths;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum StartKind {
+    Run(RunFromInput),
     FromInput(StartFromInput),
     FromInputPaths(StartFromInputPaths),
     FromExample(StartFromExample),
@@ -26,25 +32,8 @@ pub enum StartKind {
 }
 
 impl StartKind {
+    #[tracing::instrument(name = "from_args")]
     pub fn from_args(fs_opts: &FsOpts, input_opts: &InputOpts, cmd: &StartCommand) -> Self {
-        // todo: re-implement example command
-        // if let Some(example) = args.example {
-        //     return StartKind::FromExample(StartFromExample {
-        //         example,
-        //         write_input: args.write,
-        //         port: args.port,
-        //         temp: args.temp,
-        //         name: args.name.clone(),
-        //         target_kind: args
-        //             .target
-        //             .as_ref()
-        //             .map(ToOwned::to_owned)
-        //             .unwrap_or_default(),
-        //         dir: args.dir.clone(),
-        //         force: args.force,
-        //     });
-        // }
-
         // todo: make the addition of a proxy + route opts easier?
         if cmd.trailing.is_empty() {
             tracing::debug!("0 trailing, {} inputs", input_opts.input.len());
@@ -71,6 +60,11 @@ impl StartKind {
                 })
             }
         } else {
+            tracing::debug!(
+                "{} trailing, {} inputs",
+                cmd.trailing.len(),
+                input_opts.input.len()
+            );
             StartKind::FromTrailingArgs(StartFromTrailingArgs {
                 paths: cmd.trailing.clone(),
                 write_input: fs_opts.write,
@@ -86,6 +80,52 @@ impl StartKind {
     pub fn from_input(input: Input) -> Self {
         Self::FromInput(StartFromInput { input })
     }
+
+    #[tracing::instrument(name = "from_run_args")]
+    pub fn from_run_args(
+        fs_opts: &FsOpts,
+        input_opts: &InputOpts,
+        run: RunCommand,
+    ) -> Result<Self, Box<InputError>> {
+        let maybe_input = StartFromInputPaths {
+            input_paths: input_opts.input.clone(),
+            port: None,
+        };
+        let input = maybe_input
+            .input(&Default::default())
+            .and_then(|def| match def {
+                SystemStartArgs::PathWithInput { input, path: _ } => Ok(Some(input)),
+                SystemStartArgs::PathWithInvalidInput {
+                    path: _,
+                    input_error,
+                } => Err(Box::new(input_error)),
+                SystemStartArgs::InputOnly { .. } => Ok(None),
+                SystemStartArgs::RunOnly { .. } => Ok(None),
+            })?;
+        let from_cmd = run.as_input();
+        let input = match input {
+            None => from_cmd,
+            Some(mut input_from_file) => {
+                input_from_file.run.extend(from_cmd.run);
+                input_from_file
+            }
+        };
+        tracing::debug!(run.trailing = ?run.trailing);
+        tracing::debug!(run.sh = ?run.sh_commands);
+        let named = if run.trailing.is_empty() {
+            vec!["default".to_string()]
+        } else {
+            run.trailing
+        };
+        let run_mode = if run.dry { RunMode::Dry } else { RunMode::Exec };
+        let top_level = if run.all {
+            TopLevelRunMode::All
+        } else {
+            TopLevelRunMode::Seq
+        };
+        let start_kind = StartKind::Run(RunFromInput::new(input, named, run_mode, top_level));
+        Ok(start_kind)
+    }
 }
 
 impl SystemStart for StartKind {
@@ -95,6 +135,7 @@ impl SystemStart for StartKind {
             StartKind::FromExample(from_example) => from_example.input(ctx),
             StartKind::FromTrailingArgs(from_trailing_args) => from_trailing_args.input(ctx),
             StartKind::FromInput(from_inputs) => from_inputs.input(ctx),
+            StartKind::Run(run_from_input) => run_from_input.input(ctx),
         }
     }
 }

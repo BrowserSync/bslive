@@ -155,11 +155,19 @@ pub enum OutputLineDTO {
 }
 
 impl OutputLineDTO {
-    pub fn stdout(line: String, prefix: Option<String>) -> Self {
-        Self::Stdout(StdoutLineDTO { line, prefix })
+    pub fn stdout(task_id: u64, line: String, prefix: Option<String>) -> Self {
+        Self::Stdout(StdoutLineDTO {
+            task_id: task_id.to_string(),
+            line,
+            prefix,
+        })
     }
-    pub fn stderr(line: String, prefix: Option<String>) -> Self {
-        Self::Stderr(StderrLineDTO { line, prefix })
+    pub fn stderr(task_id: u64, line: String, prefix: Option<String>) -> Self {
+        Self::Stderr(StderrLineDTO {
+            task_id: task_id.to_string(),
+            line,
+            prefix,
+        })
     }
 }
 
@@ -172,6 +180,7 @@ pub struct ShCmdOpt {
 #[typeshare]
 #[derive(Debug, serde::Serialize, Clone)]
 pub struct StdoutLineDTO {
+    pub task_id: String,
     pub line: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<String>,
@@ -180,6 +189,7 @@ pub struct StdoutLineDTO {
 #[typeshare]
 #[derive(Debug, serde::Serialize, Clone)]
 pub struct StderrLineDTO {
+    pub task_id: String,
     pub line: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<String>,
@@ -352,6 +362,7 @@ pub struct ActiveServer {
 #[derive(Debug)]
 pub enum DidStart {
     Started(GetActiveServersResponse),
+    WillExit,
 }
 
 #[derive(Debug, thiserror::Error)]

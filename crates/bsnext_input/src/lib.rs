@@ -4,6 +4,7 @@ use crate::startup::StartupContext;
 use crate::yml::YamlError;
 use bsnext_fs_helpers::{DirError, FsWriteError};
 use miette::JSONReportHandler;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Display, Formatter};
 use std::net::AddrParseError;
 use std::path::{Path, PathBuf};
@@ -33,6 +34,8 @@ pub struct Input {
     pub servers: Vec<server_config::ServerConfig>,
     #[serde(default)]
     pub watchers: Vec<MultiWatch>,
+    #[serde(default)]
+    pub run: BTreeMap<String, Vec<RunOptItem>>,
 }
 
 impl Input {

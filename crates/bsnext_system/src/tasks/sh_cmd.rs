@@ -1,8 +1,13 @@
-use crate::task::TaskCommand;
-use actix::ResponseFuture;
+use crate::invoke_scope::{RequestEventSender, TaggedEvent};
+use crate::tasks::IntoRecipient;
+use crate::BsSystem;
+use actix::{Actor, Addr, Recipient, ResponseFuture};
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::{AnyEvent, ExitCode, InvocationId, TaskResult};
+use bsnext_dto::internal::AnyEvent;
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
+use bsnext_task::invocation::Invocation;
+use bsnext_task::task_report::{ExitCode, InvocationId, TaskResult};
+use bsnext_task::task_trigger::TaskTriggerSource;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
@@ -12,6 +17,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tracing::{Instrument, Span};
 
 pub const DEFAULT_TERMINAL_OUTPUT_PREFIX: &str = "[run]";
 
@@ -21,6 +27,23 @@ pub struct ShCmd {
     name: Option<String>,
     output: ShCmdOutput,
     timeout: ShDuration,
+    id: Option<String>,
+}
+
+struct ShCmdWithLogging {
+    cmd: ShCmd,
+    request: Recipient<RequestEventSender>,
+}
+
+impl IntoRecipient for ShCmd {
+    fn into_recipient(self, addr: &Addr<BsSystem>) -> Recipient<Invocation> {
+        let with_logging = ShCmdWithLogging {
+            cmd: self,
+            request: addr.clone().recipient(),
+        };
+        let actor_address = with_logging.start();
+        actor_address.recipient()
+    }
 }
 
 impl Display for ShCmd {
@@ -59,20 +82,9 @@ impl ShCmd {
             name: None,
             output: Default::default(),
             timeout: Default::default(),
+            id: None,
         }
     }
-    pub fn named(cmd: OsString, name: impl Into<String>) -> Self {
-        Self {
-            sh: Cmd(cmd),
-            name: Some(name.into()),
-            output: Default::default(),
-            timeout: Default::default(),
-        }
-    }
-
-    // pub fn from_opt(run_opt: &RunOptItem) -> {
-    //
-    // }
 
     pub fn named_prefix(&mut self, name: impl Into<String>) {
         self.output = ShCmdOutput::CustomNamed(name.into());
@@ -86,11 +98,11 @@ impl ShCmd {
         self.name.as_ref().map(ToOwned::to_owned)
     }
 
-    pub fn prefix(&self) -> Option<String> {
+    pub fn prefix(&self, sqid: String) -> Option<String> {
         match &self.output {
             ShCmdOutput::None => None,
             ShCmdOutput::DefaultNamed => match &self.name {
-                None => Some(DEFAULT_TERMINAL_OUTPUT_PREFIX.to_string()),
+                None => Some(format!("[{}]", sqid.get(0..6).unwrap_or(&sqid))),
                 Some(sn_name) => Some(sn_name.clone()),
             },
             ShCmdOutput::CustomNamed(name) => Some(name.clone()),
@@ -141,40 +153,79 @@ impl Deref for Cmd {
     }
 }
 
-impl actix::Actor for ShCmd {
+impl actix::Actor for ShCmdWithLogging {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        tracing::trace!(
+            sqid = self.cmd.id,
+            actor.name = "ShCmd",
+            actor.lifecyle = "started"
+        );
+    }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        tracing::trace!(
+            sqid = self.cmd.id,
+            actor.name = "ShCmd",
+            actor.lifecyle = "stopped"
+        );
+    }
 }
 
-impl actix::Handler<TaskCommand> for ShCmd {
+impl actix::Handler<Invocation> for ShCmdWithLogging {
     type Result = ResponseFuture<TaskResult>;
 
-    fn handle(&mut self, msg: TaskCommand, _ctx: &mut Self::Context) -> Self::Result {
-        let cmd = self.sh.clone();
+    #[tracing::instrument(skip_all, name = "ShCmd", fields(id=invocation.sqid()))]
+    fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
+        let sqid = invocation.sqid();
+        self.cmd.id = Some(sqid.clone());
+        let cmd = self.cmd.sh.clone();
+        let Invocation { id, trigger, .. } = invocation;
         let cmd = cmd.to_os_string();
-        tracing::debug!("ShCmd: Will run... {:?}", cmd);
-        let any_event_sender = msg.comms().any_event_sender.clone();
-        let any_event_sender2 = msg.comms().any_event_sender.clone();
-        let reason = match &msg {
-            TaskCommand::Changes { changes, .. } => format!("{} files changed", changes.len()),
-            TaskCommand::Exec { .. } => "command executed".to_string(),
+        tracing::info!("Will run... {:?}", cmd);
+        // let any_event_sender = comms.any_event_sender.clone();
+        // let any_event_sender2 = comms.any_event_sender.clone();
+        let reason = match &trigger.variant {
+            TaskTriggerSource::FsChanges { changes, .. } => {
+                format!("{} files changed", changes.len())
+            }
+            TaskTriggerSource::Exec { .. } => "command executed".to_string(),
         };
-        let files = match &msg {
-            TaskCommand::Changes { changes, .. } => changes
+
+        let files = match &trigger.variant {
+            TaskTriggerSource::FsChanges { changes, .. } => changes
                 .iter()
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
-            TaskCommand::Exec { .. } => "NONE".to_string(),
+            TaskTriggerSource::Exec => "NONE".to_string(),
         };
 
-        let sh_prefix = Arc::new(self.prefix());
+        let sh_prefix = Arc::new(self.cmd.prefix(sqid));
         let sh_prefix_2 = sh_prefix.clone();
-        let max_duration = self.timeout.duration().to_owned();
+        let max_duration = self.cmd.timeout.duration().to_owned();
+        let addr = self.request.clone();
 
         let fut = async move {
-            let mut child = Command::new("sh")
+            let Ok(output) = addr.send(RequestEventSender { id }).await else {
+                todo!("can this actually fail?");
+            };
+            let sender = output.sender.clone();
+            let sender2 = output.sender.clone();
+
+            let mut command = if cfg!(target_os = "windows") {
+                let mut c = Command::new("cmd");
+                c.arg("/C");
+                c
+            } else {
+                let mut c = Command::new("sh");
+                c.arg("-c");
+                c
+            };
+
+            let mut child = command
                 .kill_on_drop(true)
-                .arg("-c")
                 .arg(cmd)
                 .env("TERM", "xterm-256color")
                 .env("CLICOLOR_FORCE", "1")
@@ -187,7 +238,9 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 .stderr(Stdio::piped())
                 .spawn()
                 .expect("command failed to spawn?");
+
             let pid = child.id();
+            tracing::debug!(?pid);
 
             let stdout = child
                 .stdout
@@ -203,46 +256,51 @@ impl actix::Handler<TaskCommand> for ShCmd {
             let mut stderr_reader = BufReader::new(stderr).lines();
 
             let h = tokio::spawn(async move {
+                tracing::debug!(?pid, "reading stdout");
                 while let Ok(Some(line)) = stdout_reader.next_line().await {
-                    match any_event_sender
-                        .send(AnyEvent::External(ExternalEventsDTO::stdout_line(
+                    match sender
+                        .send(TaggedEvent::new(id, AnyEvent::External(ExternalEventsDTO::stdout_line(
+                            id,
                             line,
                             (*sh_prefix).clone(),
-                        )))
+                        ))))
                         .await
                     {
                         Ok(_) => tracing::trace!("did forward stdout line"),
                         Err(_) => tracing::error!("could not send stdout line"),
                     }
                 }
-            });
+            }.instrument(Span::current()));
+
             let h2 = tokio::spawn(async move {
+                tracing::debug!(?pid, "reading stderr");
                 while let Ok(Some(line)) = stderr_reader.next_line().await {
-                    match any_event_sender2
-                        .send(AnyEvent::External(ExternalEventsDTO::stderr_line(
+                    match sender2
+                        .send(TaggedEvent::new(id, AnyEvent::External(ExternalEventsDTO::stderr_line(
+                            id,
                             line,
                             (*sh_prefix_2).clone(),
-                        )))
+                        ))))
                         .await
                     {
-                        Ok(_) => tracing::trace!("did forward stdout line"),
-                        Err(_) => tracing::error!("could not send stdout line"),
+                        Ok(_) => tracing::trace!("did forward stderr line"),
+                        Err(_) => tracing::error!("could not send stderr line"),
                     }
                 }
-            });
+            }.instrument(Span::current()));
 
-            let sleep = tokio::time::sleep(max_duration);
+            let deadline = tokio::time::sleep(max_duration);
 
-            tokio::pin!(sleep);
+            tokio::pin!(deadline);
             let invocation_id = 0;
 
             let result: TaskResult = tokio::select! {
-                _ = &mut sleep => {
+                _ = &mut deadline => {
                     tracing::info!("⌛️ operation timed out");
                     TaskResult::timeout(InvocationId(invocation_id))
                 }
                 out = child.wait() => {
-                    tracing::info!("✅ operation ended");
+                    tracing::info!("child waited");
                     match out {
                         Ok(exit) => match exit.code() {
                            Some(0) => TaskResult::ok(InvocationId(invocation_id)),
@@ -270,10 +328,10 @@ impl actix::Handler<TaskCommand> for ShCmd {
                 Err(e) => tracing::trace!("failed waiting for stderr {e}"),
             };
 
-            tracing::debug!("✅ Run (+cleanup) complete");
+            tracing::info!("✅ complete");
 
             result
-        };
+        }.instrument(Span::current());
         Box::pin(fut)
     }
 }

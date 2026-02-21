@@ -9,7 +9,7 @@ fn test_input_to_str() -> anyhow::Result<()> {
     let output = MdWriter.input_to_str(&input);
     println!("{}", output);
     let input = MdFs::from_input_str(&output, &Default::default()).expect("unwrapped 2");
-    println!("{:#?}", input);
+    println!("{:?}", input);
     assert_eq!(input.servers.len(), 1);
     assert_eq!(input.servers.first().unwrap().routes.len(), 2);
     Ok(())

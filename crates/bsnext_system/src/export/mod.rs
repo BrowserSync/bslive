@@ -42,5 +42,6 @@ pub async fn export_cmd(
             todo!("handle more than 1 server for export?")
         }
         Ok(SystemStartArgs::PathWithInvalidInput { .. }) => todo!("handle PathWithInvalidInput?"),
+        Ok(SystemStartArgs::RunOnly { .. }) => todo!("handle PathWithInvalidInput?"),
     }
 }

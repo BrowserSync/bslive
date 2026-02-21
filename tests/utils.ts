@@ -50,6 +50,12 @@ interface NextArgs {
 type TServersResp = z.infer<typeof getActiveServersResponseDTOSchema>;
 
 export const test = base.extend<{
+    run: {
+        waitForOutput: (
+            kind: z.infer<typeof either>["kind"],
+            count?: number,
+        ) => Promise<z.infer<typeof either>[]>;
+    };
     bs: {
         url: string;
         cwd: string;
@@ -73,6 +79,125 @@ export const test = base.extend<{
         // next: (args: NextArgs) => Promise<string[]>;
     };
 }>({
+    run: async ({}, use, testInfo) => {
+        const json = JSON.parse(testInfo.annotations[0].type);
+        let ann;
+        if ("args" in json) {
+            ann = cliInputSchema.parse(json);
+        } else {
+            throw new Error("unreachable?");
+        }
+
+        const test_dir = ["tests"];
+        const cwd = process.cwd();
+        const base = join(cwd, ...test_dir);
+        const file = join(base, "..", "bin.js");
+        const combined_args = [...ann.args, "-f", "json"];
+
+        console.log("will exec with args: ", combined_args);
+        console.log("cmd: ", combined_args.join(" "));
+
+        let child = fork(file, combined_args, {
+            cwd,
+            stdio: "pipe",
+        });
+
+        const lines: string[] = [];
+        const parsedMessages: z.infer<typeof either>[] = [];
+        const failedMessages: string[] = [];
+        const handler = (chunk: Buffer) => {
+            for (let line of chunk.toString().split("\n")) {
+                if (line.trim() === "") continue;
+                lines.push(line);
+                console.log("-->", line);
+                try {
+                    const json = JSON.parse(line);
+                    const parsed = either.safeParse(json);
+                    if (parsed.error) {
+                        failedMessages.push(line);
+                        const loose = z.object({
+                            kind: z.string(),
+                            payload: z.record(z.any()),
+                        });
+                        const parsed = loose.safeParse(json);
+                        if (parsed.error) {
+                            console.log(
+                                "cannot continue - probably an unsupported type",
+                            );
+                        } else {
+                            if (parsed.data.kind === "OutputLine") {
+                                const tryOutput = outputLineDTOSchema.safeParse(
+                                    parsed.data.payload,
+                                );
+                                console.log(tryOutput.error);
+                            }
+                        }
+                        // console.log(parsed.error);
+                    } else {
+                        parsedMessages.push(parsed.data);
+                    }
+                } catch (e) {
+                    // something went REALLY wrong?
+                    console.log(e);
+                    console.error("JSON not accepted", json);
+                }
+            }
+        };
+        child.stdout?.on("data", handler);
+        child.stderr?.on("data", (d) => console.error(d.toString()));
+        const closed = new Promise((res, rej) => {
+            child.on("disconnect", (...args) => {
+                console.log("did disconnect", ...args);
+            });
+            child.on("close", (err, signal) => {
+                if (err) {
+                    if (err !== 0) {
+                        console.log("did close with error code", err);
+                        console.log(lines);
+                        return rej(err);
+                    }
+                }
+                console.log("did close cleanly", { signal });
+                res(signal);
+            });
+            child.on("exit", (err, signal) => {
+                console.log("did exit", { err, signal });
+            });
+            child.on("error", (err) => {
+                console.error("did error", err);
+            });
+        });
+        await use({
+            waitForOutput(
+                kind: z.infer<typeof either>["kind"],
+                count = 1,
+            ): Promise<z.infer<typeof either>[]> {
+                return new Promise((resolve, reject) => {
+                    let start = Date.now();
+                    let max = 5000;
+                    let int = setInterval(() => {
+                        if (Date.now() - start > max) {
+                            reject(new Error(`timed out waiting for ${kind}`));
+                            clearInterval(int);
+                            return;
+                        }
+                        const matched = parsedMessages.filter(
+                            (x) => x.kind === kind,
+                        );
+                        if (matched.length >= count) {
+                            resolve(matched);
+                            clearInterval(int);
+                            return;
+                        }
+                    }, 50);
+                });
+            },
+        });
+
+        child.kill("SIGTERM");
+
+        await closed;
+    },
     bs: async ({}, use, testInfo) => {
         const json = JSON.parse(testInfo.annotations[0].type);
         let ann;
@@ -91,7 +216,7 @@ export const test = base.extend<{
 
         console.log("will exec with args: ", combined_args);
         console.log("cmd: ", combined_args.join(" "));
-        
+
         let child = fork(file, combined_args, {
             cwd,
             stdio: "pipe",

@@ -3,28 +3,38 @@ use crate::BsSystem;
 use actix::{AsyncContext, ResponseFuture};
 use bsnext_dto::internal::{Available, Expected, InitialTaskError, TaskReportAndTree};
 use bsnext_input::route::RunOptItem;
+use bsnext_input::startup::TopLevelRunMode;
 use bsnext_input::Input;
 use std::collections::HashMap;
 
 #[derive(actix::Message)]
-#[rtype(result = "Result<TaskReportAndTree, InitialTaskError>")]
+#[rtype(result = "Result<ResolveRunTasksOutput, InitialTaskError>")]
 pub struct ResolveRunTasks {
     input: Input,
     named: Vec<String>,
+    top_level_run_mode: TopLevelRunMode,
+}
+
+pub struct ResolveRunTasksOutput {
+    pub task_spec: TaskSpec,
 }
 
 impl ResolveRunTasks {
-    pub fn new(input: Input, named: Vec<String>) -> Self {
-        Self { input, named }
+    pub fn new(input: Input, named: Vec<String>, top_level_run_mode: TopLevelRunMode) -> Self {
+        Self {
+            input,
+            named,
+            top_level_run_mode,
+        }
     }
 }
 
 impl actix::Handler<ResolveRunTasks> for BsSystem {
-    type Result = ResponseFuture<Result<TaskReportAndTree, InitialTaskError>>;
+    type Result = ResponseFuture<Result<ResolveRunTasksOutput, InitialTaskError>>;
 
     #[tracing::instrument(skip_all, name = "ResolveRunTasks")]
     fn handle(&mut self, msg: ResolveRunTasks, ctx: &mut Self::Context) -> Self::Result {
-        let addr = ctx.address();
+        let _addr = ctx.address();
         tracing::debug!(run.lookup.keys = ?msg.named);
         tracing::debug!(run.lookup.available = ?msg.input.run.keys());
         #[derive(Debug)]
@@ -92,10 +102,35 @@ impl actix::Handler<ResolveRunTasks> for BsSystem {
 
         tracing::debug!(run.lookup.ordered = ?ordered);
 
-        let spec = TaskSpec::seq_from(&ordered);
-        let (invoke_scope, rx) = self.run_only(addr, spec);
-        ctx.notify(invoke_scope);
+        let spec = match msg.top_level_run_mode {
+            TopLevelRunMode::Seq => TaskSpec::seq_from(&ordered),
+            TopLevelRunMode::All => TaskSpec::all_from(&ordered),
+        };
 
+        Box::pin(async move { Ok(ResolveRunTasksOutput { task_spec: spec }) })
+    }
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "Result<TaskReportAndTree, InitialTaskError>")]
+pub struct InvokeRunTasks {
+    task_spec: TaskSpec,
+}
+
+impl InvokeRunTasks {
+    pub fn new(task_spec: TaskSpec) -> Self {
+        Self { task_spec }
+    }
+}
+
+impl actix::Handler<InvokeRunTasks> for BsSystem {
+    type Result = ResponseFuture<Result<TaskReportAndTree, InitialTaskError>>;
+
+    #[tracing::instrument(skip_all, name = "ResolveRunTasks")]
+    fn handle(&mut self, msg: InvokeRunTasks, ctx: &mut Self::Context) -> Self::Result {
+        let addr = ctx.address();
+        let (invoke_scope, rx) = self.run_only(addr, msg.task_spec);
+        ctx.notify(invoke_scope);
         Box::pin(async move {
             match rx.await {
                 Ok(TaskReportAndTree { report, tree }) if report.is_ok() => {

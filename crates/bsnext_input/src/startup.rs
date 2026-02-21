@@ -42,6 +42,24 @@ pub enum SystemStartArgs {
         path: PathBuf,
         input_error: InputError,
     },
+    RunOnly {
+        input: Input,
+        named: Vec<String>,
+        run_mode: RunMode,
+        top_level_run_mode: TopLevelRunMode,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum RunMode {
+    Exec,
+    Dry,
+}
+
+#[derive(Debug, Clone)]
+pub enum TopLevelRunMode {
+    Seq,
+    All,
 }
 
 pub trait SystemStart {

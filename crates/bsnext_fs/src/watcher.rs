@@ -16,6 +16,8 @@ pub fn create_watcher(
         let span = tracing::span!(tracing::Level::TRACE, "raw");
         let _guard = span.enter();
         match res {
+            // todo: fix this, caused by log output on linux
+            // 2026-02-15T11:23:28.459104Z TRACE notify-rs inotify loop raw: [not-accepted] event=Event { kind: Modify(Data(Any)), paths: ["/usr/local/ddg/www-release/frontend/./bslive.log"], attr:tracker: None, attr:flag: None, attr:info: None, attr:source: None }
             Ok(event) if platform_accepts(&event) => {
                 if event.paths.iter().any(|p| {
                     is_ignored_path_type(&p.as_path())

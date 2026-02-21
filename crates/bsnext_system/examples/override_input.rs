@@ -46,6 +46,10 @@ servers:
         .await
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
+    let Some(api) = api else {
+        unreachable!("failed if we get here")
+    };
+
     let active_servers = api.active_servers().await?;
     let s1 = active_servers.first().unwrap();
 

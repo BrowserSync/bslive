@@ -49,7 +49,7 @@ where
         line_opts,
     );
 
-    tracing::debug!("{:#?}", args);
+    tracing::debug!("{:?}", args);
 
     let format_clone = format;
 
@@ -101,6 +101,10 @@ where
             let multi = MultiWatch::from(watch);
             input.watchers.push(multi);
             let start_kind = StartKind::FromInput(StartFromInput { input });
+            start_stdout_wrapper(start_kind, cwd, writer).await
+        }
+        SubCommands::Run(run) => {
+            let start_kind = StartKind::from_run_args(&args.fs_opts, &args.input_opts, run)?;
             start_stdout_wrapper(start_kind, cwd, writer).await
         }
     }

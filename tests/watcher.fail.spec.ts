@@ -23,8 +23,16 @@ test.describe(
             bs.touch("examples/watch/src/index.html");
             const lines = await bs.outputLines(2);
             expect(lines).toStrictEqual([
-                { line: "start.a", prefix: "[run]" },
-                { line: "start.b", prefix: "[run]" },
+                {
+                    line: "start.a",
+                    prefix: "[KWpxOO]",
+                    task_id: "12811876391347057540",
+                },
+                {
+                    line: "start.b",
+                    prefix: "[aP4ZWs]",
+                    task_id: "9235661974223744739",
+                },
             ]);
         });
     },

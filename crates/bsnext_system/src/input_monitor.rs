@@ -46,7 +46,7 @@ impl actix::Handler<MonitorInput> for BsSystem {
         let pw = PathWatchable::Any(AnyWatchable {
             dirs: vec![msg.path.to_path_buf()],
             spec: Spec::default(),
-            task_list: None,
+            task_spec: None,
         });
 
         let input_path_monitor = PathMonitor::new(sys, debounce, cwd, ctx, pw);
