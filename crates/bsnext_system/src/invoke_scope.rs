@@ -3,9 +3,9 @@ use crate::tasks::task_spec::TaskSpec;
 use crate::BsSystem;
 use actix::Handler;
 use actix::ResponseActFuture;
-use actix::StreamHandler;
 use actix::WrapFuture;
 use actix::{ActorFutureExt, ResponseFuture};
+use actix_rt::Arbiter;
 use bsnext_dto::internal::{AnyEvent, TaskActionStage, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
@@ -13,7 +13,9 @@ use bsnext_task::task_report::TaskReport;
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::TaskTrigger;
 use std::collections::HashMap;
+use std::convert::Infallible;
 use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 /// A struct representing a message to trigger a specific task in the system.
 /// This message will be handled by an actor in the Actix framework.
@@ -74,33 +76,31 @@ pub struct OutputStream {
 }
 
 #[derive(actix::Message)]
-#[rtype(result = "OutputStream")]
+#[rtype(result = "Result<OutputStream, anyhow::Error>")]
 pub struct RequestEventSender {
     pub id: u64,
 }
 
 impl Handler<RequestEventSender> for BsSystem {
-    type Result = ResponseFuture<OutputStream>;
+    type Result = ResponseFuture<Result<OutputStream, anyhow::Error>>;
 
     fn handle(&mut self, _msg: RequestEventSender, ctx: &mut Self::Context) -> Self::Result {
         let (tx, rx) = tokio::sync::mpsc::channel::<TaggedEvent>(100);
-        let stream = ReceiverStream::new(rx);
-        <Self as StreamHandler<TaggedEvent>>::add_stream(stream, ctx);
-        Box::pin(async move { OutputStream { sender: tx } })
-    }
-}
-
-impl actix::StreamHandler<TaggedEvent> for BsSystem {
-    fn handle(&mut self, item: TaggedEvent, _ctx: &mut Self::Context) {
-        self.publish_any_event(item.event)
-    }
-
-    fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!("stream started");
-    }
-
-    fn finished(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!("stream ended!");
+        let mut stream = ReceiverStream::new(rx);
+        if let Some(any_event_sender) = &self.any_event_sender {
+            Arbiter::current().spawn({
+                let events_sender = any_event_sender.clone();
+                async move {
+                    while let Some(evt) = stream.next().await {
+                        match events_sender.send(evt.event).await {
+                            Ok(_) => {}
+                            Err(_) => tracing::error!("could not send"),
+                        }
+                    }
+                }
+            });
+        }
+        Box::pin(async move { Ok(OutputStream { sender: tx }) })
     }
 }
 

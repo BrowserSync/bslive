@@ -54,7 +54,7 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
             TaskTriggerSource::Exec => vec![],
         };
         Box::pin(async move {
-            let Ok(output) = addr.send(RequestEventSender { id }).await else {
+            let Ok(Ok(output)) = addr.send(RequestEventSender { id }).await else {
                 todo!("can this actually fail?");
             };
             for evt in events {

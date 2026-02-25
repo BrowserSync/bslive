@@ -208,7 +208,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         let addr = self.request.clone();
 
         let fut = async move {
-            let Ok(output) = addr.send(RequestEventSender { id }).await else {
+            let Ok(Ok(output)) = addr.send(RequestEventSender { id }).await else {
                 todo!("can this actually fail?");
             };
             let sender = output.sender.clone();
