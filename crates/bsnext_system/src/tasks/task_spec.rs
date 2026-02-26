@@ -1,3 +1,4 @@
+use crate::capabilities::Capabilities;
 use crate::tasks::{append_with_reports, Comms, Index, Runnable, RunnableWithComms};
 use crate::BsSystem;
 use actix::Addr;
@@ -155,7 +156,7 @@ impl TaskSpec {
     pub fn to_task_scope(
         self,
         servers_addr: Option<Addr<ServersSupervisor>>,
-        sys_addr: Addr<BsSystem>,
+        capabilities_addr: Addr<Capabilities>,
     ) -> TaskScope {
         let parent_id = self.as_id();
         let inner_tasks = self
@@ -166,14 +167,17 @@ impl TaskSpec {
                 let item_id = runnable.as_id_with(Index(index_position as u64));
                 match runnable {
                     Runnable::Many(task_spec) => TaskEntry::new(
-                        Box::new(task_spec.to_task_scope(servers_addr.clone(), sys_addr.clone())),
+                        Box::new(
+                            task_spec
+                                .to_task_scope(servers_addr.clone(), capabilities_addr.clone()),
+                        ),
                         item_id,
                     ),
                     _ => {
                         let with_ctx = RunnableWithComms {
                             ctx: Comms {
                                 servers_addr: servers_addr.clone(),
-                                sys: sys_addr.clone(),
+                                capabilities: capabilities_addr.clone(),
                             },
                             runnable,
                         };

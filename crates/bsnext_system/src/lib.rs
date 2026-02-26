@@ -4,6 +4,7 @@ use actix::{
 };
 
 use crate::any_watchable::to_any_watchables;
+use crate::capabilities::Capabilities;
 use crate::monitor_path_watchables::MonitorPathWatchables;
 use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::path_watchable::PathWatchable;
@@ -44,6 +45,7 @@ use tracing::{debug, Instrument, Span};
 
 pub mod any_watchable;
 pub mod args;
+pub mod capabilities;
 pub mod cli;
 pub mod export;
 mod external_event_sender;
@@ -65,6 +67,7 @@ pub mod watch;
 #[derive(Debug)]
 pub struct BsSystem {
     self_addr: Option<Addr<BsSystem>>,
+    capabilities_addr: Option<Addr<Capabilities>>,
     servers_addr: Option<Addr<ServersSupervisor>>,
     any_event_sender: Option<Sender<AnyEvent>>,
     input_monitors: Option<InputMonitor>,
@@ -132,6 +135,7 @@ impl BsSystem {
     pub fn new() -> Self {
         BsSystem {
             self_addr: None,
+            capabilities_addr: None,
             servers_addr: None,
             any_event_sender: None,
             input_monitors: None,
@@ -232,7 +236,7 @@ impl BsSystem {
     fn before(
         &mut self,
         input: &Input,
-        addr: Addr<BsSystem>,
+        addr: Addr<Capabilities>,
     ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
         let comms = self.task_comms();
         let all = input.before_run_opts();
@@ -255,7 +259,7 @@ impl BsSystem {
 
     fn run_only(
         &mut self,
-        addr: Addr<BsSystem>,
+        addr: Addr<Capabilities>,
         spec: TaskSpec,
     ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
         let comms = self.task_comms();
@@ -391,6 +395,9 @@ impl Handler<Start> for BsSystem {
 
         let start_context = StartupContext::from_cwd(self.cwd.as_ref());
         self.start_context = Some(start_context.clone());
+
+        let capabilities = Capabilities::new(msg.events_sender.clone());
+        self.capabilities_addr = Some(capabilities.start());
 
         debug!(?start_context);
 
@@ -643,8 +650,10 @@ impl actix::Handler<ResolveInitialTasks> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "Handler->ResolveInitialTasks->BsSystem")]
     fn handle(&mut self, msg: ResolveInitialTasks, ctx: &mut Self::Context) -> Self::Result {
-        let addr = ctx.address();
-        let (next, rx) = self.before(&msg.input, addr);
+        let Some(addr) = self.capabilities_addr.as_ref() else {
+            todo!("unreachable")
+        };
+        let (next, rx) = self.before(&msg.input, addr.clone());
         ctx.notify(next);
 
         Box::pin(async move {

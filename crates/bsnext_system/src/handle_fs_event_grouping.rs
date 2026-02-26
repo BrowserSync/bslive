@@ -140,11 +140,14 @@ impl BsSystem {
         };
 
         let task_trigger = TaskTrigger::new(variant, 0);
+        let Some(capabilities_addr) = self.capabilities_addr.as_ref() else {
+            todo!("unreachlable")
+        };
 
         Some((
             fs_triggered_task_spec
                 .clone()
-                .to_task_scope(self.servers_addr.clone(), addr),
+                .to_task_scope(self.servers_addr.clone(), capabilities_addr.clone()),
             task_trigger,
             fs_triggered_task_spec,
         ))

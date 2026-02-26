@@ -1,4 +1,5 @@
-use crate::invoke_scope::{RequestEventSender, TaggedEvent};
+use crate::capabilities::output_channel::RequestOutputChannel;
+use crate::capabilities::TaggedEvent;
 use actix::{Handler, Recipient, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
@@ -7,11 +8,11 @@ use bsnext_task::task_report::{InvocationId, TaskResult};
 use bsnext_task::task_trigger::TaskTriggerSource;
 
 pub struct ExternalEventSenderWithLogging {
-    pub request: Recipient<RequestEventSender>,
+    pub request: Recipient<RequestOutputChannel>,
 }
 
 impl ExternalEventSenderWithLogging {
-    pub fn new(request: Recipient<RequestEventSender>) -> Self {
+    pub fn new(request: Recipient<RequestOutputChannel>) -> Self {
         Self { request }
     }
 }
@@ -54,7 +55,7 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
             TaskTriggerSource::Exec => vec![],
         };
         Box::pin(async move {
-            let Ok(Ok(output)) = addr.send(RequestEventSender { id }).await else {
+            let Ok(Ok(output)) = addr.send(RequestOutputChannel { id }).await else {
                 todo!("can this actually fail?");
             };
             for evt in events {

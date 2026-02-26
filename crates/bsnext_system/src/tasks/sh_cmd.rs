@@ -1,6 +1,6 @@
-use crate::invoke_scope::{RequestEventSender, TaggedEvent};
+use crate::capabilities::output_channel::RequestOutputChannel;
+use crate::capabilities::{Capabilities, TaggedEvent};
 use crate::tasks::IntoRecipient;
-use crate::BsSystem;
 use actix::{Actor, Addr, Recipient, ResponseFuture};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
@@ -32,14 +32,14 @@ pub struct ShCmd {
 
 struct ShCmdWithLogging {
     cmd: ShCmd,
-    request: Recipient<RequestEventSender>,
+    request_sender: Recipient<RequestOutputChannel>,
 }
 
 impl IntoRecipient for ShCmd {
-    fn into_recipient(self, addr: &Addr<BsSystem>) -> Recipient<Invocation> {
+    fn into_recipient(self, addr: &Addr<Capabilities>) -> Recipient<Invocation> {
         let with_logging = ShCmdWithLogging {
             cmd: self,
-            request: addr.clone().recipient(),
+            request_sender: addr.clone().recipient(),
         };
         let actor_address = with_logging.start();
         actor_address.recipient()
@@ -205,10 +205,10 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         let sh_prefix = Arc::new(self.cmd.prefix(sqid));
         let sh_prefix_2 = sh_prefix.clone();
         let max_duration = self.cmd.timeout.duration().to_owned();
-        let addr = self.request.clone();
+        let addr = self.request_sender.clone();
 
         let fut = async move {
-            let Ok(Ok(output)) = addr.send(RequestEventSender { id }).await else {
+            let Ok(Ok(output)) = addr.send(RequestOutputChannel { id }).await else {
                 todo!("can this actually fail?");
             };
             let sender = output.sender.clone();

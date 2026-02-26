@@ -128,8 +128,10 @@ impl actix::Handler<InvokeRunTasks> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "ResolveRunTasks")]
     fn handle(&mut self, msg: InvokeRunTasks, ctx: &mut Self::Context) -> Self::Result {
-        let addr = ctx.address();
-        let (invoke_scope, rx) = self.run_only(addr, msg.task_spec);
+        let Some(addr) = self.capabilities_addr.as_ref() else {
+            todo!("unreachable")
+        };
+        let (invoke_scope, rx) = self.run_only(addr.clone(), msg.task_spec);
         ctx.notify(invoke_scope);
         Box::pin(async move {
             match rx.await {
