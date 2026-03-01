@@ -1,18 +1,18 @@
 use crate::{LineNumberOption, OutputFormat, WriteOption};
 use std::fs::File;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
+use tracing_subscriber::layer::Layered;
+use tracing_subscriber::{EnvFilter, Layer, Registry};
 
-pub fn init_tracing_subscriber(
+pub fn create_filter_and_fmt(
     debug_str: &str,
     format: OutputFormat,
     write_option: WriteOption,
     line_opts: LineNumberOption,
+) -> (
+    EnvFilter,
+    Box<dyn Layer<Layered<EnvFilter, Registry>> + Send + Sync>,
 ) {
-    let filter =
-        tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| debug_str.into());
-
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| debug_str.into());
     let include_lines = line_opts == LineNumberOption::FileAndLineNumber;
 
     let fmt_layer = match (format, write_option) {
@@ -51,8 +51,5 @@ pub fn init_tracing_subscriber(
         }
     };
 
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt_layer)
-        .init();
+    (filter, fmt_layer)
 }

@@ -15,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
         bsnext_tracing::LogHttp::Off,
     );
     let with = format!("{str},watch_cmd=trace");
-    bsnext_tracing::raw_tracing::init_tracing_subscriber(
+    bsnext_tracing::raw_tracing::create_filter_and_fmt(
         &with,
         bsnext_tracing::OutputFormat::Normal,
         bsnext_tracing::WriteOption::None,

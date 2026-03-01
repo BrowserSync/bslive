@@ -6,14 +6,18 @@ use crate::start::start_command::StartCommand;
 use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
+use bsnext_core::shared_args::LoggingOpts;
 use bsnext_input::route::MultiWatch;
 use bsnext_input::Input;
 use bsnext_output::OutputWriters;
-use bsnext_tracing::{init_tracing, LineNumberOption, OutputFormat, WriteOption};
+use bsnext_tracing::{
+    init_tracing, init_tracing_with_otel, LineNumberOption, OutputFormat, WriteOption,
+};
 use clap::Parser;
 use std::env::current_dir;
 use std::ffi::OsString;
 use std::path::PathBuf;
+use tracing::debug_span;
 
 /// The typical lifecycle when ran from a CLI environment
 pub async fn from_args<I, T>(itr: I) -> Result<(), anyhow::Error>
@@ -25,6 +29,7 @@ where
         std::env::set_var("RUST_LIB_BACKTRACE", "0");
     }
     let args = Args::parse_from(itr);
+    let args_c = args.clone();
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
 
     let logging = *args.logging();
@@ -41,15 +46,23 @@ where
     };
 
     let format = args.format();
-    init_tracing(
-        logging.log_level,
-        logging.log_http.unwrap_or_default(),
-        format,
-        write_log_opt,
-        line_opts,
-    );
-
-    tracing::debug!("{:?}", args);
+    let _tracing_guard = if logging.otel {
+        init_tracing_with_otel(
+            logging.log_level,
+            logging.log_http.unwrap_or_default(),
+            format,
+            write_log_opt,
+            line_opts,
+        )
+    } else {
+        init_tracing(
+            logging.log_level,
+            logging.log_http.unwrap_or_default(),
+            format,
+            write_log_opt,
+            line_opts,
+        )
+    };
 
     let format_clone = format;
 
@@ -58,8 +71,6 @@ where
         OutputFormat::Normal => OutputWriters::Pretty,
         OutputFormat::Json => OutputWriters::Json,
     };
-
-    tracing::debug!("writer: {}", writer);
 
     // create a channel onto which commands can publish events
     let command = args.command.unwrap_or_else(move || {
@@ -74,7 +85,21 @@ where
     });
 
     tracing::debug!("subcommand = {:?}", command);
+    let _guard = debug_span!("parent").entered();
+    let r = async_init(command, writer, logging, format, args_c, cwd).await;
+    drop(_tracing_guard);
+    r
+}
 
+#[tracing::instrument]
+async fn async_init(
+    command: SubCommands,
+    writer: OutputWriters,
+    logging: LoggingOpts,
+    format: OutputFormat,
+    args: Args,
+    cwd: PathBuf,
+) -> Result<(), anyhow::Error> {
     match command {
         SubCommands::Export(cmd) => {
             let start_cmd = StartCommand {
