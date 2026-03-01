@@ -4,6 +4,7 @@ use actix::Actor;
 use bsnext_dto::internal::AnyEvent;
 use tokio::sync::mpsc::Sender;
 
+#[derive(Debug)]
 pub struct Capabilities {
     any_event_sender: Sender<AnyEvent>,
 }

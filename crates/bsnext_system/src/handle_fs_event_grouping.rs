@@ -104,7 +104,7 @@ impl BsSystem {
     fn handle_buffered(
         &mut self,
         buf: BufferedChangeEvent,
-        addr: Addr<BsSystem>,
+        _addr: Addr<BsSystem>,
     ) -> Option<(TaskScope, TaskTrigger, TaskSpec)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 

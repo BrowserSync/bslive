@@ -126,7 +126,7 @@ impl InvokeRunTasks {
 impl actix::Handler<InvokeRunTasks> for BsSystem {
     type Result = ResponseFuture<Result<TaskReportAndTree, InitialTaskError>>;
 
-    #[tracing::instrument(skip_all, name = "ResolveRunTasks")]
+    #[tracing::instrument(skip_all, name = "InvokeRunTasks")]
     fn handle(&mut self, msg: InvokeRunTasks, ctx: &mut Self::Context) -> Self::Result {
         let Some(addr) = self.capabilities_addr.as_ref() else {
             todo!("unreachable")

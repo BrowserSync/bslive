@@ -51,6 +51,7 @@ impl InvokeScope {
 impl Handler<InvokeScope> for BsSystem {
     type Result = ResponseActFuture<Self, ()>;
 
+    #[tracing::instrument(skip_all, name = "InvokeScope")]
     fn handle(&mut self, msg: InvokeScope, _ctx: &mut Self::Context) -> Self::Result {
         let task_trigger = msg.task_trigger;
         let task_spec = msg.task_spec;

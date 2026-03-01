@@ -46,7 +46,7 @@ where
     };
 
     let format = args.format();
-    let _tracing_guard = if logging.otel {
+    let tracing_guard = if logging.otel {
         init_tracing_with_otel(
             logging.log_level,
             logging.log_http.unwrap_or_default(),
@@ -87,11 +87,11 @@ where
     tracing::debug!("subcommand = {:?}", command);
     let _guard = debug_span!("parent").entered();
     let r = async_init(command, writer, logging, format, args_c, cwd).await;
-    drop(_tracing_guard);
+    drop(_guard);
+    drop(tracing_guard);
     r
 }
 
-#[tracing::instrument]
 async fn async_init(
     command: SubCommands,
     writer: OutputWriters,

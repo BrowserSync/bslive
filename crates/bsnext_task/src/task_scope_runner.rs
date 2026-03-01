@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::select;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
-use tracing::{Instrument, Span, debug};
+use tracing::{Instrument, Span, debug, debug_span};
 
 /// Represents a task group runner responsible for managing and executing a set of tasks.
 ///
@@ -50,13 +50,10 @@ impl actix::Actor for TaskScopeRunner {
 impl Handler<Invocation> for TaskScopeRunner {
     type Result = ResponseActFuture<Self, TaskResult>;
 
-    #[tracing::instrument(skip_all, name = "Invocation", fields(id = invocation.sqid()))]
+    #[tracing::instrument(skip_all, name = "Invocation", fields(sqid = invocation.sqid()))]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
         let Invocation { trigger, .. } = invocation;
-        let span = Span::current();
-        let gg = Arc::new(span.clone());
-        let ggg = gg.clone();
 
         let Some(group) = self.task_scope.take() else {
             todo!("how to handle a concurrent request here?");
@@ -67,21 +64,22 @@ impl Handler<Invocation> for TaskScopeRunner {
         let run_kind = group.run_kind().clone();
         let tasks = group.tasks();
 
-        tracing::info!(
-            group.sqid = sqid,
-            group.len = expected_len,
-            group.kind = ?run_kind,
-            group.exit_on_failure = exit_on_failure,
+        tracing::debug!(
+            bs.group.sqid = sqid,
+            bs.group.len = expected_len,
+            bs.group.kind = ?run_kind,
+            bs.group.exit_on_failure = exit_on_failure,
         );
 
         let future = async move {
             let mut done: Vec<(usize, TaskReport)> = vec![];
-            let _e = ggg.enter();
+            // let span = gg.clone();
             // let inner = channels;
             match run_kind {
                 RunKind::Sequence { opts: _ } => {
                     for (index, task_entry) in tasks.into_iter().enumerate() {
                         let id = task_entry.id();
+                        let sqid = task_entry.sqid();
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
                         let one_task = Invocation::new(id, trigger.clone());
                         let sqid = one_task.sqid();
@@ -137,7 +135,6 @@ impl Handler<Invocation> for TaskScopeRunner {
                                 let _permit = semaphore.acquire().await.unwrap();
                                 let task_run = actor
                                     .send(one_task)
-                                    .instrument(Span::current())
                                     .map(move |task_result| (index, id, task_result));
                                 let output = select! {
                                     result = task_run => {
@@ -191,7 +188,6 @@ impl Handler<Invocation> for TaskScopeRunner {
             done
         };
         Box::pin(future.into_actor(self).map(move |res, _actor, _ctx| {
-            let _e = gg.enter();
             debug!("actual len: {}", res.len());
             debug!("expected len: {}", expected_len);
 

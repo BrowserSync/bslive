@@ -4,7 +4,6 @@ use bsnext_core::shared_args::LoggingOpts;
 use bsnext_input::route::{RunAll, RunOptItem, RunSeq, ShRunOptItem};
 use bsnext_input::Input;
 use bsnext_tracing::OutputFormat;
-use tracing::instrument;
 
 #[derive(Debug, Clone, clap::Parser)]
 pub struct RunCommand {
@@ -31,14 +30,11 @@ pub struct RunCommand {
 }
 
 impl RunCommand {
-    #[instrument(name = "as_input", skip(self))]
     pub fn as_input(&self) -> Input {
         let mut input = Input::default();
         let mut list_of_commands: Vec<RunOptItem> = vec![];
 
         {
-            let span = tracing::debug_span!("adding sh_commands commands from cli");
-            let _enter = span.enter();
             for (index, sh) in self.sh_commands.iter().enumerate() {
                 tracing::info!(index = index, sh = sh);
                 list_of_commands.push(RunOptItem::Sh(ShRunOptItem {

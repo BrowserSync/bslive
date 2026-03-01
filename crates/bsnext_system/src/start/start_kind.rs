@@ -81,9 +81,8 @@ impl StartKind {
         Self::FromInput(StartFromInput { input })
     }
 
-    #[tracing::instrument(name = "from_run_args")]
     pub fn from_run_args(
-        fs_opts: &FsOpts,
+        _fs_opts: &FsOpts,
         input_opts: &InputOpts,
         run: RunCommand,
     ) -> Result<Self, Box<InputError>> {

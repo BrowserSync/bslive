@@ -41,7 +41,7 @@ use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Receiver;
-use tracing::{debug, Instrument, Span};
+use tracing::debug;
 
 pub mod any_watchable;
 pub mod args;
@@ -409,7 +409,7 @@ impl Handler<Start> for BsSystem {
                 let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
                 let input_clone2 = input.clone();
                 let addr = ctx.address();
-                let jobs = setup_jobs(addr, input.clone()).instrument(Span::current());
+                let jobs = setup_jobs(addr, input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {

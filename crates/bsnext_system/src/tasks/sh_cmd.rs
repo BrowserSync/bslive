@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tracing::{Instrument, Span};
+use tracing::Instrument;
 
 pub const DEFAULT_TERMINAL_OUTPUT_PREFIX: &str = "[run]";
 
@@ -176,7 +176,7 @@ impl actix::Actor for ShCmdWithLogging {
 impl actix::Handler<Invocation> for ShCmdWithLogging {
     type Result = ResponseFuture<TaskResult>;
 
-    #[tracing::instrument(skip_all, name = "ShCmd", fields(id=invocation.sqid()))]
+    #[tracing::instrument(skip_all, name="sh_cmd::invocation", fields(sqid=invocation.sqid()))]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
         self.cmd.id = Some(sqid.clone());
@@ -202,136 +202,167 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
             TaskTriggerSource::Exec => "NONE".to_string(),
         };
 
-        let sh_prefix = Arc::new(self.cmd.prefix(sqid));
+        let sh_prefix = Arc::new(self.cmd.prefix(sqid.clone()));
         let sh_prefix_2 = sh_prefix.clone();
         let max_duration = self.cmd.timeout.duration().to_owned();
         let addr = self.request_sender.clone();
 
-        let fut = async move {
-            let Ok(Ok(output)) = addr.send(RequestOutputChannel { id }).await else {
-                todo!("can this actually fail?");
-            };
-            let sender = output.sender.clone();
-            let sender2 = output.sender.clone();
+        let fut = sh_cmd(
+            addr,
+            id,
+            sqid,
+            cmd,
+            reason,
+            files,
+            sh_prefix,
+            sh_prefix_2,
+            max_duration,
+        )
+        .in_current_span();
 
-            let mut command = if cfg!(target_os = "windows") {
-                let mut c = Command::new("cmd");
-                c.arg("/C");
-                c
-            } else {
-                let mut c = Command::new("sh");
-                c.arg("-c");
-                c
-            };
-
-            let mut child = command
-                .kill_on_drop(true)
-                .arg(cmd)
-                .env("TERM", "xterm-256color")
-                .env("CLICOLOR_FORCE", "1")
-                .env("FORCE_COLOR", "true")
-                .env("CLICOLOR", "1")
-                .env("COLORTERM", "truecolor")
-                .env("BSLIVE_REASON", reason)
-                .env("BSLIVE_FILES", files)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .expect("command failed to spawn?");
-
-            let pid = child.id();
-            tracing::debug!(?pid);
-
-            let stdout = child
-                .stdout
-                .take()
-                .expect("child did not have a handle to stdout");
-
-            let stderr = child
-                .stderr
-                .take()
-                .expect("child did not have a handle to stderr");
-
-            let mut stdout_reader = BufReader::new(stdout).lines();
-            let mut stderr_reader = BufReader::new(stderr).lines();
-
-            let h = tokio::spawn(async move {
-                tracing::debug!(?pid, "reading stdout");
-                while let Ok(Some(line)) = stdout_reader.next_line().await {
-                    match sender
-                        .send(TaggedEvent::new(id, AnyEvent::External(ExternalEventsDTO::stdout_line(
-                            id,
-                            line,
-                            (*sh_prefix).clone(),
-                        ))))
-                        .await
-                    {
-                        Ok(_) => tracing::trace!("did forward stdout line"),
-                        Err(_) => tracing::error!("could not send stdout line"),
-                    }
-                }
-            }.instrument(Span::current()));
-
-            let h2 = tokio::spawn(async move {
-                tracing::debug!(?pid, "reading stderr");
-                while let Ok(Some(line)) = stderr_reader.next_line().await {
-                    match sender2
-                        .send(TaggedEvent::new(id, AnyEvent::External(ExternalEventsDTO::stderr_line(
-                            id,
-                            line,
-                            (*sh_prefix_2).clone(),
-                        ))))
-                        .await
-                    {
-                        Ok(_) => tracing::trace!("did forward stderr line"),
-                        Err(_) => tracing::error!("could not send stderr line"),
-                    }
-                }
-            }.instrument(Span::current()));
-
-            let deadline = tokio::time::sleep(max_duration);
-
-            tokio::pin!(deadline);
-            let invocation_id = 0;
-
-            let result: TaskResult = tokio::select! {
-                _ = &mut deadline => {
-                    tracing::info!("⌛️ operation timed out");
-                    TaskResult::timeout(InvocationId(invocation_id))
-                }
-                out = child.wait() => {
-                    tracing::info!("child waited");
-                    match out {
-                        Ok(exit) => match exit.code() {
-                           Some(0) => TaskResult::ok(InvocationId(invocation_id)),
-                           Some(code) => {
-                                tracing::debug!("did exit with code {}", code);
-                                TaskResult::err_code(InvocationId(invocation_id), ExitCode(code))
-                            },
-                           None => TaskResult::err_message(InvocationId(invocation_id), "unknown error!")
-                        },
-                        Err(err) => TaskResult::err_message(InvocationId(invocation_id), &err.to_string())
-                    }
-                }
-            };
-            if let Some(pid) = pid {
-                let _ = kill_tree::tokio::kill_tree(pid).await;
-                tracing::trace!("child tree killed");
-            }
-
-            match h.await {
-                Ok(_) => tracing::trace!("did wait for stdout"),
-                Err(e) => tracing::trace!("failed waiting for stdout {e}"),
-            };
-            match h2.await {
-                Ok(_) => tracing::trace!("did wait for stderr"),
-                Err(e) => tracing::trace!("failed waiting for stderr {e}"),
-            };
-
-            tracing::info!("✅ complete");
-
-            result
-        }.instrument(Span::current());
         Box::pin(fut)
     }
+}
+
+#[tracing::instrument]
+async fn sh_cmd(
+    addr: Recipient<RequestOutputChannel>,
+    id: u64,
+    sqid: String,
+    cmd: OsString,
+    reason: String,
+    files: String,
+    sh_prefix: Arc<Option<String>>,
+    sh_prefix_2: Arc<Option<String>>,
+    max_duration: Duration,
+) -> TaskResult {
+    let Ok(Ok(output)) = addr.send(RequestOutputChannel { invocation_id: id }).await else {
+        todo!("can this actually fail?");
+    };
+    let sender = output.sender.clone();
+    let sender2 = output.sender.clone();
+
+    let mut command = if cfg!(target_os = "windows") {
+        let mut c = Command::new("cmd");
+        c.arg("/C");
+        c
+    } else {
+        let mut c = Command::new("sh");
+        c.arg("-c");
+        c
+    };
+
+    let mut child = command
+        .kill_on_drop(true)
+        .arg(cmd)
+        .env("TERM", "xterm-256color")
+        .env("CLICOLOR_FORCE", "1")
+        .env("FORCE_COLOR", "true")
+        .env("CLICOLOR", "1")
+        .env("COLORTERM", "truecolor")
+        .env("BSLIVE_REASON", reason)
+        .env("BSLIVE_FILES", files)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("command failed to spawn?");
+
+    let pid = child.id();
+    tracing::debug!(?pid);
+
+    let stdout = child
+        .stdout
+        .take()
+        .expect("child did not have a handle to stdout");
+
+    let stderr = child
+        .stderr
+        .take()
+        .expect("child did not have a handle to stderr");
+
+    let mut stdout_reader = BufReader::new(stdout).lines();
+    let mut stderr_reader = BufReader::new(stderr).lines();
+
+    let h = tokio::spawn(async move {
+        tracing::debug!(?pid, "reading stdout");
+        while let Ok(Some(line)) = stdout_reader.next_line().await {
+            match sender
+                .send(TaggedEvent::new(
+                    id,
+                    AnyEvent::External(ExternalEventsDTO::stdout_line(
+                        id,
+                        line,
+                        (*sh_prefix).clone(),
+                    )),
+                ))
+                .await
+            {
+                Ok(_) => tracing::trace!("did forward stdout line"),
+                Err(_) => tracing::error!("could not send stdout line"),
+            }
+        }
+    });
+
+    let h2 = tokio::spawn(async move {
+        tracing::debug!(?pid, "reading stderr");
+        while let Ok(Some(line)) = stderr_reader.next_line().await {
+            match sender2
+                .send(TaggedEvent::new(
+                    id,
+                    AnyEvent::External(ExternalEventsDTO::stderr_line(
+                        id,
+                        line,
+                        (*sh_prefix_2).clone(),
+                    )),
+                ))
+                .await
+            {
+                Ok(_) => tracing::trace!("did forward stderr line"),
+                Err(_) => tracing::error!("could not send stderr line"),
+            }
+        }
+    });
+
+    let deadline = tokio::time::sleep(max_duration);
+
+    tokio::pin!(deadline);
+    let invocation_id = 0;
+
+    let result: TaskResult = tokio::select! {
+        _ = &mut deadline => {
+            tracing::info!("⌛️ operation timed out");
+            TaskResult::timeout(InvocationId(invocation_id))
+        }
+        out = child.wait() => {
+            tracing::info!("child waited");
+            match out {
+                Ok(exit) => match exit.code() {
+                   Some(0) => TaskResult::ok(InvocationId(invocation_id)),
+                   Some(code) => {
+                        tracing::debug!("did exit with code {}", code);
+                        TaskResult::err_code(InvocationId(invocation_id), ExitCode(code))
+                    },
+                   None => TaskResult::err_message(InvocationId(invocation_id), "unknown error!")
+                },
+                Err(err) => TaskResult::err_message(InvocationId(invocation_id), &err.to_string())
+            }
+        }
+    };
+    if let Some(pid) = pid {
+        let _ = kill_tree::tokio::kill_tree(pid).await;
+        tracing::trace!("child tree killed");
+    }
+
+    match h.await {
+        Ok(_) => tracing::trace!("did wait for stdout"),
+        Err(e) => tracing::trace!("failed waiting for stdout {e}"),
+    };
+    match h2.await {
+        Ok(_) => tracing::trace!("did wait for stderr"),
+        Err(e) => tracing::trace!("failed waiting for stderr {e}"),
+    };
+
+    tracing::info!("✅ complete");
+
+    result
 }
