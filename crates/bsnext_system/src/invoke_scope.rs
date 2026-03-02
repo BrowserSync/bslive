@@ -74,13 +74,14 @@ impl Handler<InvokeScope> for BsSystem {
             .map(move |resp, actor, _ctx| match resp {
                 Ok(result) => {
                     let report = result.to_report(task_id);
-                    let mut e = HashMap::new();
-                    every_report(&mut e, &report);
+                    let mut report_map = HashMap::new();
+                    every_report(&mut report_map, &report);
 
-                    let tree = task_spec.as_tree_with_results(&e);
+                    let tree = task_spec.as_tree_with_results(&report_map);
                     let report_and_tree = TaskReportAndTree {
                         report: report.clone(),
                         tree: tree.clone(),
+                        report_map,
                     };
                     actor.publish_any_event(TaskActionStage::complete(task_id, tree, report));
                     match done.send(report_and_tree) {

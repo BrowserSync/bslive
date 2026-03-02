@@ -135,9 +135,15 @@ impl actix::Handler<InvokeRunTasks> for BsSystem {
         ctx.notify(invoke_scope);
         Box::pin(async move {
             match rx.await {
-                Ok(TaskReportAndTree { report, tree }) if report.is_ok() => {
-                    Ok(TaskReportAndTree { report, tree })
-                }
+                Ok(TaskReportAndTree {
+                    report,
+                    tree,
+                    report_map,
+                }) if report.is_ok() => Ok(TaskReportAndTree {
+                    report,
+                    tree,
+                    report_map,
+                }),
                 Ok(TaskReportAndTree { .. }) => Err(InitialTaskError::FailedReport),
                 Err(_) => Err(InitialTaskError::FailedUnknown),
             }

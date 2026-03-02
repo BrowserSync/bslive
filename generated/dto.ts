@@ -169,13 +169,13 @@ export interface TaskActionDTO {
 	stage: TaskActionStageDTO;
 }
 
-export type TaskStatusDTO = 
+export type TaskConclusionDTO = 
 	| { kind: "Ok", payload?: undefined }
 	| { kind: "Err", payload: string }
 	| { kind: "Cancelled", payload?: undefined };
 
 export interface TaskResultDTO {
-	status: TaskStatusDTO;
+	conclusion: TaskConclusionDTO;
 	invocation_id: InvocationIdDTO;
 	task_reports: TaskReportDTO[];
 }

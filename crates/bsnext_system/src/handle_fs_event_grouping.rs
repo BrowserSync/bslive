@@ -193,14 +193,11 @@ impl BsSystem {
             let err = input.unwrap_err();
             return (AnyEvent::Internal(InternalEvents::InputError(*err)), None);
         };
-
-        let Some(relative) = &inner.relative else {
-            todo!("todo: is this reachable?")
-        };
+        let path_to_report = inner.relative.as_ref().unwrap_or(&inner.absolute);
 
         (
             AnyEvent::External(ExternalEventsDTO::InputFileChanged(
-                bsnext_dto::FileChangedDTO::from_path_buf(relative),
+                bsnext_dto::FileChangedDTO::from_path_buf(path_to_report),
             )),
             Some(input),
         )

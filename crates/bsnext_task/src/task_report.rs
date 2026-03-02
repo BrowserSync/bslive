@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
-pub enum TaskStatus {
+pub enum TaskConclusion {
     Ok(TaskOk),
     Cancelled,
     Err(TaskError),
@@ -53,7 +53,7 @@ impl Display for TaskReport {
 #[derive(Debug, Clone)]
 pub struct TaskResult {
     #[allow(dead_code)]
-    pub status: TaskStatus,
+    pub conclusion: TaskConclusion,
     #[allow(dead_code)]
     pub invocation_id: InvocationId,
     #[allow(dead_code)]
@@ -64,7 +64,7 @@ impl TaskResult {
     pub fn cancelled() -> Self {
         Self {
             task_reports: vec![],
-            status: TaskStatus::Cancelled,
+            conclusion: TaskConclusion::Cancelled,
             invocation_id: InvocationId(0),
         }
     }
@@ -72,10 +72,10 @@ impl TaskResult {
 
 impl Display for TaskResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self.status {
-            TaskStatus::Ok(_s) => write!(f, "✅"),
-            TaskStatus::Err(err) => write!(f, "❌, {err}"),
-            TaskStatus::Cancelled => write!(f, "[cancelled]"),
+        match &self.conclusion {
+            TaskConclusion::Ok(_s) => write!(f, "✅"),
+            TaskConclusion::Err(err) => write!(f, "❌, {err}"),
+            TaskConclusion::Cancelled => write!(f, "[cancelled]"),
         }
     }
 }
@@ -107,38 +107,38 @@ impl TaskReport {
 impl TaskResult {
     pub fn ok(id: InvocationId) -> Self {
         Self {
-            status: TaskStatus::Ok(TaskOk),
+            conclusion: TaskConclusion::Ok(TaskOk),
             invocation_id: id,
             task_reports: vec![],
         }
     }
     pub fn is_ok(&self) -> bool {
-        matches!(self.status, TaskStatus::Ok(..))
+        matches!(self.conclusion, TaskConclusion::Ok(..))
     }
     pub fn err_code(id: InvocationId, code: ExitCode) -> Self {
         Self {
-            status: TaskStatus::Err(TaskError::FailedCode { code }),
+            conclusion: TaskConclusion::Err(TaskError::FailedCode { code }),
             invocation_id: id,
             task_reports: vec![],
         }
     }
     pub fn err_message(id: InvocationId, message: &str) -> Self {
         Self {
-            status: TaskStatus::Err(TaskError::FailedMsg(message.to_string())),
+            conclusion: TaskConclusion::Err(TaskError::FailedMsg(message.to_string())),
             invocation_id: id,
             task_reports: vec![],
         }
     }
     pub fn timeout(id: InvocationId) -> Self {
         Self {
-            status: TaskStatus::Err(TaskError::FailedTimeout),
+            conclusion: TaskConclusion::Err(TaskError::FailedTimeout),
             invocation_id: id,
             task_reports: vec![],
         }
     }
     pub fn ok_tasks(id: InvocationId, tasks: Vec<TaskReport>) -> Self {
         Self {
-            status: TaskStatus::Ok(TaskOk),
+            conclusion: TaskConclusion::Ok(TaskOk),
             invocation_id: id,
             task_reports: tasks,
         }
@@ -149,7 +149,7 @@ impl TaskResult {
         results: Vec<TaskReport>,
     ) -> Self {
         Self {
-            status: TaskStatus::Err(TaskError::GroupFailed {
+            conclusion: TaskConclusion::Err(TaskError::GroupFailed {
                 failed_tasks: failed_only.clone(),
             }),
             invocation_id: id,
@@ -162,7 +162,7 @@ impl TaskResult {
         expected: ExpectedLen,
     ) -> Self {
         Self {
-            status: TaskStatus::Err(TaskError::GroupPartial {
+            conclusion: TaskConclusion::Err(TaskError::GroupPartial {
                 actual: ActualLen(tasks.len()),
                 expected,
                 failed_tasks: tasks.clone(),

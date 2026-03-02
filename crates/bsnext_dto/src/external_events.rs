@@ -57,7 +57,7 @@ pub struct TaskReportDTO {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TaskResultDTO {
     #[allow(dead_code)]
-    pub status: TaskStatusDTO,
+    pub conclusion: TaskConclusionDTO,
     #[allow(dead_code)]
     pub invocation_id: InvocationIdDTO,
     #[allow(dead_code)]
@@ -67,7 +67,7 @@ pub struct TaskResultDTO {
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
-pub enum TaskStatusDTO {
+pub enum TaskConclusionDTO {
     Ok,
     Err(String),
     Cancelled,
@@ -235,13 +235,13 @@ pub fn print_task_action<W: Write>(w: &mut W, action_dto: &TaskActionDTO) -> any
             // let s = archy(tree, Prefix::None);
             // write!(w, "{s}")?;
         }
-        TaskActionStageDTO::Ended { report, tree } => match report.result.status {
-            TaskStatusDTO::Ok => {}
-            TaskStatusDTO::Err(_) => {
+        TaskActionStageDTO::Ended { report, tree } => match report.result.conclusion {
+            TaskConclusionDTO::Ok => {}
+            TaskConclusionDTO::Err(_) => {
                 let s = archy(tree, Prefix::None);
                 write!(w, "{s}")?;
             }
-            TaskStatusDTO::Cancelled => {}
+            TaskConclusionDTO::Cancelled => {}
         },
         TaskActionStageDTO::Error => {}
     }

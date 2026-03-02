@@ -186,7 +186,7 @@ var stdoutLineDTOSchema = z.object({
 var stoppedWatchingDTOSchema = z.object({
   paths: z.array(z.string())
 });
-var taskStatusDTOSchema = z.union([
+var taskConclusionDTOSchema = z.union([
   z.object({
     kind: z.literal("Ok"),
     payload: z.undefined().optional()
@@ -374,7 +374,7 @@ var taskActionDTOSchema = z.lazy(
 );
 var taskResultDTOSchema = z.lazy(
   () => z.object({
-    status: taskStatusDTOSchema,
+    conclusion: taskConclusionDTOSchema,
     invocation_id: invocationIdDTOSchema,
     task_reports: z.array(taskReportDTOSchema)
   })
@@ -455,8 +455,8 @@ export {
   stoppedWatchingDTOSchema,
   taskActionDTOSchema,
   taskActionStageDTOSchema,
+  taskConclusionDTOSchema,
   taskReportDTOSchema,
   taskResultDTOSchema,
-  taskStatusDTOSchema,
   watchingDTOSchema
 };

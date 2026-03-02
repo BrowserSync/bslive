@@ -1,12 +1,13 @@
 use crate::archy::ArchyNode;
 use crate::external_events::{
-    ExternalEventsDTO, InvocationIdDTO, TaskActionDTO, TaskActionStageDTO, TaskReportDTO,
-    TaskResultDTO, TaskStatusDTO,
+    ExternalEventsDTO, InvocationIdDTO, TaskActionDTO, TaskActionStageDTO, TaskConclusionDTO,
+    TaskReportDTO, TaskResultDTO,
 };
 use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
-use bsnext_task::task_report::{TaskReport, TaskResult, TaskStatus};
+use bsnext_task::task_report::{TaskConclusion, TaskReport, TaskResult};
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use typeshare::typeshare;
@@ -34,6 +35,7 @@ pub enum InternalEvents {
 pub struct TaskReportAndTree {
     pub report: TaskReport,
     pub tree: ArchyNode,
+    pub report_map: HashMap<u64, TaskReport>,
 }
 
 #[derive(Debug, Clone)]
@@ -86,10 +88,10 @@ impl From<TaskResult> for TaskResultDTO {
     fn from(value: TaskResult) -> Self {
         TaskResultDTO {
             invocation_id: InvocationIdDTO(value.invocation_id.0.to_string()),
-            status: match value.status {
-                TaskStatus::Ok(_) => TaskStatusDTO::Ok,
-                TaskStatus::Err(e) => TaskStatusDTO::Err(e.to_string()),
-                TaskStatus::Cancelled => TaskStatusDTO::Cancelled,
+            conclusion: match value.conclusion {
+                TaskConclusion::Ok(_) => TaskConclusionDTO::Ok,
+                TaskConclusion::Err(e) => TaskConclusionDTO::Err(e.to_string()),
+                TaskConclusion::Cancelled => TaskConclusionDTO::Cancelled,
             },
             task_reports: value
                 .task_reports

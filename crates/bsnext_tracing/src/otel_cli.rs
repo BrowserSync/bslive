@@ -108,7 +108,6 @@ pub struct OtelGuard {
 
 impl Drop for OtelGuard {
     fn drop(&mut self) {
-        println!("did drop...");
         if let Err(err) = self.tracer_provider.shutdown() {
             error!("--> {err:?}");
         }

@@ -201,7 +201,7 @@ export const stoppedWatchingDTOSchema = z.object({
     paths: z.array(z.string()),
 });
 
-export const taskStatusDTOSchema = z.union([
+export const taskConclusionDTOSchema = z.union([
     z.object({
         kind: z.literal("Ok"),
         payload: z.undefined().optional(),
@@ -404,7 +404,7 @@ export const taskActionDTOSchema: z.ZodSchema<TaskActionDTO> = z.lazy(() =>
 
 export const taskResultDTOSchema: z.ZodSchema<TaskResultDTO> = z.lazy(() =>
     z.object({
-        status: taskStatusDTOSchema,
+        conclusion: taskConclusionDTOSchema,
         invocation_id: invocationIdDTOSchema,
         task_reports: z.array(taskReportDTOSchema),
     }),
