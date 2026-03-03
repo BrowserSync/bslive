@@ -2,8 +2,9 @@ use actix::{Actor, ActorFutureExt, Recipient, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::AnyEvent;
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
+use bsnext_task::invocation::InvocationId;
+use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_entry::TaskEntry;
-use bsnext_task::task_report::{InvocationId, TaskResult};
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_scope_runner::TaskScopeRunner;
 use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
@@ -67,13 +68,13 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
         type Context = actix::Context<Self>;
     }
     impl actix::Handler<Invocation> for A {
-        type Result = ResponseActFuture<Self, TaskResult>;
+        type Result = ResponseActFuture<Self, InvocationResult>;
 
         fn handle(&mut self, _invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
             let f = self.f.take().unwrap();
             Box::pin(
                 f.into_actor(self)
-                    .map(|_, _, _| TaskResult::ok(InvocationId(0))),
+                    .map(|_, _, _| InvocationResult::ok(InvocationId(0))),
             )
         }
     }

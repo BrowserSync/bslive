@@ -1,12 +1,12 @@
-use crate::task_report::TaskResult;
+use crate::invocation_result::InvocationResult;
 use bsnext_fs::FsEventContext;
 use std::fmt::Debug;
 use std::path::PathBuf;
 
 #[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "TaskResult")]
+#[rtype(result = "InvocationResult")]
 pub struct TaskTrigger {
-    pub variant: TaskTriggerSource,
+    pub trigger_source: TaskTriggerSource,
     pub invocation_id: u64,
 }
 
@@ -20,9 +20,9 @@ pub enum TaskTriggerSource {
 }
 
 impl TaskTrigger {
-    pub fn new(variant: TaskTriggerSource, invocation_id: u64) -> Self {
+    pub fn new(trigger_source: TaskTriggerSource, invocation_id: u64) -> Self {
         Self {
-            variant,
+            trigger_source,
             invocation_id,
         }
     }

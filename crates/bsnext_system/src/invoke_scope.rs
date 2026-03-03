@@ -8,10 +8,8 @@ use actix::WrapFuture;
 use bsnext_dto::internal::{TaskActionStage, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::task_report::TaskReport;
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::TaskTrigger;
-use std::collections::HashMap;
 
 /// A struct representing a message to trigger a specific task in the system.
 /// This message will be handled by an actor in the Actix framework.
@@ -73,10 +71,7 @@ impl Handler<InvokeScope> for BsSystem {
             .into_actor(self)
             .map(move |resp, actor, _ctx| match resp {
                 Ok(result) => {
-                    let report = result.to_report(task_id);
-                    let mut report_map = HashMap::new();
-                    every_report(&mut report_map, &report);
-
+                    let (report, report_map) = result.to_report_and_map(task_id);
                     let tree = task_spec.as_tree_with_results(&report_map);
                     let report_and_tree = TaskReportAndTree {
                         report: report.clone(),
@@ -92,12 +87,5 @@ impl Handler<InvokeScope> for BsSystem {
                 _ => todo!("handle this case..."),
             });
         Box::pin(next)
-    }
-}
-
-pub fn every_report(hm: &mut HashMap<u64, TaskReport>, report: &TaskReport) {
-    hm.insert(report.id(), report.clone());
-    for inner in &report.result().task_reports {
-        every_report(hm, inner)
     }
 }

@@ -1,7 +1,8 @@
 use crate::RunKind;
 use crate::as_actor::AsActor;
-use crate::invocation::Invocation;
-use crate::task_report::{ExpectedLen, InvocationId, TaskReport, TaskResult};
+use crate::invocation::{Invocation, InvocationId};
+use crate::invocation_result::InvocationResult;
+use crate::task_report::{ExpectedLen, TaskReport};
 use crate::task_scope::TaskScope;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use futures_util::FutureExt;
@@ -48,12 +49,13 @@ impl actix::Actor for TaskScopeRunner {
 }
 
 impl Handler<Invocation> for TaskScopeRunner {
-    type Result = ResponseActFuture<Self, TaskResult>;
+    type Result = ResponseActFuture<Self, InvocationResult>;
 
     #[tracing::instrument(skip_all, name = "Invocation", fields(sqid = invocation.sqid()))]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
-        let Invocation { trigger, .. } = invocation;
+        let Invocation { trigger, id } = invocation;
+        let invocation_id = InvocationId(id);
 
         let Some(group) = self.task_scope.take() else {
             todo!("how to handle a concurrent request here?");
@@ -129,7 +131,7 @@ impl Handler<Invocation> for TaskScopeRunner {
                             let one_task = Invocation::new(id, trigger.clone());
                             async move {
                                 if child_token.is_cancelled() {
-                                    let v = TaskResult::cancelled();
+                                    let v = InvocationResult::cancelled();
                                     return (index, id, Ok::<_, _>(v));
                                 };
                                 let _permit = semaphore.acquire().await.unwrap();
@@ -157,7 +159,7 @@ impl Handler<Invocation> for TaskScopeRunner {
                                     }
                                     _ = child_token.cancelled() => {
                                         debug!("child_token was cancelled");
-                                        let v = TaskResult::cancelled();
+                                        let v = InvocationResult::cancelled();
                                         (index, id, Ok::<_, _>(v))
                                     }
                                 };
@@ -209,11 +211,13 @@ impl Handler<Invocation> for TaskScopeRunner {
             );
 
             match (all_ran, all_good, exit_on_failure) {
-                (true, true, _) => TaskResult::ok_tasks(InvocationId(0), reports),
-                (true, false, true) => TaskResult::err_tasks(InvocationId(0), failed_only, reports),
-                (true, false, false) => TaskResult::ok_tasks(InvocationId(0), reports),
-                (false, _, _) => TaskResult::err_partial_tasks(
-                    InvocationId(0),
+                (true, true, _) => InvocationResult::ok_tasks(invocation_id, reports),
+                (true, false, true) => {
+                    InvocationResult::err_tasks(invocation_id, failed_only, reports)
+                }
+                (true, false, false) => InvocationResult::ok_tasks(invocation_id, reports),
+                (false, _, _) => InvocationResult::err_partial_tasks(
+                    invocation_id,
                     reports,
                     ExpectedLen(expected_len),
                 ),

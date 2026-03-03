@@ -1,5 +1,6 @@
 use crate::capabilities::Capabilities;
-use crate::tasks::{append_with_reports, Comms, Index, Runnable, RunnableWithComms};
+use crate::tasks::comms::Comms;
+use crate::tasks::{Runnable, RunnableWithComms};
 use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
@@ -191,3 +192,56 @@ impl TaskSpec {
         }
     }
 }
+
+pub fn append_with_reports(
+    archy: &mut ArchyNode,
+    tasks: &[Runnable],
+    hm: &HashMap<u64, TaskReport>,
+) {
+    for (index_position, runnable) in tasks.iter().enumerate() {
+        let id = runnable.as_id_with(Index(index_position as u64));
+        let sqid = runnable.as_sqid(id);
+        let label_with_id = match hm.get(&id) {
+            None => format!(
+                "[{sqid}] − {}",
+                runnable.as_tree_label(Index(index_position as u64))
+            ),
+            Some(report) => {
+                if runnable.is_group() {
+                    runnable.as_tree_label(Index(index_position as u64))
+                } else {
+                    format!(
+                        "[{sqid}] {} {}",
+                        if report.is_ok() { "✅" } else { "❌" },
+                        runnable.as_tree_label(Index(index_position as u64))
+                    )
+                }
+            }
+        };
+        let raw_label = match hm.get(&id) {
+            None => format!("{}", runnable.as_tree_label(Index(index_position as u64))),
+            Some(report) => {
+                if runnable.is_group() {
+                    runnable.as_tree_label(Index(index_position as u64))
+                } else {
+                    format!(
+                        "{} {}",
+                        if report.is_ok() { "✅" } else { "❌" },
+                        runnable.as_tree_label(Index(index_position as u64))
+                    )
+                }
+            }
+        };
+        match runnable {
+            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
+            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
+            Runnable::Many(runner) => {
+                let mut next = ArchyNode::new(&raw_label);
+                append_with_reports(&mut next, &runner.tasks, hm);
+                archy.nodes.push(next);
+            }
+        }
+    }
+}
+
+pub struct Index(pub u64);

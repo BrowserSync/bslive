@@ -1,12 +1,13 @@
 use crate::capabilities::output_channel::RequestOutputChannel;
 use crate::capabilities::{Capabilities, TaggedEvent};
-use crate::tasks::IntoRecipient;
+use crate::tasks::into_recipient::IntoRecipient;
 use actix::{Actor, Addr, Recipient, ResponseFuture};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
-use bsnext_task::invocation::Invocation;
-use bsnext_task::task_report::{ExitCode, InvocationId, TaskResult};
+use bsnext_task::invocation::{Invocation, InvocationId};
+use bsnext_task::invocation_result::InvocationResult;
+use bsnext_task::task_report::ExitCode;
 use bsnext_task::task_trigger::TaskTriggerSource;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
@@ -174,7 +175,7 @@ impl actix::Actor for ShCmdWithLogging {
 }
 
 impl actix::Handler<Invocation> for ShCmdWithLogging {
-    type Result = ResponseFuture<TaskResult>;
+    type Result = ResponseFuture<InvocationResult>;
 
     #[tracing::instrument(skip_all, name="sh_cmd::invocation", fields(sqid=invocation.sqid()))]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
@@ -186,14 +187,14 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         tracing::info!("Will run... {:?}", cmd);
         // let any_event_sender = comms.any_event_sender.clone();
         // let any_event_sender2 = comms.any_event_sender.clone();
-        let reason = match &trigger.variant {
+        let reason = match &trigger.trigger_source {
             TaskTriggerSource::FsChanges { changes, .. } => {
                 format!("{} files changed", changes.len())
             }
             TaskTriggerSource::Exec { .. } => "command executed".to_string(),
         };
 
-        let files = match &trigger.variant {
+        let files = match &trigger.trigger_source {
             TaskTriggerSource::FsChanges { changes, .. } => changes
                 .iter()
                 .map(|x| format!("{}", x.display()))
@@ -235,7 +236,7 @@ async fn sh_cmd(
     sh_prefix: Arc<Option<String>>,
     sh_prefix_2: Arc<Option<String>>,
     max_duration: Duration,
-) -> TaskResult {
+) -> InvocationResult {
     let Ok(Ok(output)) = addr.send(RequestOutputChannel { invocation_id: id }).await else {
         todo!("can this actually fail?");
     };
@@ -328,23 +329,23 @@ async fn sh_cmd(
     tokio::pin!(deadline);
     let invocation_id = 0;
 
-    let result: TaskResult = tokio::select! {
+    let result: InvocationResult = tokio::select! {
         _ = &mut deadline => {
             tracing::info!("⌛️ operation timed out");
-            TaskResult::timeout(InvocationId(invocation_id))
+            InvocationResult::timeout(InvocationId(invocation_id))
         }
         out = child.wait() => {
             tracing::info!("child waited");
             match out {
                 Ok(exit) => match exit.code() {
-                   Some(0) => TaskResult::ok(InvocationId(invocation_id)),
+                   Some(0) => InvocationResult::ok(InvocationId(invocation_id)),
                    Some(code) => {
                         tracing::debug!("did exit with code {}", code);
-                        TaskResult::err_code(InvocationId(invocation_id), ExitCode(code))
+                        InvocationResult::err_code(InvocationId(invocation_id), ExitCode(code))
                     },
-                   None => TaskResult::err_message(InvocationId(invocation_id), "unknown error!")
+                   None => InvocationResult::err_message(InvocationId(invocation_id), "unknown error!")
                 },
-                Err(err) => TaskResult::err_message(InvocationId(invocation_id), &err.to_string())
+                Err(err) => InvocationResult::err_message(InvocationId(invocation_id), &err.to_string())
             }
         }
     };

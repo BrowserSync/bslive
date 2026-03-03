@@ -1,4 +1,3 @@
-use crate::invoke_scope::every_report;
 use crate::tasks::task_spec::TaskSpec;
 use crate::BsSystem;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
@@ -8,7 +7,6 @@ use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
-use std::collections::HashMap;
 
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
@@ -32,7 +30,7 @@ impl TriggerFsTaskEvent {
     }
 
     pub fn fs_ctx(&self) -> &FsEventContext {
-        match &self.task_trigger.variant {
+        match &self.task_trigger.trigger_source {
             TaskTriggerSource::FsChanges {
                 fs_event_context, ..
             } => fs_event_context,
@@ -74,11 +72,8 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
                     let runner = actor.task_spec_mapping.get(&cloned_id);
                     match (resp, runner) {
                         (Ok(result), Some(task_spec)) => {
-                            let report = result.to_report(task_id);
-                            let mut e = HashMap::new();
-                            every_report(&mut e, &report);
-
-                            let tree = task_spec.as_tree_with_results(&e);
+                            let (report, report_map) = result.to_report_and_map(task_id);
+                            let tree = task_spec.as_tree_with_results(&report_map);
                             actor.publish_any_event(TaskActionStage::complete(
                                 task_id, tree, report,
                             ));

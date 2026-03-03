@@ -1,5 +1,6 @@
 pub mod as_actor;
 pub mod invocation;
+pub mod invocation_result;
 pub mod task_entry;
 pub mod task_report;
 pub mod task_scope;

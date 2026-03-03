@@ -6,7 +6,8 @@ use crate::external_events::{
 use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
-use bsnext_task::task_report::{TaskConclusion, TaskReport, TaskResult};
+use bsnext_task::invocation_result::{InvocationConclusion, InvocationResult};
+use bsnext_task::task_report::TaskReport;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
@@ -84,14 +85,14 @@ impl From<TaskReport> for TaskReportDTO {
     }
 }
 
-impl From<TaskResult> for TaskResultDTO {
-    fn from(value: TaskResult) -> Self {
+impl From<InvocationResult> for TaskResultDTO {
+    fn from(value: InvocationResult) -> Self {
         TaskResultDTO {
             invocation_id: InvocationIdDTO(value.invocation_id.0.to_string()),
             conclusion: match value.conclusion {
-                TaskConclusion::Ok(_) => TaskConclusionDTO::Ok,
-                TaskConclusion::Err(e) => TaskConclusionDTO::Err(e.to_string()),
-                TaskConclusion::Cancelled => TaskConclusionDTO::Cancelled,
+                InvocationConclusion::Ok(_) => TaskConclusionDTO::Ok,
+                InvocationConclusion::Err(e) => TaskConclusionDTO::Err(e.to_string()),
+                InvocationConclusion::Cancelled => TaskConclusionDTO::Cancelled,
             },
             task_reports: value
                 .task_reports

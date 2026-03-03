@@ -1,9 +1,9 @@
-use crate::task_report::TaskResult;
+use crate::invocation_result::InvocationResult;
 use crate::task_trigger::TaskTrigger;
 use std::fmt::Debug;
 
 #[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "TaskResult")]
+#[rtype(result = "InvocationResult")]
 pub struct Invocation {
     pub id: u64,
     pub trigger: TaskTrigger,
@@ -20,3 +20,6 @@ impl Invocation {
             .unwrap_or_else(|_| self.id.to_string())
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct InvocationId(pub u64);

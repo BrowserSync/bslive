@@ -4,7 +4,8 @@ use actix::{Handler, Recipient, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::task_report::{InvocationId, TaskResult};
+use bsnext_task::invocation::InvocationId;
+use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_trigger::TaskTriggerSource;
 
 pub struct ExternalEventSenderWithLogging {
@@ -34,12 +35,12 @@ impl actix::Actor for ExternalEventSenderWithLogging {
 }
 
 impl Handler<Invocation> for ExternalEventSenderWithLogging {
-    type Result = ResponseFuture<TaskResult>;
+    type Result = ResponseFuture<InvocationResult>;
 
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         let id = invocation.id;
         let addr = self.request.clone();
-        let events: Vec<AnyEvent> = match invocation.trigger.variant {
+        let events: Vec<AnyEvent> = match invocation.trigger.trigger_source {
             TaskTriggerSource::FsChanges { changes, .. } => {
                 let as_strings = changes
                     .iter()
@@ -65,7 +66,7 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
                     Err(e) => tracing::error!("{e}"),
                 };
             }
-            TaskResult::ok(InvocationId(0))
+            InvocationResult::ok(InvocationId(0))
         })
     }
 }

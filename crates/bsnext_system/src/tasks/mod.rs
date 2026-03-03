@@ -1,21 +1,21 @@
-use crate::capabilities::Capabilities;
 use crate::external_event_sender::ExternalEventSenderWithLogging;
 use crate::tasks::notify_servers::{NotifyServers, NotifyServersNoOp};
 use crate::tasks::sh_cmd::ShCmd;
 use crate::tasks::task_spec::{TaskSpec, TreeDisplay};
-use actix::{Actor, Addr, Recipient};
+use actix::{Actor, Recipient};
 use bs_live_task::BsLiveTask;
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
-use bsnext_dto::archy::ArchyNode;
 use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::task_report::TaskReport;
 use bsnext_task::{OverlappingOpts, SequenceOpts};
-use std::collections::HashMap;
+use comms::Comms;
+use into_recipient::IntoRecipient;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use task_spec::Index;
 
 pub mod bs_live_task;
+pub mod comms;
+mod into_recipient;
 pub mod notify_servers;
 pub mod sh_cmd;
 pub mod task_comms;
@@ -32,16 +32,6 @@ pub enum Runnable {
 pub struct RunnableWithComms {
     runnable: Runnable,
     ctx: Comms,
-}
-
-#[derive(Debug, Clone)]
-pub struct Comms {
-    servers_addr: Option<Addr<ServersSupervisor>>,
-    capabilities: Addr<Capabilities>,
-}
-
-pub trait IntoRecipient {
-    fn into_recipient(self: Self, addr: &Addr<Capabilities>) -> Recipient<Invocation>;
 }
 
 impl AsActor for RunnableWithComms {
@@ -66,53 +56,6 @@ impl AsActor for RunnableWithComms {
             }
             Runnable::Sh(sh) => sh.into_recipient(&self.ctx.capabilities),
             Runnable::Many(_) => unreachable!("The conversion to Task happens elsewhere"),
-        }
-    }
-}
-
-fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u64, TaskReport>) {
-    for (index_position, runnable) in tasks.iter().enumerate() {
-        let id = runnable.as_id_with(Index(index_position as u64));
-        let sqid = runnable.as_sqid(id);
-        let label_with_id = match hm.get(&id) {
-            None => format!(
-                "[{sqid}] − {}",
-                runnable.as_tree_label(Index(index_position as u64))
-            ),
-            Some(report) => {
-                if runnable.is_group() {
-                    runnable.as_tree_label(Index(index_position as u64))
-                } else {
-                    format!(
-                        "[{sqid}] {} {}",
-                        if report.is_ok() { "✅" } else { "❌" },
-                        runnable.as_tree_label(Index(index_position as u64))
-                    )
-                }
-            }
-        };
-        let raw_label = match hm.get(&id) {
-            None => format!("{}", runnable.as_tree_label(Index(index_position as u64))),
-            Some(report) => {
-                if runnable.is_group() {
-                    runnable.as_tree_label(Index(index_position as u64))
-                } else {
-                    format!(
-                        "{} {}",
-                        if report.is_ok() { "✅" } else { "❌" },
-                        runnable.as_tree_label(Index(index_position as u64))
-                    )
-                }
-            }
-        };
-        match runnable {
-            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
-            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
-            Runnable::Many(runner) => {
-                let mut next = ArchyNode::new(&raw_label);
-                append_with_reports(&mut next, &runner.tasks, hm);
-                archy.nodes.push(next);
-            }
         }
     }
 }
@@ -142,8 +85,6 @@ impl Runnable {
         sqid.get(0..6).map(String::from).unwrap_or(sqid)
     }
 }
-
-pub struct Index(pub u64);
 
 impl From<&RunOptItem> for Runnable {
     fn from(value: &RunOptItem) -> Self {
