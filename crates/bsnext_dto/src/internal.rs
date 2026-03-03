@@ -88,7 +88,7 @@ impl From<TaskReport> for TaskReportDTO {
 impl From<InvocationResult> for TaskResultDTO {
     fn from(value: InvocationResult) -> Self {
         TaskResultDTO {
-            invocation_id: InvocationIdDTO(value.invocation_id.0.to_string()),
+            invocation_id: InvocationIdDTO(value.invocation_id.u64().to_string()),
             conclusion: match value.conclusion {
                 InvocationConclusion::Ok(_) => TaskConclusionDTO::Ok,
                 InvocationConclusion::Err(e) => TaskConclusionDTO::Err(e.to_string()),

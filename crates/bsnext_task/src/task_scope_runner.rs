@@ -55,7 +55,6 @@ impl Handler<Invocation> for TaskScopeRunner {
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         let sqid = invocation.sqid();
         let Invocation { trigger, id } = invocation;
-        let invocation_id = InvocationId(id);
 
         let Some(group) = self.task_scope.take() else {
             todo!("how to handle a concurrent request here?");
@@ -81,15 +80,15 @@ impl Handler<Invocation> for TaskScopeRunner {
                 RunKind::Sequence { opts: _ } => {
                     for (index, task_entry) in tasks.into_iter().enumerate() {
                         let id = task_entry.id();
-                        let sqid = task_entry.sqid();
+                        let invo = InvocationId::new(id);
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
-                        let one_task = Invocation::new(id, trigger.clone());
+                        let one_task = Invocation::new(invo, trigger.clone());
                         let sqid = one_task.sqid();
 
                         match boxed_actor.send(one_task).await {
                             Ok(result) => {
                                 let is_ok = result.is_ok();
-                                done.push((index, result.to_report(id)));
+                                done.push((index, result.to_report(invo)));
                                 if is_ok {
                                     debug!(
                                         "index {index} completed, will move to next text in seq"
@@ -125,19 +124,20 @@ impl Handler<Invocation> for TaskScopeRunner {
                         let parent_token = token.clone();
                         let child_token = parent_token.child_token();
                         let id = as_actor.id();
+                        let invo = InvocationId::new(id);
                         let actor = Box::new(as_actor).into_task_recipient();
                         let jh = tokio::spawn({
                             let semaphore = sem.clone();
-                            let one_task = Invocation::new(id, trigger.clone());
+                            let one_task = Invocation::new(invo, trigger.clone());
                             async move {
                                 if child_token.is_cancelled() {
                                     let v = InvocationResult::cancelled();
-                                    return (index, id, Ok::<_, _>(v));
+                                    return (index, invo, Ok::<_, _>(v));
                                 };
                                 let _permit = semaphore.acquire().await.unwrap();
                                 let task_run = actor
                                     .send(one_task)
-                                    .map(move |task_result| (index, id, task_result));
+                                    .map(move |task_result| (index, invo, task_result));
                                 let output = select! {
                                     result = task_run => {
                                         match (&result, fail_early) {
@@ -160,7 +160,7 @@ impl Handler<Invocation> for TaskScopeRunner {
                                     _ = child_token.cancelled() => {
                                         debug!("child_token was cancelled");
                                         let v = InvocationResult::cancelled();
-                                        (index, id, Ok::<_, _>(v))
+                                        (index, invo, Ok::<_, _>(v))
                                     }
                                 };
                                 drop(_permit);
@@ -211,16 +211,12 @@ impl Handler<Invocation> for TaskScopeRunner {
             );
 
             match (all_ran, all_good, exit_on_failure) {
-                (true, true, _) => InvocationResult::ok_tasks(invocation_id, reports),
-                (true, false, true) => {
-                    InvocationResult::err_tasks(invocation_id, failed_only, reports)
+                (true, true, _) => InvocationResult::ok_tasks(id, reports),
+                (true, false, true) => InvocationResult::err_tasks(id, failed_only, reports),
+                (true, false, false) => InvocationResult::ok_tasks(id, reports),
+                (false, _, _) => {
+                    InvocationResult::err_partial_tasks(id, reports, ExpectedLen(expected_len))
                 }
-                (true, false, false) => InvocationResult::ok_tasks(invocation_id, reports),
-                (false, _, _) => InvocationResult::err_partial_tasks(
-                    invocation_id,
-                    reports,
-                    ExpectedLen(expected_len),
-                ),
             }
         }))
     }

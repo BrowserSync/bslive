@@ -1,10 +1,11 @@
+use crate::invocation::InvocationId;
 use crate::invocation_result::InvocationResult;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct TaskReport {
     pub result: InvocationResult,
-    pub id: u64,
+    pub id: InvocationId,
 }
 
 impl Display for TaskReport {
@@ -20,11 +21,11 @@ impl TaskReport {
 }
 
 impl TaskReport {
-    pub fn new(result: InvocationResult, id: u64) -> Self {
+    pub fn new(result: InvocationResult, id: InvocationId) -> Self {
         Self { id, result }
     }
     pub fn id(&self) -> u64 {
-        self.id
+        self.id.u64()
     }
     pub fn result(&self) -> &InvocationResult {
         &self.result

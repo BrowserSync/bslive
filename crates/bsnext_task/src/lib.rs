@@ -69,3 +69,14 @@ impl SequenceOpts {
         Self { exit_on_failure }
     }
 }
+
+pub fn sqid(id: u64) -> String {
+    let sqids = sqids::Sqids::default();
+    sqids.encode(&[id]).unwrap_or_else(|_| id.to_string())
+}
+
+pub fn sqid_short(id: u64) -> String {
+    let sqids = sqids::Sqids::default();
+    let sqid = sqids.encode(&[id]).unwrap();
+    sqid.get(0..6).unwrap_or(&sqid).to_string()
+}

@@ -33,7 +33,7 @@ impl Handler<Invocation> for NotifyServers {
 
     fn handle(
         &mut self,
-        Invocation { trigger, .. }: Invocation,
+        Invocation { trigger, id }: Invocation,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         tracing::debug!("NotifyServers::TaskCommand");
@@ -51,7 +51,7 @@ impl Handler<Invocation> for NotifyServers {
                 todo!("I cannot accept this")
             }
         }
-        Box::pin(async { InvocationResult::ok(InvocationId(0)) })
+        Box::pin(async move { InvocationResult::ok(id) })
     }
 }
 
@@ -62,6 +62,6 @@ impl Actor for NotifyServersNoOp {
 impl Handler<Invocation> for NotifyServersNoOp {
     type Result = ResponseFuture<InvocationResult>;
     fn handle(&mut self, _invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        Box::pin(async { InvocationResult::ok(InvocationId(0)) })
+        Box::pin(async { InvocationResult::ok(InvocationId::new(0)) })
     }
 }

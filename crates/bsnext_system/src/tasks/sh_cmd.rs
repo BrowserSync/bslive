@@ -228,7 +228,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
 #[tracing::instrument]
 async fn sh_cmd(
     addr: Recipient<RequestOutputChannel>,
-    id: u64,
+    id: InvocationId,
     sqid: String,
     cmd: OsString,
     reason: String,
@@ -289,9 +289,9 @@ async fn sh_cmd(
         while let Ok(Some(line)) = stdout_reader.next_line().await {
             match sender
                 .send(TaggedEvent::new(
-                    id,
+                    id.u64(),
                     AnyEvent::External(ExternalEventsDTO::stdout_line(
-                        id,
+                        id.u64(),
                         line,
                         (*sh_prefix).clone(),
                     )),
@@ -309,9 +309,9 @@ async fn sh_cmd(
         while let Ok(Some(line)) = stderr_reader.next_line().await {
             match sender2
                 .send(TaggedEvent::new(
-                    id,
+                    id.u64(),
                     AnyEvent::External(ExternalEventsDTO::stderr_line(
-                        id,
+                        id.u64(),
                         line,
                         (*sh_prefix_2).clone(),
                     )),
@@ -332,20 +332,20 @@ async fn sh_cmd(
     let result: InvocationResult = tokio::select! {
         _ = &mut deadline => {
             tracing::info!("⌛️ operation timed out");
-            InvocationResult::timeout(InvocationId(invocation_id))
+            InvocationResult::timeout(InvocationId::new(invocation_id))
         }
         out = child.wait() => {
             tracing::info!("child waited");
             match out {
                 Ok(exit) => match exit.code() {
-                   Some(0) => InvocationResult::ok(InvocationId(invocation_id)),
+                   Some(0) => InvocationResult::ok(InvocationId::new(invocation_id)),
                    Some(code) => {
                         tracing::debug!("did exit with code {}", code);
-                        InvocationResult::err_code(InvocationId(invocation_id), ExitCode(code))
+                        InvocationResult::err_code(InvocationId::new(invocation_id), ExitCode(code))
                     },
-                   None => InvocationResult::err_message(InvocationId(invocation_id), "unknown error!")
+                   None => InvocationResult::err_message(InvocationId::new(invocation_id), "unknown error!")
                 },
-                Err(err) => InvocationResult::err_message(InvocationId(invocation_id), &err.to_string())
+                Err(err) => InvocationResult::err_message(InvocationId::new(invocation_id), &err.to_string())
             }
         }
     };

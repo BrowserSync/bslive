@@ -18,7 +18,7 @@ impl InvocationResult {
         Self {
             task_reports: vec![],
             conclusion: InvocationConclusion::Cancelled,
-            invocation_id: InvocationId(0),
+            invocation_id: InvocationId::new(0),
         }
     }
 }
@@ -100,10 +100,10 @@ impl InvocationResult {
             task_reports: tasks,
         }
     }
-    pub fn to_report(self, id: u64) -> TaskReport {
+    pub fn to_report(self, id: InvocationId) -> TaskReport {
         TaskReport { id, result: self }
     }
-    pub fn to_report_and_map(self, id: u64) -> (TaskReport, HashMap<u64, TaskReport>) {
+    pub fn to_report_and_map(self, id: InvocationId) -> (TaskReport, HashMap<u64, TaskReport>) {
         let report = self.to_report(id);
         let mut report_map = HashMap::new();
         every_report(&mut report_map, &report);

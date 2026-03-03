@@ -4,19 +4,18 @@ use bsnext_task::task_report::{TaskOk, TaskReport};
 
 #[test]
 fn add() {
-    assert_eq!(1 + 1, 2);
     let task_report = TaskReport {
         result: InvocationResult {
             conclusion: InvocationConclusion::Ok(TaskOk),
-            invocation_id: InvocationId(0),
+            invocation_id: InvocationId::new(0),
             task_reports: vec![],
         },
-        id: 0,
+        id: InvocationId::new(0),
     };
     let invocation_result = InvocationResult {
         conclusion: InvocationConclusion::Ok(TaskOk),
         task_reports: vec![task_report],
-        invocation_id: InvocationId(0),
+        invocation_id: InvocationId::new(0),
     };
     assert!(invocation_result.is_ok());
 }

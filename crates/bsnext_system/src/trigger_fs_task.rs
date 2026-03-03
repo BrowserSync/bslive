@@ -4,7 +4,7 @@ use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::TaskActionStage;
 use bsnext_fs::FsEventContext;
 use bsnext_task::as_actor::AsActor;
-use bsnext_task::invocation::Invocation;
+use bsnext_task::invocation::{Invocation, InvocationId};
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 
@@ -59,10 +59,11 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
             .insert(*fs_ctx, msg.task_spec.to_owned());
 
         let task_id = msg.task_spec.as_id();
+        let invo = InvocationId::new(task_id);
 
         let trigger_recipient = Box::new(msg.task_scope).into_task_recipient();
         // let comms = self.task_comms();
-        let one_task = Invocation::new(task_id, trigger);
+        let one_task = Invocation::new(invo, trigger);
 
         Box::pin(
             trigger_recipient
@@ -72,7 +73,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
                     let runner = actor.task_spec_mapping.get(&cloned_id);
                     match (resp, runner) {
                         (Ok(result), Some(task_spec)) => {
-                            let (report, report_map) = result.to_report_and_map(task_id);
+                            let (report, report_map) = result.to_report_and_map(invo);
                             let tree = task_spec.as_tree_with_results(&report_map);
                             actor.publish_any_event(TaskActionStage::complete(
                                 task_id, tree, report,

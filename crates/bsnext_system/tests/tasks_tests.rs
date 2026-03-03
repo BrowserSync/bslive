@@ -46,7 +46,7 @@ async fn test_task_scope_runner() -> anyhow::Result<()> {
     let id = 0;
     let trigger = TaskTrigger::new(variant, id);
 
-    let one_task = Invocation::new(0, trigger);
+    let one_task = Invocation::new(InvocationId::new(0), trigger);
 
     let task_result = addr.send(one_task).await.unwrap();
     let _evt = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await;
@@ -74,7 +74,7 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
             let f = self.f.take().unwrap();
             Box::pin(
                 f.into_actor(self)
-                    .map(|_, _, _| InvocationResult::ok(InvocationId(0))),
+                    .map(|_, _, _| InvocationResult::ok(InvocationId::new(0))),
             )
         }
     }

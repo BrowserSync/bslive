@@ -60,13 +60,13 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
                 todo!("can this actually fail?");
             };
             for evt in events {
-                let tagged = TaggedEvent::new(id, evt);
+                let tagged = TaggedEvent::new(id.u64(), evt);
                 match output.sender.send(tagged).await {
                     Ok(_) => tracing::trace!("sent"),
                     Err(e) => tracing::error!("{e}"),
                 };
             }
-            InvocationResult::ok(InvocationId(0))
+            InvocationResult::ok(InvocationId::new(0))
         })
     }
 }
