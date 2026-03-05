@@ -62,8 +62,8 @@ impl Actor for BsSystem {
 }
 
 impl BsSystem {
-    pub fn capabilities(&self) -> Addr<Capabilities> {
-        self.capabilities_addr.clone()
+    pub fn capabilities(&self) -> &Addr<Capabilities> {
+        &self.capabilities_addr
     }
     pub fn servers(&self) -> &Addr<ServersSupervisor> {
         &self.servers_addr

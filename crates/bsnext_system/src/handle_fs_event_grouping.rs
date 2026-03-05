@@ -145,7 +145,7 @@ impl BsSystem {
         Some((
             fs_triggered_task_spec
                 .clone()
-                .to_task_scope(self.servers().clone(), self.capabilities()),
+                .to_task_scope(self.servers().clone(), self.capabilities().clone()),
             task_trigger,
             fs_triggered_task_spec,
         ))
