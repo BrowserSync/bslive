@@ -574,12 +574,10 @@ dependencies = [
  "anyhow",
  "bsnext_tracing",
  "futures",
- "futures-util",
  "globset",
  "kill_tree",
  "notify",
  "pin-project-lite",
- "tempfile",
  "thiserror 1.0.60",
  "tokio",
  "tokio-stream",
@@ -682,7 +680,6 @@ dependencies = [
  "http",
  "insta",
  "serde",
- "tokio",
 ]
 
 [[package]]
@@ -747,7 +744,6 @@ dependencies = [
  "sqids",
  "thiserror 1.0.60",
  "tokio",
- "tokio-stream",
  "tokio-util",
  "tracing",
 ]

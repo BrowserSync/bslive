@@ -1,5 +1,5 @@
-use crate::path_monitor::{PathMonitor, PathMonitorMeta, StopPathMonitor};
 use crate::system::BsSystem;
+use crate::watchables::path_monitor::{PathMonitor, PathMonitorMeta, StopPathMonitor};
 use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};

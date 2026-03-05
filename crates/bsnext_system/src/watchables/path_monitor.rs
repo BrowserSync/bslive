@@ -22,7 +22,7 @@ use tracing::{debug, debug_span};
 pub struct PathMonitor {
     pub(crate) cwd: PathBuf,
     pub(crate) addrs: Vec<Addr<FsWatcher>>,
-    pub(crate) sys: Recipient<FsEventGrouping>,
+    pub(crate) recipient: Recipient<FsEventGrouping>,
     pub(crate) fs_ctx: FsEventContext,
     pub(crate) path_watchable: PathWatchable,
     pub(crate) debounce: Debounce,
@@ -53,7 +53,7 @@ impl From<&PathMonitor> for PathMonitorMeta {
 
 impl StreamHandler<FsEvent> for PathMonitor {
     fn handle(&mut self, event: FsEvent, _ctx: &mut Context<PathMonitor>) {
-        self.sys.do_send(FsEventGrouping::Singular(event))
+        self.recipient.do_send(FsEventGrouping::Singular(event))
     }
 }
 
@@ -73,7 +73,7 @@ impl StreamHandler<Vec<FsEvent>> for PathMonitor {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        self.sys
+        self.recipient
             .do_send(FsEventGrouping::buffered_change(outgoing, self.fs_ctx))
     }
 }
@@ -294,7 +294,7 @@ impl Handler<FsEvent> for PathMonitor {
             }
             _ => {
                 // todo: any need to buffer these?
-                self.sys.do_send(FsEventGrouping::Singular(msg))
+                self.recipient.do_send(FsEventGrouping::Singular(msg))
             }
         }
     }
@@ -353,7 +353,7 @@ impl PathMonitor {
     ) -> Self {
         let (inner_sender, inner_receiver) = mpsc::channel::<FsEvent>(1);
         Self {
-            sys,
+            recipient: sys,
             debounce,
             cwd,
             addrs: vec![],

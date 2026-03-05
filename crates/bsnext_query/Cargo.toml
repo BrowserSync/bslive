@@ -7,7 +7,6 @@ edition = "2024"
 bsnext_resp = { path = "../bsnext_resp" }
 
 axum = { workspace = true }
-tokio = { workspace = true }
 serde = { workspace = true }
 insta = { workspace = true }
 anyhow = { workspace = true }

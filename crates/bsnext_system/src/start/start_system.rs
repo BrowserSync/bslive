@@ -1,7 +1,7 @@
 use crate::api::BsSystemApi;
-use crate::input_monitor::MonitorInput;
 use crate::start::start_kind::StartKind;
 use crate::system::{BsSystem, RunDryOk, RunOk, SetupOk};
+use crate::watchables::input_monitor::MonitorInput;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
 };

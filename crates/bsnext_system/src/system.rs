@@ -1,12 +1,11 @@
 use crate::capabilities::Capabilities;
-use crate::input_monitor::InputMonitor;
 use crate::invoke_scope::InvokeScope;
-use crate::monitor_path_watchables::MonitorPathWatchables;
-use crate::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::run::resolve_run::{InvokeRunTasks, ResolveRunTasks};
 use crate::servers::ResolveServers;
 use crate::tasks::resolve::ResolveInitialTasks;
 use crate::tasks::task_spec::TaskSpec;
+use crate::watchables::input_monitor::InputMonitor;
+use crate::watchables::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext, Running};
 use actix_rt::Arbiter;
