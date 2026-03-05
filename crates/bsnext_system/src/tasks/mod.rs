@@ -17,6 +17,7 @@ pub mod bs_live_task;
 pub mod comms;
 mod into_recipient;
 pub mod notify_servers;
+pub mod resolve;
 pub mod sh_cmd;
 pub mod task_comms;
 pub mod task_spec;
