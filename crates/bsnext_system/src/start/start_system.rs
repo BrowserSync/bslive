@@ -57,6 +57,7 @@ impl Handler<Start> for BsSystem {
 
     #[tracing::instrument(name = "BsSystem->Start", skip(self, msg, ctx))]
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
+        let addr = ctx.address();
         match msg.kind.input(&self.start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
                 debug!("SystemStartArgs::PathWithInput");
@@ -64,8 +65,7 @@ impl Handler<Start> for BsSystem {
                 let ids = input.ids();
                 let input_ctx = InputCtx::new(&ids, None, &self.start_context, Some(&path));
                 let input_clone2 = input.clone();
-                let addr = ctx.address();
-                let jobs = crate::system::setup_jobs(addr, input.clone());
+                let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
@@ -77,7 +77,7 @@ impl Handler<Start> for BsSystem {
                             input_ctx,
                         });
                         // todo: where to better sequence these side-effects?
-                        actor.accept_watchables(&input_clone2);
+                        actor.accept_watchables(&input_clone2, addr);
                         Ok(DidStart::Started(servers))
                     },
                 ))
@@ -87,7 +87,7 @@ impl Handler<Start> for BsSystem {
 
                 let addr = ctx.address();
                 let input_clone2 = input.clone();
-                let jobs = crate::system::setup_jobs(addr, input.clone());
+                let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
@@ -98,7 +98,7 @@ impl Handler<Start> for BsSystem {
                             debug!("errored: {:?}", errored);
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        actor.accept_watchables(&input_clone2);
+                        actor.accept_watchables(&input_clone2, addr);
                         Ok(DidStart::Started(res.servers))
                     },
                 ))

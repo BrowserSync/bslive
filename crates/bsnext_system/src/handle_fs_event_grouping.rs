@@ -30,7 +30,7 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
         let span = debug_span!("Handler->FsEventGrouping->BsSystem");
         let _guard = span.enter();
         let next = match msg {
-            FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event),
+            FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event, addr),
             FsEventGrouping::BufferedChange(buff) => {
                 if let Some((task_scope, task_trigger, task_spec)) =
                     self.handle_buffered(buff, addr)
@@ -49,7 +49,7 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
 }
 
 impl BsSystem {
-    fn handle_fs_event(&mut self, fs_event: FsEvent) -> Option<AnyEvent> {
+    fn handle_fs_event(&mut self, fs_event: FsEvent, addr: Addr<Self>) -> Option<AnyEvent> {
         match &fs_event.kind {
             FsEventKind::Change(ch) if fs_event.fs_event_ctx.is_root() => {
                 tracing::info!("fs_event_ctx=root");
@@ -57,12 +57,10 @@ impl BsSystem {
                     // if the change included a new Input, use it
                     (any_event, Some(input)) => {
                         tracing::info!("will override input");
-                        if let Some(addr) = &self.self_addr {
-                            addr.do_send(OverrideInput {
-                                input,
-                                original_event: any_event,
-                            });
-                        };
+                        addr.do_send(OverrideInput {
+                            input,
+                            original_event: any_event,
+                        });
                         // return None here so that the event is not published yet (the updated Input will do it)
                         None
                     }

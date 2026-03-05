@@ -56,8 +56,6 @@ impl Actor for BsSystem {
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(actor.name = "BsSystem", actor.lifecyle = "stopped");
         self.self_addr = None;
-        // self.servers_addr = None;
-        // self.any_event_sender = None;
     }
 }
 
@@ -94,7 +92,7 @@ impl BsSystem {
     }
 
     #[tracing::instrument(skip_all, name = "BsSystem.accept_watchables")]
-    pub(crate) fn accept_watchables(&mut self, input: &Input) {
+    pub(crate) fn accept_watchables(&mut self, input: &Input, addr: Addr<BsSystem>) {
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
         let any_watchables = to_any_watchables(input);
@@ -102,10 +100,6 @@ impl BsSystem {
         debug!("processing {} route watchables", route_watchables.len(),);
         debug!("processing {} server watchables", server_watchables.len());
         debug!("processing {} any watchables", any_watchables.len());
-
-        let Some(self_address) = &self.self_addr else {
-            unreachable!("?")
-        };
 
         // todo: clean up this merging
         let all_watchables = route_watchables
@@ -123,14 +117,12 @@ impl BsSystem {
         let watchables = all_watchables.chain(servers).chain(any).collect::<Vec<_>>();
 
         let cwd = self.cwd.clone();
-        let addr = self_address.clone();
         debug!(
             "{} watchables to add, cwd: {}",
             watchables.len(),
             cwd.display()
         );
         let msg = MonitorPathWatchables { watchables, cwd };
-
         addr.do_send(msg);
     }
 

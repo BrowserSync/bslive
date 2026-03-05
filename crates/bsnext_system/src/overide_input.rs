@@ -21,6 +21,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
     fn handle(&mut self, msg: OverrideInput, ctx: &mut Self::Context) -> Self::Result {
         let input_clone = msg.input.clone();
         let start_ctx_clone = self.start_context.clone();
+        let addr = ctx.address();
         // let ctx_clone = self.st
         let f = ctx
             .address()
@@ -33,7 +34,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
                     Ok(Err(s_e)) => Err(s_e),
                     Err(err) => Err(ServerError::Unknown(err.to_string())),
                 };
-                actor.accept_watchables(&input_clone);
+                actor.accept_watchables(&input_clone, addr);
                 actor.update_ctx(&input_clone, &start_ctx_clone);
                 output
             });
