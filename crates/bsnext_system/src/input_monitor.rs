@@ -1,7 +1,7 @@
-use crate::any_watchable::AnyWatchable;
 use crate::path_monitor::{PathMonitor, PathMonitorMeta};
-use crate::path_watchable::PathWatchable;
 use crate::system::BsSystem;
+use crate::watchables::any_watchable::AnyWatchable;
+use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::Spec;

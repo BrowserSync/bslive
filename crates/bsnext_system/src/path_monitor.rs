@@ -1,4 +1,4 @@
-use crate::path_watchable::PathWatchable;
+use crate::watchables::path_watchable::PathWatchable;
 use actix::{ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
