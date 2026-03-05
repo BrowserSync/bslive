@@ -1,20 +1,17 @@
 use crate::api::BsSystemApi;
-use crate::capabilities::Capabilities;
 use crate::input_monitor::MonitorInput;
 use crate::start::start_kind::StartKind;
 use crate::system::{BsSystem, RunDryOk, RunOk, SetupOk};
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
 };
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::internal::InternalEvents::TaskSpecDisplay;
 use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
 use bsnext_dto::{DidStart, StartupError};
-use bsnext_input::startup::{RunMode, StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::startup::{RunMode, SystemStart, SystemStartArgs};
 use bsnext_input::InputCtx;
 use std::future::ready;
 use std::path::PathBuf;
-use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tracing::debug;
 
@@ -24,15 +21,12 @@ pub async fn start_system(
     events_sender: tokio::sync::mpsc::Sender<AnyEvent>,
 ) -> Result<Option<BsSystemApi>, StartupError> {
     let (tx, rx) = oneshot::channel();
-    let system = BsSystem::new(events_sender.clone(), tx);
+    let system = BsSystem::new(events_sender.clone(), cwd, tx);
     let sys_addr = system.start();
 
     tracing::debug!("{:?}", start_kind);
 
-    let start = Start {
-        kind: start_kind,
-        cwd,
-    };
+    let start = Start { kind: start_kind };
 
     match sys_addr.send(start).await {
         Ok(Ok(DidStart::Started(..))) => {
@@ -56,7 +50,6 @@ pub async fn start_system(
 #[rtype(result = "Result<DidStart, StartupError>")]
 pub struct Start {
     pub kind: StartKind,
-    pub cwd: PathBuf,
 }
 
 impl Handler<Start> for BsSystem {
@@ -64,25 +57,12 @@ impl Handler<Start> for BsSystem {
 
     #[tracing::instrument(name = "BsSystem->Start", skip(self, msg, ctx))]
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
-        self.cwd = Some(msg.cwd);
-
-        debug!("self.cwd {:?}", self.cwd);
-
-        let Some(cwd) = &self.cwd else {
-            unreachable!("?")
-        };
-
-        let start_context = StartupContext::from_cwd(self.cwd.as_ref());
-        self.start_context = Some(start_context.clone());
-
-        debug!(?start_context);
-
-        match msg.kind.input(&start_context) {
+        match msg.kind.input(&self.start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
                 debug!("SystemStartArgs::PathWithInput");
 
                 let ids = input.ids();
-                let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
+                let input_ctx = InputCtx::new(&ids, None, &self.start_context, Some(&path));
                 let input_clone2 = input.clone();
                 let addr = ctx.address();
                 let jobs = crate::system::setup_jobs(addr, input.clone());
@@ -93,7 +73,7 @@ impl Handler<Start> for BsSystem {
                         debug!("✅ setup jobs completed");
                         ctx.notify(MonitorInput {
                             path: path.clone(),
-                            cwd: actor.cwd.clone().unwrap(),
+                            cwd: actor.cwd.clone(),
                             input_ctx,
                         });
                         // todo: where to better sequence these side-effects?
@@ -127,7 +107,7 @@ impl Handler<Start> for BsSystem {
                 debug!("SystemStartArgs::PathWithInvalidInput");
                 ctx.notify(MonitorInput {
                     path: path.clone(),
-                    cwd: cwd.clone(),
+                    cwd: self.cwd.clone(),
                     input_ctx: InputCtx::default(),
                 });
                 self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));

@@ -23,8 +23,8 @@ impl actix::Handler<ResolveServers> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "Handler->ResolveServers->BsSystem")]
     fn handle(&mut self, msg: ResolveServers, _ctx: &mut Self::Context) -> Self::Result {
-        let external_event_sender = self.any_event_sender.clone();
-        let addr = self.servers_addr.clone();
+        let external_event_sender = self.sender().clone();
+        let addr = self.servers().clone();
 
         let f = async move {
             debug!("will mark input as changed or new");
@@ -119,7 +119,7 @@ impl actix::Handler<ReadActiveServers> for BsSystem {
     type Result = ResponseFuture<Result<GetActiveServersResponse, ServerError>>;
 
     fn handle(&mut self, _msg: ReadActiveServers, _ctx: &mut Self::Context) -> Self::Result {
-        let cloned_address = self.servers_addr.clone();
+        let cloned_address = self.servers().clone();
 
         Box::pin(async move {
             match cloned_address.send(GetActiveServers).await {

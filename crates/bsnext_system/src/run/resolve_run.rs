@@ -128,7 +128,7 @@ impl actix::Handler<InvokeRunTasks> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "InvokeRunTasks")]
     fn handle(&mut self, msg: InvokeRunTasks, ctx: &mut Self::Context) -> Self::Result {
-        let capabilities = self.capabilities_addr.clone();
+        let capabilities = self.capabilities();
         let (invoke_scope, rx) = self.run_only(capabilities, msg.task_spec);
         ctx.notify(invoke_scope);
         Box::pin(async move {

@@ -1,5 +1,4 @@
 use crate::any_watchable::to_any_watchables;
-use crate::capabilities;
 use crate::capabilities::Capabilities;
 use crate::input_monitor::InputMonitor;
 use crate::invoke_scope::InvokeScope;
@@ -31,14 +30,14 @@ use tracing::debug;
 #[derive(Debug)]
 pub struct BsSystem {
     pub(crate) self_addr: Option<Addr<BsSystem>>,
-    pub(crate) capabilities_addr: Addr<Capabilities>,
-    pub(crate) servers_addr: Addr<ServersSupervisor>,
-    pub(crate) any_event_sender: Sender<AnyEvent>,
+    capabilities_addr: Addr<Capabilities>,
+    servers_addr: Addr<ServersSupervisor>,
+    any_event_sender: Sender<AnyEvent>,
     pub(crate) input_monitors: Option<InputMonitor>,
     pub(crate) any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
     pub(crate) task_spec_mapping: HashMap<FsEventContext, TaskSpec>,
-    pub(crate) cwd: Option<PathBuf>,
-    pub(crate) start_context: Option<StartupContext>,
+    pub(crate) cwd: PathBuf,
+    pub(crate) start_context: StartupContext,
 }
 
 impl Actor for BsSystem {
@@ -63,9 +62,24 @@ impl Actor for BsSystem {
 }
 
 impl BsSystem {
-    pub fn new(any_event_sender: Sender<AnyEvent>, tx: tokio::sync::oneshot::Sender<()>) -> Self {
+    pub fn capabilities(&self) -> Addr<Capabilities> {
+        self.capabilities_addr.clone()
+    }
+    pub fn servers(&self) -> &Addr<ServersSupervisor> {
+        &self.servers_addr
+    }
+    pub fn sender(&self) -> &Sender<AnyEvent> {
+        &self.any_event_sender
+    }
+
+    pub fn new(
+        any_event_sender: Sender<AnyEvent>,
+        cwd: PathBuf,
+        tx: tokio::sync::oneshot::Sender<()>,
+    ) -> Self {
         let servers = ServersSupervisor::new(tx);
         let capabilities = Capabilities::new(any_event_sender.clone());
+        let start_context = StartupContext::from_cwd(Some(&cwd));
         BsSystem {
             self_addr: None,
             capabilities_addr: capabilities.start(),
@@ -74,8 +88,8 @@ impl BsSystem {
             input_monitors: None,
             any_monitors: Default::default(),
             task_spec_mapping: Default::default(),
-            cwd: None,
-            start_context: None,
+            cwd,
+            start_context,
         }
     }
 
@@ -93,10 +107,6 @@ impl BsSystem {
             unreachable!("?")
         };
 
-        let Some(cwd) = &self.cwd else {
-            unreachable!("can this occur?")
-        };
-
         // todo: clean up this merging
         let all_watchables = route_watchables
             .iter()
@@ -112,7 +122,7 @@ impl BsSystem {
 
         let watchables = all_watchables.chain(servers).chain(any).collect::<Vec<_>>();
 
-        let cwd = cwd.clone();
+        let cwd = self.cwd.clone();
         let addr = self_address.clone();
         debug!(
             "{} watchables to add, cwd: {}",

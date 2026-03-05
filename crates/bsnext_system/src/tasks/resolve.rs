@@ -14,7 +14,7 @@ impl actix::Handler<ResolveInitialTasks> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "Handler->ResolveInitialTasks->BsSystem")]
     fn handle(&mut self, msg: ResolveInitialTasks, ctx: &mut Self::Context) -> Self::Result {
-        let capabilities = self.capabilities_addr.clone();
+        let capabilities = self.capabilities().clone();
         let (next, rx) = self.before(&msg.input, capabilities);
         ctx.notify(next);
 

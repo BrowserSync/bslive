@@ -36,12 +36,6 @@ impl actix::Handler<MonitorInput> for BsSystem {
             duration: Duration::from_millis(300),
         };
 
-        let cwd = self
-            .cwd
-            .as_ref()
-            .map(ToOwned::to_owned)
-            .expect("if this fails, lots will");
-
         let ctx = FsEventContext::for_root();
         let pw = PathWatchable::Any(AnyWatchable {
             dirs: vec![msg.path.to_path_buf()],
@@ -49,7 +43,7 @@ impl actix::Handler<MonitorInput> for BsSystem {
             task_spec: None,
         });
 
-        let input_path_monitor = PathMonitor::new(sys, debounce, cwd, ctx, pw);
+        let input_path_monitor = PathMonitor::new(sys, debounce, self.cwd.clone(), ctx, pw);
         let meta = PathMonitorMeta::from(&input_path_monitor);
 
         tracing::debug!("starting input monitor");

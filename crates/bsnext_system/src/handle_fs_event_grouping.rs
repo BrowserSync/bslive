@@ -145,14 +145,14 @@ impl BsSystem {
         Some((
             fs_triggered_task_spec
                 .clone()
-                .to_task_scope(self.servers_addr.clone(), self.capabilities_addr.clone()),
+                .to_task_scope(self.servers().clone(), self.capabilities()),
             task_trigger,
             fs_triggered_task_spec,
         ))
     }
 
     pub fn task_comms(&mut self) -> TaskComms {
-        TaskComms::new(self.any_event_sender.clone())
+        TaskComms::new(self.sender().clone())
     }
 
     fn handle_any_change(
@@ -161,7 +161,7 @@ impl BsSystem {
         inner: &PathDescriptionOwned,
     ) -> AnyEvent {
         tracing::trace!(?inner, "Other file changed");
-        self.servers_addr.do_send(FileChanged {
+        self.servers().do_send(FileChanged {
             path: inner.absolute.clone(),
             ctx: *fs_event_ctx,
         });
@@ -209,11 +209,11 @@ impl BsSystem {
 
     fn handle_path_not_found(&mut self, pdo: &PathEvent) -> Option<AnyEvent> {
         let as_str = pdo.path.to_string_lossy().to_string();
-        let cwd = self.cwd.clone().unwrap();
+        let cwd = self.cwd.clone();
         let abs = cwd.join(&as_str);
         let def = PathDefinition {
             input: as_str,
-            cwd: self.cwd.clone().unwrap(),
+            cwd: self.cwd.clone(),
             absolute: abs,
         };
         let e = InputError::PathError(PathError::MissingPaths {

@@ -1,5 +1,5 @@
 use crate::external_event_sender::ExternalEventSenderWithLogging;
-use crate::tasks::notify_servers::{NotifyServers, NotifyServersNoOp};
+use crate::tasks::notify_servers::NotifyServers;
 use crate::tasks::sh_cmd::ShCmd;
 use crate::tasks::task_spec::TaskSpec;
 use actix::{Actor, Recipient};

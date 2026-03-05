@@ -20,10 +20,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
 
     fn handle(&mut self, msg: OverrideInput, ctx: &mut Self::Context) -> Self::Result {
         let input_clone = msg.input.clone();
-        let start_ctx_clone = self
-            .start_context
-            .clone()
-            .expect("If we get here, it's a big problem");
+        let start_ctx_clone = self.start_context.clone();
         // let ctx_clone = self.st
         let f = ctx
             .address()
