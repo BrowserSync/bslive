@@ -1,4 +1,4 @@
-use crate::BsSystem;
+use crate::system::BsSystem;
 use actix::{AsyncContext, ResponseFuture};
 use bsnext_dto::internal::{InitialTaskError, TaskReportAndTree};
 use bsnext_input::Input;

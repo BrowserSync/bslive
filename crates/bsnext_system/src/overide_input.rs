@@ -1,5 +1,5 @@
 use crate::servers::ResolveServers;
-use crate::BsSystem;
+use crate::system::BsSystem;
 use actix::{ActorFutureExt, AsyncContext, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::{AnyEvent, ChildResult, ServerError};
 use bsnext_dto::GetActiveServersResponse;

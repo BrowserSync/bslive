@@ -1,4 +1,4 @@
-use crate::BsSystem;
+use crate::system::BsSystem;
 use actix::ResponseFuture;
 use actix_rt::Arbiter;
 use bsnext_core::server::handler_client_config::ClientConfigChange;

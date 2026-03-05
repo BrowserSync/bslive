@@ -1,6 +1,6 @@
+use crate::system::BsSystem;
 use crate::tasks::task_comms::TaskComms;
 use crate::tasks::task_spec::TaskSpec;
-use crate::BsSystem;
 use actix::ActorFutureExt;
 use actix::Handler;
 use actix::ResponseActFuture;

@@ -2,7 +2,7 @@ use crate::api::BsSystemApi;
 use crate::capabilities::Capabilities;
 use crate::input_monitor::MonitorInput;
 use crate::start::start_kind::StartKind;
-use crate::{BsSystem, RunDryOk, RunOk, SetupOk};
+use crate::system::{BsSystem, RunDryOk, RunOk, SetupOk};
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
 };
@@ -97,7 +97,7 @@ impl Handler<Start> for BsSystem {
                 let input_ctx = InputCtx::new(&ids, None, &start_context, Some(&path));
                 let input_clone2 = input.clone();
                 let addr = ctx.address();
-                let jobs = crate::setup_jobs(addr, input.clone());
+                let jobs = crate::system::setup_jobs(addr, input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
@@ -119,7 +119,7 @@ impl Handler<Start> for BsSystem {
 
                 let addr = ctx.address();
                 let input_clone2 = input.clone();
-                let jobs = crate::setup_jobs(addr, input.clone());
+                let jobs = crate::system::setup_jobs(addr, input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
@@ -153,7 +153,7 @@ impl Handler<Start> for BsSystem {
                 top_level_run_mode,
             }) => {
                 let addr = ctx.address();
-                let jobs = crate::run_jobs(addr, input.clone(), named, top_level_run_mode);
+                let jobs = crate::system::run_jobs(addr, input.clone(), named, top_level_run_mode);
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
                         Ok(_) => Ok(DidStart::WillExit),
@@ -168,7 +168,8 @@ impl Handler<Start> for BsSystem {
                 top_level_run_mode,
             }) => {
                 let addr = ctx.address();
-                let jobs = crate::print_jobs(addr, input.clone(), named, top_level_run_mode);
+                let jobs =
+                    crate::system::print_jobs(addr, input.clone(), named, top_level_run_mode);
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<RunDryOk, anyhow::Error>, actor, _ctx| match res {
                         Ok(RunDryOk { tree, spec: _ }) => {
