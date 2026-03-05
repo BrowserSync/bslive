@@ -14,10 +14,8 @@ impl actix::Handler<ResolveInitialTasks> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "Handler->ResolveInitialTasks->BsSystem")]
     fn handle(&mut self, msg: ResolveInitialTasks, ctx: &mut Self::Context) -> Self::Result {
-        let Some(addr) = self.capabilities_addr.as_ref() else {
-            todo!("unreachable")
-        };
-        let (next, rx) = self.before(&msg.input, addr.clone());
+        let capabilities = self.capabilities_addr.clone();
+        let (next, rx) = self.before(&msg.input, capabilities);
         ctx.notify(next);
 
         Box::pin(async move {

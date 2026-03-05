@@ -1,4 +1,5 @@
 use crate::any_watchable::to_any_watchables;
+use crate::capabilities;
 use crate::capabilities::Capabilities;
 use crate::input_monitor::InputMonitor;
 use crate::invoke_scope::InvokeScope;
@@ -30,9 +31,9 @@ use tracing::debug;
 #[derive(Debug)]
 pub struct BsSystem {
     pub(crate) self_addr: Option<Addr<BsSystem>>,
-    pub(crate) capabilities_addr: Option<Addr<Capabilities>>,
-    pub(crate) servers_addr: Option<Addr<ServersSupervisor>>,
-    pub(crate) any_event_sender: Option<Sender<AnyEvent>>,
+    pub(crate) capabilities_addr: Addr<Capabilities>,
+    pub(crate) servers_addr: Addr<ServersSupervisor>,
+    pub(crate) any_event_sender: Sender<AnyEvent>,
     pub(crate) input_monitors: Option<InputMonitor>,
     pub(crate) any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
     pub(crate) task_spec_mapping: HashMap<FsEventContext, TaskSpec>,
@@ -56,24 +57,20 @@ impl Actor for BsSystem {
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(actor.name = "BsSystem", actor.lifecyle = "stopped");
         self.self_addr = None;
-        self.servers_addr = None;
-        self.any_event_sender = None;
-    }
-}
-
-impl Default for BsSystem {
-    fn default() -> Self {
-        Self::new()
+        // self.servers_addr = None;
+        // self.any_event_sender = None;
     }
 }
 
 impl BsSystem {
-    pub fn new() -> Self {
+    pub fn new(any_event_sender: Sender<AnyEvent>, tx: tokio::sync::oneshot::Sender<()>) -> Self {
+        let servers = ServersSupervisor::new(tx);
+        let capabilities = Capabilities::new(any_event_sender.clone());
         BsSystem {
             self_addr: None,
-            capabilities_addr: None,
-            servers_addr: None,
-            any_event_sender: None,
+            capabilities_addr: capabilities.start(),
+            servers_addr: servers.start(),
+            any_event_sender,
             input_monitors: None,
             any_monitors: Default::default(),
             task_spec_mapping: Default::default(),
@@ -129,18 +126,16 @@ impl BsSystem {
 
     pub fn publish_any_event(&mut self, evt: AnyEvent) {
         tracing::trace!(?evt);
+        let sender = self.any_event_sender.clone();
 
-        if let Some(any_event_sender) = &self.any_event_sender {
-            Arbiter::current().spawn({
-                let events_sender = any_event_sender.clone();
-                async move {
-                    match events_sender.send(evt).await {
-                        Ok(_) => {}
-                        Err(_) => tracing::error!("could not send"),
-                    }
+        Arbiter::current().spawn({
+            async move {
+                match sender.send(evt).await {
+                    Ok(_) => {}
+                    Err(_) => tracing::error!("could not send"),
                 }
-            });
-        }
+            }
+        });
     }
 
     pub(crate) fn before(
@@ -159,7 +154,9 @@ impl BsSystem {
         let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
 
         debug!("{} before tasks to execute", all.len());
-        let task_scope = task_spec.clone().to_task_scope(None, addr);
+        let task_scope = task_spec
+            .clone()
+            .to_task_scope(self.servers_addr.clone(), addr);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
         (
             InvokeScope::new(task_scope, trigger, task_spec, comms, tx),
@@ -175,7 +172,7 @@ impl BsSystem {
         let comms = self.task_comms();
         let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
 
-        let task_scope = spec.clone().to_task_scope(None, addr);
+        let task_scope = spec.clone().to_task_scope(self.servers_addr.clone(), addr);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
         (InvokeScope::new(task_scope, trigger, spec, comms, tx), rx)
     }

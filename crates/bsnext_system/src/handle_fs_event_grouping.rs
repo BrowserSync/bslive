@@ -141,24 +141,18 @@ impl BsSystem {
         };
 
         let task_trigger = TaskTrigger::new(variant, 0);
-        let Some(capabilities_addr) = self.capabilities_addr.as_ref() else {
-            todo!("unreachlable")
-        };
 
         Some((
             fs_triggered_task_spec
                 .clone()
-                .to_task_scope(self.servers_addr.clone(), capabilities_addr.clone()),
+                .to_task_scope(self.servers_addr.clone(), self.capabilities_addr.clone()),
             task_trigger,
             fs_triggered_task_spec,
         ))
     }
 
     pub fn task_comms(&mut self) -> TaskComms {
-        let Some(any_event_sender) = &self.any_event_sender else {
-            todo!("must have these senders...?");
-        };
-        TaskComms::new(any_event_sender.clone())
+        TaskComms::new(self.any_event_sender.clone())
     }
 
     fn handle_any_change(
@@ -167,12 +161,10 @@ impl BsSystem {
         inner: &PathDescriptionOwned,
     ) -> AnyEvent {
         tracing::trace!(?inner, "Other file changed");
-        if let Some(servers) = &self.servers_addr {
-            servers.do_send(FileChanged {
-                path: inner.absolute.clone(),
-                ctx: *fs_event_ctx,
-            })
-        }
+        self.servers_addr.do_send(FileChanged {
+            path: inner.absolute.clone(),
+            ctx: *fs_event_ctx,
+        });
         AnyEvent::External(ExternalEventsDTO::FileChanged(
             bsnext_dto::FileChangedDTO::from_path_buf(
                 inner.relative.as_ref().unwrap_or(&inner.absolute),

@@ -24,7 +24,7 @@ pub async fn start_system(
     events_sender: tokio::sync::mpsc::Sender<AnyEvent>,
 ) -> Result<Option<BsSystemApi>, StartupError> {
     let (tx, rx) = oneshot::channel();
-    let system = BsSystem::new();
+    let system = BsSystem::new(events_sender.clone(), tx);
     let sys_addr = system.start();
 
     tracing::debug!("{:?}", start_kind);
@@ -32,8 +32,6 @@ pub async fn start_system(
     let start = Start {
         kind: start_kind,
         cwd,
-        ack: tx,
-        events_sender,
     };
 
     match sys_addr.send(start).await {
@@ -59,8 +57,6 @@ pub async fn start_system(
 pub struct Start {
     pub kind: StartKind,
     pub cwd: PathBuf,
-    pub ack: oneshot::Sender<()>,
-    pub events_sender: Sender<AnyEvent>,
 }
 
 impl Handler<Start> for BsSystem {
@@ -68,7 +64,6 @@ impl Handler<Start> for BsSystem {
 
     #[tracing::instrument(name = "BsSystem->Start", skip(self, msg, ctx))]
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
-        self.any_event_sender = Some(msg.events_sender.clone());
         self.cwd = Some(msg.cwd);
 
         debug!("self.cwd {:?}", self.cwd);
@@ -77,15 +72,8 @@ impl Handler<Start> for BsSystem {
             unreachable!("?")
         };
 
-        let servers = ServersSupervisor::new(msg.ack);
-        // store the servers addr for later
-        self.servers_addr = Some(servers.start());
-
         let start_context = StartupContext::from_cwd(self.cwd.as_ref());
         self.start_context = Some(start_context.clone());
-
-        let capabilities = Capabilities::new(msg.events_sender.clone());
-        self.capabilities_addr = Some(capabilities.start());
 
         debug!(?start_context);
 

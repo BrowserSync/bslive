@@ -38,18 +38,11 @@ pub struct RunnableWithComms {
 impl AsActor for RunnableWithComms {
     fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
         match self.runnable {
-            Runnable::BsLiveTask(BsLiveTask::NotifyServer) => match self.ctx.servers_addr {
-                None => {
-                    let s = NotifyServersNoOp;
-                    let s = s.start();
-                    s.recipient()
-                }
-                Some(addr) => {
-                    let s = NotifyServers::new(addr.clone());
-                    let s = s.start();
-                    s.recipient()
-                }
-            },
+            Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
+                let s = NotifyServers::new(self.ctx.servers_addr.clone());
+                let s = s.start();
+                s.recipient()
+            }
             Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent) => {
                 let actor = ExternalEventSenderWithLogging::new(self.ctx.capabilities.recipient());
                 let addr = actor.start();

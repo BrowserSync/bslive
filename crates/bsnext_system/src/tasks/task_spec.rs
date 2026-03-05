@@ -155,7 +155,7 @@ pub trait TreeDisplay {
 impl TaskSpec {
     pub fn to_task_scope(
         self,
-        servers_addr: Option<Addr<ServersSupervisor>>,
+        servers_addr: Addr<ServersSupervisor>,
         capabilities_addr: Addr<Capabilities>,
     ) -> TaskScope {
         let parent_id = self.as_id();
