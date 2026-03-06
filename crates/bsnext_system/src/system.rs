@@ -1,6 +1,6 @@
 use crate::capabilities::Capabilities;
 use crate::invoke_scope::InvokeScope;
-use crate::run::resolve_run::{InvokeRunTasks, ResolveRunTasks};
+use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
 use crate::servers::ResolveServers;
 use crate::tasks::resolve::ResolveInitialTasks;
 use crate::tasks::task_spec::TaskSpec;
@@ -21,7 +21,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::Receiver;
-use tracing::debug;
 
 #[derive(Debug)]
 pub struct BsSystem {
@@ -101,33 +100,13 @@ impl BsSystem {
         });
     }
 
-    pub(crate) fn before(
-        &mut self,
-        input: &Input,
-        addr: Addr<Capabilities>,
-    ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
-        let comms = self.task_comms();
+    pub(crate) fn before(&mut self, input: &Input) -> TaskSpec {
         let all = input.before_run_opts();
         let task_spec = TaskSpec::seq_from(&all);
-
-        // let tree = task_spec.as_tree();
-        // let next = archy(&tree, Prefix::None);
-        // print!("{next}");
-
-        let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
-
-        debug!("{} before tasks to execute", all.len());
-        let task_scope = task_spec
-            .clone()
-            .to_task_scope(self.servers_addr.clone(), addr);
-        let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
-        (
-            InvokeScope::new(task_scope, trigger, task_spec, comms, tx),
-            rx,
-        )
+        task_spec
     }
 
-    pub(crate) fn run_only(
+    pub(crate) fn spec_to_invoke_scope(
         &mut self,
         addr: Addr<Capabilities>,
         spec: TaskSpec,
@@ -144,9 +123,9 @@ impl BsSystem {
 pub async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupOk> {
     let clone = input.clone();
     let clone2 = input.clone();
-    let report_and_tree = addr.send(ResolveInitialTasks { input: clone }).await??;
-    let servers_resp = addr.send(ResolveServers { input: clone2 });
-    let (servers, child_results) = servers_resp.await??;
+    let spec = addr.send(ResolveInitialTasks::new(clone)).await??;
+    let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
+    let (servers, child_results) = addr.send(ResolveServers::new(clone2)).await??;
     Ok(SetupOk {
         report_and_tree,
         servers,
@@ -161,10 +140,10 @@ pub async fn run_jobs(
     top_level_run_mode: TopLevelRunMode,
 ) -> anyhow::Result<RunOk> {
     let spec_output = addr
-        .send(ResolveRunTasks::new(input, named, top_level_run_mode))
+        .send(ResolveSpec::new(input, named, top_level_run_mode))
         .await??;
     let report_and_tree = addr
-        .send(InvokeRunTasks::new(spec_output.task_spec))
+        .send(InvokeRunTasks::new(spec_output.as_spec()))
         .await??;
 
     Ok(RunOk { report_and_tree })
@@ -177,9 +156,9 @@ pub async fn print_jobs(
     top_level_run_mode: TopLevelRunMode,
 ) -> anyhow::Result<RunDryOk> {
     let spec_output = addr
-        .send(ResolveRunTasks::new(input, named, top_level_run_mode))
+        .send(ResolveSpec::new(input, named, top_level_run_mode))
         .await??;
-    let spec = spec_output.task_spec;
+    let spec = spec_output.as_spec();
     let tree = spec.as_tree();
     Ok(RunDryOk { tree, spec })
 }

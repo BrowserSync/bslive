@@ -1,37 +1,29 @@
 use crate::system::BsSystem;
-use actix::{AsyncContext, ResponseFuture};
-use bsnext_dto::internal::{InitialTaskError, TaskReportAndTree};
+use crate::tasks::task_spec::TaskSpec;
+use actix::ResponseFuture;
+use bsnext_dto::internal::InitialTaskError;
 use bsnext_input::Input;
 
 #[derive(actix::Message)]
-#[rtype(result = "Result<TaskReportAndTree, InitialTaskError>")]
+#[rtype(result = "Result<TaskSpec, InitialTaskError>")]
 pub struct ResolveInitialTasks {
-    pub(crate) input: Input,
+    input: Input,
+}
+
+impl ResolveInitialTasks {
+    pub fn new(input: Input) -> Self {
+        Self { input }
+    }
 }
 
 impl actix::Handler<ResolveInitialTasks> for BsSystem {
-    type Result = ResponseFuture<Result<TaskReportAndTree, InitialTaskError>>;
+    type Result = ResponseFuture<Result<TaskSpec, InitialTaskError>>;
 
-    #[tracing::instrument(skip_all, name = "Handler->ResolveInitialTasks->BsSystem")]
-    fn handle(&mut self, msg: ResolveInitialTasks, ctx: &mut Self::Context) -> Self::Result {
-        let capabilities = self.capabilities().clone();
-        let (next, rx) = self.before(&msg.input, capabilities);
-        ctx.notify(next);
-
-        Box::pin(async move {
-            match rx.await {
-                Ok(TaskReportAndTree {
-                    report,
-                    tree,
-                    report_map,
-                }) if report.is_ok() => Ok(TaskReportAndTree {
-                    report,
-                    tree,
-                    report_map,
-                }),
-                Ok(TaskReportAndTree { .. }) => Err(InitialTaskError::FailedReport),
-                Err(_) => Err(InitialTaskError::FailedUnknown),
-            }
-        })
+    // Note: This handler is implemented as an async call to facilitate future upgrades
+    // when task resolution logic becomes more complex and requires asynchronous operations.
+    #[tracing::instrument(skip_all, name = "ResolveInitialTasks")]
+    fn handle(&mut self, msg: ResolveInitialTasks, _ctx: &mut Self::Context) -> Self::Result {
+        let task_spec = self.before(&msg.input);
+        Box::pin(async move { Ok(task_spec) })
     }
 }

@@ -28,9 +28,9 @@ impl Handler<RequestOutputChannel> for Capabilities {
     fn handle(&mut self, msg: RequestOutputChannel, _ctx: &mut Self::Context) -> Self::Result {
         let (tx, rx) = tokio::sync::mpsc::channel::<TaggedEvent>(100);
         // keeping this as a stream for future things like combinators
-        let mut stream = ReceiverStream::new(rx);
         let id = msg.invocation_id;
         Arbiter::current().spawn({
+            let mut stream = ReceiverStream::new(rx);
             let events_sender = self.any_event_sender.clone();
             async move {
                 while let Some(evt) = stream.next().await {

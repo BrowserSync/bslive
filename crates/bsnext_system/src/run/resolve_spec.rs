@@ -8,18 +8,14 @@ use bsnext_input::Input;
 use std::collections::HashMap;
 
 #[derive(actix::Message)]
-#[rtype(result = "Result<ResolveRunTasksOutput, InitialTaskError>")]
-pub struct ResolveRunTasks {
+#[rtype(result = "Result<ResolveSpecResult, InitialTaskError>")]
+pub struct ResolveSpec {
     input: Input,
     named: Vec<String>,
     top_level_run_mode: TopLevelRunMode,
 }
 
-pub struct ResolveRunTasksOutput {
-    pub task_spec: TaskSpec,
-}
-
-impl ResolveRunTasks {
+impl ResolveSpec {
     pub fn new(input: Input, named: Vec<String>, top_level_run_mode: TopLevelRunMode) -> Self {
         Self {
             input,
@@ -28,12 +24,24 @@ impl ResolveRunTasks {
         }
     }
 }
+pub struct ResolveSpecResult {
+    task_spec: TaskSpec,
+}
 
-impl actix::Handler<ResolveRunTasks> for BsSystem {
-    type Result = ResponseFuture<Result<ResolveRunTasksOutput, InitialTaskError>>;
+impl ResolveSpecResult {
+    pub fn new(task_spec: TaskSpec) -> Self {
+        Self { task_spec }
+    }
+    pub fn as_spec(self) -> TaskSpec {
+        self.task_spec
+    }
+}
+
+impl actix::Handler<ResolveSpec> for BsSystem {
+    type Result = ResponseFuture<Result<ResolveSpecResult, InitialTaskError>>;
 
     #[tracing::instrument(skip_all, name = "ResolveRunTasks")]
-    fn handle(&mut self, msg: ResolveRunTasks, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ResolveSpec, ctx: &mut Self::Context) -> Self::Result {
         let _addr = ctx.address();
         tracing::debug!(run.lookup.keys = ?msg.named);
         tracing::debug!(run.lookup.available = ?msg.input.run.keys());
@@ -107,7 +115,7 @@ impl actix::Handler<ResolveRunTasks> for BsSystem {
             TopLevelRunMode::All => TaskSpec::all_from(&ordered),
         };
 
-        Box::pin(async move { Ok(ResolveRunTasksOutput { task_spec: spec }) })
+        Box::pin(async move { Ok(ResolveSpecResult { task_spec: spec }) })
     }
 }
 
@@ -129,7 +137,7 @@ impl actix::Handler<InvokeRunTasks> for BsSystem {
     #[tracing::instrument(skip_all, name = "InvokeRunTasks")]
     fn handle(&mut self, msg: InvokeRunTasks, ctx: &mut Self::Context) -> Self::Result {
         let capabilities = self.capabilities().clone();
-        let (invoke_scope, rx) = self.run_only(capabilities, msg.task_spec);
+        let (invoke_scope, rx) = self.spec_to_invoke_scope(capabilities, msg.task_spec);
         ctx.notify(invoke_scope);
         Box::pin(async move {
             match rx.await {

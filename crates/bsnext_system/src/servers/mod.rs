@@ -15,7 +15,13 @@ use tracing::debug;
 #[derive(actix::Message)]
 #[rtype(result = "Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>")]
 pub struct ResolveServers {
-    pub(crate) input: Input,
+    input: Input,
+}
+
+impl ResolveServers {
+    pub fn new(input: Input) -> Self {
+        Self { input }
+    }
 }
 
 impl actix::Handler<ResolveServers> for BsSystem {

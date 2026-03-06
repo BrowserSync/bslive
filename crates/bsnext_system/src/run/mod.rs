@@ -1,4 +1,4 @@
-pub mod resolve_run;
+pub mod resolve_spec;
 
 use bsnext_core::shared_args::LoggingOpts;
 use bsnext_input::route::{RunAll, RunOptItem, RunSeq, ShRunOptItem};

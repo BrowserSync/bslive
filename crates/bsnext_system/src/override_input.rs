@@ -25,7 +25,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
         // let ctx_clone = self.st
         let f = ctx
             .address()
-            .send(ResolveServers { input: msg.input })
+            .send(ResolveServers::new(msg.input))
             .into_actor(self)
             .map(move |res, actor, _ctx| {
                 debug!(" + did override input");
@@ -34,6 +34,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
                     Ok(Err(s_e)) => Err(s_e),
                     Err(err) => Err(ServerError::Unknown(err.to_string())),
                 };
+                // todo: only process the override if valid?
                 actor.accept_watchables(&input_clone, addr);
                 actor.update_ctx(&input_clone, &start_ctx_clone);
                 output
