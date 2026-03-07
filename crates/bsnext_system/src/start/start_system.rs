@@ -1,6 +1,6 @@
 use crate::api::BsSystemApi;
 use crate::start::start_kind::StartKind;
-use crate::system::{BsSystem, RunDryOk, RunOk, SetupOk};
+use crate::system::{run_jobs_with_preview, BsSystem, RunDryOk, RunOk, SetupOk};
 use crate::watchables::input_monitor::MonitorInput;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
@@ -122,6 +122,22 @@ impl Handler<Start> for BsSystem {
             }) => {
                 let addr = ctx.address();
                 let jobs = crate::system::run_jobs(addr, input.clone(), named, top_level_run_mode);
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
+                        Ok(_) => Ok(DidStart::WillExit),
+                        Err(err) => Err(StartupError::Any(err.into())),
+                    },
+                ))
+            }
+            Ok(SystemStartArgs::RunOnly {
+                input,
+                named,
+                run_mode: RunMode::ExecWithPreview,
+                top_level_run_mode,
+            }) => {
+                let addr = ctx.address();
+                let jobs = run_jobs_with_preview(addr, input.clone(), named, top_level_run_mode);
+
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
                         Ok(_) => Ok(DidStart::WillExit),

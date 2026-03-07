@@ -119,7 +119,8 @@ impl TaskSpec {
         let label = self.as_tree_label(Index(0));
         let mut first = ArchyNode::new(&label);
         let empty = HashMap::default();
-        append_with_reports(&mut first, &self.tasks, &empty);
+        let mut path = vec![Index(0)];
+        append_with_reports(&mut first, &self.tasks, &empty, &mut path);
         first
     }
     pub fn as_tree_with_results(&self, hm: &HashMap<u64, TaskReport>) -> ArchyNode {
@@ -130,7 +131,8 @@ impl TaskSpec {
             Some(_) => self.as_tree_label(Index(0)),
         };
         let mut first = ArchyNode::new(&label);
-        append_with_reports(&mut first, &self.tasks, hm);
+        let mut path = vec![Index(0)];
+        append_with_reports(&mut first, &self.tasks, hm, &mut path);
         first
     }
 }
@@ -197,10 +199,12 @@ pub fn append_with_reports(
     archy: &mut ArchyNode,
     tasks: &[Runnable],
     hm: &HashMap<u64, TaskReport>,
+    path: &mut Vec<Index>,
 ) {
     for (index_position, runnable) in tasks.iter().enumerate() {
         let id = runnable.as_id_with(Index(index_position as u64));
         let sqid = runnable.as_sqid(id);
+        // dbg!(&sqid, &id);
         let label_with_id = match hm.get(&id) {
             None => format!(
                 "[{sqid}] − {}",
@@ -237,11 +241,12 @@ pub fn append_with_reports(
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
             Runnable::Many(runner) => {
                 let mut next = ArchyNode::new(&raw_label);
-                append_with_reports(&mut next, &runner.tasks, hm);
+                append_with_reports(&mut next, &runner.tasks, hm, path);
                 archy.nodes.push(next);
             }
         }
     }
 }
 
+#[derive(Hash)]
 pub struct Index(pub u64);

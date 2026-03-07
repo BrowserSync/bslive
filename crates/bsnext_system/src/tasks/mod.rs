@@ -73,6 +73,12 @@ impl Runnable {
         index.hash(&mut hasher);
         hasher.finish()
     }
+    pub fn as_id_with_path(&self, path: Vec<Index>) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        path.hash(&mut hasher);
+        hasher.finish()
+    }
     pub fn as_sqid(&self, id: u64) -> String {
         let sqids = sqids::Sqids::default();
         let sqid = sqids.encode(&[id]).unwrap_or_else(|_| id.to_string());

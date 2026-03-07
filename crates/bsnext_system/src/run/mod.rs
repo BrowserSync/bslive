@@ -24,6 +24,10 @@ pub struct RunCommand {
     /// just print the task tree
     #[arg(long = "dry")]
     pub dry: bool,
+    /// Whether to print the task tree before running
+    /// This is different to '--dry' because this will still execute
+    #[arg(long = "preview")]
+    pub preview: bool,
     /// output format
     #[arg(short, long, value_enum, default_value_t)]
     pub format: OutputFormat,

@@ -116,7 +116,17 @@ impl StartKind {
         } else {
             run.trailing
         };
-        let run_mode = if run.dry { RunMode::Dry } else { RunMode::Exec };
+
+        // dry takes precedence
+        let run_mode = if run.dry {
+            RunMode::Dry
+        } else {
+            if run.preview {
+                RunMode::ExecWithPreview
+            } else {
+                RunMode::Exec
+            }
+        };
         let top_level = if run.all {
             TopLevelRunMode::All
         } else {

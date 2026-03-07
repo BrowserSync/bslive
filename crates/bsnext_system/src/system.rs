@@ -7,10 +7,11 @@ use crate::tasks::task_spec::TaskSpec;
 use crate::watchables::input_monitor::InputMonitor;
 use crate::watchables::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::watchables::path_watchable::PathWatchable;
-use actix::{Actor, Addr, AsyncContext, Running};
+use actix::{Actor, Addr, AsyncContext, ResponseFuture, Running};
 use actix_rt::Arbiter;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
+use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_fs::FsEventContext;
@@ -19,6 +20,7 @@ use bsnext_input::Input;
 use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::Receiver;
 
@@ -118,6 +120,46 @@ impl BsSystem {
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
         (InvokeScope::new(task_scope, trigger, spec, comms, tx), rx)
     }
+}
+
+#[derive(Debug, actix::Message)]
+#[rtype(result = "Result<(), anyhow::Error>")]
+pub struct ExternalEventMsg {
+    pub evt: ExternalEventsDTO,
+}
+
+impl actix::Handler<ExternalEventMsg> for BsSystem {
+    type Result = ResponseFuture<Result<(), anyhow::Error>>;
+    fn handle(&mut self, msg: ExternalEventMsg, _ctx: &mut Self::Context) -> Self::Result {
+        Box::pin({
+            let sender = self.any_event_sender.clone();
+            async move {
+                sender.send(AnyEvent::External(msg.evt)).await?;
+                Ok(())
+            }
+        })
+    }
+}
+
+pub async fn run_jobs_with_preview(
+    addr: Addr<BsSystem>,
+    input: Input,
+    named: Vec<String>,
+    top_level_run_mode: TopLevelRunMode,
+) -> anyhow::Result<RunOk> {
+    let spec_output = addr
+        .send(ResolveSpec::new(input, named, top_level_run_mode))
+        .await??;
+    let spec = spec_output.as_spec();
+    let tree = spec.as_tree();
+    let _sent = addr
+        .send(ExternalEventMsg {
+            evt: ExternalEventsDTO::TaskTreePreview(tree),
+        })
+        .await??;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
+    Ok(RunOk { report_and_tree })
 }
 
 pub async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupOk> {

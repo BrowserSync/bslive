@@ -22,6 +22,7 @@ pub enum ExternalEventsDTO {
     InputAccepted(InputAcceptedDTO),
     OutputLine(OutputLineDTO),
     TaskAction(TaskActionDTO),
+    TaskTreePreview(ArchyNode),
 }
 
 #[typeshare]
@@ -124,8 +125,16 @@ impl OutputWriterTrait for ExternalEventsDTO {
                 print_stderr_line(sink, stderr)
             }
             ExternalEventsDTO::TaskAction(action) => print_task_action(sink, action),
+            ExternalEventsDTO::TaskTreePreview(tree) => print_task_tree_preview(sink, tree),
         }
     }
+}
+
+fn print_task_tree_preview<W: Write>(w: &mut W, tree: &ArchyNode) -> anyhow::Result<()> {
+    let s = archy(tree, Prefix::None);
+    write!(w, "{s}")?;
+    writeln!(w, "continuing after 2 seconds...")?;
+    Ok(())
 }
 
 pub fn print_servers_changed<W>(
