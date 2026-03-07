@@ -227,7 +227,12 @@ export type ExternalEventsDTO =
 	| { kind: "InputFileChanged", payload: FileChangedDTO }
 	| { kind: "InputAccepted", payload: InputAcceptedDTO }
 	| { kind: "OutputLine", payload: OutputLineDTO }
-	| { kind: "TaskAction", payload: TaskActionDTO };
+	| { kind: "TaskAction", payload: TaskActionDTO }
+	| { kind: "TaskTreePreview", payload: {
+	tree: ArchyNode;
+	will_exec: boolean;
+}}
+	| { kind: "TaskTreeSummary", payload: ArchyNode };
 
 /** @discriminator kind */
 export type InputErrorDTO = 

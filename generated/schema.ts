@@ -449,5 +449,16 @@ export const externalEventsDTOSchema: z.ZodSchema<ExternalEventsDTO> = z.lazy(
                 kind: z.literal("TaskAction"),
                 payload: taskActionDTOSchema,
             }),
+            z.object({
+                kind: z.literal("TaskTreePreview"),
+                payload: z.object({
+                    tree: archyNodeSchema,
+                    will_exec: z.boolean(),
+                }),
+            }),
+            z.object({
+                kind: z.literal("TaskTreeSummary"),
+                payload: archyNodeSchema,
+            }),
         ]),
 );

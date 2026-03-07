@@ -52,8 +52,7 @@ pub enum SystemStartArgs {
 
 #[derive(Debug, Clone)]
 pub enum RunMode {
-    Exec,
-    ExecWithPreview,
+    Exec { preview: bool, summary: bool },
     Dry,
 }
 

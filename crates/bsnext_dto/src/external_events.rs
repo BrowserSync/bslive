@@ -22,7 +22,8 @@ pub enum ExternalEventsDTO {
     InputAccepted(InputAcceptedDTO),
     OutputLine(OutputLineDTO),
     TaskAction(TaskActionDTO),
-    TaskTreePreview(ArchyNode),
+    TaskTreePreview { tree: ArchyNode, will_exec: bool },
+    TaskTreeSummary(ArchyNode),
 }
 
 #[typeshare]
@@ -125,15 +126,35 @@ impl OutputWriterTrait for ExternalEventsDTO {
                 print_stderr_line(sink, stderr)
             }
             ExternalEventsDTO::TaskAction(action) => print_task_action(sink, action),
-            ExternalEventsDTO::TaskTreePreview(tree) => print_task_tree_preview(sink, tree),
+            ExternalEventsDTO::TaskTreePreview {
+                tree,
+                will_exec: false,
+            } => print_task_tree(sink, tree),
+            ExternalEventsDTO::TaskTreePreview {
+                tree,
+                will_exec: true,
+            } => print_task_tree_preview(sink, tree),
+            ExternalEventsDTO::TaskTreeSummary(tree) => print_task_tree_summary(sink, tree),
         }
     }
+}
+
+fn print_task_tree<W: Write>(w: &mut W, tree: &ArchyNode) -> anyhow::Result<()> {
+    let s = archy(tree, Prefix::None);
+    write!(w, "{s}")?;
+    Ok(())
 }
 
 fn print_task_tree_preview<W: Write>(w: &mut W, tree: &ArchyNode) -> anyhow::Result<()> {
     let s = archy(tree, Prefix::None);
     write!(w, "{s}")?;
     writeln!(w, "continuing after 2 seconds...")?;
+    Ok(())
+}
+
+fn print_task_tree_summary<W: Write>(w: &mut W, tree: &ArchyNode) -> anyhow::Result<()> {
+    let s = archy(tree, Prefix::None);
+    write!(w, "{s}")?;
     Ok(())
 }
 

@@ -121,10 +121,9 @@ impl StartKind {
         let run_mode = if run.dry {
             RunMode::Dry
         } else {
-            if run.preview {
-                RunMode::ExecWithPreview
-            } else {
-                RunMode::Exec
+            RunMode::Exec {
+                preview: run.preview,
+                summary: run.summary,
             }
         };
         let top_level = if run.all {

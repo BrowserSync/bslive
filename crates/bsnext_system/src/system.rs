@@ -10,8 +10,8 @@ use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext, ResponseFuture, Running};
 use actix_rt::Arbiter;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
-use bsnext_dto::archy::ArchyNode;
 use bsnext_dto::external_events::ExternalEventsDTO;
+use bsnext_dto::external_events::ExternalEventsDTO::{TaskTreePreview, TaskTreeSummary};
 use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_fs::FsEventContext;
@@ -141,27 +141,6 @@ impl actix::Handler<ExternalEventMsg> for BsSystem {
     }
 }
 
-pub async fn run_jobs_with_preview(
-    addr: Addr<BsSystem>,
-    input: Input,
-    named: Vec<String>,
-    top_level_run_mode: TopLevelRunMode,
-) -> anyhow::Result<RunOk> {
-    let spec_output = addr
-        .send(ResolveSpec::new(input, named, top_level_run_mode))
-        .await??;
-    let spec = spec_output.as_spec();
-    let tree = spec.as_tree();
-    let _sent = addr
-        .send(ExternalEventMsg {
-            evt: ExternalEventsDTO::TaskTreePreview(tree),
-        })
-        .await??;
-    tokio::time::sleep(Duration::from_secs(2)).await;
-    let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
-    Ok(RunOk { report_and_tree })
-}
-
 pub async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupOk> {
     let clone = input.clone();
     let clone2 = input.clone();
@@ -180,15 +159,42 @@ pub async fn run_jobs(
     input: Input,
     named: Vec<String>,
     top_level_run_mode: TopLevelRunMode,
+    preview: bool,
+    summary: bool,
 ) -> anyhow::Result<RunOk> {
     let spec_output = addr
         .send(ResolveSpec::new(input, named, top_level_run_mode))
         .await??;
-    let report_and_tree = addr
-        .send(InvokeRunTasks::new(spec_output.as_spec()))
-        .await??;
+    let spec = spec_output.as_spec();
+    let tree = spec.as_tree();
 
-    Ok(RunOk { report_and_tree })
+    if preview {
+        let _preview = addr
+            .send(ExternalEventMsg {
+                evt: TaskTreePreview {
+                    tree: tree.clone(),
+                    will_exec: true,
+                },
+            })
+            .await??;
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+
+    let report_and_tree = addr.send(InvokeRunTasks::new(spec.clone())).await??;
+
+    if summary {
+        let tree = spec.as_tree_with_results(&report_and_tree.report_map);
+        let _preview = addr
+            .send(ExternalEventMsg {
+                evt: TaskTreeSummary(tree.clone()),
+            })
+            .await??;
+    }
+
+    Ok(RunOk {
+        report_and_tree,
+        spec,
+    })
 }
 
 pub async fn print_jobs(
@@ -202,7 +208,15 @@ pub async fn print_jobs(
         .await??;
     let spec = spec_output.as_spec();
     let tree = spec.as_tree();
-    Ok(RunDryOk { tree, spec })
+    let _preview = addr
+        .send(ExternalEventMsg {
+            evt: TaskTreePreview {
+                tree: tree.clone(),
+                will_exec: false,
+            },
+        })
+        .await??;
+    Ok(RunDryOk)
 }
 
 pub struct SetupOk {
@@ -214,11 +228,8 @@ pub struct SetupOk {
 
 pub struct RunOk {
     #[allow(dead_code)]
-    report_and_tree: TaskReportAndTree,
-}
-
-pub struct RunDryOk {
-    #[allow(dead_code)]
-    pub tree: ArchyNode,
+    pub report_and_tree: TaskReportAndTree,
     pub spec: TaskSpec,
 }
+
+pub struct RunDryOk;

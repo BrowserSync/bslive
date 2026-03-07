@@ -1,11 +1,10 @@
 use crate::api::BsSystemApi;
 use crate::start::start_kind::StartKind;
-use crate::system::{run_jobs_with_preview, BsSystem, RunDryOk, RunOk, SetupOk};
+use crate::system::{run_jobs, BsSystem, RunDryOk, RunOk, SetupOk};
 use crate::watchables::input_monitor::MonitorInput;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
 };
-use bsnext_dto::internal::InternalEvents::TaskSpecDisplay;
 use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
 use bsnext_dto::{DidStart, StartupError};
 use bsnext_input::startup::{RunMode, SystemStart, SystemStartArgs};
@@ -117,30 +116,21 @@ impl Handler<Start> for BsSystem {
             Ok(SystemStartArgs::RunOnly {
                 input,
                 named,
-                run_mode: RunMode::Exec,
+                run_mode: RunMode::Exec { summary, preview },
                 top_level_run_mode,
             }) => {
                 let addr = ctx.address();
-                let jobs = crate::system::run_jobs(addr, input.clone(), named, top_level_run_mode);
+                let jobs = run_jobs(
+                    addr,
+                    input.clone(),
+                    named,
+                    top_level_run_mode,
+                    preview,
+                    summary,
+                );
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
-                        Ok(_) => Ok(DidStart::WillExit),
-                        Err(err) => Err(StartupError::Any(err.into())),
-                    },
-                ))
-            }
-            Ok(SystemStartArgs::RunOnly {
-                input,
-                named,
-                run_mode: RunMode::ExecWithPreview,
-                top_level_run_mode,
-            }) => {
-                let addr = ctx.address();
-                let jobs = run_jobs_with_preview(addr, input.clone(), named, top_level_run_mode);
-
-                Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
-                        Ok(_) => Ok(DidStart::WillExit),
+                        Ok(RunOk { .. }) => Ok(DidStart::WillExit),
                         Err(err) => Err(StartupError::Any(err.into())),
                     },
                 ))
@@ -155,11 +145,8 @@ impl Handler<Start> for BsSystem {
                 let jobs =
                     crate::system::print_jobs(addr, input.clone(), named, top_level_run_mode);
                 Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<RunDryOk, anyhow::Error>, actor, _ctx| match res {
-                        Ok(RunDryOk { tree, spec: _ }) => {
-                            actor.publish_any_event(AnyEvent::Internal(TaskSpecDisplay { tree }));
-                            Ok(DidStart::WillExit)
-                        }
+                    move |res: Result<RunDryOk, anyhow::Error>, _actor, _ctx| match res {
+                        Ok(RunDryOk) => Ok(DidStart::WillExit),
                         Err(err) => Err(StartupError::Any(err.into())),
                     },
                 ))

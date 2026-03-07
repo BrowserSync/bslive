@@ -28,6 +28,9 @@ pub struct RunCommand {
     /// This is different to '--dry' because this will still execute
     #[arg(long = "preview")]
     pub preview: bool,
+    /// Whether to print the task tree summary after execution
+    #[arg(long = "summary")]
+    pub summary: bool,
     /// output format
     #[arg(short, long, value_enum, default_value_t)]
     pub format: OutputFormat,
