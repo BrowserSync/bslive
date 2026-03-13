@@ -1,16 +1,16 @@
-use crate::invocation::InvocationId;
+use crate::invocation::SpecId;
 use crate::invocation_result::InvocationResult;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct TaskReport {
     pub result: InvocationResult,
-    pub id: InvocationId,
+    pub spec_id: SpecId,
 }
 
 impl Display for TaskReport {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "id: {}", self.id)
+        writeln!(f, "spec_id: {}", self.spec_id)
     }
 }
 
@@ -21,11 +21,11 @@ impl TaskReport {
 }
 
 impl TaskReport {
-    pub fn new(result: InvocationResult, id: InvocationId) -> Self {
-        Self { id, result }
+    pub fn new(result: InvocationResult, spec_id: SpecId) -> Self {
+        Self { spec_id, result }
     }
-    pub fn id(&self) -> u64 {
-        self.id.u64()
+    pub fn spec_id(&self) -> u64 {
+        self.spec_id.u64()
     }
     pub fn result(&self) -> &InvocationResult {
         &self.result

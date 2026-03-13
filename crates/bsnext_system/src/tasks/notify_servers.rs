@@ -2,7 +2,7 @@ use actix::{Actor, Addr, Handler, ResponseFuture};
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::invocation::InvocationId;
+use bsnext_task::invocation::SpecId;
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_trigger::TaskTriggerSource;
 
@@ -31,14 +31,11 @@ impl Actor for NotifyServers {
 impl Handler<Invocation> for NotifyServers {
     type Result = ResponseFuture<InvocationResult>;
 
-    fn handle(
-        &mut self,
-        Invocation { trigger, id }: Invocation,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("NotifyServers::TaskCommand");
         let addr = self.addr.clone();
-        match trigger.trigger_source {
+        let spec_id = invocation.spec_id().to_owned();
+        match invocation.trigger().to_owned().trigger_source {
             TaskTriggerSource::FsChanges {
                 changes,
                 fs_event_context,
@@ -51,7 +48,7 @@ impl Handler<Invocation> for NotifyServers {
                 todo!("I cannot accept this")
             }
         }
-        Box::pin(async move { InvocationResult::ok(id) })
+        Box::pin(async move { InvocationResult::ok(spec_id) })
     }
 }
 
@@ -62,6 +59,6 @@ impl Actor for NotifyServersNoOp {
 impl Handler<Invocation> for NotifyServersNoOp {
     type Result = ResponseFuture<InvocationResult>;
     fn handle(&mut self, _invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        Box::pin(async { InvocationResult::ok(InvocationId::new(0)) })
+        Box::pin(async { InvocationResult::ok(SpecId::new(0)) })
     }
 }

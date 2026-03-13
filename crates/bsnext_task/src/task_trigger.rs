@@ -7,7 +7,6 @@ use std::path::PathBuf;
 #[rtype(result = "InvocationResult")]
 pub struct TaskTrigger {
     pub trigger_source: TaskTriggerSource,
-    pub invocation_id: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -20,13 +19,7 @@ pub enum TaskTriggerSource {
 }
 
 impl TaskTrigger {
-    pub fn new(trigger_source: TaskTriggerSource, invocation_id: u64) -> Self {
-        Self {
-            trigger_source,
-            invocation_id,
-        }
-    }
-    pub fn id(&self) -> u64 {
-        self.invocation_id
+    pub fn new(trigger_source: TaskTriggerSource) -> Self {
+        Self { trigger_source }
     }
 }

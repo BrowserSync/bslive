@@ -4,7 +4,7 @@ use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::TaskActionStage;
 use bsnext_fs::FsEventContext;
 use bsnext_task::as_actor::AsActor;
-use bsnext_task::invocation::{Invocation, InvocationId};
+use bsnext_task::invocation::{Invocation, SpecId};
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
 
@@ -59,7 +59,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
             .insert(*fs_ctx, msg.task_spec.to_owned());
 
         let task_id = msg.task_spec.as_id();
-        let invo = InvocationId::new(task_id);
+        let invo = SpecId::new(task_id);
 
         let trigger_recipient = Box::new(msg.task_scope).into_task_recipient();
         // let comms = self.task_comms();

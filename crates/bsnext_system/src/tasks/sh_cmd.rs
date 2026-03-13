@@ -5,7 +5,7 @@ use actix::{Actor, Addr, Recipient, ResponseFuture};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
-use bsnext_task::invocation::{Invocation, InvocationId};
+use bsnext_task::invocation::{Invocation, SpecId};
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_report::ExitCode;
 use bsnext_task::task_trigger::TaskTriggerSource;
@@ -182,7 +182,8 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         let sqid = invocation.sqid();
         self.cmd.id = Some(sqid.clone());
         let cmd = self.cmd.sh.clone();
-        let Invocation { id, trigger, .. } = invocation;
+        let trigger = invocation.trigger().to_owned();
+        let spec_id = invocation.spec_id().to_owned();
         let cmd = cmd.to_os_string();
         tracing::info!("Will run... {:?}", cmd);
         // let any_event_sender = comms.any_event_sender.clone();
@@ -210,7 +211,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
 
         let fut = sh_cmd(
             addr,
-            id,
+            spec_id,
             sqid,
             cmd,
             reason,
@@ -228,7 +229,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
 #[tracing::instrument]
 async fn sh_cmd(
     addr: Recipient<RequestOutputChannel>,
-    id: InvocationId,
+    id: SpecId,
     sqid: String,
     cmd: OsString,
     reason: String,
@@ -237,7 +238,7 @@ async fn sh_cmd(
     sh_prefix_2: Arc<Option<String>>,
     max_duration: Duration,
 ) -> InvocationResult {
-    let Ok(Ok(output)) = addr.send(RequestOutputChannel { invocation_id: id }).await else {
+    let Ok(Ok(output)) = addr.send(RequestOutputChannel { spec_id: id }).await else {
         todo!("can this actually fail?");
     };
     let sender = output.sender.clone();
@@ -332,20 +333,20 @@ async fn sh_cmd(
     let result: InvocationResult = tokio::select! {
         _ = &mut deadline => {
             tracing::info!("⌛️ operation timed out");
-            InvocationResult::timeout(InvocationId::new(invocation_id))
+            InvocationResult::timeout(SpecId::new(invocation_id))
         }
         out = child.wait() => {
             tracing::info!("child waited");
             match out {
                 Ok(exit) => match exit.code() {
-                   Some(0) => InvocationResult::ok(InvocationId::new(invocation_id)),
+                   Some(0) => InvocationResult::ok(SpecId::new(invocation_id)),
                    Some(code) => {
                         tracing::debug!("did exit with code {}", code);
-                        InvocationResult::err_code(InvocationId::new(invocation_id), ExitCode(code))
+                        InvocationResult::err_code(SpecId::new(invocation_id), ExitCode(code))
                     },
-                   None => InvocationResult::err_message(InvocationId::new(invocation_id), "unknown error!")
+                   None => InvocationResult::err_message(SpecId::new(invocation_id), "unknown error!")
                 },
-                Err(err) => InvocationResult::err_message(InvocationId::new(invocation_id), &err.to_string())
+                Err(err) => InvocationResult::err_message(SpecId::new(invocation_id), &err.to_string())
             }
         }
     };

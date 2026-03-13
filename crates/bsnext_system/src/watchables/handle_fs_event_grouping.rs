@@ -138,7 +138,7 @@ impl BsSystem {
             fs_event_context: change.fs_ctx,
         };
 
-        let task_trigger = TaskTrigger::new(variant, 0);
+        let task_trigger = TaskTrigger::new(variant);
 
         Some((
             fs_triggered_task_spec

@@ -2,7 +2,7 @@ use actix::{Actor, ActorFutureExt, Recipient, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::AnyEvent;
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::invocation::InvocationId;
+use bsnext_task::invocation::SpecId;
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_entry::TaskEntry;
 use bsnext_task::task_scope::TaskScope;
@@ -43,10 +43,9 @@ async fn test_task_scope_runner() -> anyhow::Result<()> {
     // let comms = TaskComms {
     //     any_event_sender: tx,
     // };
-    let id = 0;
-    let trigger = TaskTrigger::new(variant, id);
+    let trigger = TaskTrigger::new(variant);
 
-    let one_task = Invocation::new(InvocationId::new(0), trigger);
+    let one_task = Invocation::new(SpecId::new(0), trigger);
 
     let task_result = addr.send(one_task).await.unwrap();
     let _evt = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await;
@@ -74,7 +73,7 @@ fn mock_f(f: impl Future<Output = ()> + 'static) -> Box<dyn AsActor> {
             let f = self.f.take().unwrap();
             Box::pin(
                 f.into_actor(self)
-                    .map(|_, _, _| InvocationResult::ok(InvocationId::new(0))),
+                    .map(|_, _, _| InvocationResult::ok(SpecId::new(0))),
             )
         }
     }

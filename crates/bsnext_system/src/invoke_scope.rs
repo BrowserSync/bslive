@@ -7,7 +7,7 @@ use actix::ResponseActFuture;
 use actix::WrapFuture;
 use bsnext_dto::internal::{TaskActionStage, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
-use bsnext_task::invocation::{Invocation, InvocationId};
+use bsnext_task::invocation::{Invocation, SpecId};
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::TaskTrigger;
 
@@ -53,18 +53,18 @@ impl Handler<InvokeScope> for BsSystem {
     fn handle(&mut self, msg: InvokeScope, _ctx: &mut Self::Context) -> Self::Result {
         let task_trigger = msg.task_trigger;
         let task_spec = msg.task_spec;
-        let task_id = task_spec.as_id();
-        let invo = InvocationId::new(task_id);
+        let spec_id_raw = task_spec.as_id();
+        let spec_id = SpecId::new(spec_id_raw);
 
         let top_level_scope = Box::new(msg.task_scope).into_task_recipient();
         let done = msg.done;
         let comms = msg.comms.clone();
         let tree = task_spec.as_tree();
-        let invocation = Invocation::new(invo, task_trigger);
+        let invocation = Invocation::new(spec_id, task_trigger);
         let with_start = async move {
             let _sent = comms
                 .any_event_sender
-                .send(TaskActionStage::started(task_id, tree))
+                .send(TaskActionStage::started(spec_id_raw, tree))
                 .await;
             top_level_scope.send(invocation).await
         };
@@ -72,14 +72,14 @@ impl Handler<InvokeScope> for BsSystem {
             .into_actor(self)
             .map(move |resp, actor, _ctx| match resp {
                 Ok(result) => {
-                    let (report, report_map) = result.to_report_and_map(invo);
+                    let (report, report_map) = result.to_report_and_map(spec_id);
                     let tree = task_spec.as_tree_with_results(&report_map);
                     let report_and_tree = TaskReportAndTree {
                         report: report.clone(),
                         tree: tree.clone(),
                         report_map,
                     };
-                    actor.publish_any_event(TaskActionStage::complete(task_id, tree, report));
+                    actor.publish_any_event(TaskActionStage::complete(spec_id_raw, tree, report));
                     match done.send(report_and_tree) {
                         Ok(_) => tracing::debug!("did finish initial"),
                         Err(_) => tracing::error!("could not send"),

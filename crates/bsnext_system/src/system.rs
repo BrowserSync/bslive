@@ -114,7 +114,7 @@ impl BsSystem {
         spec: TaskSpec,
     ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
         let comms = self.task_comms();
-        let trigger = TaskTrigger::new(TaskTriggerSource::Exec, 0);
+        let trigger = TaskTrigger::new(TaskTriggerSource::Exec);
 
         let task_scope = spec.clone().to_task_scope(self.servers_addr.clone(), addr);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();

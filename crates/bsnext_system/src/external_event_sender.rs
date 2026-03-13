@@ -4,7 +4,7 @@ use actix::{Handler, Recipient, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::invocation::InvocationId;
+use bsnext_task::invocation::SpecId;
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_trigger::TaskTriggerSource;
 
@@ -38,9 +38,9 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
     type Result = ResponseFuture<InvocationResult>;
 
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        let id = invocation.id;
+        let id = invocation.spec_id().to_owned();
         let addr = self.request.clone();
-        let events: Vec<AnyEvent> = match invocation.trigger.trigger_source {
+        let events: Vec<AnyEvent> = match invocation.trigger().to_owned().trigger_source {
             TaskTriggerSource::FsChanges { changes, .. } => {
                 let as_strings = changes
                     .iter()
@@ -56,7 +56,12 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
             TaskTriggerSource::Exec => vec![],
         };
         Box::pin(async move {
-            let Ok(Ok(output)) = addr.send(RequestOutputChannel { invocation_id: id }).await else {
+            let Ok(Ok(output)) = addr
+                .send(RequestOutputChannel {
+                    spec_id: id.clone(),
+                })
+                .await
+            else {
                 todo!("can this actually fail?");
             };
             for evt in events {
@@ -66,7 +71,7 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
                     Err(e) => tracing::error!("{e}"),
                 };
             }
-            InvocationResult::ok(InvocationId::new(0))
+            InvocationResult::ok(SpecId::new(0))
         })
     }
 }

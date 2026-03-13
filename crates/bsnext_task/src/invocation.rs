@@ -6,23 +6,32 @@ use std::fmt::{Debug, Display, Formatter};
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "InvocationResult")]
 pub struct Invocation {
-    pub id: InvocationId,
-    pub trigger: TaskTrigger,
+    spec_id: SpecId,
+    trigger: TaskTrigger,
 }
 
 impl Invocation {
-    pub fn new(id: InvocationId, trigger: TaskTrigger) -> Self {
-        Self { id, trigger }
+    pub fn trigger(&self) -> &TaskTrigger {
+        &self.trigger
+    }
+    pub fn spec_id(&self) -> &SpecId {
+        &self.spec_id
+    }
+}
+
+impl Invocation {
+    pub fn new(spec_id: SpecId, trigger: TaskTrigger) -> Self {
+        Self { spec_id, trigger }
     }
     pub fn sqid(&self) -> String {
-        self.id.sqid()
+        self.spec_id.sqid()
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct InvocationId(u64);
+pub struct SpecId(u64);
 
-impl InvocationId {
+impl SpecId {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
@@ -34,7 +43,7 @@ impl InvocationId {
     }
 }
 
-impl Display for InvocationId {
+impl Display for SpecId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "InvocationId({})", self.0)
     }
