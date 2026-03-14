@@ -28,10 +28,6 @@ impl TriggerFsTaskEvent {
     pub fn trigger(&self) -> FsChangesTrigger {
         self.task_trigger.clone()
     }
-
-    pub fn fs_ctx(&self) -> &FsEventContext {
-        &self.task_trigger.fs_event_context
-    }
 }
 
 impl Handler<TriggerFsTaskEvent> for BsSystem {
@@ -39,9 +35,9 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
 
     fn handle(&mut self, msg: TriggerFsTaskEvent, _ctx: &mut Self::Context) -> Self::Result {
         let trigger = msg.trigger();
-        let fs_ctx = msg.fs_ctx();
-        let entry = self.task_spec_mapping.get(fs_ctx);
-        let cloned_id = *fs_ctx;
+        let fs_ctx = trigger.fs_event_context;
+        let entry = self.task_spec_mapping.get(&fs_ctx);
+        let cloned_id = fs_ctx;
 
         if let Some(entry) = entry {
             tracing::info!("ignoring concurrent task triggering: prev: {:?}", entry);
@@ -49,7 +45,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
         }
 
         self.task_spec_mapping
-            .insert(*fs_ctx, msg.task_spec.to_owned());
+            .insert(fs_ctx, msg.task_spec.to_owned());
 
         let task_id = msg.task_spec.as_id();
         let spec_id = SpecId::new(task_id);
