@@ -2,26 +2,22 @@ use crate::system::BsSystem;
 use crate::tasks::task_spec::TaskSpec;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::TaskActionStage;
-use bsnext_fs::FsEventContext;
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::{Invocation, SpecId};
-use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::{FsChangesTrigger, TaskTrigger, TaskTriggerSource};
 
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
 pub struct TriggerFsTaskEvent {
-    task_scope: TaskScope,
-    task_trigger: FsChangesTrigger,
     task_spec: TaskSpec,
+    task_trigger: FsChangesTrigger,
 }
 
 impl TriggerFsTaskEvent {
-    pub fn new(task_scope: TaskScope, task_trigger: FsChangesTrigger, task_spec: TaskSpec) -> Self {
+    pub fn new(task_spec: TaskSpec, task_trigger: FsChangesTrigger) -> Self {
         Self {
-            task_scope,
-            task_trigger,
             task_spec,
+            task_trigger,
         }
     }
 
@@ -34,8 +30,12 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
     type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, msg: TriggerFsTaskEvent, _ctx: &mut Self::Context) -> Self::Result {
+        let scope = msg
+            .task_spec
+            .clone()
+            .to_task_scope(self.servers().clone(), self.capabilities().clone());
         let trigger = msg.trigger();
-        let fs_ctx = trigger.fs_event_context;
+        let fs_ctx = trigger.fs_ctx().to_owned();
         let entry = self.task_spec_mapping.get(&fs_ctx);
         let cloned_id = fs_ctx;
 
@@ -50,7 +50,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
         let task_id = msg.task_spec.as_id();
         let spec_id = SpecId::new(task_id);
 
-        let trigger_recipient = Box::new(msg.task_scope).into_task_recipient();
+        let trigger_recipient = Box::new(scope).into_task_recipient();
         // let comms = self.task_comms();
         let as_trigger = TaskTrigger::new(TaskTriggerSource::FsChanges(trigger));
         let invocation = Invocation::new(spec_id, as_trigger);

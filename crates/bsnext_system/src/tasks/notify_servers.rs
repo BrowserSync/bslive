@@ -4,7 +4,7 @@ use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::invocation::SpecId;
 use bsnext_task::invocation_result::InvocationResult;
-use bsnext_task::task_trigger::{FsChangesTrigger, TaskTriggerSource};
+use bsnext_task::task_trigger::TaskTriggerSource;
 
 pub struct NotifyServers {
     addr: Addr<ServersSupervisor>,
@@ -36,12 +36,9 @@ impl Handler<Invocation> for NotifyServers {
         let addr = self.addr.clone();
         let spec_id = invocation.spec_id().to_owned();
         match invocation.trigger().source() {
-            TaskTriggerSource::FsChanges(FsChangesTrigger {
-                changes,
-                fs_event_context,
-            }) => addr.do_send(FilesChanged {
-                paths: changes.clone(),
-                ctx: fs_event_context.to_owned(),
+            TaskTriggerSource::FsChanges(trigger) => addr.do_send(FilesChanged {
+                paths: trigger.changes().to_owned(),
+                ctx: trigger.fs_ctx().to_owned(),
             }),
             TaskTriggerSource::Exec(..) => {
                 todo!("I cannot accept this")

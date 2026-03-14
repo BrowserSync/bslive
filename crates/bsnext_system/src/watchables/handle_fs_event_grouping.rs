@@ -18,7 +18,6 @@ use bsnext_fs::{
     PathDescriptionOwned, PathEvent,
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::FsChangesTrigger;
 use tracing::{debug_span, info};
 
@@ -32,11 +31,9 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
         let next = match msg {
             FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event, addr),
             FsEventGrouping::BufferedChange(buff) => {
-                if let Some((task_scope, task_trigger, task_spec)) =
-                    self.handle_buffered(buff, addr)
-                {
+                if let Some((task_trigger, task_spec)) = self.handle_buffered(buff) {
                     tracing::debug!("will trigger task runner");
-                    ctx.notify(TriggerFsTaskEvent::new(task_scope, task_trigger, task_spec));
+                    ctx.notify(TriggerFsTaskEvent::new(task_spec, task_trigger));
                 }
                 None
             }
@@ -103,8 +100,7 @@ impl BsSystem {
     fn handle_buffered(
         &mut self,
         buf: BufferedChangeEvent,
-        _addr: Addr<BsSystem>,
-    ) -> Option<(TaskScope, FsChangesTrigger, TaskSpec)> {
+    ) -> Option<(FsChangesTrigger, TaskSpec)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
@@ -131,20 +127,10 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let fs_triggered_task_spec = self.task_spec_for_fs_event(&change.fs_ctx);
+        let task_spec = self.task_spec_for_fs_event(&change.fs_ctx);
+        let trigger = FsChangesTrigger::new(paths, change.fs_ctx);
 
-        let variant = FsChangesTrigger {
-            changes: paths,
-            fs_event_context: change.fs_ctx,
-        };
-
-        Some((
-            fs_triggered_task_spec
-                .clone()
-                .to_task_scope(self.servers().clone(), self.capabilities().clone()),
-            variant,
-            fs_triggered_task_spec,
-        ))
+        Some((trigger, task_spec))
     }
 
     pub fn task_comms(&mut self) -> TaskComms {

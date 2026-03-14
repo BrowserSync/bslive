@@ -36,18 +36,11 @@ async fn test_task_scope_runner() -> anyhow::Result<()> {
     let addr = task_scope_runner.start();
 
     let (_tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
-    let variant = TaskTriggerSource::FsChanges(FsChangesTrigger {
-        changes: vec![],
-        fs_event_context: Default::default(),
-    });
-    // let comms = TaskComms {
-    //     any_event_sender: tx,
-    // };
-    let trigger = TaskTrigger::new(variant);
+    let trigger = TaskTriggerSource::FsChanges(FsChangesTrigger::new(vec![], Default::default()));
+    let task_trigger = TaskTrigger::new(trigger);
+    let invocation = Invocation::new(SpecId::new(0), task_trigger);
 
-    let one_task = Invocation::new(SpecId::new(0), trigger);
-
-    let task_result = addr.send(one_task).await.unwrap();
+    let task_result = addr.send(invocation).await.unwrap();
     let _evt = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await;
     assert_eq!(task_result.task_reports.len(), 2);
     Ok(())

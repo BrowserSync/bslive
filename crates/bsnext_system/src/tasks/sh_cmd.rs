@@ -8,7 +8,7 @@ use bsnext_input::route::{PrefixOpt, ShRunOptItem};
 use bsnext_task::invocation::{Invocation, SpecId};
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_report::ExitCode;
-use bsnext_task::task_trigger::{FsChangesTrigger, TaskTriggerSource};
+use bsnext_task::task_trigger::TaskTriggerSource;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
@@ -189,14 +189,15 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         // let any_event_sender = comms.any_event_sender.clone();
         // let any_event_sender2 = comms.any_event_sender.clone();
         let reason = match &trigger.source() {
-            TaskTriggerSource::FsChanges(FsChangesTrigger { changes, .. }) => {
-                format!("{} files changed", changes.len())
+            TaskTriggerSource::FsChanges(trigger) => {
+                format!("{} files changed", trigger.changes().len())
             }
             TaskTriggerSource::Exec { .. } => "command executed".to_string(),
         };
 
         let files = match &trigger.source() {
-            TaskTriggerSource::FsChanges(FsChangesTrigger { changes, .. }) => changes
+            TaskTriggerSource::FsChanges(trigger) => trigger
+                .changes()
                 .iter()
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()

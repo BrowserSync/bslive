@@ -9,21 +9,6 @@ pub struct TaskTrigger {
     trigger_source: TaskTriggerSource,
 }
 
-#[derive(Debug, Clone)]
-pub struct FsChangesTrigger {
-    pub changes: Vec<PathBuf>,
-    pub fs_event_context: FsEventContext,
-}
-
-#[derive(Debug, Clone)]
-pub struct ExecTrigger;
-
-#[derive(Debug, Clone)]
-pub enum TaskTriggerSource {
-    FsChanges(FsChangesTrigger),
-    Exec(ExecTrigger),
-}
-
 impl TaskTrigger {
     pub fn new(trigger_source: TaskTriggerSource) -> Self {
         Self { trigger_source }
@@ -32,3 +17,33 @@ impl TaskTrigger {
         &self.trigger_source
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum TaskTriggerSource {
+    FsChanges(FsChangesTrigger),
+    Exec(ExecTrigger),
+}
+
+#[derive(Debug, Clone)]
+pub struct FsChangesTrigger {
+    changes: Vec<PathBuf>,
+    fs_event_context: FsEventContext,
+}
+
+impl FsChangesTrigger {
+    pub fn new(changes: Vec<PathBuf>, fs_event_context: FsEventContext) -> Self {
+        Self {
+            fs_event_context,
+            changes,
+        }
+    }
+    pub fn fs_ctx(&self) -> &FsEventContext {
+        &self.fs_event_context
+    }
+    pub fn changes(&self) -> &Vec<PathBuf> {
+        &self.changes
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExecTrigger;
