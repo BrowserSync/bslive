@@ -188,14 +188,14 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         tracing::info!("Will run... {:?}", cmd);
         // let any_event_sender = comms.any_event_sender.clone();
         // let any_event_sender2 = comms.any_event_sender.clone();
-        let reason = match &trigger.trigger_source {
+        let reason = match &trigger.source() {
             TaskTriggerSource::FsChanges(FsChangesTrigger { changes, .. }) => {
                 format!("{} files changed", changes.len())
             }
             TaskTriggerSource::Exec { .. } => "command executed".to_string(),
         };
 
-        let files = match &trigger.trigger_source {
+        let files = match &trigger.source() {
             TaskTriggerSource::FsChanges(FsChangesTrigger { changes, .. }) => changes
                 .iter()
                 .map(|x| format!("{}", x.display()))

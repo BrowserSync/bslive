@@ -52,21 +52,19 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
             .insert(*fs_ctx, msg.task_spec.to_owned());
 
         let task_id = msg.task_spec.as_id();
-        let invo = SpecId::new(task_id);
+        let spec_id = SpecId::new(task_id);
 
         let trigger_recipient = Box::new(msg.task_scope).into_task_recipient();
         // let comms = self.task_comms();
-        let as_trigger = TaskTrigger {
-            trigger_source: TaskTriggerSource::FsChanges(trigger),
-        };
-        let invocation = Invocation::new(invo, as_trigger);
+        let as_trigger = TaskTrigger::new(TaskTriggerSource::FsChanges(trigger));
+        let invocation = Invocation::new(spec_id, as_trigger);
 
         Box::pin(trigger_recipient.send(invocation).into_actor(self).map(
             move |resp, actor, _ctx| {
                 let runner = actor.task_spec_mapping.get(&cloned_id);
                 match (resp, runner) {
                     (Ok(result), Some(task_spec)) => {
-                        let (report, report_map) = result.to_report_and_map(invo);
+                        let (report, report_map) = result.to_report_and_map(spec_id);
                         let tree = task_spec.as_tree_with_results(&report_map);
                         actor.publish_any_event(TaskActionStage::complete(task_id, tree, report));
                     }

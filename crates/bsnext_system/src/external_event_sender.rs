@@ -40,7 +40,7 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         let id = invocation.spec_id().to_owned();
         let addr = self.request.clone();
-        let events: Vec<AnyEvent> = match invocation.trigger().to_owned().trigger_source {
+        let events: Vec<AnyEvent> = match invocation.trigger().source() {
             TaskTriggerSource::FsChanges(FsChangesTrigger { changes, .. }) => {
                 let as_strings = changes
                     .iter()

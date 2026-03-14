@@ -6,7 +6,7 @@ use std::path::PathBuf;
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "InvocationResult")]
 pub struct TaskTrigger {
-    pub trigger_source: TaskTriggerSource,
+    trigger_source: TaskTriggerSource,
 }
 
 #[derive(Debug, Clone)]
@@ -27,5 +27,8 @@ pub enum TaskTriggerSource {
 impl TaskTrigger {
     pub fn new(trigger_source: TaskTriggerSource) -> Self {
         Self { trigger_source }
+    }
+    pub fn source(&self) -> &TaskTriggerSource {
+        &self.trigger_source
     }
 }

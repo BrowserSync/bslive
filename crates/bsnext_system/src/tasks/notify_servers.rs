@@ -35,13 +35,13 @@ impl Handler<Invocation> for NotifyServers {
         tracing::debug!("NotifyServers::TaskCommand");
         let addr = self.addr.clone();
         let spec_id = invocation.spec_id().to_owned();
-        match invocation.trigger().to_owned().trigger_source {
+        match invocation.trigger().source() {
             TaskTriggerSource::FsChanges(FsChangesTrigger {
                 changes,
                 fs_event_context,
             }) => addr.do_send(FilesChanged {
                 paths: changes.clone(),
-                ctx: fs_event_context,
+                ctx: fs_event_context.to_owned(),
             }),
             TaskTriggerSource::Exec(..) => {
                 todo!("I cannot accept this")
