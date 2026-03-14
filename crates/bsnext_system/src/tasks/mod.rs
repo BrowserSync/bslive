@@ -11,7 +11,7 @@ use bsnext_task::{OverlappingOpts, SequenceOpts};
 use comms::Comms;
 use into_recipient::IntoRecipient;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use task_spec::Index;
+use task_spec::ParentID;
 
 pub mod bs_live_task;
 pub mod comms;
@@ -67,13 +67,13 @@ impl Runnable {
         self.hash(&mut hasher);
         hasher.finish()
     }
-    pub fn as_id_with(&self, Index(index): Index) -> u64 {
+    pub fn as_id_with(&self, ParentID(index): ParentID) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
         index.hash(&mut hasher);
         hasher.finish()
     }
-    pub fn as_id_with_path(&self, path: Vec<Index>) -> u64 {
+    pub fn as_id_with_path(&self, path: &[ParentID]) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
         path.hash(&mut hasher);

@@ -19,7 +19,7 @@ use bsnext_fs::{
 };
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 use bsnext_task::task_scope::TaskScope;
-use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
+use bsnext_task::task_trigger::FsChangesTrigger;
 use tracing::{debug_span, info};
 
 impl actix::Handler<FsEventGrouping> for BsSystem {
@@ -104,7 +104,7 @@ impl BsSystem {
         &mut self,
         buf: BufferedChangeEvent,
         _addr: Addr<BsSystem>,
-    ) -> Option<(TaskScope, TaskTrigger, TaskSpec)> {
+    ) -> Option<(TaskScope, FsChangesTrigger, TaskSpec)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
@@ -133,18 +133,16 @@ impl BsSystem {
 
         let fs_triggered_task_spec = self.task_spec_for_fs_event(&change.fs_ctx);
 
-        let variant = TaskTriggerSource::FsChanges {
+        let variant = FsChangesTrigger {
             changes: paths,
             fs_event_context: change.fs_ctx,
         };
-
-        let task_trigger = TaskTrigger::new(variant);
 
         Some((
             fs_triggered_task_spec
                 .clone()
                 .to_task_scope(self.servers().clone(), self.capabilities().clone()),
-            task_trigger,
+            variant,
             fs_triggered_task_spec,
         ))
     }

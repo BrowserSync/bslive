@@ -6,7 +6,7 @@ use bsnext_dto::internal::AnyEvent;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::invocation::SpecId;
 use bsnext_task::invocation_result::InvocationResult;
-use bsnext_task::task_trigger::TaskTriggerSource;
+use bsnext_task::task_trigger::{FsChangesTrigger, TaskTriggerSource};
 
 pub struct ExternalEventSenderWithLogging {
     pub request: Recipient<RequestOutputChannel>,
@@ -41,7 +41,7 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
         let id = invocation.spec_id().to_owned();
         let addr = self.request.clone();
         let events: Vec<AnyEvent> = match invocation.trigger().to_owned().trigger_source {
-            TaskTriggerSource::FsChanges { changes, .. } => {
+            TaskTriggerSource::FsChanges(FsChangesTrigger { changes, .. }) => {
                 let as_strings = changes
                     .iter()
                     .map(|p| p.to_string_lossy().to_string())

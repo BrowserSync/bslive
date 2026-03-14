@@ -10,11 +10,14 @@ pub struct TaskTrigger {
 }
 
 #[derive(Debug, Clone)]
+pub struct FsChangesTrigger {
+    pub changes: Vec<PathBuf>,
+    pub fs_event_context: FsEventContext,
+}
+
+#[derive(Debug, Clone)]
 pub enum TaskTriggerSource {
-    FsChanges {
-        changes: Vec<PathBuf>,
-        fs_event_context: FsEventContext,
-    },
+    FsChanges(FsChangesTrigger),
     Exec,
 }
 

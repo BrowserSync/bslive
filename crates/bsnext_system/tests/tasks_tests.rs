@@ -7,7 +7,7 @@ use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_entry::TaskEntry;
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_scope_runner::TaskScopeRunner;
-use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
+use bsnext_task::task_trigger::{FsChangesTrigger, TaskTrigger, TaskTriggerSource};
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
@@ -36,10 +36,10 @@ async fn test_task_scope_runner() -> anyhow::Result<()> {
     let addr = task_scope_runner.start();
 
     let (_tx, mut rx) = tokio::sync::mpsc::channel::<AnyEvent>(100);
-    let variant = TaskTriggerSource::FsChanges {
+    let variant = TaskTriggerSource::FsChanges(FsChangesTrigger {
         changes: vec![],
         fs_event_context: Default::default(),
-    };
+    });
     // let comms = TaskComms {
     //     any_event_sender: tx,
     // };
