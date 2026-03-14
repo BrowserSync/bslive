@@ -73,12 +73,13 @@ impl BsSystem {
         tx: tokio::sync::oneshot::Sender<()>,
     ) -> Self {
         let servers = ServersSupervisor::new(tx);
-        let capabilities = Capabilities::new(any_event_sender.clone());
+        let servers_addr = servers.start();
+        let capabilities = Capabilities::new(any_event_sender.clone(), servers_addr.clone());
         let start_context = StartupContext::from_cwd(Some(&cwd));
         BsSystem {
             self_addr: None,
             capabilities_addr: capabilities.start(),
-            servers_addr: servers.start(),
+            servers_addr,
             any_event_sender,
             input_monitors: None,
             any_monitors: Default::default(),

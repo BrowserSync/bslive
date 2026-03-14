@@ -1,5 +1,5 @@
 use crate::external_event_sender::ExternalEventSenderWithLogging;
-use crate::tasks::notify_servers::NotifyServers;
+use crate::tasks::notify_servers::NotifyServersReady;
 use crate::tasks::sh_cmd::ShCmd;
 use crate::tasks::task_spec::TaskSpec;
 use actix::{Actor, Recipient};
@@ -39,9 +39,11 @@ impl AsActor for RunnableWithComms {
     fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
         match self.runnable {
             Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
-                let s = NotifyServers::new(self.ctx.servers_addr.clone());
-                let s = s.start();
-                s.recipient()
+                let a = NotifyServersReady {
+                    addr: self.ctx.capabilities.recipient(),
+                };
+                let actor = a.start();
+                actor.recipient()
             }
             Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent) => {
                 let actor = ExternalEventSenderWithLogging::new(self.ctx.capabilities.recipient());
