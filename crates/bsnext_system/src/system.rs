@@ -17,7 +17,7 @@ use bsnext_dto::GetActiveServersResponse;
 use bsnext_fs::FsEventContext;
 use bsnext_input::startup::{StartupContext, TopLevelRunMode};
 use bsnext_input::Input;
-use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
+use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -114,7 +114,7 @@ impl BsSystem {
         spec: TaskSpec,
     ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
         let comms = self.task_comms();
-        let trigger = TaskTrigger::new(TaskTriggerSource::Exec);
+        let trigger = TaskTrigger::new(TaskTriggerSource::Exec(ExecTrigger));
 
         let task_scope = spec.clone().to_task_scope(self.servers_addr.clone(), addr);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();

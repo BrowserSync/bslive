@@ -201,7 +201,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
                 .map(|x| format!("{}", x.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
-            TaskTriggerSource::Exec => "NONE".to_string(),
+            TaskTriggerSource::Exec(..) => "NONE".to_string(),
         };
 
         let sh_prefix = Arc::new(self.cmd.prefix(sqid.clone()));

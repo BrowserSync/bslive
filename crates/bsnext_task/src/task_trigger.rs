@@ -16,9 +16,12 @@ pub struct FsChangesTrigger {
 }
 
 #[derive(Debug, Clone)]
+pub struct ExecTrigger;
+
+#[derive(Debug, Clone)]
 pub enum TaskTriggerSource {
     FsChanges(FsChangesTrigger),
-    Exec,
+    Exec(ExecTrigger),
 }
 
 impl TaskTrigger {

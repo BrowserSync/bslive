@@ -53,7 +53,7 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
                     },
                 ))]
             }
-            TaskTriggerSource::Exec => vec![],
+            TaskTriggerSource::Exec(..) => vec![],
         };
         Box::pin(async move {
             let Ok(Ok(output)) = addr
