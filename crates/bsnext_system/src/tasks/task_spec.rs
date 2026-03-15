@@ -5,6 +5,7 @@ use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
 use bsnext_input::route::RunOptItem;
+use bsnext_task::invocation::SpecId;
 use bsnext_task::task_entry::TaskEntry;
 use bsnext_task::task_report::TaskReport;
 use bsnext_task::task_scope::TaskScope;
@@ -100,12 +101,6 @@ impl TaskSpec {
         self.hash(&mut hasher);
         hasher.finish()
     }
-    pub fn as_id_with(&self, path: &[ParentID]) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        path.hash(&mut hasher);
-        hasher.finish()
-    }
 }
 
 impl TaskSpec {
@@ -117,9 +112,10 @@ impl TaskSpec {
         append_with_reports(&mut first, &self.tasks, &empty, &mut path);
         first
     }
-    pub fn as_tree_with_results(&self, hm: &HashMap<u64, TaskReport>) -> ArchyNode {
-        let mut path = vec![ParentID::new(self.as_id())];
-        let r = hm.get(&self.as_id());
+    pub fn as_tree_with_results(&self, hm: &HashMap<SpecId, TaskReport>) -> ArchyNode {
+        let mut path = vec![];
+        let spec_id = SpecId::new(self.as_id());
+        let r = hm.get(&spec_id);
         let label = match r {
             None => "missing".to_string(),
             Some(_) => self.as_tree_label(),
@@ -186,7 +182,7 @@ impl TaskSpec {
 pub fn append_with_reports(
     archy: &mut ArchyNode,
     tasks: &[Runnable],
-    hm: &HashMap<u64, TaskReport>,
+    hm: &HashMap<SpecId, TaskReport>,
     path: &mut Vec<ParentID>,
 ) {
     for (_index_position, runnable) in tasks.iter().enumerate() {

@@ -64,7 +64,7 @@ impl Handler<InvokeScope> for BsSystem {
         let with_start = async move {
             let _sent = comms
                 .any_event_sender
-                .send(TaskActionStage::started(spec_id_raw, tree))
+                .send(TaskActionStage::started(tree))
                 .await;
             top_level_scope.send(invocation).await
         };
@@ -79,7 +79,7 @@ impl Handler<InvokeScope> for BsSystem {
                         tree: tree.clone(),
                         report_map,
                     };
-                    actor.publish_any_event(TaskActionStage::complete(spec_id_raw, tree, report));
+                    actor.publish_any_event(TaskActionStage::complete(tree, report));
                     match done.send(report_and_tree) {
                         Ok(_) => tracing::debug!("did finish initial"),
                         Err(_) => tracing::error!("could not send"),

@@ -62,7 +62,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
                     (Ok(result), Some(task_spec)) => {
                         let (report, report_map) = result.to_report_and_map(spec_id);
                         let tree = task_spec.as_tree_with_results(&report_map);
-                        actor.publish_any_event(TaskActionStage::complete(task_id, tree, report));
+                        actor.publish_any_event(TaskActionStage::complete(tree, report));
                     }
                     (Ok(_), _) => {
                         tracing::trace!("a triggered command completed");

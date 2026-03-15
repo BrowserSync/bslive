@@ -24,7 +24,7 @@ impl Invocation {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub struct SpecId(u64);
 
 impl SpecId {

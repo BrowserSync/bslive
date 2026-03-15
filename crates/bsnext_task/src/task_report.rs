@@ -24,8 +24,8 @@ impl TaskReport {
     pub fn new(result: InvocationResult, spec_id: SpecId) -> Self {
         Self { spec_id, result }
     }
-    pub fn spec_id(&self) -> u64 {
-        self.spec_id.u64()
+    pub fn spec_id(&self) -> SpecId {
+        self.spec_id
     }
     pub fn result(&self) -> &InvocationResult {
         &self.result

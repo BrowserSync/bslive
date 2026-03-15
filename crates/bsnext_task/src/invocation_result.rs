@@ -98,7 +98,7 @@ impl InvocationResult {
             result: self,
         }
     }
-    pub fn to_report_and_map(self, id: SpecId) -> (TaskReport, HashMap<u64, TaskReport>) {
+    pub fn to_report_and_map(self, id: SpecId) -> (TaskReport, HashMap<SpecId, TaskReport>) {
         let report = self.to_report(id);
         let mut report_map = HashMap::new();
         every_report(&mut report_map, &report);
@@ -109,7 +109,7 @@ impl InvocationResult {
     }
 }
 
-pub fn every_report(hm: &mut HashMap<u64, TaskReport>, report: &TaskReport) {
+pub fn every_report(hm: &mut HashMap<SpecId, TaskReport>, report: &TaskReport) {
     hm.insert(report.spec_id(), report.clone());
     for inner in &report.result().task_reports {
         every_report(hm, inner)

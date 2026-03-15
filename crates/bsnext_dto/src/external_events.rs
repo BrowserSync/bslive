@@ -29,7 +29,6 @@ pub enum ExternalEventsDTO {
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TaskActionDTO {
-    pub id: String,
     pub stage: TaskActionStageDTO,
 }
 

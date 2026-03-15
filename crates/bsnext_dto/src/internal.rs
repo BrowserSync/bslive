@@ -6,6 +6,7 @@ use crate::external_events::{
 use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
+use bsnext_task::invocation::SpecId;
 use bsnext_task::invocation_result::{InvocationConclusion, InvocationResult};
 use bsnext_task::task_report::TaskReport;
 use std::collections::HashMap;
@@ -36,7 +37,7 @@ pub enum InternalEvents {
 pub struct TaskReportAndTree {
     pub report: TaskReport,
     pub tree: ArchyNode,
-    pub report_map: HashMap<u64, TaskReport>,
+    pub report_map: HashMap<SpecId, TaskReport>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,20 +54,18 @@ pub enum TaskActionStage {
 }
 
 impl TaskActionStage {
-    pub fn started(id: u64, tree: ArchyNode) -> AnyEvent {
+    pub fn started(tree: ArchyNode) -> AnyEvent {
         // let action = TaskAction {
         //     id,
         //     stage: TaskActionStage::Started { tree },
         // };
         let dto = TaskActionDTO {
-            id: id.to_string(),
             stage: TaskActionStageDTO::Started { tree },
         };
         AnyEvent::External(ExternalEventsDTO::TaskAction(dto))
     }
-    pub fn complete(id: u64, tree: ArchyNode, report: TaskReport) -> AnyEvent {
+    pub fn complete(tree: ArchyNode, report: TaskReport) -> AnyEvent {
         let dto = TaskActionDTO {
-            id: id.to_string(),
             stage: TaskActionStageDTO::Ended {
                 tree,
                 report: TaskReportDTO::from(report),
