@@ -394,7 +394,6 @@ export const taskReportDTOSchema: z.ZodSchema<TaskReportDTO> = z.lazy(() =>
 
 export const taskActionDTOSchema: z.ZodSchema<TaskActionDTO> = z.lazy(() =>
     z.object({
-        id: z.string(),
         stage: taskActionStageDTOSchema,
     }),
 );

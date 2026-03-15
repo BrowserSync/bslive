@@ -163,7 +163,6 @@ export type TaskActionStageDTO =
 	| { kind: "Error", payload?: undefined };
 
 export interface TaskActionDTO {
-	id: string;
 	stage: TaskActionStageDTO;
 }
 

@@ -365,7 +365,6 @@ var taskReportDTOSchema = z.lazy(
 );
 var taskActionDTOSchema = z.lazy(
   () => z.object({
-    id: z.string(),
     stage: taskActionStageDTOSchema
   })
 );
