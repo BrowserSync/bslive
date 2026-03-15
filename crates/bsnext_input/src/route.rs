@@ -429,9 +429,14 @@ impl RunAll {
     Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
 pub struct RunAllOpts {
+    #[serde(default = "default_max")]
     pub max: u8,
     #[serde(default)]
     pub exit_on_fail: bool,
+}
+
+fn default_max() -> u8 {
+    5
 }
 
 impl RunAllOpts {
@@ -446,7 +451,7 @@ impl RunAllOpts {
 impl Default for RunAllOpts {
     fn default() -> Self {
         Self {
-            max: 5,
+            max: default_max(),
             exit_on_fail: false,
         }
     }
