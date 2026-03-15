@@ -174,12 +174,10 @@ var serversChangedDTOSchema = z.object({
   servers_resp: getActiveServersResponseDTOSchema
 });
 var stderrLineDTOSchema = z.object({
-  task_id: z.string(),
   line: z.string(),
   prefix: z.string().optional()
 });
 var stdoutLineDTOSchema = z.object({
-  task_id: z.string(),
   line: z.string(),
   prefix: z.string().optional()
 });
@@ -362,8 +360,7 @@ var taskActionStageDTOSchema = z.lazy(
 );
 var taskReportDTOSchema = z.lazy(
   () => z.object({
-    result: taskResultDTOSchema,
-    id: z.string()
+    result: taskResultDTOSchema
   })
 );
 var taskActionDTOSchema = z.lazy(

@@ -186,13 +186,11 @@ export const serversChangedDTOSchema = z.object({
 });
 
 export const stderrLineDTOSchema = z.object({
-    task_id: z.string(),
     line: z.string(),
     prefix: z.string().optional(),
 });
 
 export const stdoutLineDTOSchema = z.object({
-    task_id: z.string(),
     line: z.string(),
     prefix: z.string().optional(),
 });
@@ -391,7 +389,6 @@ export const taskActionStageDTOSchema: z.ZodSchema<TaskActionStageDTO> = z.lazy(
 export const taskReportDTOSchema: z.ZodSchema<TaskReportDTO> = z.lazy(() =>
     z.object({
         result: taskResultDTOSchema,
-        id: z.string(),
     }),
 );
 

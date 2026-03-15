@@ -52,7 +52,6 @@ pub enum TaskActionStageDTO {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TaskReportDTO {
     pub result: TaskResultDTO,
-    pub id: String,
 }
 
 #[typeshare]
@@ -80,19 +79,11 @@ pub enum TaskConclusionDTO {
 pub struct InvocationIdDTO(pub String);
 
 impl ExternalEventsDTO {
-    pub fn stdout_line(task_id: u64, line: String, prefix: Option<String>) -> Self {
-        Self::OutputLine(crate::OutputLineDTO::Stdout(StdoutLineDTO {
-            task_id: task_id.to_string(),
-            line,
-            prefix,
-        }))
+    pub fn stdout_line(line: String, prefix: Option<String>) -> Self {
+        Self::OutputLine(crate::OutputLineDTO::Stdout(StdoutLineDTO { line, prefix }))
     }
-    pub fn stderr_line(task_id: u64, line: String, prefix: Option<String>) -> Self {
-        Self::OutputLine(crate::OutputLineDTO::Stderr(StderrLineDTO {
-            task_id: task_id.to_string(),
-            line,
-            prefix,
-        }))
+    pub fn stderr_line(line: String, prefix: Option<String>) -> Self {
+        Self::OutputLine(crate::OutputLineDTO::Stderr(StderrLineDTO { line, prefix }))
     }
 }
 

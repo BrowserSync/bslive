@@ -192,10 +192,7 @@ pub async fn run_jobs(
             .await??;
     }
 
-    Ok(RunOk {
-        report_and_tree,
-        spec,
-    })
+    Ok(RunOk { report_and_tree })
 }
 
 pub async fn print_jobs(
@@ -230,7 +227,6 @@ pub struct SetupOk {
 pub struct RunOk {
     #[allow(dead_code)]
     pub report_and_tree: TaskReportAndTree,
-    pub spec: TaskSpec,
 }
 
 pub struct RunDryOk;

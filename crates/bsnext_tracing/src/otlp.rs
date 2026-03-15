@@ -9,9 +9,6 @@ use opentelemetry_semantic_conventions::{
     attribute::{DEPLOYMENT_ENVIRONMENT_NAME, SERVICE_VERSION},
     SCHEMA_URL,
 };
-use std::fs::File;
-use tracing::error;
-// use crate::{OutputFormat, WriteOption};
 
 use tracing_opentelemetry::{MetricsLayer, OpenTelemetryLayer};
 use tracing_subscriber::layer::Layered;

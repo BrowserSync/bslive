@@ -4,7 +4,7 @@ use crate::startup::StartupContext;
 use crate::yml::YamlError;
 use bsnext_fs_helpers::{DirError, FsWriteError};
 use miette::JSONReportHandler;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::net::AddrParseError;
 use std::path::{Path, PathBuf};

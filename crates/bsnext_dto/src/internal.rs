@@ -79,7 +79,6 @@ impl TaskActionStage {
 impl From<TaskReport> for TaskReportDTO {
     fn from(value: TaskReport) -> Self {
         TaskReportDTO {
-            id: value.spec_id.to_string(),
             result: TaskResultDTO::from(value.result),
         }
     }

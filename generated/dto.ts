@@ -138,13 +138,11 @@ export interface SseDTOOpts {
 }
 
 export interface StderrLineDTO {
-	task_id: string;
 	line: string;
 	prefix?: string;
 }
 
 export interface StdoutLineDTO {
-	task_id: string;
 	line: string;
 	prefix?: string;
 }
@@ -182,7 +180,6 @@ export interface TaskResultDTO {
 
 export interface TaskReportDTO {
 	result: TaskResultDTO;
-	id: string;
 }
 
 export interface WatchingDTO {

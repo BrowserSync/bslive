@@ -291,7 +291,7 @@ async fn sh_cmd(
         while let Ok(Some(line)) = stdout_reader.next_line().await {
             match sender
                 .send(TaggedEvent::new(AnyEvent::External(
-                    ExternalEventsDTO::stdout_line(id.u64(), line, (*sh_prefix).clone()),
+                    ExternalEventsDTO::stdout_line(line, (*sh_prefix).clone()),
                 )))
                 .await
             {
@@ -306,7 +306,7 @@ async fn sh_cmd(
         while let Ok(Some(line)) = stderr_reader.next_line().await {
             match sender2
                 .send(TaggedEvent::new(AnyEvent::External(
-                    ExternalEventsDTO::stderr_line(id.u64(), line, (*sh_prefix_2).clone()),
+                    ExternalEventsDTO::stderr_line(line, (*sh_prefix_2).clone()),
                 )))
                 .await
             {

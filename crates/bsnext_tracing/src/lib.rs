@@ -107,7 +107,7 @@ pub fn init_tracing(
     let (filter, fmt_layer) =
         raw_tracing::create_filter_and_fmt(&level, format, write_option, line_opts);
 
-    let registry = tracing_subscriber::registry()
+    let _registry = tracing_subscriber::registry()
         .with(filter)
         .with(fmt_layer)
         .init();

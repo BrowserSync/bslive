@@ -33,12 +33,11 @@ pub struct TaskSpec {
 }
 
 impl TreeDisplay for TaskSpec {
-    fn as_tree_label(&self, _path: &[ParentID]) -> String {
-        let sqid = "SQID";
+    fn as_tree_label(&self) -> String {
         match &self.run_kind {
-            RunKind::Sequence { .. } => format!("[{sqid}] Seq: {} task(s)", self.tasks.len()),
+            RunKind::Sequence { .. } => format!("Seq: {} task(s)", self.tasks.len()),
             RunKind::Overlapping { opts } => format!(
-                "[{sqid}] Overlapping {} task(s) (max concurrency: {})",
+                "Overlapping {} task(s) (max concurrency: {})",
                 self.tasks.len(),
                 opts.max_concurrent_items
             ),
@@ -111,8 +110,8 @@ impl TaskSpec {
 
 impl TaskSpec {
     pub fn as_tree(&self) -> ArchyNode {
-        let mut path = vec![ParentID::new(self.as_id())];
-        let label = self.as_tree_label(&path);
+        let mut path = vec![];
+        let label = self.as_tree_label();
         let mut first = ArchyNode::new(&label);
         let empty = HashMap::default();
         append_with_reports(&mut first, &self.tasks, &empty, &mut path);
@@ -123,7 +122,7 @@ impl TaskSpec {
         let r = hm.get(&self.as_id());
         let label = match r {
             None => "missing".to_string(),
-            Some(_) => self.as_tree_label(&path),
+            Some(_) => self.as_tree_label(),
         };
         let mut first = ArchyNode::new(&label);
         append_with_reports(&mut first, &self.tasks, hm, &mut path);
@@ -132,17 +131,17 @@ impl TaskSpec {
 }
 
 impl TreeDisplay for Runnable {
-    fn as_tree_label(&self, path: &[ParentID]) -> String {
+    fn as_tree_label(&self) -> String {
         match self {
             Runnable::BsLiveTask(item) => format!("{}{}", "Runnable::BsLiveTask", item),
             Runnable::Sh(sh) => format!("{} {}", "Runnable::Sh", sh),
-            Runnable::Spec(task_spec) => task_spec.as_tree_label(&path),
+            Runnable::Spec(task_spec) => task_spec.as_tree_label(),
         }
     }
 }
 
 pub trait TreeDisplay {
-    fn as_tree_label(&self, path: &[ParentID]) -> String;
+    fn as_tree_label(&self) -> String;
 }
 
 impl TaskSpec {
@@ -155,7 +154,7 @@ impl TaskSpec {
         let path = vec![ParentID::new(parent_id)];
         let mut tasks = vec![];
 
-        for (index_position, runnable) in self.tasks.into_iter().enumerate() {
+        for (_index_position, runnable) in self.tasks.into_iter().enumerate() {
             let item_id = runnable.as_id_with_path(&path);
 
             match runnable {
@@ -190,42 +189,11 @@ pub fn append_with_reports(
     hm: &HashMap<u64, TaskReport>,
     path: &mut Vec<ParentID>,
 ) {
-    for (index_position, runnable) in tasks.iter().enumerate() {
-        let id = runnable.as_id_with_path(&path);
-        let sqid = "sqid1";
-        let sqid2 = "sqid2";
-        // dbg!(&sqid, &id);
-        let label_with_id = match hm.get(&id) {
-            None => format!("[{sqid}:{sqid2}] − {}", runnable.as_tree_label(&path)),
-            Some(report) => {
-                if runnable.is_group() {
-                    runnable.as_tree_label(&path)
-                } else {
-                    format!(
-                        "[{sqid}] {} {}",
-                        if report.is_ok() { "✅" } else { "❌" },
-                        runnable.as_tree_label(&path)
-                    )
-                }
-            }
-        };
-        let raw_label = match hm.get(&id) {
-            None => format!("{}", runnable.as_tree_label(&path)),
-            Some(report) => {
-                if runnable.is_group() {
-                    runnable.as_tree_label(&path)
-                } else {
-                    format!(
-                        "{} {}",
-                        if report.is_ok() { "✅" } else { "❌" },
-                        runnable.as_tree_label(&path)
-                    )
-                }
-            }
-        };
+    for (_index_position, runnable) in tasks.iter().enumerate() {
+        let raw_label = runnable.as_tree_label();
         match runnable {
-            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
-            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
+            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
+            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
             Runnable::Spec(runner) => {
                 let mut next = ArchyNode::new(&raw_label);
                 append_with_reports(&mut next, &runner.tasks, hm, path);
