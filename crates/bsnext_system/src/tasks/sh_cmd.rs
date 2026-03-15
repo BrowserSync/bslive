@@ -177,10 +177,10 @@ impl actix::Actor for ShCmdWithLogging {
 impl actix::Handler<Invocation> for ShCmdWithLogging {
     type Result = ResponseFuture<InvocationResult>;
 
-    #[tracing::instrument(skip_all, name="sh_cmd::invocation", fields(sqid=invocation.sqid()))]
+    #[tracing::instrument(skip_all, name = "sh_cmd::invocation")]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        let sqid = invocation.sqid();
-        self.cmd.id = Some(sqid.clone());
+        let sqid = "invoke-sqid";
+        self.cmd.id = Some(sqid.to_owned());
         let cmd = self.cmd.sh.clone();
         let trigger = invocation.trigger().to_owned();
         let spec_id = invocation.spec_id().to_owned();
@@ -205,7 +205,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
             TaskTriggerSource::Exec(..) => "NONE".to_string(),
         };
 
-        let sh_prefix = Arc::new(self.cmd.prefix(sqid.clone()));
+        let sh_prefix = Arc::new(self.cmd.prefix(sqid.to_owned()));
         let sh_prefix_2 = sh_prefix.clone();
         let max_duration = self.cmd.timeout.duration().to_owned();
         let addr = self.request_sender.clone();
@@ -213,7 +213,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         let fut = sh_cmd(
             addr,
             spec_id,
-            sqid,
+            sqid.to_owned(),
             cmd,
             reason,
             files,
@@ -239,7 +239,7 @@ async fn sh_cmd(
     sh_prefix_2: Arc<Option<String>>,
     max_duration: Duration,
 ) -> InvocationResult {
-    let Ok(Ok(output)) = addr.send(RequestOutputChannel { spec_id: id }).await else {
+    let Ok(Ok(output)) = addr.send(RequestOutputChannel).await else {
         todo!("can this actually fail?");
     };
     let sender = output.sender.clone();
@@ -290,14 +290,9 @@ async fn sh_cmd(
         tracing::debug!(?pid, "reading stdout");
         while let Ok(Some(line)) = stdout_reader.next_line().await {
             match sender
-                .send(TaggedEvent::new(
-                    id.u64(),
-                    AnyEvent::External(ExternalEventsDTO::stdout_line(
-                        id.u64(),
-                        line,
-                        (*sh_prefix).clone(),
-                    )),
-                ))
+                .send(TaggedEvent::new(AnyEvent::External(
+                    ExternalEventsDTO::stdout_line(id.u64(), line, (*sh_prefix).clone()),
+                )))
                 .await
             {
                 Ok(_) => tracing::trace!("did forward stdout line"),
@@ -310,14 +305,9 @@ async fn sh_cmd(
         tracing::debug!(?pid, "reading stderr");
         while let Ok(Some(line)) = stderr_reader.next_line().await {
             match sender2
-                .send(TaggedEvent::new(
-                    id.u64(),
-                    AnyEvent::External(ExternalEventsDTO::stderr_line(
-                        id.u64(),
-                        line,
-                        (*sh_prefix_2).clone(),
-                    )),
-                ))
+                .send(TaggedEvent::new(AnyEvent::External(
+                    ExternalEventsDTO::stderr_line(id.u64(), line, (*sh_prefix_2).clone()),
+                )))
                 .await
             {
                 Ok(_) => tracing::trace!("did forward stderr line"),

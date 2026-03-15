@@ -62,27 +62,11 @@ impl Runnable {
             Runnable::Spec(_) => true,
         }
     }
-    pub fn as_id(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        hasher.finish()
-    }
-    pub fn as_id_with(&self, ParentID(index): ParentID) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        index.hash(&mut hasher);
-        hasher.finish()
-    }
     pub fn as_id_with_path(&self, path: &[ParentID]) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
         path.hash(&mut hasher);
         hasher.finish()
-    }
-    pub fn as_sqid(&self, id: u64) -> String {
-        let sqids = sqids::Sqids::default();
-        let sqid = sqids.encode(&[id]).unwrap_or_else(|_| id.to_string());
-        sqid.get(0..6).map(String::from).unwrap_or(sqid)
     }
 }
 

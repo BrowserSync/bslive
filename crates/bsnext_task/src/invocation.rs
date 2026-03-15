@@ -1,5 +1,4 @@
 use crate::invocation_result::InvocationResult;
-use crate::sqid;
 use crate::task_trigger::TaskTrigger;
 use std::fmt::{Debug, Display, Formatter};
 
@@ -23,9 +22,6 @@ impl Invocation {
     pub fn new(spec_id: SpecId, trigger: TaskTrigger) -> Self {
         Self { spec_id, trigger }
     }
-    pub fn sqid(&self) -> String {
-        self.spec_id.sqid()
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -37,9 +33,6 @@ impl SpecId {
     }
     pub fn u64(&self) -> u64 {
         self.0
-    }
-    pub fn sqid(&self) -> String {
-        sqid(self.0)
     }
 }
 

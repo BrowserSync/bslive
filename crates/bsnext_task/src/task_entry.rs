@@ -1,6 +1,5 @@
 use crate::as_actor::AsActor;
 use crate::invocation::Invocation;
-use crate::sqid_short;
 use actix::Recipient;
 use std::fmt::{Display, Formatter};
 
@@ -40,8 +39,5 @@ impl AsActor for TaskEntry {
 impl TaskEntry {
     pub fn id(&self) -> u64 {
         self.id
-    }
-    pub fn sqid(&self) -> String {
-        sqid_short(self.id)
     }
 }

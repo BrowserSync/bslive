@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tokio::select;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
-use tracing::{Instrument, Span, debug, debug_span};
+use tracing::debug;
 
 /// Represents a task group runner responsible for managing and executing a set of tasks.
 ///
@@ -51,9 +51,9 @@ impl actix::Actor for TaskScopeRunner {
 impl Handler<Invocation> for TaskScopeRunner {
     type Result = ResponseActFuture<Self, InvocationResult>;
 
-    #[tracing::instrument(skip_all, name = "Invocation", fields(sqid = invocation.sqid()))]
+    #[tracing::instrument(skip_all, name = "Invocation")]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        let sqid = invocation.sqid();
+        let sqid = "TaskScopeRunner:sqid";
         let trigger = invocation.trigger().to_owned();
         let spec_id = invocation.spec_id().to_owned();
 
@@ -84,7 +84,6 @@ impl Handler<Invocation> for TaskScopeRunner {
                         let child_spec_id = SpecId::new(raw_id);
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
                         let one_task = Invocation::new(child_spec_id, trigger.clone());
-                        let sqid = one_task.sqid();
 
                         match boxed_actor.send(one_task).await {
                             Ok(result) => {
@@ -96,7 +95,7 @@ impl Handler<Invocation> for TaskScopeRunner {
                                     );
                                 } else if exit_on_failure {
                                     debug!(
-                                        "❌ stopping after index {index} sqid: {sqid} ran, because it did not complete successfully."
+                                        "❌ stopping after index {index} ran, because it did not complete successfully."
                                     );
                                     break;
                                 } else {

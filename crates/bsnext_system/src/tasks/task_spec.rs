@@ -33,9 +33,8 @@ pub struct TaskSpec {
 }
 
 impl TreeDisplay for TaskSpec {
-    fn as_tree_label(&self, path: &[ParentID]) -> String {
-        let full_path = self.as_id_with(path);
-        let sqid = self.as_sqid(full_path);
+    fn as_tree_label(&self, _path: &[ParentID]) -> String {
+        let sqid = "SQID";
         match &self.run_kind {
             RunKind::Sequence { .. } => format!("[{sqid}] Seq: {} task(s)", self.tasks.len()),
             RunKind::Overlapping { opts } => format!(
@@ -111,13 +110,8 @@ impl TaskSpec {
 }
 
 impl TaskSpec {
-    pub fn as_sqid(&self, parent: u64) -> String {
-        let sqids = sqids::Sqids::default();
-        let sqid = sqids.encode(&[parent]).unwrap();
-        sqid.get(0..6).unwrap_or(&sqid).to_string()
-    }
     pub fn as_tree(&self) -> ArchyNode {
-        let mut path = vec![ParentID(self.as_id())];
+        let mut path = vec![ParentID::new(self.as_id())];
         let label = self.as_tree_label(&path);
         let mut first = ArchyNode::new(&label);
         let empty = HashMap::default();
@@ -125,7 +119,7 @@ impl TaskSpec {
         first
     }
     pub fn as_tree_with_results(&self, hm: &HashMap<u64, TaskReport>) -> ArchyNode {
-        let mut path = vec![ParentID(self.as_id())];
+        let mut path = vec![ParentID::new(self.as_id())];
         let r = hm.get(&self.as_id());
         let label = match r {
             None => "missing".to_string(),
@@ -158,13 +152,10 @@ impl TaskSpec {
         capabilities_addr: Addr<Capabilities>,
     ) -> TaskScope {
         let parent_id = self.as_id();
-        let mut path = vec![ParentID(parent_id)];
+        let path = vec![ParentID::new(parent_id)];
         let mut tasks = vec![];
 
         for (index_position, runnable) in self.tasks.into_iter().enumerate() {
-            path.push(ParentID(index_position as u64));
-            path.push(ParentID(runnable.as_id()));
-
             let item_id = runnable.as_id_with_path(&path);
 
             match runnable {
@@ -193,30 +184,16 @@ impl TaskSpec {
     }
 }
 
-fn sqid<D: Hash>(d: &D) -> String {
-    let mut hasher = DefaultHasher::new();
-    d.hash(&mut hasher);
-    let id = hasher.finish();
-    let sqids = sqids::Sqids::default();
-    let sqid = sqids.encode(&[id]).unwrap_or_else(|_| id.to_string());
-    sqid.get(0..6).map(String::from).unwrap_or(sqid)
-}
-
 pub fn append_with_reports(
     archy: &mut ArchyNode,
     tasks: &[Runnable],
     hm: &HashMap<u64, TaskReport>,
     path: &mut Vec<ParentID>,
 ) {
-    let _s = sqid(&path);
     for (index_position, runnable) in tasks.iter().enumerate() {
-        path.push(ParentID(index_position as u64));
-        path.push(ParentID(runnable.as_id()));
-
         let id = runnable.as_id_with_path(&path);
-        let content_id = runnable.as_id();
-        let sqid = runnable.as_sqid(id);
-        let sqid2 = runnable.as_sqid(content_id);
+        let sqid = "sqid1";
+        let sqid2 = "sqid2";
         // dbg!(&sqid, &id);
         let label_with_id = match hm.get(&id) {
             None => format!("[{sqid}:{sqid2}] − {}", runnable.as_tree_label(&path)),
@@ -259,4 +236,18 @@ pub fn append_with_reports(
 }
 
 #[derive(Hash, Debug, Copy, Clone)]
-pub struct ParentID(pub u64);
+pub struct ParentID {
+    inner: u64,
+}
+
+impl ParentID {
+    pub fn new(id: u64) -> Self {
+        Self { inner: id }
+    }
+}
+
+impl ParentID {
+    pub fn id(&self) -> u64 {
+        self.inner
+    }
+}

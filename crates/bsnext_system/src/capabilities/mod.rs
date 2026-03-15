@@ -27,19 +27,10 @@ impl Actor for Capabilities {
 
 pub struct TaggedEvent {
     event: AnyEvent,
-    id: u64,
 }
 
 impl TaggedEvent {
-    pub fn sqid(&self) -> String {
-        let sqids = sqids::Sqids::default();
-        let sqid = sqids.encode(&[self.id]).unwrap();
-        sqid.get(0..6).unwrap_or(&sqid).to_string()
-    }
-}
-
-impl TaggedEvent {
-    pub fn new(id: u64, event: AnyEvent) -> TaggedEvent {
-        Self { event, id }
+    pub fn new(event: AnyEvent) -> TaggedEvent {
+        Self { event }
     }
 }

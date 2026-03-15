@@ -38,7 +38,6 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
     type Result = ResponseFuture<InvocationResult>;
 
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        let id = invocation.spec_id().to_owned();
         let addr = self.request.clone();
         let events: Vec<AnyEvent> = match invocation.trigger().source() {
             TaskTriggerSource::FsChanges(trigger) => {
@@ -57,16 +56,11 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
             TaskTriggerSource::Exec(..) => vec![],
         };
         Box::pin(async move {
-            let Ok(Ok(output)) = addr
-                .send(RequestOutputChannel {
-                    spec_id: id.clone(),
-                })
-                .await
-            else {
+            let Ok(Ok(output)) = addr.send(RequestOutputChannel).await else {
                 todo!("can this actually fail?");
             };
             for evt in events {
-                let tagged = TaggedEvent::new(id.u64(), evt);
+                let tagged = TaggedEvent::new(evt);
                 match output.sender.send(tagged).await {
                     Ok(_) => tracing::trace!("sent"),
                     Err(e) => tracing::error!("{e}"),
