@@ -142,7 +142,7 @@ impl TreeDisplay for Runnable {
         match self {
             Runnable::BsLiveTask(item) => format!("{}{}", "Runnable::BsLiveTask", item),
             Runnable::Sh(sh) => format!("{} {}", "Runnable::Sh", sh),
-            Runnable::Many(task_spec) => task_spec.as_tree_label(&path),
+            Runnable::Spec(task_spec) => task_spec.as_tree_label(&path),
         }
     }
 }
@@ -168,12 +168,11 @@ impl TaskSpec {
             let item_id = runnable.as_id_with_path(&path);
 
             match runnable {
-                Runnable::Many(task_spec) => tasks.push(TaskEntry::new(
-                    Box::new(
-                        task_spec.to_task_scope(servers_addr.clone(), capabilities_addr.clone()),
-                    ),
-                    item_id,
-                )),
+                Runnable::Spec(task_spec) => {
+                    let as_scope =
+                        task_spec.to_task_scope(servers_addr.clone(), capabilities_addr.clone());
+                    tasks.push(TaskEntry::new(Box::new(as_scope), item_id))
+                }
                 _ => {
                     let with_ctx = RunnableWithComms {
                         ctx: Comms {
@@ -250,7 +249,7 @@ pub fn append_with_reports(
         match runnable {
             Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
-            Runnable::Many(runner) => {
+            Runnable::Spec(runner) => {
                 let mut next = ArchyNode::new(&raw_label);
                 append_with_reports(&mut next, &runner.tasks, hm, path);
                 archy.nodes.push(next);

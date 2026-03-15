@@ -26,7 +26,7 @@ pub mod task_spec;
 pub enum Runnable {
     BsLiveTask(BsLiveTask),
     Sh(ShCmd),
-    Many(TaskSpec),
+    Spec(TaskSpec),
 }
 
 #[derive(Debug)]
@@ -39,9 +39,7 @@ impl AsActor for RunnableWithComms {
     fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
         match self.runnable {
             Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
-                let a = NotifyServersReady {
-                    addr: self.ctx.capabilities.recipient(),
-                };
+                let a = NotifyServersReady::new(self.ctx.capabilities.recipient());
                 let actor = a.start();
                 actor.recipient()
             }
@@ -51,7 +49,7 @@ impl AsActor for RunnableWithComms {
                 addr.recipient()
             }
             Runnable::Sh(sh) => sh.into_recipient(&self.ctx.capabilities),
-            Runnable::Many(_) => unreachable!("The conversion to Task happens elsewhere"),
+            Runnable::Spec(_) => unreachable!("The conversion to Task happens elsewhere"),
         }
     }
 }
@@ -61,7 +59,7 @@ impl Runnable {
         match self {
             Runnable::BsLiveTask(_) => false,
             Runnable::Sh(_) => false,
-            Runnable::Many(_) => true,
+            Runnable::Spec(_) => true,
         }
     }
     pub fn as_id(&self) -> u64 {
@@ -105,14 +103,14 @@ impl From<&RunOptItem> for Runnable {
                     max_concurrent_items: run_all_opts.max,
                     exit_on_failure: run_all_opts.exit_on_fail,
                 };
-                Self::Many(TaskSpec::all(&items, opts))
+                Self::Spec(TaskSpec::all(&items, opts))
             }
             RunOptItem::Seq(RunSeq { seq, seq_opts }) => {
                 let items: Vec<_> = seq.iter().map(Runnable::from).collect();
                 let opts = SequenceOpts {
                     exit_on_failure: seq_opts.exit_on_fail,
                 };
-                Self::Many(TaskSpec::seq_opts(&items, opts))
+                Self::Spec(TaskSpec::seq_opts(&items, opts))
             }
         }
     }

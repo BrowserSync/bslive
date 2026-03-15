@@ -6,7 +6,13 @@ use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_trigger::{FsChangesTrigger, TaskTriggerSource};
 
 pub struct NotifyServersReady {
-    pub(crate) addr: Recipient<RequestServersAddr>,
+    addr: Recipient<RequestServersAddr>,
+}
+
+impl NotifyServersReady {
+    pub fn new(addr: Recipient<RequestServersAddr>) -> Self {
+        Self { addr }
+    }
 }
 
 impl Actor for NotifyServersReady {
