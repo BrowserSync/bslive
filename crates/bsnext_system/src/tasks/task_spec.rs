@@ -179,7 +179,6 @@ pub fn append_with_reports(
     path: Vec<ParentID>,
 ) {
     for (index_position, runnable) in tasks.iter().enumerate() {
-        todo!("now we need to use `iid` to store/lookup reports and overlay in summary");
         let mut next_path = path.clone();
         next_path.push(ParentID::new(index_position as u64));
         // println!("{runnable}");
@@ -188,11 +187,8 @@ pub fn append_with_reports(
         let cid = runnable.as_id();
 
         next_path.push(ParentID::new(cid));
-        // println!(" cid=|| {}", cid.sqid_short());
-
         {
             let mut iid = DefaultHasher::new();
-            cid.hash(&mut iid);
             next_path.hash(&mut iid);
             let iid = iid.finish();
             let path_str = next_path
@@ -200,6 +196,7 @@ pub fn append_with_reports(
                 .map(|p| p.inner.to_string())
                 .collect::<Vec<_>>()
                 .join(",");
+            todo!("now we need to use `iid` to store/lookup reports and overlay in summary");
             // println!(" iid=|| {} || {}", iid.sqid_short(), path_str);
         }
 
