@@ -47,7 +47,7 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
         self.task_spec_mapping
             .insert(fs_ctx, msg.task_spec.to_owned());
 
-        let task_id = msg.task_spec.as_id();
+        let task_id = msg.task_spec.as_id(None);
         let spec_id = SpecId::new(task_id);
 
         let trigger_recipient = Box::new(scope).into_task_recipient();

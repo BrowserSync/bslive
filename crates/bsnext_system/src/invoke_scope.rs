@@ -53,7 +53,7 @@ impl Handler<InvokeScope> for BsSystem {
     fn handle(&mut self, msg: InvokeScope, _ctx: &mut Self::Context) -> Self::Result {
         let task_trigger = msg.task_trigger;
         let task_spec = msg.task_spec;
-        let spec_id_raw = task_spec.as_id();
+        let spec_id_raw = task_spec.as_id(None);
         let spec_id = SpecId::new(spec_id_raw);
 
         let top_level_scope = Box::new(msg.task_scope).into_task_recipient();

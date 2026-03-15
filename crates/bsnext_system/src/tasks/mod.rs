@@ -10,8 +10,26 @@ use bsnext_task::invocation::Invocation;
 use bsnext_task::{OverlappingOpts, SequenceOpts};
 use comms::Comms;
 use into_recipient::IntoRecipient;
+use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
-use task_spec::ParentID;
+
+trait Sqid {
+    fn sqid(&self) -> String;
+    fn sqid_short(&self) -> String;
+}
+
+impl Sqid for u64 {
+    fn sqid(&self) -> String {
+        let sqids = sqids::Sqids::default();
+        sqids.encode(&[*self]).unwrap_or_else(|_| self.to_string())
+    }
+
+    fn sqid_short(&self) -> String {
+        let sqids = sqids::Sqids::default();
+        let sqid = sqids.encode(&[*self]).unwrap();
+        sqid.get(0..6).unwrap_or(&sqid).to_string()
+    }
+}
 
 pub mod bs_live_task;
 pub mod comms;
@@ -27,6 +45,21 @@ pub enum Runnable {
     BsLiveTask(BsLiveTask),
     Sh(ShCmd),
     Spec(TaskSpec),
+}
+
+impl Display for Runnable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Runnable::BsLiveTask(_) => write!(f, "{}", "Runnable::BsLiveTask"),
+            Runnable::Sh(_) => write!(f, "{}", "Runnable::Sh"),
+            Runnable::Spec(spec) if spec.is_seq() => {
+                write!(f, "{}", "Runnable::Spec (seq)")
+            }
+            Runnable::Spec(spec) => {
+                write!(f, "{}", "Runnable::Spec (all)")
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -62,10 +95,9 @@ impl Runnable {
             Runnable::Spec(_) => true,
         }
     }
-    pub fn as_id_with_path(&self, path: &[ParentID]) -> u64 {
+    pub fn as_id(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
-        path.hash(&mut hasher);
         hasher.finish()
     }
 }

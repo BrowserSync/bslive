@@ -1,6 +1,6 @@
 use crate::capabilities::Capabilities;
 use crate::tasks::comms::Comms;
-use crate::tasks::{Runnable, RunnableWithComms};
+use crate::tasks::{Runnable, RunnableWithComms, Sqid};
 use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
@@ -29,8 +29,8 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 ///
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct TaskSpec {
-    pub run_kind: RunKind,
-    pub tasks: Vec<Runnable>,
+    run_kind: RunKind,
+    tasks: Vec<Runnable>,
 }
 
 impl TreeDisplay for TaskSpec {
@@ -47,24 +47,30 @@ impl TreeDisplay for TaskSpec {
 }
 
 impl TaskSpec {
-    pub fn all(p0: &[Runnable], opts: OverlappingOpts) -> Self {
+    pub fn is_seq(&self) -> bool {
+        matches!(self.run_kind, RunKind::Sequence { .. })
+    }
+    pub fn is_all(&self) -> bool {
+        matches!(self.run_kind, RunKind::Overlapping { .. })
+    }
+    pub fn all(tasks: &[Runnable], opts: OverlappingOpts) -> Self {
         Self {
             run_kind: RunKind::Overlapping { opts },
-            tasks: p0.to_vec(),
+            tasks: tasks.to_vec(),
         }
     }
-    pub fn seq(p0: &[Runnable]) -> Self {
+    pub fn seq(tasks: &[Runnable]) -> Self {
         Self {
             run_kind: RunKind::Sequence {
                 opts: SequenceOpts::default(),
             },
-            tasks: p0.to_vec(),
+            tasks: tasks.to_vec(),
         }
     }
-    pub fn seq_opts(p0: &[Runnable], opts: SequenceOpts) -> Self {
+    pub fn seq_opts(tasks: &[Runnable], opts: SequenceOpts) -> Self {
         Self {
             run_kind: RunKind::Sequence { opts },
-            tasks: p0.to_vec(),
+            tasks: tasks.to_vec(),
         }
     }
     pub fn seq_from(run_items: &[RunOptItem]) -> Self {
@@ -83,45 +89,33 @@ impl TaskSpec {
             tasks: run_items.iter().map(Runnable::from).collect(),
         }
     }
-    pub fn seq_from_opts(run_items: &[RunOptItem], opts: SequenceOpts) -> Self {
-        Self {
-            run_kind: RunKind::Sequence { opts },
-            tasks: run_items.iter().map(Runnable::from).collect(),
-        }
-    }
-    pub fn all_from_opts(run_items: &[RunOptItem], opts: OverlappingOpts) -> Self {
-        Self {
-            run_kind: RunKind::Overlapping { opts },
-            tasks: run_items.iter().map(Runnable::from).collect(),
-        }
-    }
-
-    pub fn as_id(&self) -> u64 {
+    pub fn as_id(&self, parent: Option<ParentID>) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
+        parent.hash(&mut hasher);
         hasher.finish()
     }
 }
 
 impl TaskSpec {
     pub fn as_tree(&self) -> ArchyNode {
-        let mut path = vec![];
+        let path = vec![ParentID::new(self.as_id(None))];
         let label = self.as_tree_label();
         let mut first = ArchyNode::new(&label);
         let empty = HashMap::default();
-        append_with_reports(&mut first, &self.tasks, &empty, &mut path);
+        append_with_reports(&mut first, &self.tasks, &empty, path);
         first
     }
     pub fn as_tree_with_results(&self, hm: &HashMap<SpecId, TaskReport>) -> ArchyNode {
-        let mut path = vec![];
-        let spec_id = SpecId::new(self.as_id());
+        let path = vec![ParentID::new(self.as_id(None))];
+        let spec_id = SpecId::new(self.as_id(None));
         let r = hm.get(&spec_id);
         let label = match r {
             None => "missing".to_string(),
             Some(_) => self.as_tree_label(),
         };
         let mut first = ArchyNode::new(&label);
-        append_with_reports(&mut first, &self.tasks, hm, &mut path);
+        append_with_reports(&mut first, &self.tasks, hm, path);
         first
     }
 }
@@ -146,12 +140,11 @@ impl TaskSpec {
         servers_addr: Addr<ServersSupervisor>,
         capabilities_addr: Addr<Capabilities>,
     ) -> TaskScope {
-        let parent_id = self.as_id();
-        let path = vec![ParentID::new(parent_id)];
+        let parent_id = self.as_id(None);
         let mut tasks = vec![];
 
         for (_index_position, runnable) in self.tasks.into_iter().enumerate() {
-            let item_id = runnable.as_id_with_path(&path);
+            let item_id = runnable.as_id();
 
             match runnable {
                 Runnable::Spec(task_spec) => {
@@ -183,16 +176,47 @@ pub fn append_with_reports(
     archy: &mut ArchyNode,
     tasks: &[Runnable],
     hm: &HashMap<SpecId, TaskReport>,
-    path: &mut Vec<ParentID>,
+    path: Vec<ParentID>,
 ) {
-    for (_index_position, runnable) in tasks.iter().enumerate() {
+    for (index_position, runnable) in tasks.iter().enumerate() {
+        todo!("now we need to use `iid` to store/lookup reports and overlay in summary");
+        let mut next_path = path.clone();
+        next_path.push(ParentID::new(index_position as u64));
+        // println!("{runnable}");
+
         let raw_label = runnable.as_tree_label();
+        let cid = runnable.as_id();
+
+        next_path.push(ParentID::new(cid));
+        // println!(" cid=|| {}", cid.sqid_short());
+
+        {
+            let mut iid = DefaultHasher::new();
+            cid.hash(&mut iid);
+            next_path.hash(&mut iid);
+            let iid = iid.finish();
+            let path_str = next_path
+                .iter()
+                .map(|p| p.inner.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            // println!(" iid=|| {} || {}", iid.sqid_short(), path_str);
+        }
+
+        // {
+        //     let mut pid = DefaultHasher::new();
+        //     next_path.hash(&mut pid);
+        //     let pid = pid.finish();
+        //     println!(" pid=|| {}", pid.sqid_short());
+        // }
+
+        // dbg!(id);
         match runnable {
             Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
             Runnable::Spec(runner) => {
                 let mut next = ArchyNode::new(&raw_label);
-                append_with_reports(&mut next, &runner.tasks, hm, path);
+                append_with_reports(&mut next, &runner.tasks, hm, next_path);
                 archy.nodes.push(next);
             }
         }
