@@ -5,6 +5,7 @@ use bsnext_dto::internal::TaskActionStage;
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::{Invocation, SpecId};
 use bsnext_task::task_trigger::{FsChangesTrigger, TaskTrigger, TaskTriggerSource};
+use bsnext_task::ContentId;
 
 #[derive(actix::Message, Debug)]
 #[rtype(result = "()")]
@@ -47,8 +48,8 @@ impl Handler<TriggerFsTaskEvent> for BsSystem {
         self.task_spec_mapping
             .insert(fs_ctx, msg.task_spec.to_owned());
 
-        let task_id = msg.task_spec.as_id(None);
-        let spec_id = SpecId::new(task_id);
+        let task_id = msg.task_spec.as_id();
+        let spec_id = SpecId::new(ContentId::new(task_id));
 
         let trigger_recipient = Box::new(scope).into_task_recipient();
         // let comms = self.task_comms();

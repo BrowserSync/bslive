@@ -1,3 +1,4 @@
+use crate::ContentId;
 use crate::as_actor::AsActor;
 use crate::invocation::Invocation;
 use actix::Recipient;
@@ -15,7 +16,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug)]
 pub struct TaskEntry {
     task: Box<dyn AsActor>,
-    id: u64,
+    id: ContentId,
 }
 
 impl Display for TaskEntry {
@@ -25,7 +26,7 @@ impl Display for TaskEntry {
 }
 
 impl TaskEntry {
-    pub fn new(t: Box<dyn AsActor>, id: u64) -> Self {
+    pub fn new(t: Box<dyn AsActor>, id: ContentId) -> Self {
         Self { id, task: t }
     }
 }
@@ -37,7 +38,7 @@ impl AsActor for TaskEntry {
 }
 
 impl TaskEntry {
-    pub fn id(&self) -> u64 {
+    pub fn id(&self) -> ContentId {
         self.id
     }
 }

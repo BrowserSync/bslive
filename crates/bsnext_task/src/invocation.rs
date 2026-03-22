@@ -1,3 +1,4 @@
+use crate::ContentId;
 use crate::invocation_result::InvocationResult;
 use crate::task_trigger::TaskTrigger;
 use std::fmt::{Debug, Display, Formatter};
@@ -25,19 +26,19 @@ impl Invocation {
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord)]
-pub struct SpecId(u64);
+pub struct SpecId(ContentId);
 
 impl SpecId {
-    pub fn new(id: u64) -> Self {
+    pub fn new(id: ContentId) -> Self {
         Self(id)
     }
     pub fn u64(&self) -> u64 {
-        self.0
+        self.0.inner
     }
 }
 
 impl Display for SpecId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InvocationId({})", self.0)
+        write!(f, "InvocationId({})", self.0.inner)
     }
 }

@@ -10,6 +10,7 @@ use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::{Invocation, SpecId};
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::TaskTrigger;
+use bsnext_task::ContentId;
 
 /// A struct representing a message to trigger a specific task in the system.
 /// This message will be handled by an actor in the Actix framework.
@@ -53,8 +54,8 @@ impl Handler<InvokeScope> for BsSystem {
     fn handle(&mut self, msg: InvokeScope, _ctx: &mut Self::Context) -> Self::Result {
         let task_trigger = msg.task_trigger;
         let task_spec = msg.task_spec;
-        let spec_id_raw = task_spec.as_id(None);
-        let spec_id = SpecId::new(spec_id_raw);
+        let spec_id_raw = task_spec.as_id();
+        let spec_id = SpecId::new(ContentId::new(spec_id_raw));
 
         let top_level_scope = Box::new(msg.task_scope).into_task_recipient();
         let done = msg.done;

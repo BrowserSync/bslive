@@ -1,3 +1,4 @@
+use crate::ContentId;
 use crate::invocation::SpecId;
 use crate::task_report::{ActualLen, ExitCode, ExpectedLen, TaskError, TaskOk, TaskReport};
 use std::collections::HashMap;
@@ -18,7 +19,7 @@ impl InvocationResult {
         Self {
             task_reports: vec![],
             conclusion: InvocationConclusion::Cancelled,
-            spec_id: SpecId::new(0),
+            spec_id: SpecId::new(ContentId::new(0)),
         }
     }
 }

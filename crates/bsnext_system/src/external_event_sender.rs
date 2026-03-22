@@ -7,6 +7,7 @@ use bsnext_task::invocation::Invocation;
 use bsnext_task::invocation::SpecId;
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_trigger::TaskTriggerSource;
+use bsnext_task::ContentId;
 
 pub struct ExternalEventSenderWithLogging {
     pub request: Recipient<RequestOutputChannel>,
@@ -66,7 +67,7 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
                     Err(e) => tracing::error!("{e}"),
                 };
             }
-            InvocationResult::ok(SpecId::new(0))
+            InvocationResult::ok(SpecId::new(ContentId::new(0)))
         })
     }
 }

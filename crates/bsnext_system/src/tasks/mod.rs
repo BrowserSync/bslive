@@ -1,13 +1,13 @@
 use crate::external_event_sender::ExternalEventSenderWithLogging;
 use crate::tasks::notify_servers::NotifyServersReady;
 use crate::tasks::sh_cmd::ShCmd;
-use crate::tasks::task_spec::TaskSpec;
+use crate::tasks::task_spec::{TaskSpec, TreeDisplay};
 use actix::{Actor, Recipient};
 use bs_live_task::BsLiveTask;
 use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::{OverlappingOpts, SequenceOpts};
+use bsnext_task::{ContentId, NodePath, OverlappingOpts, PathSegment, SequenceOpts};
 use comms::Comms;
 use into_recipient::IntoRecipient;
 use std::fmt::{Display, Formatter};
@@ -41,6 +41,36 @@ pub mod task_comms;
 pub mod task_spec;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+pub struct Node {
+    node: Runnable,
+    path: NodePath,
+}
+
+impl Node {
+    pub fn content_id(&self) -> ContentId {
+        self.node.content_id()
+    }
+    pub fn path(&self) -> &NodePath {
+        &self.path
+    }
+}
+
+impl TreeDisplay for Node {
+    fn as_tree_label(&self) -> String {
+        let p = &self.path;
+        let p2 = self.path.path_hash().sqid_short();
+        todo!("where to use path hash over raw path?");
+        todo!("Also, implement path for node only, not separately for node vs task spec");
+        let p = format!("[{p}]");
+        match &self.node {
+            Runnable::BsLiveTask(item) => format!("{p} {}{}", "Runnable::BsLiveTask", item),
+            Runnable::Sh(sh) => format!("{p} {} {}", "Runnable::Sh", sh),
+            Runnable::Spec(task_spec) => task_spec.as_tree_label(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum Runnable {
     BsLiveTask(BsLiveTask),
     Sh(ShCmd),
@@ -64,13 +94,13 @@ impl Display for Runnable {
 
 #[derive(Debug)]
 pub struct RunnableWithComms {
-    runnable: Runnable,
+    runnable: Node,
     ctx: Comms,
 }
 
 impl AsActor for RunnableWithComms {
     fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
-        match self.runnable {
+        match self.runnable.node {
             Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
                 let a = NotifyServersReady::new(self.ctx.capabilities.recipient());
                 let actor = a.start();
@@ -95,10 +125,10 @@ impl Runnable {
             Runnable::Spec(_) => true,
         }
     }
-    pub fn as_id(&self) -> u64 {
+    pub fn content_id(&self) -> ContentId {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
-        hasher.finish()
+        ContentId::new(hasher.finish())
     }
 }
 

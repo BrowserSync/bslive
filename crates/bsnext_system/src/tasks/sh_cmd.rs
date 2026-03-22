@@ -9,6 +9,7 @@ use bsnext_task::invocation::{Invocation, SpecId};
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_report::ExitCode;
 use bsnext_task::task_trigger::TaskTriggerSource;
+use bsnext_task::ContentId;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
@@ -319,7 +320,7 @@ async fn sh_cmd(
     let deadline = tokio::time::sleep(max_duration);
 
     tokio::pin!(deadline);
-    let invocation_id = 0;
+    let invocation_id = ContentId::new(0);
 
     let result: InvocationResult = tokio::select! {
         _ = &mut deadline => {

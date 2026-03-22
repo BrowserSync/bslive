@@ -1,3 +1,6 @@
+use std::fmt::{Display, Formatter};
+use std::hash::{DefaultHasher, Hash, Hasher};
+
 pub mod as_actor;
 pub mod invocation;
 pub mod invocation_result;
@@ -67,6 +70,95 @@ impl Default for SequenceOpts {
 impl SequenceOpts {
     pub fn new(exit_on_failure: bool) -> Self {
         Self { exit_on_failure }
+    }
+}
+
+#[derive(Eq, PartialEq, PartialOrd, Ord, Hash, Debug, Clone, Default)]
+pub struct NodePath {
+    inner: Vec<PathSegment>,
+}
+
+impl Display for NodePath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.inner
+                .iter()
+                .map(|s| match s {
+                    PathSegment::Content(c) => sqid_short(c.id()),
+                    PathSegment::Index(index) => index.id().to_string(),
+                })
+                .collect::<Vec<String>>()
+                .join(".")
+        )
+    }
+}
+
+impl NodePath {
+    pub fn new() -> Self {
+        Self { inner: Vec::new() }
+    }
+    pub fn append(&mut self, segment: PathSegment) {
+        self.inner.push(segment);
+    }
+    pub fn segments(&self) -> &[PathSegment] {
+        &self.inner
+    }
+    pub fn path_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.inner.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+
+#[derive(Eq, PartialEq, PartialOrd, Ord, Hash, Debug, Copy, Clone)]
+pub enum PathSegment {
+    Content(ContentId),
+    Index(IndexId),
+}
+
+impl Display for PathSegment {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            PathSegment::Content(c) => sqid_short(c.id()),
+            PathSegment::Index(i) => sqid_short(i.id()),
+        };
+        write!(f, "{string}")
+    }
+}
+
+#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Debug, Copy, Clone)]
+pub struct ContentId {
+    inner: u64,
+}
+
+impl ContentId {
+    pub fn new(id: u64) -> Self {
+        Self { inner: id }
+    }
+}
+
+impl ContentId {
+    pub fn id(&self) -> u64 {
+        self.inner
+    }
+}
+
+#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Debug, Copy, Clone)]
+pub struct IndexId {
+    inner: u64,
+}
+
+impl IndexId {
+    pub fn new(id: u64) -> Self {
+        Self { inner: id }
+    }
+}
+
+impl IndexId {
+    pub fn id(&self) -> u64 {
+        self.inner
     }
 }
 
