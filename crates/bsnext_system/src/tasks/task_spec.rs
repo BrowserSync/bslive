@@ -5,6 +5,7 @@ use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
 use bsnext_input::route::RunOptItem;
+use bsnext_input::when_guard::JsonGuard::Path;
 use bsnext_task::invocation::SpecId;
 use bsnext_task::task_entry::TaskEntry;
 use bsnext_task::task_report::TaskReport;
@@ -34,21 +35,6 @@ pub struct TaskSpec {
     run_kind: RunKind,
     tasks: Vec<Node>,
     path: NodePath,
-}
-
-impl TreeDisplay for TaskSpec {
-    fn as_tree_label(&self) -> String {
-        let p = &self.path();
-        let f = format!("[{p}]");
-        match &self.run_kind {
-            RunKind::Sequence { .. } => format!("{f} Seq: {} task(s)", self.tasks.len()),
-            RunKind::Overlapping { opts } => format!(
-                "{f} Overlapping {} task(s) (max concurrency: {})",
-                self.tasks.len(),
-                opts.max_concurrent_items
-            ),
-        }
-    }
 }
 
 impl TaskSpec {
@@ -106,7 +92,8 @@ impl TaskSpec {
             tasks: nodes,
             path: Default::default(),
         };
-        item.annotate(Default::default());
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
         item
     }
     pub fn seq_from(run_items: &[RunOptItem]) -> Self {
@@ -126,7 +113,8 @@ impl TaskSpec {
             tasks: nodes,
             path: Default::default(),
         };
-        item.annotate(Default::default());
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
         item
     }
     pub fn all_from(run_items: &[RunOptItem]) -> Self {
@@ -155,16 +143,12 @@ impl TaskSpec {
 
     fn annotate(&mut self, mut path: NodePath) {
         let mut index = 0;
-        let cid = self.as_id();
-
-        path.append(PathSegment::Content(ContentId::new(cid)));
         self.path = path.clone();
 
         for runnable in &mut self.tasks {
             let mut next_path = path.clone();
             next_path.append(PathSegment::Index(IndexId::new(index as u64)));
 
-            // let cid = runnable.content_id();
             match runnable.node {
                 Runnable::BsLiveTask(_) => {
                     next_path.append(PathSegment::Content(runnable.content_id()));
@@ -175,6 +159,7 @@ impl TaskSpec {
                     runnable.path = next_path;
                 }
                 Runnable::Spec(ref mut spec) => {
+                    next_path.append(PathSegment::Content(ContentId::new(spec.as_id())));
                     runnable.path = next_path.clone();
                     spec.annotate(next_path);
                 }
@@ -187,19 +172,13 @@ impl TaskSpec {
 
 impl TaskSpec {
     pub fn as_tree(&self) -> ArchyNode {
-        // let mut path = NodePath::default();
-        // // path.append(PathSegment::Content(ContentId::new(self.as_id())));
-        // // let label = self.as_tree_label();
         let empty = HashMap::default();
         let label = self.as_tree_label();
-        // let p = &self.parent;
         let mut first = ArchyNode::new(&label);
         append_with_reports(&mut first, &self.tasks, &empty);
         first
     }
     pub fn as_tree_with_results(&self, hm: &HashMap<SpecId, TaskReport>) -> ArchyNode {
-        let mut path = NodePath::default();
-        path.append(PathSegment::Content(ContentId::new(self.as_id())));
         let spec_id = SpecId::new(ContentId::new(self.as_id()));
         let r = hm.get(&spec_id);
         let label = match r {
@@ -214,6 +193,13 @@ impl TaskSpec {
 
 pub trait TreeDisplay {
     fn as_tree_label(&self) -> String;
+}
+
+impl TreeDisplay for TaskSpec {
+    fn as_tree_label(&self) -> String {
+        let p = &self.path;
+        format!("{p}")
+    }
 }
 
 impl TaskSpec {
@@ -260,32 +246,7 @@ pub fn append_with_reports(
     hm: &HashMap<SpecId, TaskReport>,
 ) {
     for (index_position, node) in tasks.iter().enumerate() {
-        // todo!("debug why none of the parent paths are populated.");
-        // dbg!(&runnable);
-        // println!("runnanle {runnable:#?}");
-        let l = node.as_tree_label();
-        let path = &node.path();
-        println!("path  =  {path}");
-
-        // let mut next_path = path.clone();
-        // next_path.append(PathSegment::Index(IndexId::new(index_position as u64)));
-        //
-        // let cid = runnable.content_id();
-        // next_path.append(PathSegment::Content(cid));
-        //
-        // let mut iid = DefaultHasher::new();
-        // next_path.hash(&mut iid);
-        // let iid = iid.finish();
-        //
-        // let p = runnable.path();
-        // let p = format!("[{p}]");
-        let raw_label = match node.node {
-            Runnable::BsLiveTask(_) => format!("{}", node.as_tree_label()),
-            Runnable::Sh(_) => format!("{}", node.as_tree_label()),
-            Runnable::Spec(_) => format!("{}", node.as_tree_label()),
-        };
-        //
-        // // dbg!(id);
+        let raw_label = node.as_tree_label();
         match &node.node {
             Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&raw_label)),

@@ -58,15 +58,8 @@ impl Node {
 impl TreeDisplay for Node {
     fn as_tree_label(&self) -> String {
         let p = &self.path;
-        let p2 = self.path.path_hash().sqid_short();
-        todo!("where to use path hash over raw path?");
-        todo!("Also, implement path for node only, not separately for node vs task spec");
-        let p = format!("[{p}]");
-        match &self.node {
-            Runnable::BsLiveTask(item) => format!("{p} {}{}", "Runnable::BsLiveTask", item),
-            Runnable::Sh(sh) => format!("{p} {} {}", "Runnable::Sh", sh),
-            Runnable::Spec(task_spec) => task_spec.as_tree_label(),
-        }
+        let p = format!("{p}");
+        p
     }
 }
 

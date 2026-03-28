@@ -82,6 +82,7 @@ impl Handler<Invocation> for TaskScopeRunner {
                     for (index, task_entry) in tasks.into_iter().enumerate() {
                         let raw_id = task_entry.id();
                         let child_spec_id = SpecId::new(raw_id);
+
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
                         let one_task = Invocation::new(child_spec_id, trigger.clone());
                         println!("executing {raw_id:?}");

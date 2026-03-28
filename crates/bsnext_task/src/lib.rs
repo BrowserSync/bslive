@@ -96,9 +96,6 @@ impl Display for NodePath {
 }
 
 impl NodePath {
-    pub fn new() -> Self {
-        Self { inner: Vec::new() }
-    }
     pub fn append(&mut self, segment: PathSegment) {
         self.inner.push(segment);
     }
@@ -109,6 +106,11 @@ impl NodePath {
         let mut hasher = DefaultHasher::new();
         self.inner.hash(&mut hasher);
         hasher.finish()
+    }
+    pub fn root_for(cid: ContentId) -> Self {
+        let mut node_path = Self::default();
+        node_path.append(PathSegment::Content(cid));
+        node_path
     }
 }
 
