@@ -25,7 +25,7 @@ impl Handler<Invocation> for NotifyServersReady {
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
         tracing::debug!("NotifyServersReady::TaskCommand");
         let addr = self.addr.clone();
-        let spec_id = invocation.spec_id().to_owned();
+        let spec_id = invocation.path().to_owned();
         let source = invocation.trigger().source();
         Box::pin({
             let source = source.clone();

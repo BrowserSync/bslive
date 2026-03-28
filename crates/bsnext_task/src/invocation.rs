@@ -1,12 +1,12 @@
-use crate::ContentId;
+use crate::NodePath;
 use crate::invocation_result::InvocationResult;
 use crate::task_trigger::TaskTrigger;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::Debug;
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "InvocationResult")]
 pub struct Invocation {
-    spec_id: SpecId,
+    node_path: NodePath,
     trigger: TaskTrigger,
 }
 
@@ -14,31 +14,16 @@ impl Invocation {
     pub fn trigger(&self) -> &TaskTrigger {
         &self.trigger
     }
-    pub fn spec_id(&self) -> &SpecId {
-        &self.spec_id
+    pub fn path(&self) -> &NodePath {
+        &self.node_path
     }
 }
 
 impl Invocation {
-    pub fn new(spec_id: SpecId, trigger: TaskTrigger) -> Self {
-        Self { spec_id, trigger }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord)]
-pub struct SpecId(ContentId);
-
-impl SpecId {
-    pub fn new(id: ContentId) -> Self {
-        Self(id)
-    }
-    pub fn u64(&self) -> u64 {
-        self.0.inner
-    }
-}
-
-impl Display for SpecId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InvocationId({})", self.0.inner)
+    pub fn new(node_path: &NodePath, trigger: TaskTrigger) -> Self {
+        Self {
+            node_path: node_path.to_owned(),
+            trigger,
+        }
     }
 }

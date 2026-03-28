@@ -5,8 +5,6 @@ use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
 use bsnext_input::route::RunOptItem;
-use bsnext_input::when_guard::JsonGuard::Path;
-use bsnext_task::invocation::SpecId;
 use bsnext_task::task_entry::TaskEntry;
 use bsnext_task::task_report::TaskReport;
 use bsnext_task::task_scope::TaskScope;
@@ -178,9 +176,9 @@ impl TaskSpec {
         append_with_reports(&mut first, &self.tasks, &empty);
         first
     }
-    pub fn as_tree_with_results(&self, hm: &HashMap<SpecId, TaskReport>) -> ArchyNode {
-        let spec_id = SpecId::new(ContentId::new(self.as_id()));
-        let r = hm.get(&spec_id);
+    pub fn as_tree_with_results(&self, hm: &HashMap<NodePath, TaskReport>) -> ArchyNode {
+        let node_path = self.path().to_owned();
+        let r = hm.get(&node_path);
         let label = match r {
             None => "missing".to_string(),
             Some(_) => self.as_tree_label(),
@@ -216,9 +214,10 @@ impl TaskSpec {
 
             match runnable.node {
                 Runnable::Spec(task_spec) => {
+                    let path = task_spec.path().to_owned();
                     let as_scope =
                         task_spec.to_task_scope(servers_addr.clone(), capabilities_addr.clone());
-                    tasks.push(TaskEntry::new(Box::new(as_scope), item_id))
+                    tasks.push(TaskEntry::new(Box::new(as_scope), item_id, path))
                 }
                 _ => {
                     let with_ctx = RunnableWithComms {
@@ -228,7 +227,8 @@ impl TaskSpec {
                         },
                         runnable,
                     };
-                    tasks.push(TaskEntry::new(Box::new(with_ctx), item_id))
+                    let path = self.path.to_owned();
+                    tasks.push(TaskEntry::new(Box::new(with_ctx), item_id, path))
                 }
             }
         }
@@ -243,7 +243,7 @@ impl TaskSpec {
 pub fn append_with_reports(
     archy: &mut ArchyNode,
     tasks: &[Node],
-    hm: &HashMap<SpecId, TaskReport>,
+    hm: &HashMap<NodePath, TaskReport>,
 ) {
     for (index_position, node) in tasks.iter().enumerate() {
         let raw_label = node.as_tree_label();

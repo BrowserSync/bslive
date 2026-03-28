@@ -7,7 +7,7 @@ use actix::ResponseActFuture;
 use actix::WrapFuture;
 use bsnext_dto::internal::{TaskActionStage, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
-use bsnext_task::invocation::{Invocation, SpecId};
+use bsnext_task::invocation::Invocation;
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::task_trigger::TaskTrigger;
 use bsnext_task::ContentId;
@@ -54,14 +54,13 @@ impl Handler<InvokeScope> for BsSystem {
     fn handle(&mut self, msg: InvokeScope, _ctx: &mut Self::Context) -> Self::Result {
         let task_trigger = msg.task_trigger;
         let task_spec = msg.task_spec;
-        let spec_id_raw = task_spec.as_id();
-        let spec_id = SpecId::new(ContentId::new(spec_id_raw));
+        let path = task_spec.path().to_owned();
 
         let top_level_scope = Box::new(msg.task_scope).into_task_recipient();
         let done = msg.done;
         let comms = msg.comms.clone();
         let tree = task_spec.as_tree();
-        let invocation = Invocation::new(spec_id, task_trigger);
+        let invocation = Invocation::new(&path, task_trigger);
         let with_start = async move {
             let _sent = comms
                 .any_event_sender
@@ -73,7 +72,7 @@ impl Handler<InvokeScope> for BsSystem {
             .into_actor(self)
             .map(move |resp, actor, _ctx| match resp {
                 Ok(result) => {
-                    let (report, report_map) = result.to_report_and_map(spec_id);
+                    let (report, report_map) = result.to_report_and_map(path);
                     let tree = task_spec.as_tree_with_results(&report_map);
                     let report_and_tree = TaskReportAndTree {
                         report: report.clone(),

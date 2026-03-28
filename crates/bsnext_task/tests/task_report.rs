@@ -7,7 +7,7 @@ fn add() {
     let task_report = TaskReport {
         result: InvocationResult {
             conclusion: InvocationConclusion::Ok(TaskOk),
-            spec_id: SpecId::new(0),
+            node_path: SpecId::new(0),
             task_reports: vec![],
         },
         spec_id: SpecId::new(0),
@@ -15,7 +15,7 @@ fn add() {
     let invocation_result = InvocationResult {
         conclusion: InvocationConclusion::Ok(TaskOk),
         task_reports: vec![task_report],
-        spec_id: SpecId::new(0),
+        node_path: SpecId::new(0),
     };
     assert!(invocation_result.is_ok());
 }

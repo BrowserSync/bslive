@@ -1,6 +1,5 @@
-use crate::ContentId;
-use crate::invocation::SpecId;
 use crate::task_report::{ActualLen, ExitCode, ExpectedLen, TaskError, TaskOk, TaskReport};
+use crate::{ContentId, NodePath};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
@@ -9,17 +8,18 @@ pub struct InvocationResult {
     #[allow(dead_code)]
     pub conclusion: InvocationConclusion,
     #[allow(dead_code)]
-    pub spec_id: SpecId,
+    pub node_path: NodePath,
     #[allow(dead_code)]
     pub task_reports: Vec<TaskReport>,
 }
 
 impl InvocationResult {
     pub fn cancelled() -> Self {
+        let p = NodePath::root_for(ContentId::new(0));
         Self {
             task_reports: vec![],
             conclusion: InvocationConclusion::Cancelled,
-            spec_id: SpecId::new(ContentId::new(0)),
+            node_path: p,
         }
     }
 }
@@ -35,72 +35,83 @@ impl Display for InvocationResult {
 }
 
 impl InvocationResult {
-    pub fn ok(id: SpecId) -> Self {
+    pub fn ok(node_path: NodePath) -> Self {
         Self {
             conclusion: InvocationConclusion::Ok(TaskOk),
-            spec_id: id,
+            node_path,
             task_reports: vec![],
         }
     }
     pub fn is_ok(&self) -> bool {
         matches!(self.conclusion, InvocationConclusion::Ok(..))
     }
-    pub fn err_code(id: SpecId, code: ExitCode) -> Self {
+    pub fn err_code(node_path: NodePath, code: ExitCode) -> Self {
         Self {
             conclusion: InvocationConclusion::Err(TaskError::FailedCode { code }),
-            spec_id: id,
+            node_path,
             task_reports: vec![],
         }
     }
-    pub fn err_message(id: SpecId, message: &str) -> Self {
+    pub fn err_message(node_path: NodePath, message: &str) -> Self {
         Self {
             conclusion: InvocationConclusion::Err(TaskError::FailedMsg(message.to_string())),
-            spec_id: id,
+            node_path,
             task_reports: vec![],
         }
     }
-    pub fn timeout(id: SpecId) -> Self {
+    pub fn timeout(node_path: NodePath) -> Self {
         Self {
             conclusion: InvocationConclusion::Err(TaskError::FailedTimeout),
-            spec_id: id,
+            node_path,
             task_reports: vec![],
         }
     }
-    pub fn ok_tasks(id: SpecId, tasks: Vec<TaskReport>) -> Self {
+    pub fn ok_tasks(node_path: NodePath, tasks: Vec<TaskReport>) -> Self {
         Self {
             conclusion: InvocationConclusion::Ok(TaskOk),
-            spec_id: id,
+            node_path,
             task_reports: tasks,
         }
     }
-    pub fn err_tasks(id: SpecId, failed_only: Vec<TaskReport>, results: Vec<TaskReport>) -> Self {
+    pub fn err_tasks(
+        node_path: NodePath,
+        failed_only: Vec<TaskReport>,
+        results: Vec<TaskReport>,
+    ) -> Self {
         Self {
             conclusion: InvocationConclusion::Err(TaskError::GroupFailed {
                 failed_tasks: failed_only.clone(),
             }),
-            spec_id: id,
+            node_path,
             task_reports: results,
         }
     }
-    pub fn err_partial_tasks(id: SpecId, tasks: Vec<TaskReport>, expected: ExpectedLen) -> Self {
+    pub fn err_partial_tasks(
+        node_path: NodePath,
+        tasks: Vec<TaskReport>,
+        expected: ExpectedLen,
+    ) -> Self {
         Self {
             conclusion: InvocationConclusion::Err(TaskError::GroupPartial {
                 actual: ActualLen(tasks.len()),
                 expected,
                 failed_tasks: tasks.clone(),
             }),
-            spec_id: id,
+            node_path,
             task_reports: tasks,
         }
     }
-    pub fn to_report(self, id: SpecId) -> TaskReport {
+    pub fn to_report(self, node_path: NodePath) -> TaskReport {
         TaskReport {
-            spec_id: id,
+            node_path,
             result: self,
         }
     }
-    pub fn to_report_and_map(self, id: SpecId) -> (TaskReport, HashMap<SpecId, TaskReport>) {
-        let report = self.to_report(id);
+    pub fn to_report_and_map(
+        self,
+        node_path: NodePath,
+    ) -> (TaskReport, HashMap<NodePath, TaskReport>) {
+        let report = self.to_report(node_path);
         let mut report_map = HashMap::new();
         every_report(&mut report_map, &report);
         (report, report_map)
@@ -110,8 +121,8 @@ impl InvocationResult {
     }
 }
 
-pub fn every_report(hm: &mut HashMap<SpecId, TaskReport>, report: &TaskReport) {
-    hm.insert(report.spec_id(), report.clone());
+pub fn every_report(hm: &mut HashMap<NodePath, TaskReport>, report: &TaskReport) {
+    hm.insert(report.node_path(), report.clone());
     for inner in &report.result().task_reports {
         every_report(hm, inner)
     }

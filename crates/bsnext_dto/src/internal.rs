@@ -6,9 +6,9 @@ use crate::external_events::{
 use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
-use bsnext_task::invocation::SpecId;
 use bsnext_task::invocation_result::{InvocationConclusion, InvocationResult};
 use bsnext_task::task_report::TaskReport;
+use bsnext_task::NodePath;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
@@ -37,7 +37,7 @@ pub enum InternalEvents {
 pub struct TaskReportAndTree {
     pub report: TaskReport,
     pub tree: ArchyNode,
-    pub report_map: HashMap<SpecId, TaskReport>,
+    pub report_map: HashMap<NodePath, TaskReport>,
 }
 
 #[derive(Debug, Clone)]
@@ -86,7 +86,7 @@ impl From<TaskReport> for TaskReportDTO {
 impl From<InvocationResult> for TaskResultDTO {
     fn from(value: InvocationResult) -> Self {
         TaskResultDTO {
-            invocation_id: InvocationIdDTO(value.spec_id.u64().to_string()),
+            invocation_id: InvocationIdDTO(value.node_path.to_string()),
             conclusion: match value.conclusion {
                 InvocationConclusion::Ok(_) => TaskConclusionDTO::Ok,
                 InvocationConclusion::Err(e) => TaskConclusionDTO::Err(e.to_string()),

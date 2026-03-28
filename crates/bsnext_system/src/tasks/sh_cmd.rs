@@ -5,11 +5,11 @@ use actix::{Actor, Addr, Recipient, ResponseFuture};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_input::route::{PrefixOpt, ShRunOptItem};
-use bsnext_task::invocation::{Invocation, SpecId};
+use bsnext_task::invocation::Invocation;
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_report::ExitCode;
 use bsnext_task::task_trigger::TaskTriggerSource;
-use bsnext_task::ContentId;
+use bsnext_task::{ContentId, NodePath};
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
@@ -184,7 +184,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         self.cmd.id = Some(sqid.to_owned());
         let cmd = self.cmd.sh.clone();
         let trigger = invocation.trigger().to_owned();
-        let spec_id = invocation.spec_id().to_owned();
+        let spec_id = invocation.path().to_owned();
         let cmd = cmd.to_os_string();
         tracing::info!("Will run... {:?}", cmd);
         // let any_event_sender = comms.any_event_sender.clone();
@@ -231,7 +231,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
 #[tracing::instrument]
 async fn sh_cmd(
     addr: Recipient<RequestOutputChannel>,
-    id: SpecId,
+    node_path: NodePath,
     sqid: String,
     cmd: OsString,
     reason: String,
@@ -325,20 +325,20 @@ async fn sh_cmd(
     let result: InvocationResult = tokio::select! {
         _ = &mut deadline => {
             tracing::info!("⌛️ operation timed out");
-            InvocationResult::timeout(SpecId::new(invocation_id))
+            InvocationResult::timeout(node_path)
         }
         out = child.wait() => {
             tracing::info!("child waited");
             match out {
                 Ok(exit) => match exit.code() {
-                   Some(0) => InvocationResult::ok(SpecId::new(invocation_id)),
+                   Some(0) => InvocationResult::ok(node_path),
                    Some(code) => {
                         tracing::debug!("did exit with code {}", code);
-                        InvocationResult::err_code(SpecId::new(invocation_id), ExitCode(code))
+                        InvocationResult::err_code(node_path, ExitCode(code))
                     },
-                   None => InvocationResult::err_message(SpecId::new(invocation_id), "unknown error!")
+                   None => InvocationResult::err_message(node_path, "unknown error!")
                 },
-                Err(err) => InvocationResult::err_message(SpecId::new(invocation_id), &err.to_string())
+                Err(err) => InvocationResult::err_message(node_path, &err.to_string())
             }
         }
     };
