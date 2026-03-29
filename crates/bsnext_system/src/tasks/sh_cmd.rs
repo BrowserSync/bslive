@@ -29,7 +29,7 @@ pub struct ShCmd {
     name: Option<String>,
     output: ShCmdOutput,
     timeout: ShDuration,
-    id: Option<String>,
+    id: Option<NodePath>,
 }
 
 struct ShCmdWithLogging {
@@ -100,11 +100,11 @@ impl ShCmd {
         self.name.as_ref().map(ToOwned::to_owned)
     }
 
-    pub fn prefix(&self, sqid: String) -> Option<String> {
+    pub fn prefix(&self, node_path: &NodePath) -> Option<String> {
         match &self.output {
             ShCmdOutput::None => None,
             ShCmdOutput::DefaultNamed => match &self.name {
-                None => Some(format!("[{}]", sqid.get(0..6).unwrap_or(&sqid))),
+                None => Some(format!("[{node_path}]")),
                 Some(sn_name) => Some(sn_name.clone()),
             },
             ShCmdOutput::CustomNamed(name) => Some(name.clone()),
@@ -159,19 +159,11 @@ impl actix::Actor for ShCmdWithLogging {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!(
-            sqid = self.cmd.id,
-            actor.name = "ShCmd",
-            actor.lifecyle = "started"
-        );
+        tracing::trace!(actor.name = "ShCmd", actor.lifecyle = "started");
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::trace!(
-            sqid = self.cmd.id,
-            actor.name = "ShCmd",
-            actor.lifecyle = "stopped"
-        );
+        tracing::trace!(actor.name = "ShCmd", actor.lifecyle = "stopped");
     }
 }
 
@@ -180,8 +172,8 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
 
     #[tracing::instrument(skip_all, name = "sh_cmd::invocation")]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        let sqid = "invoke-sqid";
-        self.cmd.id = Some(sqid.to_owned());
+        let path = invocation.path().to_owned();
+        self.cmd.id = Some(path.clone());
         let cmd = self.cmd.sh.clone();
         let trigger = invocation.trigger().to_owned();
         let node_path = invocation.path().to_owned();
@@ -207,7 +199,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
             TaskTriggerSource::Exec(..) => "NONE".to_string(),
         };
 
-        let sh_prefix = Arc::new(self.cmd.prefix(sqid.to_owned()));
+        let sh_prefix = Arc::new(self.cmd.prefix(&path));
         let sh_prefix_2 = sh_prefix.clone();
         let max_duration = self.cmd.timeout.duration().to_owned();
         let addr = self.request_sender.clone();
@@ -215,7 +207,6 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         let fut = sh_cmd(
             addr,
             node_path,
-            sqid.to_owned(),
             cmd,
             reason,
             files,
@@ -233,7 +224,6 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
 async fn sh_cmd(
     addr: Recipient<RequestOutputChannel>,
     node_path: NodePath,
-    sqid: String,
     cmd: OsString,
     reason: String,
     files: String,
@@ -321,7 +311,6 @@ async fn sh_cmd(
     let deadline = tokio::time::sleep(max_duration);
 
     tokio::pin!(deadline);
-    let invocation_id = ContentId::new(0);
 
     let result: InvocationResult = tokio::select! {
         _ = &mut deadline => {

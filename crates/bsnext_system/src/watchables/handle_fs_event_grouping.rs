@@ -1,3 +1,4 @@
+use crate::fs_task_tracker::TriggerFsTask;
 use crate::input_fs::from_input_path;
 use crate::override_input::OverrideInput;
 use crate::system::BsSystem;
@@ -5,7 +6,6 @@ use crate::tasks::bs_live_task::BsLiveTask;
 use crate::tasks::task_comms::TaskComms;
 use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
-use crate::trigger_fs_task::TriggerFsTaskEvent;
 use crate::watchables::path_monitor::PathMonitorMeta;
 use crate::watchables::path_watchable::PathWatchable;
 use actix::{Addr, AsyncContext};
@@ -33,7 +33,8 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
             FsEventGrouping::BufferedChange(buff) => {
                 if let Some((task_trigger, task_spec)) = self.handle_buffered(buff) {
                     tracing::debug!("will trigger task runner");
-                    ctx.notify(TriggerFsTaskEvent::new(task_spec, task_trigger));
+                    self.fs_task_tracker
+                        .do_send(TriggerFsTask::new(task_spec, task_trigger));
                 }
                 None
             }

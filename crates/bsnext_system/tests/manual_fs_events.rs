@@ -36,7 +36,7 @@ servers:
 
     let cwd = PathBuf::from(tmp_dir.path());
 
-    let (events_sender, events_receiver) = mpsc::channel::<AnyEvent>(1);
+    let (events_sender, events_receiver) = mpsc::channel::<AnyEvent>(2);
     let start = StartCommand {
         cors: false,
         port: None,

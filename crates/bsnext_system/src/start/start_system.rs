@@ -131,7 +131,7 @@ impl Handler<Start> for BsSystem {
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
                         Ok(RunOk { .. }) => Ok(DidStart::WillExit),
-                        Err(err) => Err(StartupError::Any(err.into())),
+                        Err(err) => Err(StartupError::Any(err)),
                     },
                 ))
             }
@@ -147,7 +147,7 @@ impl Handler<Start> for BsSystem {
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<RunDryOk, anyhow::Error>, _actor, _ctx| match res {
                         Ok(RunDryOk) => Ok(DidStart::WillExit),
-                        Err(err) => Err(StartupError::Any(err.into())),
+                        Err(err) => Err(StartupError::Any(err)),
                     },
                 ))
             }

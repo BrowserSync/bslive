@@ -6,7 +6,6 @@ use bsnext_dto::internal::AnyEvent;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_trigger::TaskTriggerSource;
-use bsnext_task::ContentId;
 
 pub struct ExternalEventSenderWithLogging {
     pub request: Recipient<RequestOutputChannel>,

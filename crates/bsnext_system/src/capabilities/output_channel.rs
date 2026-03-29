@@ -12,6 +12,12 @@ pub struct OutputChannel {
 #[rtype(result = "Result<OutputChannel, anyhow::Error>")]
 pub struct RequestOutputChannel;
 
+impl Default for RequestOutputChannel {
+    fn default() -> Self {
+        RequestOutputChannel::new()
+    }
+}
+
 impl RequestOutputChannel {
     pub fn new() -> Self {
         Self

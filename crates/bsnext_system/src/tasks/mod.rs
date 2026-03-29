@@ -7,29 +7,11 @@ use bs_live_task::BsLiveTask;
 use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::{ContentId, NodePath, OverlappingOpts, PathSegment, SequenceOpts};
+use bsnext_task::{ContentId, NodePath, OverlappingOpts, SequenceOpts};
 use comms::Comms;
 use into_recipient::IntoRecipient;
 use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
-
-trait Sqid {
-    fn sqid(&self) -> String;
-    fn sqid_short(&self) -> String;
-}
-
-impl Sqid for u64 {
-    fn sqid(&self) -> String {
-        let sqids = sqids::Sqids::default();
-        sqids.encode(&[*self]).unwrap_or_else(|_| self.to_string())
-    }
-
-    fn sqid_short(&self) -> String {
-        let sqids = sqids::Sqids::default();
-        let sqid = sqids.encode(&[*self]).unwrap();
-        sqid.get(0..6).unwrap_or(&sqid).to_string()
-    }
-}
 
 pub mod bs_live_task;
 pub mod comms;
@@ -73,13 +55,13 @@ pub enum Runnable {
 impl Display for Runnable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Runnable::BsLiveTask(_) => write!(f, "{}", "Runnable::BsLiveTask"),
-            Runnable::Sh(_) => write!(f, "{}", "Runnable::Sh"),
+            Runnable::BsLiveTask(_) => write!(f, "Runnable::BsLiveTask"),
+            Runnable::Sh(_) => write!(f, "Runnable::Sh"),
             Runnable::Spec(spec) if spec.is_seq() => {
-                write!(f, "{}", "Runnable::Spec (seq)")
+                write!(f, "Runnable::Spec (seq)")
             }
-            Runnable::Spec(spec) => {
-                write!(f, "{}", "Runnable::Spec (all)")
+            Runnable::Spec(_spec) => {
+                write!(f, "Runnable::Spec (all)")
             }
         }
     }

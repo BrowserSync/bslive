@@ -17,12 +17,14 @@ use tracing_subscriber::util::SubscriberInitExt;
     Eq,
     PartialOrd,
     Ord,
+    Default,
     clap::ValueEnum,
     serde::Serialize,
     serde::Deserialize,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
+    #[default]
     Info,
     Debug,
     Trace,
@@ -37,12 +39,6 @@ impl Display for LogLevel {
             LogLevel::Trace => write!(f, "trace"),
             LogLevel::Error => write!(f, "error"),
         }
-    }
-}
-
-impl Default for LogLevel {
-    fn default() -> Self {
-        Self::Info
     }
 }
 
@@ -107,7 +103,7 @@ pub fn init_tracing(
     let (filter, fmt_layer) =
         raw_tracing::create_filter_and_fmt(&level, format, write_option, line_opts);
 
-    let _registry = tracing_subscriber::registry()
+    tracing_subscriber::registry()
         .with(filter)
         .with(fmt_layer)
         .init();

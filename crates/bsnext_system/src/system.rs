@@ -1,5 +1,6 @@
 use crate::capabilities::Capabilities;
-use crate::invoke_scope::InvokeScope;
+use crate::fs_task_tracker::FsTaskTracker;
+use crate::invoke_scope::{InvokeScope, Invoker};
 use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
 use crate::servers::ResolveServers;
 use crate::tasks::resolve::ResolveInitialTasks;
@@ -14,7 +15,6 @@ use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::external_events::ExternalEventsDTO::{TaskTreePreview, TaskTreeSummary};
 use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
 use bsnext_dto::GetActiveServersResponse;
-use bsnext_fs::FsEventContext;
 use bsnext_input::startup::{StartupContext, TopLevelRunMode};
 use bsnext_input::Input;
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
@@ -32,7 +32,8 @@ pub struct BsSystem {
     any_event_sender: Sender<AnyEvent>,
     pub(crate) input_monitors: Option<InputMonitor>,
     pub(crate) any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
-    pub(crate) task_spec_mapping: HashMap<FsEventContext, TaskSpec>,
+    pub(crate) fs_task_tracker: Addr<FsTaskTracker>,
+    pub(crate) invoker_addr: Addr<Invoker>,
     pub(crate) cwd: PathBuf,
     pub(crate) start_context: StartupContext,
 }
@@ -75,15 +76,24 @@ impl BsSystem {
         let servers = ServersSupervisor::new(tx);
         let servers_addr = servers.start();
         let capabilities = Capabilities::new(any_event_sender.clone(), servers_addr.clone());
+        let capabilities_addr = capabilities.start();
         let start_context = StartupContext::from_cwd(Some(&cwd));
+        let invoker = Invoker::new(
+            capabilities_addr.clone(),
+            servers_addr.clone(),
+            any_event_sender.clone(),
+        );
+        let invoker_addr = invoker.start();
+        let fs_task_tracker = FsTaskTracker::new(invoker_addr.clone().recipient()).start();
         BsSystem {
             self_addr: None,
-            capabilities_addr: capabilities.start(),
+            capabilities_addr,
             servers_addr,
             any_event_sender,
             input_monitors: None,
             any_monitors: Default::default(),
-            task_spec_mapping: Default::default(),
+            invoker_addr,
+            fs_task_tracker,
             cwd,
             start_context,
         }
@@ -105,21 +115,17 @@ impl BsSystem {
 
     pub(crate) fn before(&mut self, input: &Input) -> TaskSpec {
         let all = input.before_run_opts();
-        let task_spec = TaskSpec::seq_from(&all);
-        task_spec
+        TaskSpec::seq_from(&all)
     }
 
     pub(crate) fn spec_to_invoke_scope(
         &mut self,
-        addr: Addr<Capabilities>,
         spec: TaskSpec,
     ) -> (InvokeScope, Receiver<TaskReportAndTree>) {
-        let comms = self.task_comms();
         let trigger = TaskTrigger::new(TaskTriggerSource::Exec(ExecTrigger));
 
-        let task_scope = spec.clone().to_task_scope(self.servers_addr.clone(), addr);
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
-        (InvokeScope::new(task_scope, trigger, spec, comms, tx), rx)
+        (InvokeScope::new(trigger, spec, tx), rx)
     }
 }
 
@@ -145,6 +151,7 @@ impl actix::Handler<ExternalEventMsg> for BsSystem {
 pub async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupOk> {
     let clone = input.clone();
     let clone2 = input.clone();
+
     let spec = addr.send(ResolveInitialTasks::new(clone)).await??;
     let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
     let (servers, child_results) = addr.send(ResolveServers::new(clone2)).await??;
@@ -170,14 +177,13 @@ pub async fn run_jobs(
     let tree = spec.as_tree();
 
     if preview {
-        let _preview = addr
-            .send(ExternalEventMsg {
-                evt: TaskTreePreview {
-                    tree: tree.clone(),
-                    will_exec: true,
-                },
-            })
-            .await??;
+        addr.send(ExternalEventMsg {
+            evt: TaskTreePreview {
+                tree: tree.clone(),
+                will_exec: true,
+            },
+        })
+        .await??;
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
 
@@ -185,11 +191,10 @@ pub async fn run_jobs(
 
     if summary {
         let tree = spec.as_tree_with_results(&report_and_tree.report_map);
-        let _preview = addr
-            .send(ExternalEventMsg {
-                evt: TaskTreeSummary(tree.clone()),
-            })
-            .await??;
+        addr.send(ExternalEventMsg {
+            evt: TaskTreeSummary(tree.clone()),
+        })
+        .await??;
     }
 
     Ok(RunOk { report_and_tree })
@@ -206,14 +211,13 @@ pub async fn print_jobs(
         .await??;
     let spec = spec_output.as_spec();
     let tree = spec.as_tree();
-    let _preview = addr
-        .send(ExternalEventMsg {
-            evt: TaskTreePreview {
-                tree: tree.clone(),
-                will_exec: false,
-            },
-        })
-        .await??;
+    addr.send(ExternalEventMsg {
+        evt: TaskTreePreview {
+            tree: tree.clone(),
+            will_exec: false,
+        },
+    })
+    .await??;
     Ok(RunDryOk)
 }
 

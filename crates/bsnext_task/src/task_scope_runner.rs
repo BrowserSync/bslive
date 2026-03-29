@@ -81,7 +81,6 @@ impl Handler<Invocation> for TaskScopeRunner {
             match run_kind {
                 RunKind::Sequence { opts: _ } => {
                     for (index, task_entry) in tasks.into_iter().enumerate() {
-                        let raw_id = task_entry.id();
                         let node_path = task_entry.path().to_owned();
 
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
@@ -125,7 +124,6 @@ impl Handler<Invocation> for TaskScopeRunner {
                     for (index, task_entry) in tasks.into_iter().enumerate() {
                         let parent_token = token.clone();
                         let child_token = parent_token.child_token();
-                        let raw_id = task_entry.id();
                         let node_path = task_entry.path().clone();
                         let actor = Box::new(task_entry).into_task_recipient();
                         let jh = tokio::spawn({

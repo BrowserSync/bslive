@@ -1,6 +1,6 @@
 use crate::capabilities::Capabilities;
 use crate::tasks::comms::Comms;
-use crate::tasks::{Node, Runnable, RunnableWithComms, Sqid};
+use crate::tasks::{Node, Runnable, RunnableWithComms};
 use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
@@ -47,7 +47,7 @@ impl TaskSpec {
     }
     pub fn all(tasks: &[Runnable], opts: OverlappingOpts) -> Self {
         let nodes = tasks
-            .into_iter()
+            .iter()
             .map(|r| Node {
                 node: r.clone(),
                 path: Default::default(),
@@ -64,7 +64,7 @@ impl TaskSpec {
     }
     pub fn seq(tasks: &[Runnable]) -> Self {
         let nodes = tasks
-            .into_iter()
+            .iter()
             .map(|r| Node {
                 node: r.clone(),
                 path: Default::default(),
@@ -83,7 +83,7 @@ impl TaskSpec {
     }
     pub fn seq_opts(tasks: &[Runnable], opts: SequenceOpts) -> Self {
         let nodes = tasks
-            .into_iter()
+            .iter()
             .map(|r| Node {
                 node: r.clone(),
                 path: Default::default(),
@@ -100,7 +100,7 @@ impl TaskSpec {
     }
     pub fn seq_from(run_items: &[RunOptItem]) -> Self {
         let nodes = run_items
-            .into_iter()
+            .iter()
             .map(Runnable::from)
             .map(|runnable| Node {
                 node: runnable,
@@ -120,7 +120,7 @@ impl TaskSpec {
     }
     pub fn all_from(run_items: &[RunOptItem]) -> Self {
         let nodes = run_items
-            .into_iter()
+            .iter()
             .map(Runnable::from)
             .map(|runnable| Node {
                 node: runnable,
@@ -144,11 +144,10 @@ impl TaskSpec {
         hasher.finish()
     }
 
-    fn annotate(&mut self, mut path: NodePath) {
-        let mut index = 0;
+    fn annotate(&mut self, path: NodePath) {
         self.path = path.clone();
 
-        for runnable in &mut self.tasks {
+        for (index, runnable) in self.tasks.iter_mut().enumerate() {
             let mut next_path = path.clone();
             next_path.append(PathSegment::Index(IndexId::new(index as u64)));
 
@@ -167,8 +166,6 @@ impl TaskSpec {
                     spec.annotate(next_path);
                 }
             }
-
-            index = index + 1;
         }
     }
 }
@@ -182,7 +179,7 @@ impl TaskSpec {
         first
     }
     pub fn as_tree_with_results(&self, hm: &HashMap<NodePath, TaskReport>) -> ArchyNode {
-        let r = hm.get(&self.path());
+        let r = hm.get(self.path());
         let label = match r {
             None => "missing".to_string(),
             Some(_) => self.as_tree_label(),
@@ -213,7 +210,7 @@ impl TaskSpec {
         let parent_id = self.as_id();
         let mut tasks = vec![];
 
-        for (_index_position, runnable) in self.tasks.into_iter().enumerate() {
+        for runnable in self.tasks.into_iter() {
             let content_id = runnable.content_id();
 
             match runnable.node {
@@ -249,9 +246,10 @@ pub fn append_with_reports(
     tasks: &[Node],
     hm: &HashMap<NodePath, TaskReport>,
 ) {
-    for (index_position, node) in tasks.iter().enumerate() {
+    for node in tasks {
         let raw_label = node.as_tree_label();
-        let result = hm.get(node.path());
+        let _result = hm.get(node.path());
+        todo!("now overlay _results onto the tree?");
         match &node.node {
             Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&raw_label)),

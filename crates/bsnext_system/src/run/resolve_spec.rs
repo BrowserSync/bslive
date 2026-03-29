@@ -135,10 +135,9 @@ impl actix::Handler<InvokeRunTasks> for BsSystem {
     type Result = ResponseFuture<Result<TaskReportAndTree, InitialTaskError>>;
 
     #[tracing::instrument(skip_all, name = "InvokeRunTasks")]
-    fn handle(&mut self, msg: InvokeRunTasks, ctx: &mut Self::Context) -> Self::Result {
-        let capabilities = self.capabilities().clone();
-        let (invoke_scope, rx) = self.spec_to_invoke_scope(capabilities, msg.task_spec);
-        ctx.notify(invoke_scope);
+    fn handle(&mut self, msg: InvokeRunTasks, _ctx: &mut Self::Context) -> Self::Result {
+        let (invoke_scope, rx) = self.spec_to_invoke_scope(msg.task_spec);
+        self.invoker_addr.do_send(invoke_scope);
         Box::pin(async move {
             match rx.await {
                 Ok(TaskReportAndTree {

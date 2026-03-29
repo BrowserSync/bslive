@@ -42,5 +42,5 @@ use bsnext_task::invocation::Invocation;
 /// ```
 /// pub
 pub trait IntoRecipient {
-    fn into_recipient(self: Self, addr: &Addr<Capabilities>) -> Recipient<Invocation>;
+    fn into_recipient(self, addr: &Addr<Capabilities>) -> Recipient<Invocation>;
 }
