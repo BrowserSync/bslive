@@ -184,8 +184,9 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
         self.cmd.id = Some(sqid.to_owned());
         let cmd = self.cmd.sh.clone();
         let trigger = invocation.trigger().to_owned();
-        let spec_id = invocation.path().to_owned();
+        let node_path = invocation.path().to_owned();
         let cmd = cmd.to_os_string();
+
         tracing::info!("Will run... {:?}", cmd);
         // let any_event_sender = comms.any_event_sender.clone();
         // let any_event_sender2 = comms.any_event_sender.clone();
@@ -213,7 +214,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
 
         let fut = sh_cmd(
             addr,
-            spec_id,
+            node_path,
             sqid.to_owned(),
             cmd,
             reason,
@@ -228,7 +229,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 async fn sh_cmd(
     addr: Recipient<RequestOutputChannel>,
     node_path: NodePath,

@@ -50,17 +50,18 @@ impl InvokeScope {
 impl Handler<InvokeScope> for BsSystem {
     type Result = ResponseActFuture<Self, ()>;
 
-    #[tracing::instrument(skip_all, name = "InvokeScope")]
+    #[tracing::instrument(skip_all, name = "InvokeScope", fields(path = %msg.task_spec.path()))]
     fn handle(&mut self, msg: InvokeScope, _ctx: &mut Self::Context) -> Self::Result {
-        let task_trigger = msg.task_trigger;
+        let trigger = msg.task_trigger;
         let task_spec = msg.task_spec;
-        let path = task_spec.path().to_owned();
+        let node_path = task_spec.path().to_owned();
 
         let top_level_scope = Box::new(msg.task_scope).into_task_recipient();
         let done = msg.done;
         let comms = msg.comms.clone();
+        let invocation = Invocation::new(&node_path, trigger);
         let tree = task_spec.as_tree();
-        let invocation = Invocation::new(&path, task_trigger);
+
         let with_start = async move {
             let _sent = comms
                 .any_event_sender
@@ -68,11 +69,12 @@ impl Handler<InvokeScope> for BsSystem {
                 .await;
             top_level_scope.send(invocation).await
         };
+
         let next = with_start
             .into_actor(self)
             .map(move |resp, actor, _ctx| match resp {
                 Ok(result) => {
-                    let (report, report_map) = result.to_report_and_map(path);
+                    let (report, report_map) = result.to_report_and_map(node_path);
                     let tree = task_spec.as_tree_with_results(&report_map);
                     let report_and_tree = TaskReportAndTree {
                         report: report.clone(),

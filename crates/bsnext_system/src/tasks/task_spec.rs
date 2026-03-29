@@ -46,7 +46,6 @@ impl TaskSpec {
         matches!(self.run_kind, RunKind::Overlapping { .. })
     }
     pub fn all(tasks: &[Runnable], opts: OverlappingOpts) -> Self {
-        todo!("lo");
         let nodes = tasks
             .into_iter()
             .map(|r| Node {
@@ -54,14 +53,16 @@ impl TaskSpec {
                 path: Default::default(),
             })
             .collect();
-        Self {
+        let mut item = Self {
             run_kind: RunKind::Overlapping { opts },
             tasks: nodes,
             path: Default::default(),
-        }
+        };
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
+        item
     }
     pub fn seq(tasks: &[Runnable]) -> Self {
-        todo!("lo");
         let nodes = tasks
             .into_iter()
             .map(|r| Node {
@@ -69,13 +70,16 @@ impl TaskSpec {
                 path: Default::default(),
             })
             .collect();
-        Self {
+        let mut item = Self {
             run_kind: RunKind::Sequence {
                 opts: SequenceOpts::default(),
             },
             tasks: nodes,
             path: Default::default(),
-        }
+        };
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
+        item
     }
     pub fn seq_opts(tasks: &[Runnable], opts: SequenceOpts) -> Self {
         let nodes = tasks
@@ -95,7 +99,6 @@ impl TaskSpec {
         item
     }
     pub fn seq_from(run_items: &[RunOptItem]) -> Self {
-        // todo!("lo");
         let nodes = run_items
             .into_iter()
             .map(Runnable::from)
@@ -116,7 +119,6 @@ impl TaskSpec {
         item
     }
     pub fn all_from(run_items: &[RunOptItem]) -> Self {
-        todo!("lo");
         let nodes = run_items
             .into_iter()
             .map(Runnable::from)
@@ -125,13 +127,16 @@ impl TaskSpec {
                 path: Default::default(),
             })
             .collect();
-        Self {
+        let mut item = Self {
             run_kind: RunKind::Overlapping {
                 opts: OverlappingOpts::default(),
             },
             tasks: nodes,
             path: Default::default(),
-        }
+        };
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
+        item
     }
     pub fn as_id(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -177,8 +182,7 @@ impl TaskSpec {
         first
     }
     pub fn as_tree_with_results(&self, hm: &HashMap<NodePath, TaskReport>) -> ArchyNode {
-        let node_path = self.path().to_owned();
-        let r = hm.get(&node_path);
+        let r = hm.get(&self.path());
         let label = match r {
             None => "missing".to_string(),
             Some(_) => self.as_tree_label(),
@@ -210,16 +214,17 @@ impl TaskSpec {
         let mut tasks = vec![];
 
         for (_index_position, runnable) in self.tasks.into_iter().enumerate() {
-            let item_id = runnable.content_id();
+            let content_id = runnable.content_id();
 
             match runnable.node {
                 Runnable::Spec(task_spec) => {
                     let path = task_spec.path().to_owned();
                     let as_scope =
                         task_spec.to_task_scope(servers_addr.clone(), capabilities_addr.clone());
-                    tasks.push(TaskEntry::new(Box::new(as_scope), item_id, path))
+                    tasks.push(TaskEntry::new(Box::new(as_scope), content_id, path))
                 }
                 _ => {
+                    let path = runnable.path().to_owned();
                     let with_ctx = RunnableWithComms {
                         ctx: Comms {
                             servers_addr: servers_addr.clone(),
@@ -227,8 +232,7 @@ impl TaskSpec {
                         },
                         runnable,
                     };
-                    let path = self.path.to_owned();
-                    tasks.push(TaskEntry::new(Box::new(with_ctx), item_id, path))
+                    tasks.push(TaskEntry::new(Box::new(with_ctx), content_id, path))
                 }
             }
         }
@@ -247,6 +251,7 @@ pub fn append_with_reports(
 ) {
     for (index_position, node) in tasks.iter().enumerate() {
         let raw_label = node.as_tree_label();
+        let result = hm.get(node.path());
         match &node.node {
             Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&raw_label)),

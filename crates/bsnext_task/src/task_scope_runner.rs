@@ -68,6 +68,7 @@ impl Handler<Invocation> for TaskScopeRunner {
 
         tracing::debug!(
             bs.group.sqid = sqid,
+            bs.group.node_path = %node_path,
             bs.group.len = expected_len,
             bs.group.kind = ?run_kind,
             bs.group.exit_on_failure = exit_on_failure,
@@ -85,7 +86,6 @@ impl Handler<Invocation> for TaskScopeRunner {
 
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
                         let one_task = Invocation::new(&node_path, trigger.clone());
-                        println!("executing {raw_id:?}");
 
                         match boxed_actor.send(one_task).await {
                             Ok(result) => {
