@@ -102,13 +102,15 @@ impl Handler<InvokeScope> for Invoker {
                 )
                 .await
             {
-                Ok(_) => tracing::error!("did send completion"),
-                Err(_e) => tracing::error!("could not send"),
+                Ok(_) => tracing::debug!("did send completion"),
+                Err(_e) => tracing::error!(
+                    "failed to send task completion event: timeout or channel closed"
+                ),
             }
 
             match done.send(report_and_tree) {
                 Ok(_) => tracing::debug!("did finish initial"),
-                Err(_) => tracing::error!("could not send"),
+                Err(_) => tracing::error!("failed to send task report and tree: receiver dropped"),
             };
 
             Ok::<(), _>(())

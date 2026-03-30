@@ -143,6 +143,9 @@ impl TaskSpec {
         self.hash(&mut hasher);
         hasher.finish()
     }
+    pub fn len(&self) -> usize {
+        self.tasks.len()
+    }
 
     fn annotate(&mut self, path: NodePath) {
         self.path = path.clone();
@@ -180,10 +183,7 @@ impl TaskSpec {
     }
     pub fn as_tree_with_results(&self, hm: &HashMap<NodePath, TaskReport>) -> ArchyNode {
         let r = hm.get(self.path());
-        let label = match r {
-            None => "missing".to_string(),
-            Some(_) => self.as_tree_label(),
-        };
+        let label = self.as_tree_label_result(r);
         let mut first = ArchyNode::new(&label);
         append_with_reports(&mut first, &self.tasks, hm);
         first
@@ -192,12 +192,42 @@ impl TaskSpec {
 
 pub trait TreeDisplay {
     fn as_tree_label(&self) -> String;
+    fn as_tree_label_result(&self, result: Option<&TaskReport>) -> String;
 }
 
 impl TreeDisplay for TaskSpec {
     fn as_tree_label(&self) -> String {
         let p = &self.path;
-        format!("{p}")
+        let suffix = match self.run_kind {
+            RunKind::Sequence { .. } => format!("[seq: {}]", self.len()),
+            RunKind::Overlapping {
+                opts:
+                    OverlappingOpts {
+                        max_concurrent_items,
+                        ..
+                    },
+            } => format!("[all: {}, max: {max_concurrent_items}]", self.len()),
+        };
+        format!("{p} {suffix}")
+    }
+
+    fn as_tree_label_result(&self, result: Option<&TaskReport>) -> String {
+        let p = self.as_tree_label();
+        let suff = match self.run_kind {
+            RunKind::Sequence { .. } => " seq",
+            RunKind::Overlapping { .. } => " all",
+        };
+        let l = match result {
+            None => "",
+            Some(report) => {
+                if report.is_ok() {
+                    "✅ "
+                } else {
+                    "❌ "
+                }
+            }
+        };
+        format!("{l}{p}{suff}")
     }
 }
 
@@ -247,9 +277,10 @@ pub fn append_with_reports(
     hm: &HashMap<NodePath, TaskReport>,
 ) {
     for node in tasks {
-        let raw_label = node.as_tree_label();
-        let _result = hm.get(node.path());
-        todo!("now overlay _results onto the tree?");
+        let result = hm.get(node.path());
+        let raw_label = node.as_tree_label_result(result);
+        let raw_label = format!("{raw_label}");
+        // todo!("now overlay _results onto the tree?");
         match &node.node {
             Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
             Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&raw_label)),

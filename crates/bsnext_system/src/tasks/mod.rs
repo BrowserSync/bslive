@@ -7,6 +7,7 @@ use bs_live_task::BsLiveTask;
 use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
+use bsnext_task::task_report::TaskReport;
 use bsnext_task::{ContentId, NodePath, OverlappingOpts, SequenceOpts};
 use comms::Comms;
 use into_recipient::IntoRecipient;
@@ -40,8 +41,28 @@ impl Node {
 impl TreeDisplay for Node {
     fn as_tree_label(&self) -> String {
         let p = &self.path;
-        let p = format!("{p}");
+        let label = match &self.node {
+            Runnable::BsLiveTask(_) => format!("{p}"),
+            Runnable::Sh(_) => format!("{p}"),
+            Runnable::Spec(spec) => spec.as_tree_label(),
+        };
+        let p = format!("{label}");
         p
+    }
+
+    fn as_tree_label_result(&self, result: Option<&TaskReport>) -> String {
+        let p = self.as_tree_label();
+        let l = match result {
+            None => "",
+            Some(report) => {
+                if report.is_ok() {
+                    "✅ "
+                } else {
+                    "❌ "
+                }
+            }
+        };
+        format!("{l}{p}")
     }
 }
 

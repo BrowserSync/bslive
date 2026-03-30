@@ -9,7 +9,7 @@ use bsnext_task::invocation::Invocation;
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_report::ExitCode;
 use bsnext_task::task_trigger::TaskTriggerSource;
-use bsnext_task::{ContentId, NodePath};
+use bsnext_task::NodePath;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
