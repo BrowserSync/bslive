@@ -135,10 +135,10 @@ impl Handler<Invocation> for TaskScopeRunner {
                                     return (index, node_path, Ok::<_, _>(v));
                                 };
                                 let _permit = semaphore.acquire().await.unwrap();
-                                let p1 = node_path.clone();
+                                let node_path_clone = node_path.clone();
                                 let task_run = actor
                                     .send(one_task)
-                                    .map(move |task_result| (index, p1, task_result));
+                                    .map(move |task_result| (index, node_path_clone, task_result));
                                 let output = select! {
                                     result = task_run => {
                                         match (&result, fail_early) {

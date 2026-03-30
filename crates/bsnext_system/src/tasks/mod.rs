@@ -41,13 +41,11 @@ impl Node {
 impl TreeDisplay for Node {
     fn as_tree_label(&self) -> String {
         let p = &self.path;
-        let label = match &self.node {
+        match &self.node {
             Runnable::BsLiveTask(_) => format!("{p}"),
             Runnable::Sh(_) => format!("{p}"),
             Runnable::Spec(spec) => spec.as_tree_label(),
-        };
-        let p = format!("{label}");
-        p
+        }
     }
 
     fn as_tree_label_result(&self, result: Option<&TaskReport>) -> String {

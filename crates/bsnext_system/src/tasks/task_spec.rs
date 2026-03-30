@@ -146,6 +146,9 @@ impl TaskSpec {
     pub fn len(&self) -> usize {
         self.tasks.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.tasks.is_empty()
+    }
 
     fn annotate(&mut self, path: NodePath) {
         self.path = path.clone();
@@ -279,7 +282,6 @@ pub fn append_with_reports(
     for node in tasks {
         let result = hm.get(node.path());
         let raw_label = node.as_tree_label_result(result);
-        let raw_label = format!("{raw_label}");
         // todo!("now overlay _results onto the tree?");
         match &node.node {
             Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
