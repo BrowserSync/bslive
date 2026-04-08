@@ -35,9 +35,9 @@ impl SystemStart for RunFromInputPaths {
     fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         let next = ResolvedInputOutcome::new(ctx.cwd.to_owned(), &self.input_paths);
 
-        /// Here we need to return actual errors, but not error on empty input.
-        /// For example, giving `-i abc.yaml` SHOULD fail if `abc.yaml` is absent,
-        /// but it's for no inputs to be present in the run command
+        // Here we need to return actual errors, but not error on empty input.
+        // For example, giving `-i abc.yaml` SHOULD fail if `abc.yaml` is absent,
+        // but it's for no inputs to be present in the run command
         let input_from_file = match next {
             ResolvedInputOutcome::Missing { err, .. } => return Err(err),
             ResolvedInputOutcome::GivenPath { ref absolute, .. } => {
@@ -55,6 +55,8 @@ impl SystemStart for RunFromInputPaths {
             }
             Some((mut input_from_file, pb)) => {
                 tracing::debug!(?pb, "using run_cmd to extend input from file");
+                tracing::debug!(?self.input.run);
+
                 input_from_file.run.extend(self.input.run.clone());
                 input_from_file
             }
