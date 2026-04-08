@@ -34,6 +34,7 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
     (events_sender, channel_future)
 }
 
+#[tracing::instrument]
 pub async fn with_sender(
     cwd: PathBuf,
     start_kind: StartKind,

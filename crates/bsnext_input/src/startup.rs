@@ -63,7 +63,7 @@ pub enum TopLevelRunMode {
 }
 
 pub trait SystemStart {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>>;
+    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>>;
 }
 
 impl Default for StartupContext {

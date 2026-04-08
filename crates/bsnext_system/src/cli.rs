@@ -17,7 +17,7 @@ use clap::Parser;
 use std::env::current_dir;
 use std::ffi::OsString;
 use std::path::PathBuf;
-use tracing::debug_span;
+use tracing::{debug_span, Instrument};
 
 /// The typical lifecycle when ran from a CLI environment
 pub async fn from_args<I, T>(itr: I) -> Result<(), anyhow::Error>
@@ -129,8 +129,10 @@ async fn async_init(
             start_stdout_wrapper(start_kind, cwd, writer).await
         }
         SubCommands::Run(run) => {
-            let start_kind = StartKind::from_run_args(&args.fs_opts, &args.input_opts, run)?;
-            start_stdout_wrapper(start_kind, cwd, writer).await
+            let start_kind = StartKind::from_run_args(&args.fs_opts, &args.input_opts, run);
+            start_stdout_wrapper(start_kind, cwd, writer)
+                .instrument(debug_span!("SubCommands::Run").or_current())
+                .await
         }
     }
 }

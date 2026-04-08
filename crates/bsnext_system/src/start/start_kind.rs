@@ -1,6 +1,6 @@
 use crate::run::RunCommand;
 use crate::start::start_command::StartCommand;
-use crate::start::start_kind::run_from_input::RunFromInput;
+use crate::start::start_kind::run_from_input::RunFromInputPaths;
 use crate::start::start_kind::start_from_example::StartFromExample;
 use crate::start::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
 use crate::start::start_kind::start_from_paths::StartFromTrailingArgs;
@@ -24,7 +24,7 @@ pub mod start_from_paths;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum StartKind {
-    Run(RunFromInput),
+    Run(RunFromInputPaths),
     FromInput(StartFromInput),
     FromInputPaths(StartFromInputPaths),
     FromExample(StartFromExample),
@@ -81,69 +81,54 @@ impl StartKind {
         Self::FromInput(StartFromInput { input })
     }
 
-    pub fn from_run_args(
-        _fs_opts: &FsOpts,
-        input_opts: &InputOpts,
-        run: RunCommand,
-    ) -> Result<Self, Box<InputError>> {
-        let maybe_input = StartFromInputPaths {
-            input_paths: input_opts.input.clone(),
-            port: None,
-        };
-        let input = maybe_input
-            .input(&Default::default())
-            .and_then(|def| match def {
-                SystemStartArgs::PathWithInput { input, path: _ } => Ok(Some(input)),
-                SystemStartArgs::PathWithInvalidInput {
-                    path: _,
-                    input_error,
-                } => Err(Box::new(input_error)),
-                SystemStartArgs::InputOnly { .. } => Ok(None),
-                SystemStartArgs::RunOnly { .. } => Ok(None),
-            })?;
-        let from_cmd = run.as_input();
-        let input = match input {
-            None => from_cmd,
-            Some(mut input_from_file) => {
-                input_from_file.run.extend(from_cmd.run);
-                input_from_file
-            }
-        };
-        tracing::debug!(run.trailing = ?run.trailing);
-        tracing::debug!(run.sh = ?run.sh_commands);
-        let named = if run.trailing.is_empty() {
+    #[tracing::instrument(skip_all)]
+    pub fn from_run_args(_fs_opts: &FsOpts, input_opts: &InputOpts, run_cmd: RunCommand) -> Self {
+        let from_cmd = run_cmd.as_input();
+
+        tracing::debug!(run_cmd.trailing = ?run_cmd.trailing);
+        tracing::debug!(run_cmd.sh_commands = ?run_cmd.sh_commands);
+        tracing::debug!(run_cmd.all = ?run_cmd.all);
+
+        let named = if run_cmd.trailing.is_empty() {
             vec!["default".to_string()]
         } else {
-            run.trailing
+            run_cmd.trailing
         };
 
         // dry takes precedence
-        let run_mode = if run.dry {
+        let run_mode = if run_cmd.dry {
             RunMode::Dry
         } else {
             RunMode::Exec {
-                preview: run.preview,
-                summary: run.summary,
+                preview: run_cmd.preview,
+                summary: run_cmd.summary,
             }
         };
-        let top_level = if run.all {
+        let top_level = if run_cmd.all {
             TopLevelRunMode::All
         } else {
             TopLevelRunMode::Seq
         };
-        let start_kind = StartKind::Run(RunFromInput::new(input, named, run_mode, top_level));
-        Ok(start_kind)
+        StartKind::Run(RunFromInputPaths::new(
+            from_cmd,
+            input_opts.input.clone(),
+            named,
+            run_mode,
+            top_level,
+        ))
     }
 }
 
 impl SystemStart for StartKind {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         match self {
-            StartKind::FromInputPaths(from_inputs) => from_inputs.input(ctx),
-            StartKind::FromExample(from_example) => from_example.input(ctx),
-            StartKind::FromTrailingArgs(from_trailing_args) => from_trailing_args.input(ctx),
-            StartKind::FromInput(from_inputs) => from_inputs.input(ctx),
-            StartKind::Run(run_from_input) => run_from_input.input(ctx),
+            StartKind::FromInputPaths(from_inputs) => from_inputs.resolve_input(ctx),
+            StartKind::FromExample(from_example) => from_example.resolve_input(ctx),
+            StartKind::FromTrailingArgs(from_trailing_args) => {
+                from_trailing_args.resolve_input(ctx)
+            }
+            StartKind::FromInput(from_inputs) => from_inputs.resolve_input(ctx),
+            StartKind::Run(run_from_input) => run_from_input.resolve_input(ctx),
         }
     }
 }

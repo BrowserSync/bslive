@@ -18,7 +18,7 @@ pub struct StartFromTrailingArgs {
 }
 
 impl SystemStart for StartFromTrailingArgs {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         let identity =
             ServerIdentity::from_port_or_named(self.port).map_err(|e| Box::new(e.into()))?;
         let input = from_dir_paths(&ctx.cwd, &self.paths, &self.route_opts, identity)
@@ -119,7 +119,7 @@ mod test {
         let ctx = StartupContext {
             cwd: tmp_dir.path().to_path_buf(),
         };
-        let i = v.input(&ctx);
+        let i = v.resolve_input(&ctx);
         tmp_dir.close()?;
         let start_args = i.unwrap();
         if let SystemStartArgs::InputOnly { input } = start_args {

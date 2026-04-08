@@ -37,13 +37,14 @@ pub struct RunCommand {
 }
 
 impl RunCommand {
+    #[tracing::instrument]
     pub fn as_input(&self) -> Input {
         let mut input = Input::default();
         let mut list_of_commands: Vec<RunOptItem> = vec![];
 
         {
             for (index, sh) in self.sh_commands.iter().enumerate() {
-                tracing::info!(index = index, sh = sh);
+                tracing::info!(index = index, sh = sh, name = "None", prefix = "None");
                 list_of_commands.push(RunOptItem::Sh(ShRunOptItem {
                     sh: sh.clone(),
                     name: None,

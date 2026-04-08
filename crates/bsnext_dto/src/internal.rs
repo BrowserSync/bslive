@@ -213,9 +213,12 @@ pub struct Available(pub Vec<String>);
 
 impl Display for Available {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.0.is_empty() {
+            return Ok(());
+        }
         write!(
             f,
-            "{}",
+            "Available: {}",
             self.0
                 .iter()
                 .map(|x| format!("\"{}\"", x))
@@ -229,7 +232,7 @@ impl Display for Available {
 pub enum InitialTaskError {
     #[error("initial tasks did not complete, as determined from report. TODO: access report here for better errors")]
     FailedReport,
-    #[error("Task(s) {expected} not found. Available: {available}")]
+    #[error("Task(s) {expected} not found. {available}")]
     MissingTask {
         expected: Expected,
         available: Available,

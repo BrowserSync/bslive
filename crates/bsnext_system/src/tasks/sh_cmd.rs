@@ -50,7 +50,7 @@ impl IntoRecipient for ShCmd {
 
 impl Display for ShCmd {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", (*self.sh).to_string_lossy())
+        write!(f, "ShCmd {}", (*self.sh).to_string_lossy())
     }
 }
 

@@ -57,7 +57,7 @@ impl Handler<Start> for BsSystem {
     #[tracing::instrument(name = "BsSystem->Start", skip(self, msg, ctx))]
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
         let addr = ctx.address();
-        match msg.kind.input(&self.start_context) {
+        match msg.kind.resolve_input(&self.start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
                 debug!("SystemStartArgs::PathWithInput");
 
@@ -119,6 +119,7 @@ impl Handler<Start> for BsSystem {
                 run_mode: RunMode::Exec { summary, preview },
                 top_level_run_mode,
             }) => {
+                debug!("SystemStartArgs::RunOnly + exec");
                 let addr = ctx.address();
                 let jobs = run_jobs(
                     addr,
@@ -141,6 +142,7 @@ impl Handler<Start> for BsSystem {
                 run_mode: RunMode::Dry,
                 top_level_run_mode,
             }) => {
+                debug!("SystemStartArgs::RunOnly + dry");
                 let addr = ctx.address();
                 let jobs =
                     crate::system::print_jobs(addr, input.clone(), named, top_level_run_mode);

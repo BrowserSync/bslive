@@ -41,9 +41,14 @@ impl Node {
 impl TreeDisplay for Node {
     fn as_tree_label(&self) -> String {
         let p = &self.path;
+        let leaf_label = match &self.node {
+            Runnable::BsLiveTask(bs) => format!("{bs}"),
+            Runnable::Sh(sh) => format!("{sh}"),
+            Runnable::Spec(_) => String::new(),
+        };
         match &self.node {
-            Runnable::BsLiveTask(_) => format!("{p}"),
-            Runnable::Sh(_) => format!("{p}"),
+            Runnable::BsLiveTask(_) => format!("{p} {leaf_label}"),
+            Runnable::Sh(_) => format!("{p} {leaf_label}"),
             Runnable::Spec(spec) => spec.as_tree_label(),
         }
     }
