@@ -201,25 +201,21 @@ pub trait TreeDisplay {
 impl TreeDisplay for TaskSpec {
     fn as_tree_label(&self) -> String {
         let p = &self.path;
-        let suffix = match self.run_kind {
-            RunKind::Sequence { .. } => format!("[seq: {}]", self.len()),
+        let size_suffix = match self.run_kind {
+            RunKind::Sequence { .. } => format!("seq: {}", self.len()),
             RunKind::Overlapping {
                 opts:
                     OverlappingOpts {
                         max_concurrent_items,
                         ..
                     },
-            } => format!("[all: {}, max: {max_concurrent_items}]", self.len()),
+            } => format!("all: {}, max: {max_concurrent_items}", self.len()),
         };
-        format!("{p} {suffix}")
+        format!("{p} {size_suffix}")
     }
 
     fn as_tree_label_result(&self, result: Option<&TaskReport>) -> String {
         let p = self.as_tree_label();
-        let suff = match self.run_kind {
-            RunKind::Sequence { .. } => " seq",
-            RunKind::Overlapping { .. } => " all",
-        };
         let l = match result {
             None => "",
             Some(report) => {
@@ -230,7 +226,7 @@ impl TreeDisplay for TaskSpec {
                 }
             }
         };
-        format!("{l}{p}{suff}")
+        format!("{l}{p}")
     }
 }
 

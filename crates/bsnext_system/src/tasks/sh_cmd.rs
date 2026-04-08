@@ -104,7 +104,7 @@ impl ShCmd {
         match &self.output {
             ShCmdOutput::None => None,
             ShCmdOutput::DefaultNamed => match &self.name {
-                None => Some(format!("[{node_path}]")),
+                None => Some(format!("{node_path}")),
                 Some(sn_name) => Some(sn_name.clone()),
             },
             ShCmdOutput::CustomNamed(name) => Some(name.clone()),
