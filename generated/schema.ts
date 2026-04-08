@@ -7,6 +7,7 @@ import {
     type TaskReportDTO,
     type TaskActionDTO,
     type TaskResultDTO,
+    type TaskTreeSummary,
     type ExternalEventsDTO,
     LogLevelDTO,
     ChangeKind,
@@ -17,6 +18,7 @@ export const invocationIdDTOSchema = z.string();
 
 export const archyNodeSchema: z.ZodSchema<ArchyNode> = z.lazy(() =>
     z.object({
+        id: z.string(),
         label: z.string(),
         nodes: z.array(archyNodeSchema),
     }),
@@ -214,6 +216,11 @@ export const taskConclusionDTOSchema = z.union([
     }),
 ]);
 
+export const taskTreePreviewSchema = z.object({
+    tree: archyNodeSchema,
+    will_exec: z.boolean(),
+});
+
 export const watchingDTOSchema = z.object({
     paths: z.array(z.string()),
     debounce: debounceDTOSchema,
@@ -377,6 +384,7 @@ export const taskActionStageDTOSchema: z.ZodSchema<TaskActionStageDTO> = z.lazy(
                 payload: z.object({
                     tree: archyNodeSchema,
                     report: taskReportDTOSchema,
+                    report_map: z.record(taskReportDTOSchema),
                 }),
             }),
             z.object({
@@ -403,6 +411,13 @@ export const taskResultDTOSchema: z.ZodSchema<TaskResultDTO> = z.lazy(() =>
         conclusion: taskConclusionDTOSchema,
         invocation_id: invocationIdDTOSchema,
         task_reports: z.array(taskReportDTOSchema),
+    }),
+);
+
+export const taskTreeSummarySchema: z.ZodSchema<TaskTreeSummary> = z.lazy(() =>
+    z.object({
+        tree: archyNodeSchema,
+        report_map: z.record(taskReportDTOSchema),
     }),
 );
 
@@ -447,14 +462,11 @@ export const externalEventsDTOSchema: z.ZodSchema<ExternalEventsDTO> = z.lazy(
             }),
             z.object({
                 kind: z.literal("TaskTreePreview"),
-                payload: z.object({
-                    tree: archyNodeSchema,
-                    will_exec: z.boolean(),
-                }),
+                payload: taskTreePreviewSchema,
             }),
             z.object({
                 kind: z.literal("TaskTreeSummary"),
-                payload: archyNodeSchema,
+                payload: taskTreeSummarySchema,
             }),
         ]),
 );

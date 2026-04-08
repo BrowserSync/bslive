@@ -1,24 +1,21 @@
+use crate::external_events::{TaskConclusionDTO, TaskReportDTO, TaskResultDTO};
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use typeshare::typeshare;
 
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ArchyNode {
+    pub id: String,
     pub label: String,
     pub nodes: Vec<ArchyNode>,
 }
 
 impl ArchyNode {
-    pub fn new(label: &str) -> Self {
+    pub fn new(label: &str, id: &str) -> Self {
         ArchyNode {
+            id: id.to_string(),
             label: label.to_string(),
-            nodes: Vec::new(),
-        }
-    }
-
-    pub fn from_string(s: &str) -> Self {
-        ArchyNode {
-            label: s.to_string(),
             nodes: Vec::new(),
         }
     }
@@ -133,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_archy_single_node() {
-        let node = ArchyNode::new("Root");
+        let node = ArchyNode::new("Root", "");
         let result = archy(&node, Prefix::None);
         let expected = String::from("Root\n");
         assert_eq!(result, expected);
@@ -141,9 +138,9 @@ mod tests {
 
     #[test]
     fn test_archy_with_children() {
-        let mut root = ArchyNode::new("Root");
-        root.nodes.push(ArchyNode::new("Child 1"));
-        root.nodes.push(ArchyNode::new("Child 2"));
+        let mut root = ArchyNode::new("Root", "");
+        root.nodes.push(ArchyNode::new("Child 1", ""));
+        root.nodes.push(ArchyNode::new("Child 2", ""));
 
         let result = archy(&root, Prefix::None);
         let expected = "\
@@ -156,12 +153,12 @@ Root
 
     #[test]
     fn test_archy_multi_level_structure() {
-        let mut root = ArchyNode::new("Root");
-        let mut child1 = ArchyNode::new("Child 1");
-        child1.nodes.push(ArchyNode::new("Grandchild 1.1"));
-        child1.nodes.push(ArchyNode::new("Grandchild 1.2"));
+        let mut root = ArchyNode::new("Root", "");
+        let mut child1 = ArchyNode::new("Child 1", "");
+        child1.nodes.push(ArchyNode::new("Grandchild 1.1", ""));
+        child1.nodes.push(ArchyNode::new("Grandchild 1.2", ""));
         root.nodes.push(child1);
-        root.nodes.push(ArchyNode::new("Child 2"));
+        root.nodes.push(ArchyNode::new("Child 2", ""));
 
         let result = archy(&root, Prefix::None);
         let expected = "\
@@ -173,4 +170,30 @@ Root
 ";
         assert_eq!(result, expected);
     }
+}
+
+pub fn annotate(node: &ArchyNode, hm: &HashMap<String, TaskReportDTO>) -> ArchyNode {
+    let result = hm.get(&node.id);
+
+    let conclusion_prefix = match result {
+        None => "",
+        Some(report) => {
+            let TaskResultDTO { conclusion, .. } = &report.result;
+            match conclusion {
+                TaskConclusionDTO::Ok => "✅ ",
+                TaskConclusionDTO::Err(_) => "❌ ",
+                TaskConclusionDTO::Cancelled => "- ",
+            }
+        }
+    };
+
+    let label = format!("{conclusion_prefix}{}", node.label);
+    let mut new_node = ArchyNode::new(&label, &node.id.clone());
+
+    for x in &node.nodes {
+        let next = annotate(x, hm);
+        new_node.nodes.push(next);
+    }
+
+    new_node
 }

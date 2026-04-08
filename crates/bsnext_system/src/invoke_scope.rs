@@ -87,17 +87,17 @@ impl Handler<InvokeScope> for Invoker {
             let _started = c1.send(TaskActionStage::started(tree)).await;
             let result = top_level_scope.send(invocation).await?;
             let (report, report_map) = result.to_report_and_map(node_path);
-            let tree = task_spec_clone.as_tree_with_results(&report_map);
+            let tree = task_spec_clone.as_tree();
             let report_and_tree = TaskReportAndTree {
                 report: report.clone(),
                 tree: tree.clone(),
-                report_map,
+                report_map: report_map.clone(),
             };
 
             // mark complete
             match c1
                 .send_timeout(
-                    TaskActionStage::complete(tree, report),
+                    TaskActionStage::complete(tree, report, report_map),
                     Duration::from_secs(1),
                 )
                 .await

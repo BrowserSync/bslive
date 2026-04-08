@@ -79,19 +79,9 @@ impl OutputWriterTrait for InternalEvents {
             InternalEvents::StartupError(err) => {
                 writeln!(sink, "{err}")?;
             }
-            InternalEvents::TaskAction(TaskAction { stage: action, .. }) => match action {
-                TaskActionStage::Started { tree: _ } => {
-                    // let s = archy(tree, Prefix::None);
-                    // write!(sink, "{s}")?;
-                }
-                TaskActionStage::Ended {
-                    tree: _, report: _, ..
-                } => {
-                    // let s = archy(tree, Prefix::None);
-                    // write!(sink, "{s}")?;
-                }
-                TaskActionStage::Error => {}
-            },
+            InternalEvents::TaskAction(..) => {
+                // no-op
+            }
             InternalEvents::TaskSpecDisplay { tree } => {
                 let s = archy(tree, Prefix::None);
                 write!(sink, "{s}")?;

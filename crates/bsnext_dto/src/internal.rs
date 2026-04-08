@@ -64,9 +64,18 @@ impl TaskActionStage {
         };
         AnyEvent::External(ExternalEventsDTO::TaskAction(dto))
     }
-    pub fn complete(tree: ArchyNode, report: TaskReport) -> AnyEvent {
+    pub fn complete(
+        tree: ArchyNode,
+        report: TaskReport,
+        report_map: HashMap<NodePath, TaskReport>,
+    ) -> AnyEvent {
+        let report_map_dto = report_map
+            .iter()
+            .map(|(k, v)| (k.to_string(), TaskReportDTO::from(v.clone())))
+            .collect();
         let dto = TaskActionDTO {
             stage: TaskActionStageDTO::Ended {
+                report_map: report_map_dto,
                 tree,
                 report: TaskReportDTO::from(report),
             },

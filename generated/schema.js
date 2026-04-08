@@ -24,6 +24,7 @@ var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
 var invocationIdDTOSchema = z.string();
 var archyNodeSchema = z.lazy(
   () => z.object({
+    id: z.string(),
     label: z.string(),
     nodes: z.array(archyNodeSchema)
   })
@@ -198,6 +199,10 @@ var taskConclusionDTOSchema = z.union([
     payload: z.undefined().optional()
   })
 ]);
+var taskTreePreviewSchema = z.object({
+  tree: archyNodeSchema,
+  will_exec: z.boolean()
+});
 var watchingDTOSchema = z.object({
   paths: z.array(z.string()),
   debounce: debounceDTOSchema
@@ -349,7 +354,8 @@ var taskActionStageDTOSchema = z.lazy(
       kind: z.literal("Ended"),
       payload: z.object({
         tree: archyNodeSchema,
-        report: taskReportDTOSchema
+        report: taskReportDTOSchema,
+        report_map: z.record(taskReportDTOSchema)
       })
     }),
     z.object({
@@ -373,6 +379,12 @@ var taskResultDTOSchema = z.lazy(
     conclusion: taskConclusionDTOSchema,
     invocation_id: invocationIdDTOSchema,
     task_reports: z.array(taskReportDTOSchema)
+  })
+);
+var taskTreeSummarySchema = z.lazy(
+  () => z.object({
+    tree: archyNodeSchema,
+    report_map: z.record(taskReportDTOSchema)
   })
 );
 var externalEventsDTOSchema = z.lazy(
@@ -415,14 +427,11 @@ var externalEventsDTOSchema = z.lazy(
     }),
     z.object({
       kind: z.literal("TaskTreePreview"),
-      payload: z.object({
-        tree: archyNodeSchema,
-        will_exec: z.boolean()
-      })
+      payload: taskTreePreviewSchema
     }),
     z.object({
       kind: z.literal("TaskTreeSummary"),
-      payload: archyNodeSchema
+      payload: taskTreeSummarySchema
     })
   ])
 );
@@ -465,5 +474,7 @@ export {
   taskConclusionDTOSchema,
   taskReportDTOSchema,
   taskResultDTOSchema,
+  taskTreePreviewSchema,
+  taskTreeSummarySchema,
   watchingDTOSchema
 };

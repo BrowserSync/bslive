@@ -104,11 +104,7 @@ impl StartKind {
                 summary: run_cmd.summary,
             }
         };
-        let top_level = if run_cmd.all {
-            TopLevelRunMode::All
-        } else {
-            TopLevelRunMode::Seq
-        };
+        let top_level = TopLevelRunMode::Seq;
         StartKind::Run(RunFromInputPaths::new(
             from_cmd,
             input_opts.input.clone(),

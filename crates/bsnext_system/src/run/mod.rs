@@ -72,7 +72,6 @@ impl RunCommand {
 mod test {
     use super::*;
     use clap::Parser;
-    use std::str::FromStr;
 
     #[test]
     fn single_sh() -> anyhow::Result<()> {
@@ -93,13 +92,10 @@ mod test {
     fn input() -> anyhow::Result<()> {
         let run_cmd = RunCommand::try_parse_from(vec!["COMMAND_NAME", "--sh", "def"])?;
         let as_input = run_cmd.as_input();
-        let yaml = r#"
-        run:
-          default:
-
-        "#;
-        let input = Input::from_str(yaml)?;
-        assert_eq!(as_input.run, input.run);
+        let s = vec![RunOptItem::Seq(RunSeq::new(vec![RunOptItem::Sh(
+            ShRunOptItem::new("def"),
+        )]))];
+        assert_eq!(as_input.run.get("default"), Some(&s));
         Ok(())
     }
 }

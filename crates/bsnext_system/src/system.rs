@@ -11,8 +11,7 @@ use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext, ResponseFuture, Running};
 use actix_rt::Arbiter;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
-use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::external_events::ExternalEventsDTO::{TaskTreePreview, TaskTreeSummary};
+use bsnext_dto::external_events::{ExternalEventsDTO, TaskTreePreview, TaskTreeSummary};
 use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_input::startup::{StartupContext, TopLevelRunMode};
@@ -178,10 +177,10 @@ pub async fn run_jobs(
 
     if preview {
         addr.send(ExternalEventMsg {
-            evt: TaskTreePreview {
+            evt: ExternalEventsDTO::TaskTreePreview(TaskTreePreview {
                 tree: tree.clone(),
                 will_exec: true,
-            },
+            }),
         })
         .await??;
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -190,9 +189,12 @@ pub async fn run_jobs(
     let report_and_tree = addr.send(InvokeRunTasks::new(spec.clone())).await??;
 
     if summary {
-        let tree = spec.as_tree_with_results(&report_and_tree.report_map);
+        let tree = spec.as_tree();
         addr.send(ExternalEventMsg {
-            evt: TaskTreeSummary(tree.clone()),
+            evt: ExternalEventsDTO::TaskTreeSummary(TaskTreeSummary::from_report(
+                tree,
+                &report_and_tree.report_map,
+            )),
         })
         .await??;
     }
@@ -212,10 +214,10 @@ pub async fn print_jobs(
     let spec = spec_output.as_spec();
     let tree = spec.as_tree();
     addr.send(ExternalEventMsg {
-        evt: TaskTreePreview {
+        evt: ExternalEventsDTO::TaskTreePreview(TaskTreePreview {
             tree: tree.clone(),
             will_exec: false,
-        },
+        }),
     })
     .await??;
     Ok(RunDryOk)

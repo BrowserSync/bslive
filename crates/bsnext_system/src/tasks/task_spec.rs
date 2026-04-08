@@ -6,12 +6,10 @@ use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
 use bsnext_input::route::RunOptItem;
 use bsnext_task::task_entry::TaskEntry;
-use bsnext_task::task_report::TaskReport;
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::{
     ContentId, IndexId, NodePath, OverlappingOpts, PathSegment, RunKind, SequenceOpts,
 };
-use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 /// Represents a collection of tasks that can be run, categorized by their execution type (`RunKind`).
@@ -178,24 +176,15 @@ impl TaskSpec {
 
 impl TaskSpec {
     pub fn as_tree(&self) -> ArchyNode {
-        let empty = HashMap::default();
         let label = self.as_tree_label();
-        let mut first = ArchyNode::new(&label);
-        append_with_reports(&mut first, &self.tasks, &empty);
-        first
-    }
-    pub fn as_tree_with_results(&self, hm: &HashMap<NodePath, TaskReport>) -> ArchyNode {
-        let r = hm.get(self.path());
-        let label = self.as_tree_label_result(r);
-        let mut first = ArchyNode::new(&label);
-        append_with_reports(&mut first, &self.tasks, hm);
+        let mut first = ArchyNode::new(&label, &self.path().as_string());
+        build_tree(&mut first, &self.tasks);
         first
     }
 }
 
 pub trait TreeDisplay {
     fn as_tree_label(&self) -> String;
-    fn as_tree_label_result(&self, result: Option<&TaskReport>) -> String;
 }
 
 impl TreeDisplay for TaskSpec {
@@ -211,22 +200,7 @@ impl TreeDisplay for TaskSpec {
                     },
             } => format!("all: {}, max: {max_concurrent_items}", self.len()),
         };
-        format!("{p} {size_suffix}")
-    }
-
-    fn as_tree_label_result(&self, result: Option<&TaskReport>) -> String {
-        let p = self.as_tree_label();
-        let l = match result {
-            None => "",
-            Some(report) => {
-                if report.is_ok() {
-                    "✅ "
-                } else {
-                    "❌ "
-                }
-            }
-        };
-        format!("{l}{p}")
+        format!("[{p}] {size_suffix}")
     }
 }
 
@@ -270,21 +244,16 @@ impl TaskSpec {
     }
 }
 
-pub fn append_with_reports(
-    archy: &mut ArchyNode,
-    tasks: &[Node],
-    hm: &HashMap<NodePath, TaskReport>,
-) {
+pub fn build_tree(archy: &mut ArchyNode, tasks: &[Node]) {
     for node in tasks {
-        let result = hm.get(node.path());
-        let raw_label = node.as_tree_label_result(result);
-        // todo!("now overlay _results onto the tree?");
+        let path_str = node.path().to_string();
+        let raw_label = node.as_tree_label();
         match &node.node {
-            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
-            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&raw_label)),
+            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label, &path_str)),
+            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&raw_label, &path_str)),
             Runnable::Spec(runner) => {
-                let mut next = ArchyNode::new(&raw_label);
-                append_with_reports(&mut next, &runner.tasks, hm);
+                let mut next = ArchyNode::new(&raw_label, &path_str);
+                build_tree(&mut next, &runner.tasks);
                 archy.nodes.push(next);
             }
         }

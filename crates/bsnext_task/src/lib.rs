@@ -82,7 +82,7 @@ impl Display for NodePath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "[{}]",
+            "{}",
             self.inner
                 .iter()
                 .map(|s| match s {
@@ -111,6 +111,13 @@ impl NodePath {
         let mut node_path = Self::default();
         node_path.append(PathSegment::Content(cid));
         node_path
+    }
+    pub fn as_string(&self) -> String {
+        self.inner
+            .iter()
+            .map(|seg| seg.to_string())
+            .collect::<Vec<_>>()
+            .join(".")
     }
 }
 

@@ -5,7 +5,6 @@ use bsnext_dto::internal::{Available, Expected, InitialTaskError, TaskReportAndT
 use bsnext_input::route::RunOptItem;
 use bsnext_input::startup::TopLevelRunMode;
 use bsnext_input::Input;
-use std::collections::HashMap;
 
 #[derive(actix::Message)]
 #[rtype(result = "Result<ResolveSpecResult, InitialTaskError>")]
@@ -51,7 +50,7 @@ impl actix::Handler<ResolveSpec> for BsSystem {
             Missing,
         }
 
-        let matched: HashMap<&str, Match> = msg
+        let matched: Vec<(&str, Match)> = msg
             .named
             .iter()
             .map(|name| {
@@ -62,8 +61,6 @@ impl actix::Handler<ResolveSpec> for BsSystem {
                 (name.as_str(), v)
             })
             .collect();
-
-        tracing::debug!(run.lookup.matched = ?matched);
 
         let (bad, _good): (Vec<_>, Vec<_>) = matched
             .iter()
@@ -80,22 +77,12 @@ impl actix::Handler<ResolveSpec> for BsSystem {
                 .keys()
                 .map(ToOwned::to_owned)
                 .collect::<Vec<_>>();
-            // let bad = bad.into_iter().map(|(x, i)| x.to_string()).collect();
             return Box::pin(async move {
                 Err(InitialTaskError::MissingTask {
                     expected: Expected(bad),
                     available: Available(available),
                 })
             });
-        }
-
-        for (named, matched) in &matched {
-            match matched {
-                Match::Ok { .. } => {}
-                Match::Missing => {
-                    tracing::error!("missing run item: {}", named);
-                }
-            }
         }
 
         let ordered = matched
