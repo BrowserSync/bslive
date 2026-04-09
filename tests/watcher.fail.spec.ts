@@ -25,13 +25,11 @@ test.describe(
             expect(lines).toStrictEqual([
                 {
                     line: "start.a",
-                    prefix: "[KWpxOO]",
-                    task_id: "12811876391347057540",
+                    prefix: "yoFlWY.0.gZgvRT.0.26VhXf",
                 },
                 {
                     line: "start.b",
-                    prefix: "[aP4ZWs]",
-                    task_id: "9235661974223744739",
+                    prefix: "yoFlWY.0.gZgvRT.1.NpJdaO",
                 },
             ]);
         });

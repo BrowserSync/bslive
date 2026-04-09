@@ -85,7 +85,6 @@ fn from_input_paths<T: AsRef<str>>(
 
     let initial_ctx = InputCtx::new(&[], Some(input_args), ctx, Some(input_path));
     let result = from_input_path(input_path, &initial_ctx);
-    dbg!(&result);
     match result {
         Ok(input) => Ok(SystemStartArgs::PathWithInput {
             path: input_path.to_path_buf(),

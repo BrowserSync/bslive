@@ -21,23 +21,19 @@ test.describe(
             expect(lines).toStrictEqual([
                 {
                     line: "watchers.before.before",
-                    prefix: "[M3CpiT]",
-                    task_id: "897071020278212152",
+                    prefix: "kBgX3v.0.817cQQ",
                 },
                 {
                     line: "watchers.before.after",
-                    prefix: "[5V2TUX]",
-                    task_id: "6224909781424175219",
+                    prefix: "kBgX3v.1.rlqY1s",
                 },
                 {
                     line: "Start A",
-                    prefix: "[AVCu6z]",
-                    task_id: "4603670863854342654",
+                    prefix: "kBgX3v.2.FLTr2X",
                 },
                 {
                     line: "End A",
-                    prefix: "[xD5VGO]",
-                    task_id: "1713922480753373637",
+                    prefix: "kBgX3v.3.pnDswR",
                 },
             ]);
         });
