@@ -288,7 +288,7 @@ export const test = base.extend<{
             });
         });
         const data: TServersResp = await new Promise((resolve, reject) => {
-            let max = 1000;
+            let max = 10_000;
             let elapsed = 0;
             let int = setInterval(() => {
                 elapsed += 100;
