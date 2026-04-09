@@ -13,6 +13,7 @@ pub struct RoutesUpdated {
 impl actix::Handler<RoutesUpdated> for ServerActor {
     type Result = ();
 
+    #[tracing::instrument(name = "RoutesUpdated", skip_all)]
     fn handle(&mut self, msg: RoutesUpdated, _ctx: &mut Self::Context) -> Self::Result {
         let Some(client_sender) = self.signals.as_ref().and_then(|s| s.client_sender.as_ref())
         else {
