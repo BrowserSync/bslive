@@ -1,6 +1,7 @@
 use crate::run::RunCommand;
 use crate::start::start_command::StartCommand;
-use crate::watch::{WatchCommand, WatchSubOpts};
+use crate::watch::watch_sub_opts::WatchSubOpts;
+use crate::watch::WatchCommand;
 use bsnext_core::export::ExportCommand;
 use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
 use bsnext_example::ExampleCommand;

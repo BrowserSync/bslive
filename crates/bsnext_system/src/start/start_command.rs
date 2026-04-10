@@ -1,4 +1,4 @@
-use crate::watch::WatchSubOpts;
+use crate::watch::watch_sub_opts::WatchSubOpts;
 use bsnext_core::shared_args::LoggingOpts;
 use bsnext_tracing::OutputFormat;
 

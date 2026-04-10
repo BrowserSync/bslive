@@ -1,5 +1,5 @@
 use crate::start::start_kind::fs_write_input;
-use crate::watch::WatchSubOpts;
+use crate::watch::watch_sub_opts::WatchSubOpts;
 use bsnext_fs_helpers::WriteMode;
 use bsnext_input::path_def::PathDef;
 use bsnext_input::route::{DirRoute, MultiWatch, Opts, Route, RouteKind};
