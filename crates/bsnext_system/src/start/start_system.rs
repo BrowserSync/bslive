@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err)]
 use crate::api::BsSystemApi;
 use crate::start::start_kind::StartKind;
 use crate::system::{run_jobs, BsSystem, RunDryOk, RunOk, SetupOk};

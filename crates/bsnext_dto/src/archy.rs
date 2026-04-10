@@ -13,7 +13,7 @@ pub struct ArchyNode {
 
 impl Display for ArchyNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let s = archy(&self, Prefix::None);
+        let s = archy(self, Prefix::None);
         write!(f, "{s}")
     }
 }

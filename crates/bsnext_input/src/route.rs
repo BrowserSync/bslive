@@ -98,6 +98,7 @@ impl Route {
     pub fn as_filepath(&self) -> PathBuf {
         let next = PathBuf::from(self.path.as_str());
 
+        #[allow(clippy::cmp_owned)]
         let next = if next == PathBuf::from("/") {
             next.join("index.html")
         } else {

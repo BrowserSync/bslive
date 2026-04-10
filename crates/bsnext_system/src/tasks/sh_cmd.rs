@@ -221,6 +221,7 @@ impl actix::Handler<Invocation> for ShCmdWithLogging {
 }
 
 #[tracing::instrument(skip_all)]
+#[allow(clippy::too_many_arguments)]
 async fn sh_cmd(
     addr: Recipient<RequestOutputChannel>,
     node_path: NodePath,

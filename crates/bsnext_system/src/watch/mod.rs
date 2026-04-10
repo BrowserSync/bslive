@@ -119,20 +119,13 @@ impl From<WatchSubOpts> for MultiWatch {
             .run
             .iter()
             .map(ToOwned::to_owned)
-            .enumerate()
-            .map(move |(index, item)| {
-                let _name = Some(format!("command:{index}"));
-                match item {
-                    WatchRunner::Sh(sh) => {
-                        let name = Some(format!("command:{index}"));
-                        RunOptItem::Sh(ShRunOptItem {
-                            sh,
-                            name,
-                            prefix: None,
-                        })
-                    }
-                    WatchRunner::BsLive(bslive) => RunOptItem::BsLive { bslive },
-                }
+            .map(move |item| match item {
+                WatchRunner::Sh(sh) => RunOptItem::Sh(ShRunOptItem {
+                    sh,
+                    name: None,
+                    prefix: None,
+                }),
+                WatchRunner::BsLive(bslive) => RunOptItem::BsLive { bslive },
             })
             .collect::<Vec<_>>();
         let spec = Spec {
@@ -154,13 +147,11 @@ impl From<WatchCommand> for MultiWatch {
             .sh_commands
             .iter()
             .map(ToOwned::to_owned)
-            .enumerate()
-            .map(move |(index, item)| {
-                let name = Some(format!("command:{index}"));
+            .map(move |item| {
                 let prefix = value.no_prefix.then_some(PrefixOpt::Bool(false));
                 RunOptItem::Sh(ShRunOptItem {
                     sh: item,
-                    name,
+                    name: None,
                     prefix,
                 })
             })

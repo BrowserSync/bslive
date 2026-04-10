@@ -5,7 +5,7 @@
       "kind": "Stdout",
       "payload": {
         "line": "did change",
-        "prefix": "command:0"
+        "prefix": "ILTGG3.0.HbpRD5"
       }
     }
   }
