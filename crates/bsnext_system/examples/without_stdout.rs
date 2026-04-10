@@ -23,6 +23,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
         proxies: vec![],
         logging: Default::default(),
         format: Default::default(),
+        watch_sub_opts: Default::default(),
     };
 
     let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);

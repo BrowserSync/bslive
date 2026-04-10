@@ -4,7 +4,7 @@ use crate::watchables::path_watchable::PathWatchable;
 use crate::watchables::route_watchable::to_route_watchables;
 use crate::watchables::server_watchable::to_server_watchables;
 use actix::Addr;
-use bsnext_input::Input;
+use bsnext_input::{InferWatchers, Input};
 use monitor_path_watchables::MonitorPathWatchables;
 use tracing::debug;
 
@@ -24,12 +24,7 @@ impl BsSystem {
         let server_watchables = to_server_watchables(input);
         let any_watchables = to_any_watchables(input);
 
-        debug!("processing {} route watchables", route_watchables.len(),);
-        debug!("processing {} server watchables", server_watchables.len());
-        debug!("processing {} any watchables", any_watchables.len());
-
-        // todo: clean up this merging
-        let all_watchables = route_watchables
+        let routes = route_watchables
             .iter()
             .map(|r| PathWatchable::Route(r.to_owned()));
 
@@ -41,7 +36,28 @@ impl BsSystem {
             .iter()
             .map(|w| PathWatchable::Any(w.to_owned()));
 
-        let watchables = all_watchables.chain(servers).chain(any).collect::<Vec<_>>();
+        let watchables: Vec<_> = match input.config.infer_watchers {
+            InferWatchers::None => {
+                debug!("processing {} any watchables", any.len());
+                any.collect()
+            }
+            InferWatchers::Routes => {
+                debug!("processing {} route watchables", routes.len());
+                debug!("processing {} any watchables", any.len());
+                routes.chain(any).collect()
+            }
+            InferWatchers::Servers => {
+                debug!("processing {} server watchables", servers.len());
+                debug!("processing {} any watchables", any.len());
+                servers.chain(any).collect()
+            }
+            InferWatchers::RoutesAndServers => {
+                debug!("processing {} route watchables", routes.len());
+                debug!("processing {} server watchables", servers.len());
+                debug!("processing {} any watchables", any.len());
+                routes.chain(servers).chain(any).collect()
+            }
+        };
 
         let cwd = self.cwd.clone();
         debug!(

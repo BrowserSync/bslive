@@ -46,4 +46,7 @@ Input {
     ],
     watchers: [],
     run: {},
+    config: InputConfig {
+        infer_watchers: RoutesAndServers,
+    },
 }

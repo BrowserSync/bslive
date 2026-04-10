@@ -72,13 +72,13 @@ where
         OutputFormat::Json => OutputWriters::Json,
     };
 
-    // create a channel onto which commands can publish events
     let command = args.command.unwrap_or_else(move || {
         SubCommands::Start(StartCommand {
             cors: false,
             port: args.port,
             trailing: args.trailing.clone(),
             proxies: vec![],
+            watch_sub_opts: args.watch_opts,
             logging,
             format,
         })
@@ -107,6 +107,7 @@ async fn async_init(
                 port: None,
                 trailing: cmd.trailing.clone(),
                 proxies: vec![],
+                watch_sub_opts: Default::default(),
                 logging,
                 format,
             };

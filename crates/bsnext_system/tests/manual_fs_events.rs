@@ -44,6 +44,7 @@ servers:
         trailing: vec![],
         logging: Default::default(),
         format: Default::default(),
+        watch_sub_opts: Default::default(),
     };
     let start_kind = StartKind::from_args(&FsOpts::default(), &InputOpts::default(), &start);
     let api = start_system(cwd, start_kind, events_sender)

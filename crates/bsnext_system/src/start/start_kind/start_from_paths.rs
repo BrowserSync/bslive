@@ -1,11 +1,12 @@
 use crate::start::start_kind::fs_write_input;
+use crate::watch::WatchSubOpts;
 use bsnext_fs_helpers::WriteMode;
 use bsnext_input::path_def::PathDef;
-use bsnext_input::route::{DirRoute, Opts, Route, RouteKind};
+use bsnext_input::route::{DirRoute, MultiWatch, Opts, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 use bsnext_input::target::TargetKind;
-use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
+use bsnext_input::{InferWatchers, Input, InputError, PathDefinition, PathDefs, PathError};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -15,14 +16,35 @@ pub struct StartFromTrailingArgs {
     pub port: Option<u16>,
     pub force: bool,
     pub route_opts: Opts,
+    pub watch_sub_opts: WatchSubOpts,
 }
 
 impl SystemStart for StartFromTrailingArgs {
     fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+        let span = tracing::debug_span!("StartFromTrailingArgs::resolve_input");
+        let _g = span.entered();
+
         let identity =
             ServerIdentity::from_port_or_named(self.port).map_err(|e| Box::new(e.into()))?;
-        let input = from_dir_paths(&ctx.cwd, &self.paths, &self.route_opts, identity)
+
+        let mut input = from_dir_paths(&ctx.cwd, &self.paths, &self.route_opts, identity)
             .map_err(|e| Box::new(e.into()))?;
+
+        'watch_overrides: {
+            // if there is some explicit --watch.path given, we want to ONLY support that
+            if self.watch_sub_opts.paths.is_empty() {
+                break 'watch_overrides;
+            }
+
+            let span = tracing::debug_span!(parent: None, "StartFromTrailingArgs watch_sub_opts");
+            let _g = span.entered();
+            tracing::debug!("{} paths to watch", self.watch_sub_opts.paths.len());
+            tracing::debug!("{} sh_commands to run", self.watch_sub_opts.run.len());
+            let multi = MultiWatch::from(self.watch_sub_opts.clone());
+            input.watchers = vec![multi];
+            input.config.infer_watchers = InferWatchers::None;
+        }
+
         let write_mode = if self.force {
             WriteMode::Override
         } else {
@@ -115,6 +137,7 @@ mod test {
             port: Some(3000),
             force: false,
             route_opts: Default::default(),
+            watch_sub_opts: Default::default(),
         };
         let ctx = StartupContext {
             cwd: tmp_dir.path().to_path_buf(),

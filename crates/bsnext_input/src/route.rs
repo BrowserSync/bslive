@@ -1,3 +1,4 @@
+use crate::bs_live_built_in_task::BsLiveBuiltInTask;
 use crate::path_def::PathDef;
 use crate::route_cli::RouteCli;
 use crate::watch_opts::WatchOpts;
@@ -361,7 +362,7 @@ impl ShRunOptItem {
 )]
 #[serde(untagged)]
 pub enum RunOptItem {
-    BsLive { bslive: BsLiveRunner },
+    BsLive { bslive: BsLiveBuiltInTask },
     Sh(ShRunOptItem),
     All(RunAll),
     Seq(RunSeq),
@@ -510,25 +511,6 @@ pub enum PrefixOpt {
 impl Default for PrefixOpt {
     fn default() -> Self {
         Self::Bool(true)
-    }
-}
-
-#[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
-)]
-pub enum BsLiveRunner {
-    #[serde(rename = "notify-server")]
-    NotifyServer,
-    #[serde(rename = "ext-event")]
-    PublishExternalEvent,
-}
-
-impl Display for BsLiveRunner {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BsLiveRunner::NotifyServer => write!(f, "BsLiveRunner::NotifyServer"),
-            BsLiveRunner::PublishExternalEvent => write!(f, "BsLiveRunner::ExtEvent"),
-        }
     }
 }
 

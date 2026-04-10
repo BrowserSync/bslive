@@ -2,7 +2,6 @@ use crate::fs_task_tracker::TriggerFsTask;
 use crate::input_fs::from_input_path;
 use crate::override_input::OverrideInput;
 use crate::system::BsSystem;
-use crate::tasks::bs_live_task::BsLiveTask;
 use crate::tasks::task_comms::TaskComms;
 use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
@@ -17,6 +16,7 @@ use bsnext_fs::{
     BufferedChangeEvent, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathAddedEvent,
     PathDescriptionOwned, PathEvent,
 };
+use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
 use bsnext_task::task_trigger::FsChangesTrigger;
 use tracing::{debug_span, info};
@@ -221,8 +221,8 @@ impl BsSystem {
         }
         custom_task_spec.map(ToOwned::to_owned).unwrap_or_else(|| {
             TaskSpec::seq(&[
-                Runnable::BsLiveTask(BsLiveTask::NotifyServer),
-                Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent),
+                Runnable::BsLiveTask(BsLiveBuiltInTask::NotifyServer),
+                Runnable::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent),
             ])
         })
     }

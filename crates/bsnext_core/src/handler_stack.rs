@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use tower::ServiceExt;
 use tower_http::decompression::DecompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
-use tracing::{debug, trace, trace_span};
+use tracing::{trace, trace_span};
 
 pub struct RouteMap {
     pub mapping: HashMap<String, Vec<Route>>,
@@ -88,7 +88,7 @@ pub async fn try_one(
     let path_and_query = outer_uri.path_and_query();
 
     trace!(?parts);
-    debug!("will try {} candidate routes", routes.len());
+    trace!("will try {} candidate routes", routes.len());
 
     let candidates: Vec<RouteCandidate> = routes
         .iter()
@@ -101,7 +101,7 @@ pub async fn try_one(
         .map(|(index, route)| RouteCandidate::for_route(index, route, &req, &uri, &outer_uri))
         .collect::<Vec<_>>();
 
-    debug!("{} candidates passed early checks", candidates.len());
+    trace!("{} candidates passed early checks", candidates.len());
 
     let mut req_body: Option<Body> = Some(req.into_body());
 

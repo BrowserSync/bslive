@@ -1,0 +1,12 @@
+[
+  {
+    "kind": "OutputLine",
+    "payload": {
+      "kind": "Stdout",
+      "payload": {
+        "line": "did change",
+        "prefix": "command:0"
+      }
+    }
+  }
+]

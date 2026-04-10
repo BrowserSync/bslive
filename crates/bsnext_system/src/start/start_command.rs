@@ -1,3 +1,4 @@
+use crate::watch::WatchSubOpts;
 use bsnext_core::shared_args::LoggingOpts;
 use bsnext_tracing::OutputFormat;
 
@@ -24,4 +25,8 @@ pub struct StartCommand {
 
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub trailing: Vec<String>,
+
+    /// additional watchers
+    #[clap(flatten)]
+    pub watch_sub_opts: WatchSubOpts,
 }

@@ -35,45 +35,46 @@ impl StartKind {
     #[tracing::instrument(name = "from_args")]
     pub fn from_args(fs_opts: &FsOpts, input_opts: &InputOpts, cmd: &StartCommand) -> Self {
         // todo: make the addition of a proxy + route opts easier?
-        if cmd.trailing.is_empty() {
-            tracing::debug!("0 trailing, {} inputs", input_opts.input.len());
-            if input_opts.input.is_empty() && !cmd.proxies.is_empty() {
-                tracing::debug!("input was empty, but had proxies");
-                let first_proxy = cmd.proxies.first().expect("guarded first proxy");
-                let r = Route::proxy(first_proxy);
-                let id = ServerIdentity::from_port_or_named(cmd.port).unwrap_or_else(|_e| {
-                    tracing::error!("A problem occurred with the port?");
-                    ServerIdentity::named()
-                });
-                let ser = ServerConfig::from_route(r, id);
-                let input = Input::from_server(ser);
-                StartKind::FromInput(StartFromInput { input })
-            } else {
-                tracing::debug!(
-                    input_len = input_opts.input.len(),
-                    proxes = cmd.proxies.len(),
-                    "neither inputs nor proxies were present"
-                );
-                StartKind::FromInputPaths(StartFromInputPaths {
-                    input_paths: input_opts.input.clone(),
-                    port: cmd.port,
-                })
-            }
-        } else {
+        if !cmd.trailing.is_empty() {
             tracing::debug!(
                 "{} trailing, {} inputs",
                 cmd.trailing.len(),
                 input_opts.input.len()
             );
-            StartKind::FromTrailingArgs(StartFromTrailingArgs {
+            return StartKind::FromTrailingArgs(StartFromTrailingArgs {
                 paths: cmd.trailing.clone(),
                 write_input: fs_opts.write,
                 port: cmd.port,
                 force: fs_opts.force,
+                watch_sub_opts: cmd.watch_sub_opts.clone(),
                 route_opts: Opts {
                     cors: cmd.cors.then_some(CorsOpts::Cors(true)),
                     ..Default::default()
                 },
+            });
+        }
+
+        tracing::debug!("0 trailing, {} inputs", input_opts.input.len());
+        if input_opts.input.is_empty() && !cmd.proxies.is_empty() {
+            tracing::debug!("input was empty, but had proxies");
+            let first_proxy = cmd.proxies.first().expect("guarded first proxy");
+            let r = Route::proxy(first_proxy);
+            let id = ServerIdentity::from_port_or_named(cmd.port).unwrap_or_else(|_e| {
+                tracing::error!("A problem occurred with the port?");
+                ServerIdentity::named()
+            });
+            let ser = ServerConfig::from_route(r, id);
+            let input = Input::from_server(ser);
+            StartKind::FromInput(StartFromInput { input })
+        } else {
+            tracing::debug!(
+                input_len = input_opts.input.len(),
+                proxes = cmd.proxies.len(),
+                "neither inputs nor proxies were present"
+            );
+            StartKind::FromInputPaths(StartFromInputPaths {
+                input_paths: input_opts.input.clone(),
+                port: cmd.port,
             })
         }
     }

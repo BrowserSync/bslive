@@ -3,8 +3,8 @@ use crate::tasks::notify_servers::NotifyServersReady;
 use crate::tasks::sh_cmd::ShCmd;
 use crate::tasks::task_spec::{TaskSpec, TreeDisplay};
 use actix::{Actor, Recipient};
-use bs_live_task::BsLiveTask;
-use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
+use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
+use bsnext_input::route::{RunAll, RunOptItem, RunSeq};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::{ContentId, NodePath, OverlappingOpts, SequenceOpts};
@@ -13,7 +13,6 @@ use into_recipient::IntoRecipient;
 use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-pub mod bs_live_task;
 pub mod comms;
 mod into_recipient;
 pub mod notify_servers;
@@ -55,7 +54,7 @@ impl TreeDisplay for Node {
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum Runnable {
-    BsLiveTask(BsLiveTask),
+    BsLiveTask(BsLiveBuiltInTask),
     Sh(ShCmd),
     Spec(TaskSpec),
 }
@@ -84,12 +83,12 @@ pub struct RunnableWithComms {
 impl AsActor for RunnableWithComms {
     fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
         match self.runnable.node {
-            Runnable::BsLiveTask(BsLiveTask::NotifyServer) => {
+            Runnable::BsLiveTask(BsLiveBuiltInTask::NotifyServer) => {
                 let a = NotifyServersReady::new(self.ctx.capabilities.recipient());
                 let actor = a.start();
                 actor.recipient()
             }
-            Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent) => {
+            Runnable::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent) => {
                 let actor = ExternalEventSenderWithLogging::new(self.ctx.capabilities.recipient());
                 let addr = actor.start();
                 addr.recipient()
@@ -119,9 +118,11 @@ impl From<&RunOptItem> for Runnable {
     fn from(value: &RunOptItem) -> Self {
         match value {
             RunOptItem::BsLive { bslive } => match bslive {
-                BsLiveRunner::NotifyServer => Self::BsLiveTask(BsLiveTask::NotifyServer),
-                BsLiveRunner::PublishExternalEvent => {
-                    Self::BsLiveTask(BsLiveTask::PublishExternalEvent)
+                BsLiveBuiltInTask::NotifyServer => {
+                    Self::BsLiveTask(BsLiveBuiltInTask::NotifyServer)
+                }
+                BsLiveBuiltInTask::PublishExternalEvent => {
+                    Self::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent)
                 }
             },
             RunOptItem::Sh(sh) => Self::Sh(ShCmd::from(sh)),

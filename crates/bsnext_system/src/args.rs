@@ -1,6 +1,6 @@
 use crate::run::RunCommand;
 use crate::start::start_command::StartCommand;
-use crate::watch::WatchCommand;
+use crate::watch::{WatchCommand, WatchSubOpts};
 use bsnext_core::export::ExportCommand;
 use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
 use bsnext_example::ExampleCommand;
@@ -30,31 +30,10 @@ pub struct Args {
     pub command: Option<SubCommands>,
 
     #[clap(flatten)]
-    pub watch_opts: WatchOpts,
+    pub watch_opts: WatchSubOpts,
 
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub trailing: Vec<String>,
-}
-
-#[derive(Debug, Default, Clone, clap::Parser)]
-pub struct WatchOpts {
-    #[arg(long = "watch.paths", num_args(0..))]
-    pub paths: Vec<String>,
-    #[arg(long = "watch.command", num_args(0..))]
-    pub command: Vec<String>,
-}
-
-impl From<WatchOpts> for WatchCommand {
-    fn from(value: WatchOpts) -> Self {
-        WatchCommand {
-            paths: value.paths,
-            command: value.command,
-            initial: vec![],
-            no_prefix: false,
-            logging: Default::default(),
-            format: Default::default(),
-        }
-    }
 }
 
 impl Args {
