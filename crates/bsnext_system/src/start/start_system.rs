@@ -87,6 +87,7 @@ impl Handler<Start> for BsSystem {
 
                 let addr = ctx.address();
                 let input_clone2 = input.clone();
+                todo!("It needs to be possible to start the system and then augment the input after initial tasks (eg: to create something to serve)");
                 let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
