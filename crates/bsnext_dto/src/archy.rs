@@ -11,6 +11,13 @@ pub struct ArchyNode {
     pub nodes: Vec<ArchyNode>,
 }
 
+impl Display for ArchyNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let s = archy(&self, Prefix::None);
+        write!(f, "{s}")
+    }
+}
+
 impl ArchyNode {
     pub fn new(label: &str, id: &str) -> Self {
         ArchyNode {
@@ -172,17 +179,17 @@ Root
     }
 }
 
-pub fn annotate(node: &ArchyNode, hm: &HashMap<String, TaskReportDTO>) -> ArchyNode {
+pub fn overlay_results(node: &ArchyNode, hm: &HashMap<String, TaskReportDTO>) -> ArchyNode {
     let result = hm.get(&node.id);
 
     let conclusion_prefix = match result {
-        None => "",
+        None => "⏸️ ",
         Some(report) => {
             let TaskResultDTO { conclusion, .. } = &report.result;
             match conclusion {
                 TaskConclusionDTO::Ok => "✅ ",
                 TaskConclusionDTO::Err(_) => "❌ ",
-                TaskConclusionDTO::Cancelled => "- ",
+                TaskConclusionDTO::Cancelled => "🚫 ",
             }
         }
     };
@@ -191,7 +198,7 @@ pub fn annotate(node: &ArchyNode, hm: &HashMap<String, TaskReportDTO>) -> ArchyN
     let mut new_node = ArchyNode::new(&label, &node.id.clone());
 
     for x in &node.nodes {
-        let next = annotate(x, hm);
+        let next = overlay_results(x, hm);
         new_node.nodes.push(next);
     }
 

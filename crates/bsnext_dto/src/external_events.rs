@@ -1,4 +1,4 @@
-use crate::archy::{annotate, archy, ArchyNode, Prefix};
+use crate::archy::{archy, overlay_results, ArchyNode, Prefix};
 use crate::{
     FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, OutputLineDTO, ServerIdentityDTO,
     ServersChangedDTO, StderrLineDTO, StdoutLineDTO, StoppedWatchingDTO, WatchingDTO,
@@ -180,8 +180,8 @@ fn print_task_tree_summary<W: Write>(
     tree: &ArchyNode,
     report_map: &HashMap<String, TaskReportDTO>,
 ) -> anyhow::Result<()> {
-    let tree = annotate(tree, report_map);
-    let s = archy(&tree, Prefix::None);
+    let tree_with_results = overlay_results(tree, report_map);
+    let s = archy(&tree_with_results, Prefix::None);
     write!(w, "{s}")?;
     Ok(())
 }
@@ -300,8 +300,8 @@ pub fn print_task_action<W: Write>(w: &mut W, action_dto: &TaskActionDTO) -> any
         } => match report.result.conclusion {
             TaskConclusionDTO::Ok => {}
             TaskConclusionDTO::Err(_) => {
-                let annotated = annotate(tree, report_map);
-                let s = archy(&annotated, Prefix::None);
+                let tree_with_results = overlay_results(tree, report_map);
+                let s = archy(&tree_with_results, Prefix::None);
                 write!(w, "{s}")?;
             }
             TaskConclusionDTO::Cancelled => {}

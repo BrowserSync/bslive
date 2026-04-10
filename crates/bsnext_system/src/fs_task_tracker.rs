@@ -7,6 +7,7 @@ use bsnext_fs::FsEventContext;
 use bsnext_task::task_trigger::{FsChangesTrigger, TaskTrigger, TaskTriggerSource};
 use std::collections::HashMap;
 use tokio::sync::oneshot::Receiver;
+use tracing::Level;
 
 #[derive(Debug)]
 pub struct FsTaskTracker {
@@ -31,9 +32,14 @@ impl Handler<TriggerFsTask> for FsTaskTracker {
     type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, msg: TriggerFsTask, _ctx: &mut Self::Context) -> Self::Result {
+        let span = tracing::debug_span!("TriggerFsTask");
+        let _g = span.entered();
         let trigger = msg.trigger();
+        debug_trigger(&trigger);
+
         let fs_ctx = trigger.fs_ctx().to_owned();
         let task_spec = msg.task_spec;
+        debug_spec(&task_spec);
 
         let entry = self.task_spec_mapping.get(&fs_ctx);
         let cloned_id = fs_ctx;
@@ -50,14 +56,30 @@ impl Handler<TriggerFsTask> for FsTaskTracker {
         let invoke_spec = InvokeScope::new(task_trigger, task_spec, tx);
         self.spec_invoker.do_send(invoke_spec);
 
-        let top_level_scope = run(rx);
-        Box::pin(
-            top_level_scope
-                .into_actor(self)
-                .map(move |_resp, actor, _ctx| {
-                    actor.task_spec_mapping.remove(&cloned_id);
-                }),
-        )
+        Box::pin(run(rx).into_actor(self).map(move |_resp, actor, _ctx| {
+            actor.task_spec_mapping.remove(&cloned_id);
+        }))
+    }
+}
+
+fn debug_spec(task_spec: &TaskSpec) {
+    if tracing::enabled!(Level::DEBUG) {
+        let tree = task_spec.as_tree();
+        tracing::debug!("task spec to execute:\n{tree}");
+    }
+}
+
+fn debug_trigger(trigger: &FsChangesTrigger) {
+    if tracing::enabled!(Level::DEBUG) {
+        tracing::debug!(
+            "received {} changes. (further details in trace)",
+            trigger.changes().len()
+        );
+    }
+    if tracing::enabled!(Level::TRACE) {
+        for pb in trigger.changes() {
+            tracing::trace!(?pb);
+        }
     }
 }
 
