@@ -1,22 +1,24 @@
 use bsnext_core::shared_args::LoggingOpts;
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::route::{
-    BeforeRunOptItem, MultiWatch, PrefixOpt, RunOptItem, ShRunOptItem, Spec, WatcherDirs,
+    BeforeRunOptItem, MultiWatch, RunOptItem, ShRunOptItem, Spec, WatcherDirs,
 };
 use bsnext_tracing::OutputFormat;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, clap::Parser)]
+#[derive(Debug, Default, Clone, clap::Parser)]
 pub struct WatchCommand {
     /// Paths to watch
     #[arg(required = true)]
     pub paths: Vec<String>,
+    #[arg(long, num_args(0..))]
+    pub before: Vec<WatchRunner>,
     /// sh Commands to run when files have changed
-    #[arg(long = "sh")]
-    pub sh_commands: Vec<String>,
-    /// Initial command to run before starting watchers
-    #[arg(long = "initial", short)]
-    pub initial: Vec<String>,
+    #[arg(long, num_args(0..))]
+    pub run: Vec<WatchRunner>,
+    /// if true, listed commands will execute once before watching starts
+    #[arg(long)]
+    pub initial: bool,
     /// provide this flag to disable command prefixes
     #[arg(long = "no-prefix", default_value = "false")]
     pub no_prefix: bool,
@@ -34,6 +36,10 @@ pub struct WatchSubOpts {
     pub paths: Vec<String>,
     #[arg(long = "watch.run", num_args(0..))]
     pub run: Vec<WatchRunner>,
+    #[arg(long = "watch.before", num_args(0..))]
+    pub before: Vec<WatchRunner>,
+    #[arg(long = "watch.initial")]
+    pub initial: bool,
 }
 
 impl WatchSubOpts {
@@ -103,11 +109,10 @@ impl From<WatchSubOpts> for WatchCommand {
     fn from(value: WatchSubOpts) -> Self {
         WatchCommand {
             paths: value.paths.clone(),
-            sh_commands: value.sh_commands(),
-            initial: vec![],
+            run: value.run,
+            initial: value.initial,
             no_prefix: false,
-            logging: Default::default(),
-            format: Default::default(),
+            ..Default::default()
         }
     }
 }
@@ -128,8 +133,36 @@ impl From<WatchSubOpts> for MultiWatch {
                 WatchRunner::BsLive(bslive) => RunOptItem::BsLive { bslive },
             })
             .collect::<Vec<_>>();
+
+        let initial = value.initial.then(|| {
+            run_opts
+                .iter()
+                .map(ToOwned::to_owned)
+                .enumerate()
+                .filter_map(move |(_index, item)| match item {
+                    RunOptItem::Sh(sh) => Some(BeforeRunOptItem::Sh(sh)),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        });
+
+        let before_explicit = (!value.before.is_empty()).then(|| {
+            value
+                .before
+                .iter()
+                .filter_map(|watch| match watch {
+                    WatchRunner::Sh(sh) => Some(BeforeRunOptItem::Sh(ShRunOptItem {
+                        sh: sh.to_owned(),
+                        name: None,
+                        prefix: None,
+                    })),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        });
+
         let spec = Spec {
-            before: None,
+            before: initial.or(before_explicit),
             run: Some(run_opts),
             ..Default::default()
         };
@@ -142,46 +175,12 @@ impl From<WatchSubOpts> for MultiWatch {
 
 impl From<WatchCommand> for MultiWatch {
     fn from(value: WatchCommand) -> Self {
-        let dirs = WatcherDirs::Many(value.paths);
-        let run_opts = value
-            .sh_commands
-            .iter()
-            .map(ToOwned::to_owned)
-            .map(move |item| {
-                let prefix = value.no_prefix.then_some(PrefixOpt::Bool(false));
-                RunOptItem::Sh(ShRunOptItem {
-                    sh: item,
-                    name: None,
-                    prefix,
-                })
-            })
-            .collect::<Vec<_>>();
-
-        let before = value
-            .initial
-            .iter()
-            .map(ToOwned::to_owned)
-            .enumerate()
-            .map(move |(index, item)| {
-                let name = Some(format!("initial:{index}"));
-                let prefix = value.no_prefix.then_some(PrefixOpt::Bool(false));
-                BeforeRunOptItem::Sh(ShRunOptItem {
-                    sh: item,
-                    name,
-                    prefix,
-                })
-            })
-            .collect::<Vec<_>>();
-
-        let spec = Spec {
-            before: Some(before),
-            run: Some(run_opts),
-            ..Default::default()
+        let sub_opts = WatchSubOpts {
+            paths: value.paths.clone(),
+            run: value.run,
+            before: value.before,
+            initial: value.initial,
         };
-
-        MultiWatch {
-            dirs,
-            opts: Some(spec),
-        }
+        MultiWatch::from(sub_opts)
     }
 }

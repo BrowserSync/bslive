@@ -9,8 +9,8 @@ test.describe(
                 args: [
                     "watch",
                     "examples/watch/src",
-                    "--sh",
-                    "echo did change",
+                    "--run",
+                    "sh:echo did change",
                 ],
             }),
             description: "",
@@ -89,6 +89,34 @@ test.describe(
                     },
                 ],
             ]);
+        });
+    },
+);
+
+test.describe(
+    "watch from cli with --initial",
+    {
+        annotation: {
+            type: cli({
+                args: [
+                    "watch",
+                    "examples/watch/src",
+                    "--run",
+                    "sh: echo did run initial",
+                    "--initial",
+                ],
+            }),
+            description: "",
+        },
+    },
+    () => {
+        test("runs commands once before watching", async ({
+            page,
+            bs,
+            request,
+        }) => {
+            let lines = await bs.outputLines(1);
+            expect(JSON.stringify(lines, null, 2)).toContain("did run initial");
         });
     },
 );
