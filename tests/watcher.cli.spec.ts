@@ -92,6 +92,53 @@ test.describe(
         });
     },
 );
+test.describe(
+    "start command + watcher opts from cli",
+    {
+        annotation: {
+            type: cli({
+                args: [
+                    "start",
+                    "examples/watch/src",
+                    "--watch.paths",
+                    "examples/watch/src/01.txt",
+                    "--watch.run",
+                    "sh: echo 01",
+                    "--watch.run",
+                    "bslive:notify-server",
+                ],
+            }),
+            description: "",
+        },
+    },
+    () => {
+        test("path and command override", async ({ page, bs, request }) => {
+            let out = bs.waitForOutput("Watching");
+            await page.goto(bs.path("/"));
+
+            // Install mock handler
+            await page.evaluate(installMockHandler);
+
+            // simulate the file change event
+            bs.touch("examples/watch/src/01.txt");
+
+            // Wait for the reloadPage call
+            await page.waitForFunction(() => {
+                return window.__playwright?.calls?.length === 1;
+            });
+
+            // Verify the calls
+            const calls = await page.evaluate(readCalls);
+            expect(calls).toStrictEqual([
+                [
+                    {
+                        kind: "reloadPage",
+                    },
+                ],
+            ]);
+        });
+    },
+);
 
 test.describe(
     "watch from cli with --initial",
