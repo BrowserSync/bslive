@@ -80,8 +80,9 @@ Verbose logs from **git checkouts**, **installs**, or **manual edits** in `FS_AU
 
 ## Reports
 
-| File | Platform |
-|------|----------|
-| `report-darwin.md` | macOS (older snapshot; re-run script and refresh if needed) |
+| File | Purpose |
+|------|---------|
+| `report-darwin-vs-linux.md` | Side-by-side summary of two captured runs (Darwin + Linux); **start here** for cross-OS policy gaps. |
+| `report-darwin.md` | macOS-only step table from an earlier script revision (re-run script and refresh if needed). |
 
 Raw logs under `logs/` are **gitignored** (regenerate on each machine). After `./scripts/fs-notify-audit.sh`, open `logs/raw-<kernel>.log` for analysis.
