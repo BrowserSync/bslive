@@ -21,5 +21,6 @@ thiserror = { workspace = true }
 [dev-dependencies]
 bsnext_tracing = { path = "../bsnext_tracing" }
 tracing = { workspace = true }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 kill_tree = { workspace = true }
 anyhow = { workspace = true }

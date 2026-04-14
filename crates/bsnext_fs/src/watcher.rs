@@ -45,53 +45,166 @@ pub fn create_watcher(
     })
 }
 
+/// Stable tracing target so cross-platform audits can filter with
+/// `RUST_LOG=bsnext_fs::platform_accepts=trace` (or `bsnext_fs=trace`).
+fn trace_platform_decision(
+    platform: &'static str,
+    branch: &'static str,
+    evt: &notify::Event,
+    accept: bool,
+) {
+    tracing::trace!(
+        target: "bsnext_fs::platform_accepts",
+        platform,
+        branch,
+        event_kind = ?evt.kind,
+        accept,
+    );
+}
+
+/// macOS (FSEvents) vs other Unix (e.g. inotify): same acceptance rules for now, separate
+/// `platform` labels in [`trace_platform_decision`] so audit logs are comparable per OS.
 #[cfg(not(target_os = "windows"))]
 fn platform_accepts(evt: &notify::Event) -> bool {
+    #[cfg(target_os = "macos")]
+    const PLATFORM: &str = "macos";
+    #[cfg(not(target_os = "macos"))]
+    const PLATFORM: &str = "unix";
+    platform_accepts_posix(evt, PLATFORM)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn platform_accepts_posix(evt: &notify::Event, platform: &'static str) -> bool {
     match evt.kind {
-        EventKind::Any => false,
-        EventKind::Access(..) => false,
-        EventKind::Create(..) => false,
+        EventKind::Any => {
+            trace_platform_decision(platform, "Any", evt, false);
+            false
+        }
+        EventKind::Access(kind) => {
+            trace_platform_decision(platform, "Access", evt, false);
+            let _ = kind;
+            false
+        }
+        EventKind::Create(kind) => {
+            trace_platform_decision(platform, "Create", evt, false);
+            let _ = kind;
+            false
+        }
         EventKind::Modify(modify) => match modify {
-            #[allow(clippy::match_like_matches_macro)]
-            ModifyKind::Data(data) => match data {
-                DataChange::Content => true,
-                _ => false,
-            },
-            #[allow(clippy::match_like_matches_macro)]
-            ModifyKind::Metadata(meta) => match meta {
-                MetadataKind::Any => true,
-                _ => false,
-            },
-            ModifyKind::Name(..) => false,
-            ModifyKind::Other => false,
-            ModifyKind::Any => false,
+            ModifyKind::Any => {
+                trace_platform_decision(platform, "Modify::Any", evt, false);
+                false
+            }
+            ModifyKind::Data(data) => {
+                let (accept, branch) = match data {
+                    DataChange::Content => (true, "Modify::Data::Content"),
+                    DataChange::Any => (false, "Modify::Data::Any"),
+                    DataChange::Size => (false, "Modify::Data::Size"),
+                    DataChange::Other => (false, "Modify::Data::Other"),
+                };
+                trace_platform_decision(platform, branch, evt, accept);
+                accept
+            }
+            ModifyKind::Metadata(meta) => {
+                let (accept, branch) = match meta {
+                    MetadataKind::Any => (true, "Modify::Metadata::Any"),
+                    MetadataKind::AccessTime => (false, "Modify::Metadata::AccessTime"),
+                    MetadataKind::WriteTime => (false, "Modify::Metadata::WriteTime"),
+                    MetadataKind::Permissions => (false, "Modify::Metadata::Permissions"),
+                    MetadataKind::Ownership => (false, "Modify::Metadata::Ownership"),
+                    MetadataKind::Extended => (false, "Modify::Metadata::Extended"),
+                    MetadataKind::Other => (false, "Modify::Metadata::Other"),
+                };
+                trace_platform_decision(platform, branch, evt, accept);
+                accept
+            }
+            ModifyKind::Name(mode) => {
+                trace_platform_decision(platform, "Modify::Name", evt, false);
+                let _ = mode;
+                false
+            }
+            ModifyKind::Other => {
+                trace_platform_decision(platform, "Modify::Other", evt, false);
+                false
+            }
         },
-        EventKind::Remove(..) => false,
-        EventKind::Other => false,
+        EventKind::Remove(kind) => {
+            trace_platform_decision(platform, "Remove", evt, false);
+            let _ = kind;
+            false
+        }
+        EventKind::Other => {
+            trace_platform_decision(platform, "EventKind::Other", evt, false);
+            false
+        }
     }
 }
 
 #[cfg(target_os = "windows")]
 fn platform_accepts(evt: &notify::Event) -> bool {
+    const PLATFORM: &str = "windows";
     match evt.kind {
-        EventKind::Any => false,
-        EventKind::Access(..) => false,
-        EventKind::Create(..) => false,
+        EventKind::Any => {
+            trace_platform_decision(PLATFORM, "Any", evt, false);
+            false
+        }
+        EventKind::Access(kind) => {
+            trace_platform_decision(PLATFORM, "Access", evt, false);
+            let _ = kind;
+            false
+        }
+        EventKind::Create(kind) => {
+            trace_platform_decision(PLATFORM, "Create", evt, false);
+            let _ = kind;
+            false
+        }
         EventKind::Modify(modify) => match modify {
-            ModifyKind::Any => true,
-            ModifyKind::Data(data) => match data {
-                DataChange::Content => true,
-                _ => false,
-            },
-            ModifyKind::Metadata(meta) => match meta {
-                MetadataKind::Any => true,
-                _ => false,
-            },
-            ModifyKind::Name(..) => false,
-            ModifyKind::Other => false,
+            ModifyKind::Any => {
+                trace_platform_decision(PLATFORM, "Modify::Any", evt, true);
+                true
+            }
+            ModifyKind::Data(data) => {
+                let (accept, branch) = match data {
+                    DataChange::Content => (true, "Modify::Data::Content"),
+                    DataChange::Any => (false, "Modify::Data::Any"),
+                    DataChange::Size => (false, "Modify::Data::Size"),
+                    DataChange::Other => (false, "Modify::Data::Other"),
+                };
+                trace_platform_decision(PLATFORM, branch, evt, accept);
+                accept
+            }
+            ModifyKind::Metadata(meta) => {
+                let (accept, branch) = match meta {
+                    MetadataKind::Any => (true, "Modify::Metadata::Any"),
+                    MetadataKind::AccessTime => (false, "Modify::Metadata::AccessTime"),
+                    MetadataKind::WriteTime => (false, "Modify::Metadata::WriteTime"),
+                    MetadataKind::Permissions => (false, "Modify::Metadata::Permissions"),
+                    MetadataKind::Ownership => (false, "Modify::Metadata::Ownership"),
+                    MetadataKind::Extended => (false, "Modify::Metadata::Extended"),
+                    MetadataKind::Other => (false, "Modify::Metadata::Other"),
+                };
+                trace_platform_decision(PLATFORM, branch, evt, accept);
+                accept
+            }
+            ModifyKind::Name(mode) => {
+                trace_platform_decision(PLATFORM, "Modify::Name", evt, false);
+                let _ = mode;
+                false
+            }
+            ModifyKind::Other => {
+                trace_platform_decision(PLATFORM, "Modify::Other", evt, false);
+                false
+            }
         },
-        EventKind::Remove(..) => false,
-        EventKind::Other => false,
+        EventKind::Remove(kind) => {
+            trace_platform_decision(PLATFORM, "Remove", evt, false);
+            let _ = kind;
+            false
+        }
+        EventKind::Other => {
+            trace_platform_decision(PLATFORM, "EventKind::Other", evt, false);
+            false
+        }
     }
 }
 
