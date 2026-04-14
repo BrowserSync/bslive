@@ -155,7 +155,25 @@ pub async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<Se
     let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
     let (servers, child_results) = addr.send(ResolveServers::new(clone2)).await??;
     Ok(SetupOk {
+        input,
         report_and_tree,
+        servers,
+        child_results,
+    })
+}
+
+pub async fn setup_jobs_only(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupTasksOk> {
+    let spec = addr.send(ResolveInitialTasks::new(input)).await??;
+    let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
+    Ok(SetupTasksOk { report_and_tree })
+}
+
+pub async fn setup_servers_only(
+    addr: Addr<BsSystem>,
+    input: Input,
+) -> anyhow::Result<SetupServersOk> {
+    let (servers, child_results) = addr.send(ResolveServers::new(input)).await??;
+    Ok(SetupServersOk {
         servers,
         child_results,
     })
@@ -224,10 +242,21 @@ pub async fn print_jobs(
 }
 
 pub struct SetupOk {
+    pub(crate) input: Input,
     pub(crate) servers: GetActiveServersResponse,
     #[allow(dead_code)]
-    report_and_tree: TaskReportAndTree,
+    pub report_and_tree: TaskReportAndTree,
     pub(crate) child_results: Vec<ChildResult>,
+}
+
+pub struct SetupServersOk {
+    pub(crate) servers: GetActiveServersResponse,
+    pub(crate) child_results: Vec<ChildResult>,
+}
+
+pub struct SetupTasksOk {
+    #[allow(dead_code)]
+    pub report_and_tree: TaskReportAndTree,
 }
 
 pub struct RunOk {

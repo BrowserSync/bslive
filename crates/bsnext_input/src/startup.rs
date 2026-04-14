@@ -1,5 +1,6 @@
 use crate::{Input, InputError};
 use std::env::current_dir;
+use std::fmt::{Debug, Formatter};
 use std::path::PathBuf;
 
 pub struct Startup {
@@ -38,6 +39,10 @@ pub enum SystemStartArgs {
     InputOnly {
         input: Input,
     },
+    InputOnlyDeferred {
+        input: Input,
+        create: Lazy,
+    },
     PathWithInvalidInput {
         path: PathBuf,
         input_error: InputError,
@@ -48,6 +53,25 @@ pub enum SystemStartArgs {
         run_mode: RunMode,
         top_level_run_mode: TopLevelRunMode,
     },
+}
+
+pub struct Lazy {
+    inner: Box<dyn Fn(Input) -> Result<Input, Box<InputError>>>,
+}
+
+impl Debug for Lazy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Lazy")
+    }
+}
+
+impl Lazy {
+    pub fn new(inner: Box<dyn Fn(Input) -> Result<Input, Box<InputError>>>) -> Self {
+        Self { inner }
+    }
+    pub fn exec(self, input: Input) -> Result<Input, Box<InputError>> {
+        (*self.inner)(input)
+    }
 }
 
 #[derive(Debug, Clone)]

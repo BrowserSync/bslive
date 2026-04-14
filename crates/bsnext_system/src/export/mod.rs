@@ -43,5 +43,6 @@ pub async fn export_cmd(
         }
         Ok(SystemStartArgs::PathWithInvalidInput { .. }) => todo!("handle PathWithInvalidInput?"),
         Ok(SystemStartArgs::RunOnly { .. }) => todo!("handle PathWithInvalidInput?"),
+        Ok(SystemStartArgs::InputOnlyDeferred { .. }) => todo!("not yet..."),
     }
 }

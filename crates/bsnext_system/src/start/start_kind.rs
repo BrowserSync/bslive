@@ -3,7 +3,7 @@ use crate::start::start_command::StartCommand;
 use crate::start::start_kind::run_from_input::RunFromInputPaths;
 use crate::start::start_kind::start_from_example::StartFromExample;
 use crate::start::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
-use crate::start::start_kind::start_from_paths::StartFromTrailingArgs;
+use crate::start::start_kind::start_from_paths::StartFromPaths;
 use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_fs_helpers::{fs_write_str, FsWriteError, WriteMode};
 use bsnext_input::route::{CorsOpts, Opts, Route};
@@ -28,7 +28,7 @@ pub enum StartKind {
     FromInput(StartFromInput),
     FromInputPaths(StartFromInputPaths),
     FromExample(StartFromExample),
-    FromTrailingArgs(StartFromTrailingArgs),
+    FromPaths(StartFromPaths),
 }
 
 impl StartKind {
@@ -41,7 +41,7 @@ impl StartKind {
                 cmd.trailing.len(),
                 input_opts.input.len()
             );
-            return StartKind::FromTrailingArgs(StartFromTrailingArgs {
+            return StartKind::FromPaths(StartFromPaths {
                 paths: cmd.trailing.clone(),
                 write_input: fs_opts.write,
                 port: cmd.port,
@@ -121,9 +121,7 @@ impl SystemStart for StartKind {
         match self {
             StartKind::FromInputPaths(from_inputs) => from_inputs.resolve_input(ctx),
             StartKind::FromExample(from_example) => from_example.resolve_input(ctx),
-            StartKind::FromTrailingArgs(from_trailing_args) => {
-                from_trailing_args.resolve_input(ctx)
-            }
+            StartKind::FromPaths(from_trailing_args) => from_trailing_args.resolve_input(ctx),
             StartKind::FromInput(from_inputs) => from_inputs.resolve_input(ctx),
             StartKind::Run(run_from_input) => run_from_input.resolve_input(ctx),
         }

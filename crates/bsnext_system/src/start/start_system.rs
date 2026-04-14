@@ -1,7 +1,10 @@
 #![allow(clippy::result_large_err)]
 use crate::api::BsSystemApi;
 use crate::start::start_kind::StartKind;
-use crate::system::{run_jobs, BsSystem, RunDryOk, RunOk, SetupOk};
+use crate::system::{
+    run_jobs, setup_jobs_only, setup_servers_only, BsSystem, RunDryOk, RunOk, SetupOk,
+    SetupServersOk,
+};
 use crate::watchables::input_monitor::MonitorInput;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
@@ -64,12 +67,11 @@ impl Handler<Start> for BsSystem {
 
                 let ids = input.ids();
                 let input_ctx = InputCtx::new(&ids, None, &self.start_context, Some(&path));
-                let input_clone2 = input.clone();
                 let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
-                        let SetupOk { servers, .. } = res.map_err(StartupError::Any)?;
+                        let SetupOk { servers, input, .. } = res.map_err(StartupError::Any)?;
                         debug!("✅ setup jobs completed");
                         ctx.notify(MonitorInput {
                             path: path.clone(),
@@ -77,7 +79,7 @@ impl Handler<Start> for BsSystem {
                             input_ctx,
                         });
                         // todo: where to better sequence these side-effects?
-                        actor.accept_watchables(&input_clone2, addr);
+                        actor.accept_watchables(&input, addr);
                         Ok(DidStart::Started(servers))
                     },
                 ))
@@ -86,8 +88,6 @@ impl Handler<Start> for BsSystem {
                 debug!("SystemStartArgs::InputOnly");
 
                 let addr = ctx.address();
-                let input_clone2 = input.clone();
-                todo!("It needs to be possible to start the system and then augment the input after initial tasks (eg: to create something to serve)");
                 let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
@@ -99,7 +99,45 @@ impl Handler<Start> for BsSystem {
                             debug!("errored: {:?}", errored);
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        actor.accept_watchables(&input_clone2, addr);
+                        actor.accept_watchables(&res.input, addr);
+                        Ok(DidStart::Started(res.servers))
+                    },
+                ))
+            }
+            Ok(SystemStartArgs::InputOnlyDeferred { input, create }) => {
+                debug!("SystemStartArgs::InputOnlyDeferred");
+
+                let addr = ctx.address();
+                let addr_clone = addr.clone();
+                let original_input = input.clone();
+                let jobs = async move {
+                    let res = setup_jobs_only(addr_clone.clone(), original_input.clone()).await?;
+                    let input = create
+                        .exec(original_input)
+                        .map_err(|e| StartupError::InputError(*e))?;
+                    let SetupServersOk {
+                        servers,
+                        child_results,
+                    } = setup_servers_only(addr_clone, input.clone()).await?;
+                    let next = SetupOk {
+                        input,
+                        servers,
+                        child_results,
+                        report_and_tree: res.report_and_tree,
+                    };
+                    Ok(next)
+                };
+
+                Box::pin(jobs.into_actor(self).map(
+                    move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
+                        let res = res?;
+                        debug!("✅ setup jobs completed");
+                        let errored = ChildResult::first_server_error(&res.child_results);
+                        if let Some(server_error) = errored {
+                            debug!("errored: {:?}", errored);
+                            return Err(StartupError::ServerError((*server_error).to_owned()));
+                        }
+                        actor.accept_watchables(&res.input, addr);
                         Ok(DidStart::Started(res.servers))
                     },
                 ))

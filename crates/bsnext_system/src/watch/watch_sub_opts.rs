@@ -5,7 +5,7 @@ use bsnext_input::route::{
 
 #[derive(Debug, Default, Clone, clap::Parser)]
 pub struct WatchSubOpts {
-    #[arg(long = "watch.path", num_args(0..))]
+    #[arg(long = "watch.paths", num_args(0..))]
     pub paths: Vec<String>,
     #[arg(long = "watch.run", num_args(0..))]
     pub run: Vec<WatchRunnerStr>,

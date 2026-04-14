@@ -30,7 +30,7 @@ test.describe(
     {
         annotation: {
             type: cli({
-                // args: ["examples/watch/src", "--watch.path", "examples/watch/src/01.txt", "--watch.run", "sh: echo 01"]
+                // args: ["examples/watch/src", "--watch.paths", "examples/watch/src/01.txt", "--watch.run", "sh: echo 01"]
                 args: ["examples/watch/src"],
             }),
             description: "",
@@ -53,7 +53,7 @@ test.describe(
             type: cli({
                 args: [
                     "examples/watch/src",
-                    "--watch.path",
+                    "--watch.paths",
                     "examples/watch/src/01.txt",
                     "--watch.run",
                     "sh: echo 01",

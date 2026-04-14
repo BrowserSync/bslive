@@ -44,7 +44,7 @@ fn test_watch_sub_opts_parsing() -> anyhow::Result<()> {
 
     let args = vec![
         "program",
-        "--watch.path",
+        "--watch.paths",
         "tests",
         "--watch.run",
         "sh:echo 1",
