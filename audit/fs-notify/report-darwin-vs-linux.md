@@ -1,6 +1,8 @@
 # FS notify audit — **Darwin vs Linux (side-by-side)**
 
-This document compares two runs of **`scripts/fs-notify-audit.sh`** with the same tracing defaults (`RUST_LOG=bsnext_fs=trace`) and the **current** `platform_accepts` behaviour in `crates/bsnext_fs/src/watcher.rs`. Raw logs are gitignored; paths below are where those runs lived when this file was written.
+This document compares two runs of **`scripts/fs-notify-audit.sh`** with the same tracing defaults (`RUST_LOG=bsnext_fs=trace`) and the **`platform_accepts` behaviour as of those captures**. Raw logs are gitignored; paths below are where those runs lived when this file was written.
+
+**Update (after these logs):** Linux **`Modify(Data(Any))`** is now accepted in `platform_accepts` (Linux-only, via `cfg!(target_os = "linux")`) so inotify forwards align with macOS for typical writes. Re-run the script on Linux to measure the new `[accept]` / `InnerChangeEvent` counts.
 
 | | **Darwin** | **Linux** |
 |--|------------|-----------|

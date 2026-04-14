@@ -62,8 +62,9 @@ fn trace_platform_decision(
     );
 }
 
-/// macOS (FSEvents) vs other Unix (e.g. inotify): same acceptance rules for now, separate
-/// `platform` labels in [`trace_platform_decision`] so audit logs are comparable per OS.
+/// macOS (FSEvents) vs other Unix (inotify, etc.): almost the same rules; Linux additionally accepts
+/// [`DataChange::Any`] so data writes match macOS forwarding. Separate `platform` labels in
+/// [`trace_platform_decision`] keep audit logs comparable.
 #[cfg(not(target_os = "windows"))]
 fn platform_accepts(evt: &notify::Event) -> bool {
     #[cfg(target_os = "macos")]
@@ -98,7 +99,9 @@ fn platform_accepts_posix(evt: &notify::Event, platform: &'static str) -> bool {
             ModifyKind::Data(data) => {
                 let (accept, branch) = match data {
                     DataChange::Content => (true, "Modify::Data::Content"),
-                    DataChange::Any => (false, "Modify::Data::Any"),
+                    // Linux/inotify often reports writes as `Data(Any)`; macOS/FSEvents usually uses
+                    // `Data(Content)`. Accept `Any` on Linux only so forwards match macOS for the same UX.
+                    DataChange::Any => (cfg!(target_os = "linux"), "Modify::Data::Any"),
                     DataChange::Size => (false, "Modify::Data::Size"),
                     DataChange::Other => (false, "Modify::Data::Other"),
                 };
