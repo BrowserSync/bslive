@@ -10,14 +10,14 @@
 
 Normal-case script step → what **notify** delivered (representative) → **`platform_accepts`** → **forwarded** (`InnerChangeEvent` / `[accept]`).
 
-| Script step | Raw `EventKind` observed (order may vary) | `platform_accepts` | Forwarded? |
-|-------------|-------------------------------------------|--------------------|------------|
-| **content-changed** | `Modify(Data(Content))` | `Modify::Data::Content` → accept | Yes (once) |
-| **touched** | `Modify(Metadata(Any))`, then `Modify(Data(Content))` | Metadata **Any** → accept; Data **Content** → accept | Yes (twice) |
-| **file-added** | `Create(File)` **not accepted**; `Modify(Metadata(Extended))` **not accepted**; `Modify(Data(Content))` **accepted** | Create → reject; Extended metadata → reject; Content → accept | Yes (via **Modify**, not Create) |
-| **file-removed** | `Create(File)` (replay/ordering), `Remove(File)` **not accepted**, `Modify(Metadata(Extended))` **not accepted**, `Modify(Data(Content))` **accepted** | Same pattern as add/remove policy | Yes (odd-looking **Content** on deleted path — still emitted by backend) |
-| **folder-added** | `Create(Folder)` **not accepted**; `Modify(Metadata(Extended))` **not accepted** | Create → reject; Extended → reject | **No** `InnerChangeEvent` in this run |
-| **folder-removed** | `Create(Folder)` (again), `Remove(Folder)` **not accepted**, `Modify(Metadata(Extended))` **not accepted** | Remove → reject; Extended → reject | **No** `InnerChangeEvent` in this run |
+| Script step         | Raw `EventKind` observed (order may vary)                                                                                                              | `platform_accepts`                                            | Forwarded?                                                               |
+|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------|--------------------------------------------------------------------------|
+| **content-changed** | `Modify(Data(Content))`                                                                                                                                | `Modify::Data::Content` → accept                              | Yes (once)                                                               |
+| **touched**         | `Modify(Metadata(Any))`, then `Modify(Data(Content))`                                                                                                  | Metadata **Any** → accept; Data **Content** → accept          | Yes (twice)                                                              |
+| **file-added**      | `Create(File)` **not accepted**; `Modify(Metadata(Extended))` **not accepted**; `Modify(Data(Content))` **accepted**                                   | Create → reject; Extended metadata → reject; Content → accept | Yes (via **Modify**, not Create)                                         |
+| **file-removed**    | `Create(File)` (replay/ordering), `Remove(File)` **not accepted**, `Modify(Metadata(Extended))` **not accepted**, `Modify(Data(Content))` **accepted** | Same pattern as add/remove policy                             | Yes (odd-looking **Content** on deleted path — still emitted by backend) |
+| **folder-added**    | `Create(Folder)` **not accepted**; `Modify(Metadata(Extended))` **not accepted**                                                                       | Create → reject; Extended → reject                            | **No** `InnerChangeEvent` in this run                                    |
+| **folder-removed**  | `Create(Folder)` (again), `Remove(Folder)` **not accepted**, `Modify(Metadata(Extended))` **not accepted**                                             | Remove → reject; Extended → reject                            | **No** `InnerChangeEvent` in this run                                    |
 
 ## Policy notes (current code)
 
