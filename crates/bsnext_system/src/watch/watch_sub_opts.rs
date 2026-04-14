@@ -58,8 +58,16 @@ impl From<WatchSubOpts> for MultiWatch {
                 .collect::<Vec<_>>()
         });
 
+        // if 'before' was given too, always run that first
+        let queue: Option<Vec<BeforeRunOptItem>> = match (initial, before_explicit) {
+            (Some(initial), Some(before)) => Some(before.into_iter().chain(initial).collect()),
+            (None, Some(before)) => Some(before),
+            (Some(initial), None) => Some(initial),
+            (None, None) => None,
+        };
+
         let spec = Spec {
-            before: initial.or(before_explicit),
+            before: queue,
             run: Some(run_opts),
             ..Default::default()
         };

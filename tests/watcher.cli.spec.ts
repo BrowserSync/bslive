@@ -167,3 +167,40 @@ test.describe(
         });
     },
 );
+
+test.describe(
+    "start from cli with --watch.before and --watch.initial",
+    {
+        annotation: {
+            type: cli({
+                args: [
+                    "start",
+                    "examples/watch/src",
+                    "--watch.run",
+                    "sh: echo did run normal",
+                    "--watch.initial",
+                    "--watch.before",
+                    "sh: echo did run before",
+                ],
+            }),
+            description: "",
+        },
+    },
+    () => {
+        test("runs 'before' commands before 'initial' ones", async ({
+            page,
+            bs,
+            request,
+        }) => {
+            let lines = await bs.outputLines(2);
+            let combined = JSON.stringify(lines);
+            expect(combined).toContain("did run before");
+            expect(combined).toContain("did run normal");
+
+            // Verify order
+            let beforeIndex = combined.indexOf("did run before");
+            let normalIndex = combined.indexOf("did run normal");
+            expect(beforeIndex).toBeLessThan(normalIndex);
+        });
+    },
+);
