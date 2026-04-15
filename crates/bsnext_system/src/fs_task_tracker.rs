@@ -85,7 +85,7 @@ fn debug_trigger(trigger: &FsChangesTrigger) {
 
 async fn run(rx: Receiver<TaskReportAndTree>) -> anyhow::Result<()> {
     let output = rx.await?;
-    if !output.report.is_ok() {
+    if output.report.is_ok() {
         tracing::debug!("✅TriggerFsTaskEvent triggered a invoke scope and succeeded")
     } else {
         tracing::debug!("❌ TriggerFsTaskEvent triggered a invoke scope and failed")

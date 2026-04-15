@@ -56,10 +56,10 @@ fn trace_platform_decision(
 ) {
     tracing::trace!(
         target: "bsnext_fs::platform_accepts",
+        accept,
         platform,
         branch,
         event_kind = ?evt.kind,
-        accept,
     );
 }
 
@@ -228,14 +228,45 @@ mod test {
         let excluded = is_excluded_postfix(&change);
         assert_eq!(excluded, true);
     }
+    #[test]
+    fn test_vim_4913() {
+        let p1 = Path::new("/some/path/4913");
+        assert_eq!(is_ignored_path_type(&p1), true);
+        let p2 = Path::new("/some/path/5036");
+        assert_eq!(is_ignored_path_type(&p2), true);
+        let p3 = Path::new("/some/path/6020");
+        assert_eq!(is_ignored_path_type(&p3), true);
+        let p4 = Path::new("/some/path/4912");
+        assert_eq!(is_ignored_path_type(&p4), false);
+        let p5 = Path::new("/some/path/not_a_number");
+        assert_eq!(is_ignored_path_type(&p5), false);
+        let p6 = Path::new("/some/path/4913.txt");
+        assert_eq!(is_ignored_path_type(&p6), false);
+        let p7 = Path::new("/some/path/6143"); // 11th value in sequence
+        assert_eq!(is_ignored_path_type(&p7), false);
+    }
 }
 
 fn is_ignored_path_type<P: AsRef<Path>>(subject: &P) -> bool {
-    subject
-        .as_ref()
-        .as_os_str()
-        .as_encoded_bytes()
-        .ends_with(b"~")
+    let path_ref = subject.as_ref();
+    let encoded = path_ref.as_os_str().as_encoded_bytes();
+
+    // vim backup stuff
+    if encoded.ends_with(b"~") {
+        return true;
+    }
+
+    // vim 4913 test files (used on linux/unix to check directory permissions)
+    // Starts at 4913 and increments by 123 if it already exists.
+    // We only check for the first 10 increments as it's highly unlikely
+    // that Vim will cycle through more than that in practice.
+    match path_ref.file_name().map(|name| name.as_encoded_bytes()) {
+        Some(
+            b"4913" | b"5036" | b"5159" | b"5282" | b"5405" | b"5528" | b"5651" | b"5774" | b"5897"
+            | b"6020",
+        ) => true,
+        _ => false,
+    }
 }
 
 // todo: If a folder is explicitly watched, these rules should be ignored
@@ -272,6 +303,6 @@ fn is_excluded_postfix<P: AsRef<Path>>(subject: &P) -> bool {
         Some(b"swp") => true,
         Some(b"swo") => true,
         Some(b"swn") => true,
-        _ => false
+        _ => false,
     }
 }
