@@ -664,6 +664,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bsnext_monitor"
+version = "0.1.0"
+
+[[package]]
 name = "bsnext_output"
 version = "0.23.0"
 dependencies = [

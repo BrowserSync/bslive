@@ -30,6 +30,29 @@ pub struct PathMonitor {
     inner_receiver: Option<tokio::sync::mpsc::Receiver<FsEvent>>,
 }
 
+impl PathMonitor {
+    pub fn new(
+        sys: Recipient<FsEventGrouping>,
+        debounce: Debounce,
+        cwd: PathBuf,
+        fs_ctx: FsEventContext,
+        path_watchable: PathWatchable,
+    ) -> Self {
+        let (inner_sender, inner_receiver) = mpsc::channel::<FsEvent>(1);
+        Self {
+            recipient: sys,
+            debounce,
+            cwd,
+            addrs: vec![],
+            fs_ctx,
+            path_watchable,
+            inner_sender,
+            inner_receiver: Some(inner_receiver),
+        }
+    }
+}
+
+
 #[derive(Debug, Clone)]
 pub struct PathMonitorMeta {
     #[allow(dead_code)]
@@ -335,32 +358,10 @@ impl Handler<StopPathMonitor> for PathMonitor {
     type Result = ();
 
     fn handle(&mut self, _msg: StopPathMonitor, ctx: &mut Self::Context) -> Self::Result {
-        for x in &self.addrs {
-            x.do_send(StopWatcher)
+        for addr in &self.addrs {
+            addr.do_send(StopWatcher)
         }
         self.addrs = vec![];
         ctx.stop();
-    }
-}
-
-impl PathMonitor {
-    pub fn new(
-        sys: Recipient<FsEventGrouping>,
-        debounce: Debounce,
-        cwd: PathBuf,
-        fs_ctx: FsEventContext,
-        path_watchable: PathWatchable,
-    ) -> Self {
-        let (inner_sender, inner_receiver) = mpsc::channel::<FsEvent>(1);
-        Self {
-            recipient: sys,
-            debounce,
-            cwd,
-            addrs: vec![],
-            fs_ctx,
-            path_watchable,
-            inner_sender,
-            inner_receiver: Some(inner_receiver),
-        }
     }
 }
