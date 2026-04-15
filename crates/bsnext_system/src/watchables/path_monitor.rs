@@ -52,7 +52,6 @@ impl PathMonitor {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct PathMonitorMeta {
     #[allow(dead_code)]
