@@ -1,5 +1,6 @@
 use crate::as_actor::AsActor;
 use crate::invocation::Invocation;
+use crate::{ContentId, NodePath};
 use actix::Recipient;
 use std::fmt::{Display, Formatter};
 
@@ -15,7 +16,8 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug)]
 pub struct TaskEntry {
     task: Box<dyn AsActor>,
-    id: u64,
+    id: ContentId,
+    node_path: NodePath,
 }
 
 impl Display for TaskEntry {
@@ -25,8 +27,15 @@ impl Display for TaskEntry {
 }
 
 impl TaskEntry {
-    pub fn new(t: Box<dyn AsActor>, id: u64) -> Self {
-        Self { id, task: t }
+    pub fn new(t: Box<dyn AsActor>, id: ContentId, node_path: NodePath) -> Self {
+        Self {
+            id,
+            task: t,
+            node_path,
+        }
+    }
+    pub fn path(&self) -> &NodePath {
+        &self.node_path
     }
 }
 
@@ -37,12 +46,7 @@ impl AsActor for TaskEntry {
 }
 
 impl TaskEntry {
-    pub fn id(&self) -> u64 {
+    pub fn id(&self) -> ContentId {
         self.id
-    }
-    pub fn sqid(&self) -> String {
-        let sqids = sqids::Sqids::default();
-        let sqid = sqids.encode(&[self.id]).unwrap();
-        sqid.get(0..6).unwrap_or(&sqid).to_string()
     }
 }

@@ -1,12 +1,12 @@
+use crate::fs_task_tracker::TriggerFsTask;
 use crate::input_fs::from_input_path;
-use crate::path_monitor::PathMonitorMeta;
-use crate::path_watchable::PathWatchable;
-use crate::tasks::bs_live_task::BsLiveTask;
+use crate::override_input::OverrideInput;
+use crate::system::BsSystem;
 use crate::tasks::task_comms::TaskComms;
 use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
-use crate::trigger_fs_task::TriggerFsTaskEvent;
-use crate::{BsSystem, OverrideInput};
+use crate::watchables::path_monitor::PathMonitorMeta;
+use crate::watchables::path_watchable::PathWatchable;
 use actix::{Addr, AsyncContext};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
@@ -16,9 +16,9 @@ use bsnext_fs::{
     BufferedChangeEvent, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathAddedEvent,
     PathDescriptionOwned, PathEvent,
 };
+use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use bsnext_task::task_scope::TaskScope;
-use bsnext_task::task_trigger::{TaskTrigger, TaskTriggerSource};
+use bsnext_task::task_trigger::FsChangesTrigger;
 use tracing::{debug_span, info};
 
 impl actix::Handler<FsEventGrouping> for BsSystem {
@@ -29,13 +29,12 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
         let span = debug_span!("Handler->FsEventGrouping->BsSystem");
         let _guard = span.enter();
         let next = match msg {
-            FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event),
+            FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event, addr),
             FsEventGrouping::BufferedChange(buff) => {
-                if let Some((task_scope, task_trigger, task_spec)) =
-                    self.handle_buffered(buff, addr)
-                {
+                if let Some((task_trigger, task_spec)) = self.handle_buffered(buff) {
                     tracing::debug!("will trigger task runner");
-                    ctx.notify(TriggerFsTaskEvent::new(task_scope, task_trigger, task_spec));
+                    self.fs_task_tracker
+                        .do_send(TriggerFsTask::new(task_spec, task_trigger));
                 }
                 None
             }
@@ -48,7 +47,7 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
 }
 
 impl BsSystem {
-    fn handle_fs_event(&mut self, fs_event: FsEvent) -> Option<AnyEvent> {
+    fn handle_fs_event(&mut self, fs_event: FsEvent, addr: Addr<Self>) -> Option<AnyEvent> {
         match &fs_event.kind {
             FsEventKind::Change(ch) if fs_event.fs_event_ctx.is_root() => {
                 tracing::info!("fs_event_ctx=root");
@@ -56,12 +55,10 @@ impl BsSystem {
                     // if the change included a new Input, use it
                     (any_event, Some(input)) => {
                         tracing::info!("will override input");
-                        if let Some(addr) = &self.self_addr {
-                            addr.do_send(OverrideInput {
-                                input,
-                                original_event: any_event,
-                            });
-                        };
+                        addr.do_send(OverrideInput {
+                            input,
+                            original_event: any_event,
+                        });
                         // return None here so that the event is not published yet (the updated Input will do it)
                         None
                     }
@@ -104,8 +101,7 @@ impl BsSystem {
     fn handle_buffered(
         &mut self,
         buf: BufferedChangeEvent,
-        addr: Addr<BsSystem>,
-    ) -> Option<(TaskScope, TaskTrigger, TaskSpec)> {
+    ) -> Option<(FsChangesTrigger, TaskSpec)> {
         tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
@@ -132,29 +128,14 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let fs_triggered_task_spec = self.task_spec_for_fs_event(&change.fs_ctx);
+        let task_spec = self.task_spec_for_fs_event(&change.fs_ctx);
+        let trigger = FsChangesTrigger::new(paths, change.fs_ctx);
 
-        let variant = TaskTriggerSource::FsChanges {
-            changes: paths,
-            fs_event_context: change.fs_ctx,
-        };
-
-        let task_trigger = TaskTrigger::new(variant, 0);
-
-        Some((
-            fs_triggered_task_spec
-                .clone()
-                .to_task_scope(self.servers_addr.clone(), addr),
-            task_trigger,
-            fs_triggered_task_spec,
-        ))
+        Some((trigger, task_spec))
     }
 
     pub fn task_comms(&mut self) -> TaskComms {
-        let Some(any_event_sender) = &self.any_event_sender else {
-            todo!("must have these senders...?");
-        };
-        TaskComms::new(any_event_sender.clone())
+        TaskComms::new(self.sender().clone())
     }
 
     fn handle_any_change(
@@ -163,12 +144,10 @@ impl BsSystem {
         inner: &PathDescriptionOwned,
     ) -> AnyEvent {
         tracing::trace!(?inner, "Other file changed");
-        if let Some(servers) = &self.servers_addr {
-            servers.do_send(FileChanged {
-                path: inner.absolute.clone(),
-                ctx: *fs_event_ctx,
-            })
-        }
+        self.servers().do_send(FileChanged {
+            path: inner.absolute.clone(),
+            ctx: *fs_event_ctx,
+        });
         AnyEvent::External(ExternalEventsDTO::FileChanged(
             bsnext_dto::FileChangedDTO::from_path_buf(
                 inner.relative.as_ref().unwrap_or(&inner.absolute),
@@ -190,14 +169,11 @@ impl BsSystem {
             let err = input.unwrap_err();
             return (AnyEvent::Internal(InternalEvents::InputError(*err)), None);
         };
-
-        let Some(relative) = &inner.relative else {
-            todo!("todo: is this reachable?")
-        };
+        let path_to_report = inner.relative.as_ref().unwrap_or(&inner.absolute);
 
         (
             AnyEvent::External(ExternalEventsDTO::InputFileChanged(
-                bsnext_dto::FileChangedDTO::from_path_buf(relative),
+                bsnext_dto::FileChangedDTO::from_path_buf(path_to_report),
             )),
             Some(input),
         )
@@ -216,11 +192,11 @@ impl BsSystem {
 
     fn handle_path_not_found(&mut self, pdo: &PathEvent) -> Option<AnyEvent> {
         let as_str = pdo.path.to_string_lossy().to_string();
-        let cwd = self.cwd.clone().unwrap();
+        let cwd = self.cwd.clone();
         let abs = cwd.join(&as_str);
         let def = PathDefinition {
             input: as_str,
-            cwd: self.cwd.clone().unwrap(),
+            cwd: self.cwd.clone(),
             absolute: abs,
         };
         let e = InputError::PathError(PathError::MissingPaths {
@@ -245,8 +221,8 @@ impl BsSystem {
         }
         custom_task_spec.map(ToOwned::to_owned).unwrap_or_else(|| {
             TaskSpec::seq(&[
-                Runnable::BsLiveTask(BsLiveTask::NotifyServer),
-                Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent),
+                Runnable::BsLiveTask(BsLiveBuiltInTask::NotifyServer),
+                Runnable::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent),
             ])
         })
     }

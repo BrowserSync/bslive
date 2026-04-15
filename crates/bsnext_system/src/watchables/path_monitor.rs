@@ -1,4 +1,4 @@
-use crate::path_watchable::PathWatchable;
+use crate::watchables::path_watchable::PathWatchable;
 use actix::{ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
@@ -22,13 +22,36 @@ use tracing::{debug, debug_span};
 pub struct PathMonitor {
     pub(crate) cwd: PathBuf,
     pub(crate) addrs: Vec<Addr<FsWatcher>>,
-    pub(crate) sys: Recipient<FsEventGrouping>,
+    pub(crate) recipient: Recipient<FsEventGrouping>,
     pub(crate) fs_ctx: FsEventContext,
     pub(crate) path_watchable: PathWatchable,
     pub(crate) debounce: Debounce,
     inner_sender: tokio::sync::mpsc::Sender<FsEvent>,
     inner_receiver: Option<tokio::sync::mpsc::Receiver<FsEvent>>,
 }
+
+impl PathMonitor {
+    pub fn new(
+        sys: Recipient<FsEventGrouping>,
+        debounce: Debounce,
+        cwd: PathBuf,
+        fs_ctx: FsEventContext,
+        path_watchable: PathWatchable,
+    ) -> Self {
+        let (inner_sender, inner_receiver) = mpsc::channel::<FsEvent>(1);
+        Self {
+            recipient: sys,
+            debounce,
+            cwd,
+            addrs: vec![],
+            fs_ctx,
+            path_watchable,
+            inner_sender,
+            inner_receiver: Some(inner_receiver),
+        }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct PathMonitorMeta {
@@ -53,7 +76,7 @@ impl From<&PathMonitor> for PathMonitorMeta {
 
 impl StreamHandler<FsEvent> for PathMonitor {
     fn handle(&mut self, event: FsEvent, _ctx: &mut Context<PathMonitor>) {
-        self.sys.do_send(FsEventGrouping::Singular(event))
+        self.recipient.do_send(FsEventGrouping::Singular(event))
     }
 }
 
@@ -73,7 +96,7 @@ impl StreamHandler<Vec<FsEvent>> for PathMonitor {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        self.sys
+        self.recipient
             .do_send(FsEventGrouping::buffered_change(outgoing, self.fs_ctx))
     }
 }
@@ -294,7 +317,7 @@ impl Handler<FsEvent> for PathMonitor {
             }
             _ => {
                 // todo: any need to buffer these?
-                self.sys.do_send(FsEventGrouping::Singular(msg))
+                self.recipient.do_send(FsEventGrouping::Singular(msg))
             }
         }
     }
@@ -335,32 +358,10 @@ impl Handler<StopPathMonitor> for PathMonitor {
     type Result = ();
 
     fn handle(&mut self, _msg: StopPathMonitor, ctx: &mut Self::Context) -> Self::Result {
-        for x in &self.addrs {
-            x.do_send(StopWatcher)
+        for addr in &self.addrs {
+            addr.do_send(StopWatcher)
         }
         self.addrs = vec![];
         ctx.stop();
-    }
-}
-
-impl PathMonitor {
-    pub fn new(
-        sys: Recipient<FsEventGrouping>,
-        debounce: Debounce,
-        cwd: PathBuf,
-        fs_ctx: FsEventContext,
-        path_watchable: PathWatchable,
-    ) -> Self {
-        let (inner_sender, inner_receiver) = mpsc::channel::<FsEvent>(1);
-        Self {
-            sys,
-            debounce,
-            cwd,
-            addrs: vec![],
-            fs_ctx,
-            path_watchable,
-            inner_sender,
-            inner_receiver: Some(inner_receiver),
-        }
     }
 }

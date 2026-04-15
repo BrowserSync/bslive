@@ -7,6 +7,17 @@ edition = "2021"
 [dependencies]
 clap = { workspace = true }
 serde = { workspace = true }
+tracing = { workspace = true }
+tracing-opentelemetry = { version = "0.32.1" }
+opentelemetry = { version = "0.31.0", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.31.0", default-features = false, features = [
+    "trace",
+    "experimental_metrics_custom_reader",
+    "testing",
+] }
+opentelemetry-stdout = { version = "0.31.0", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.31.0", features = ["metrics", "grpc-tonic"] }
+opentelemetry-semantic-conventions = { version = "0.31.0", features = ["semconv_experimental"] }
 
 [dependencies.tracing-subscriber]
 version = "0.3.19"

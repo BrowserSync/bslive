@@ -5,13 +5,14 @@ use bsnext_input::{Input, InputArgs, InputCtx, InputError};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
+// todo: must ensure StartFromInputPaths
 pub struct StartFromInputPaths {
     pub input_paths: Vec<String>,
     pub port: Option<u16>,
 }
 
 impl SystemStart for StartFromInputPaths {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         from_input_paths(ctx, &self.input_paths, &self.port)
     }
 }
@@ -22,7 +23,7 @@ pub struct StartFromInput {
 }
 
 impl SystemStart for StartFromInput {
-    fn input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+    fn resolve_input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         Ok(SystemStartArgs::InputOnly {
             input: self.input.clone(),
         })
@@ -89,24 +90,19 @@ fn from_input_paths<T: AsRef<str>>(
             path: input_path.to_path_buf(),
             input,
         }),
-        Err(e) => {
-            tracing::trace!("cannot continue {:?}", e);
-            match *e {
-                InputError::YamlError(yaml_error) => Ok(SystemStartArgs::PathWithInvalidInput {
-                    path: input_path.to_path_buf(),
-                    input_error: InputError::YamlError(yaml_error),
-                }),
-                InputError::BsLiveRules(bs_live_rules) => {
-                    Ok(SystemStartArgs::PathWithInvalidInput {
-                        path: input_path.to_path_buf(),
-                        input_error: InputError::BsLiveRules(bs_live_rules),
-                    })
-                }
-                _ => {
-                    tracing::trace!("cannot continue");
-                    Err(e)
-                }
+        Err(e) => match *e {
+            InputError::YamlError(yaml_error) => Ok(SystemStartArgs::PathWithInvalidInput {
+                path: input_path.to_path_buf(),
+                input_error: InputError::YamlError(yaml_error),
+            }),
+            InputError::BsLiveRules(bs_live_rules) => Ok(SystemStartArgs::PathWithInvalidInput {
+                path: input_path.to_path_buf(),
+                input_error: InputError::BsLiveRules(bs_live_rules),
+            }),
+            _ => {
+                dbg!("cannot continue");
+                Err(e)
             }
-        }
+        },
     }
 }

@@ -1,6 +1,13 @@
+pub mod otel_cli;
+pub mod otlp;
 pub mod raw_tracing;
 
+use crate::raw_tracing::create_filter_and_fmt;
+// use bsnext_otel::OtelGuard;
+use crate::otel_cli::OtelGuard;
 use std::fmt::{Display, Formatter};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(
     Debug,
@@ -10,12 +17,14 @@ use std::fmt::{Display, Formatter};
     Eq,
     PartialOrd,
     Ord,
+    Default,
     clap::ValueEnum,
     serde::Serialize,
     serde::Deserialize,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
+    #[default]
     Info,
     Debug,
     Trace,
@@ -30,12 +39,6 @@ impl Display for LogLevel {
             LogLevel::Trace => write!(f, "trace"),
             LogLevel::Error => write!(f, "error"),
         }
-    }
-}
-
-impl Default for LogLevel {
-    fn default() -> Self {
-        Self::Info
     }
 }
 
@@ -82,16 +85,45 @@ pub enum LogHttp {
     Off,
 }
 
+#[derive(Debug)]
+pub enum TracingGuard {
+    None,
+    OtelGuard(OtelGuard),
+}
+
 pub fn init_tracing(
     log_level: Option<LogLevel>,
     log_http: LogHttp,
     format: OutputFormat,
     write_option: WriteOption,
     line_opts: LineNumberOption,
-) -> Option<()> {
+) -> TracingGuard {
     let level = level(log_level, log_http);
-    raw_tracing::init_tracing_subscriber(&level, format, write_option, line_opts);
-    None::<()>
+
+    let (filter, fmt_layer) =
+        raw_tracing::create_filter_and_fmt(&level, format, write_option, line_opts);
+
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt_layer)
+        .init();
+
+    TracingGuard::None
+}
+
+pub fn init_tracing_with_otel(
+    log_level: Option<LogLevel>,
+    log_http: LogHttp,
+    format: OutputFormat,
+    write_option: WriteOption,
+    line_opts: LineNumberOption,
+) -> TracingGuard {
+    let level = level(log_level, log_http);
+
+    let (filter, fmt_layer) = create_filter_and_fmt(&level, format, write_option, line_opts);
+    let prov = otel_cli::init_tracing_subscriber((filter, fmt_layer));
+
+    TracingGuard::OtelGuard(prov)
 }
 
 pub fn level(log_level: Option<LogLevel>, log_http: LogHttp) -> String {

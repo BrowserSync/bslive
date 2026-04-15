@@ -1,14 +1,15 @@
-use crate::tasks::{append_with_reports, Comms, Index, Runnable, RunnableWithComms};
-use crate::BsSystem;
+use crate::capabilities::Capabilities;
+use crate::tasks::comms::Comms;
+use crate::tasks::{Node, Runnable, RunnableWithComms};
 use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
 use bsnext_input::route::RunOptItem;
 use bsnext_task::task_entry::TaskEntry;
-use bsnext_task::task_report::TaskReport;
 use bsnext_task::task_scope::TaskScope;
-use bsnext_task::{OverlappingOpts, RunKind, SequenceOpts};
-use std::collections::HashMap;
+use bsnext_task::{
+    ContentId, IndexId, NodePath, OverlappingOpts, PathSegment, RunKind, SequenceOpts,
+};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 /// Represents a collection of tasks that can be run, categorized by their execution type (`RunKind`).
@@ -27,164 +28,234 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 ///
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct TaskSpec {
-    pub run_kind: RunKind,
-    pub tasks: Vec<Runnable>,
-}
-
-impl TreeDisplay for TaskSpec {
-    fn as_tree_label(&self, Index(index): Index) -> String {
-        let sqid = self.as_sqid(index);
-        match &self.run_kind {
-            RunKind::Sequence { .. } => format!("[{sqid}] Seq: {} task(s)", self.tasks.len()),
-            RunKind::Overlapping { opts } => format!(
-                "[{sqid}] Overlapping {} task(s) (max concurrency: {})",
-                self.tasks.len(),
-                opts.max_concurrent_items
-            ),
-        }
-    }
+    run_kind: RunKind,
+    tasks: Vec<Node>,
+    path: NodePath,
 }
 
 impl TaskSpec {
-    pub fn all(p0: &[Runnable], opts: OverlappingOpts) -> Self {
-        Self {
-            run_kind: RunKind::Overlapping { opts },
-            tasks: p0.to_vec(),
-        }
+    pub fn path(&self) -> &NodePath {
+        &self.path
     }
-    pub fn seq(p0: &[Runnable]) -> Self {
-        Self {
+    pub fn is_seq(&self) -> bool {
+        matches!(self.run_kind, RunKind::Sequence { .. })
+    }
+    pub fn is_all(&self) -> bool {
+        matches!(self.run_kind, RunKind::Overlapping { .. })
+    }
+    pub fn all(tasks: &[Runnable], opts: OverlappingOpts) -> Self {
+        let nodes = tasks
+            .iter()
+            .map(|r| Node {
+                node: r.clone(),
+                path: Default::default(),
+            })
+            .collect();
+        let mut item = Self {
+            run_kind: RunKind::Overlapping { opts },
+            tasks: nodes,
+            path: Default::default(),
+        };
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
+        item
+    }
+    pub fn seq(tasks: &[Runnable]) -> Self {
+        let nodes = tasks
+            .iter()
+            .map(|r| Node {
+                node: r.clone(),
+                path: Default::default(),
+            })
+            .collect();
+        let mut item = Self {
             run_kind: RunKind::Sequence {
                 opts: SequenceOpts::default(),
             },
-            tasks: p0.to_vec(),
-        }
+            tasks: nodes,
+            path: Default::default(),
+        };
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
+        item
     }
-    pub fn seq_opts(p0: &[Runnable], opts: SequenceOpts) -> Self {
-        Self {
+    pub fn seq_opts(tasks: &[Runnable], opts: SequenceOpts) -> Self {
+        let nodes = tasks
+            .iter()
+            .map(|r| Node {
+                node: r.clone(),
+                path: Default::default(),
+            })
+            .collect();
+        let mut item = Self {
             run_kind: RunKind::Sequence { opts },
-            tasks: p0.to_vec(),
-        }
+            tasks: nodes,
+            path: Default::default(),
+        };
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
+        item
     }
     pub fn seq_from(run_items: &[RunOptItem]) -> Self {
-        Self {
+        let nodes = run_items
+            .iter()
+            .map(Runnable::from)
+            .map(|runnable| Node {
+                node: runnable,
+                path: Default::default(),
+            })
+            .collect();
+        let mut item = Self {
             run_kind: RunKind::Sequence {
                 opts: SequenceOpts::default(),
             },
-            tasks: run_items.iter().map(Runnable::from).collect(),
-        }
+            tasks: nodes,
+            path: Default::default(),
+        };
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
+        item
     }
     pub fn all_from(run_items: &[RunOptItem]) -> Self {
-        Self {
+        let nodes = run_items
+            .iter()
+            .map(Runnable::from)
+            .map(|runnable| Node {
+                node: runnable,
+                path: Default::default(),
+            })
+            .collect();
+        let mut item = Self {
             run_kind: RunKind::Overlapping {
                 opts: OverlappingOpts::default(),
             },
-            tasks: run_items.iter().map(Runnable::from).collect(),
-        }
+            tasks: nodes,
+            path: Default::default(),
+        };
+        let p = NodePath::root_for(ContentId::new(item.as_id()));
+        item.annotate(p);
+        item
     }
-    pub fn seq_from_opts(run_items: &[RunOptItem], opts: SequenceOpts) -> Self {
-        Self {
-            run_kind: RunKind::Sequence { opts },
-            tasks: run_items.iter().map(Runnable::from).collect(),
-        }
-    }
-    pub fn all_from_opts(run_items: &[RunOptItem], opts: OverlappingOpts) -> Self {
-        Self {
-            run_kind: RunKind::Overlapping { opts },
-            tasks: run_items.iter().map(Runnable::from).collect(),
-        }
-    }
-
     pub fn as_id(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
         hasher.finish()
     }
-    pub fn as_id_with(&self, parent: u64) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        parent.hash(&mut hasher);
-        hasher.finish()
+    pub fn len(&self) -> usize {
+        self.tasks.len()
     }
-}
+    pub fn is_empty(&self) -> bool {
+        self.tasks.is_empty()
+    }
 
-impl TaskSpec {
-    pub fn as_sqid(&self, parent: u64) -> String {
-        let sqids = sqids::Sqids::default();
-        let sqid = sqids.encode(&[parent]).unwrap();
-        sqid.get(0..6).unwrap_or(&sqid).to_string()
-    }
-    pub fn as_tree(&self) -> ArchyNode {
-        let label = self.as_tree_label(Index(0));
-        let mut first = ArchyNode::new(&label);
-        let empty = HashMap::default();
-        append_with_reports(&mut first, &self.tasks, &empty);
-        first
-    }
-    pub fn as_tree_with_results(&self, hm: &HashMap<u64, TaskReport>) -> ArchyNode {
-        // let label = self.to_string();
-        let r = hm.get(&self.as_id());
-        let label = match r {
-            None => "missing".to_string(),
-            Some(_) => self.as_tree_label(Index(0)),
-        };
-        let mut first = ArchyNode::new(&label);
-        append_with_reports(&mut first, &self.tasks, hm);
-        first
-    }
-}
+    fn annotate(&mut self, path: NodePath) {
+        self.path = path.clone();
 
-impl TreeDisplay for Runnable {
-    fn as_tree_label(&self, index: Index) -> String {
-        match self {
-            Runnable::BsLiveTask(item) => format!("{}{}", "Runnable::BsLiveTask", item),
-            Runnable::Sh(sh) => format!("{} {}", "Runnable::Sh", sh),
-            Runnable::Many(task_spec) => {
-                let id = self.as_id_with(index);
-                task_spec.as_tree_label(Index(id))
+        for (index, runnable) in self.tasks.iter_mut().enumerate() {
+            let mut next_path = path.clone();
+            next_path.append(PathSegment::Index(IndexId::new(index as u64)));
+
+            match runnable.node {
+                Runnable::BsLiveTask(_) => {
+                    next_path.append(PathSegment::Content(runnable.content_id()));
+                    runnable.path = next_path;
+                }
+                Runnable::Sh(_) => {
+                    next_path.append(PathSegment::Content(runnable.content_id()));
+                    runnable.path = next_path;
+                }
+                Runnable::Spec(ref mut spec) => {
+                    next_path.append(PathSegment::Content(ContentId::new(spec.as_id())));
+                    runnable.path = next_path.clone();
+                    spec.annotate(next_path);
+                }
             }
         }
     }
 }
 
+impl TaskSpec {
+    pub fn as_tree(&self) -> ArchyNode {
+        let label = self.as_tree_label();
+        let mut first = ArchyNode::new(&label, &self.path().as_string());
+        build_tree(&mut first, &self.tasks);
+        first
+    }
+}
+
 pub trait TreeDisplay {
-    fn as_tree_label(&self, index: Index) -> String;
+    fn as_tree_label(&self) -> String;
+}
+
+impl TreeDisplay for TaskSpec {
+    fn as_tree_label(&self) -> String {
+        let p = &self.path;
+        let size_suffix = match self.run_kind {
+            RunKind::Sequence { .. } => format!("seq: {}", self.len()),
+            RunKind::Overlapping {
+                opts:
+                    OverlappingOpts {
+                        max_concurrent_items,
+                        ..
+                    },
+            } => format!("all: {}, max: {max_concurrent_items}", self.len()),
+        };
+        format!("[{p}] {size_suffix}")
+    }
 }
 
 impl TaskSpec {
     pub fn to_task_scope(
         self,
-        servers_addr: Option<Addr<ServersSupervisor>>,
-        sys_addr: Addr<BsSystem>,
+        servers_addr: Addr<ServersSupervisor>,
+        capabilities_addr: Addr<Capabilities>,
     ) -> TaskScope {
         let parent_id = self.as_id();
-        let inner_tasks = self
-            .tasks
-            .into_iter()
-            .enumerate()
-            .map(|(index_position, runnable)| -> TaskEntry {
-                let item_id = runnable.as_id_with(Index(index_position as u64));
-                match runnable {
-                    Runnable::Many(task_spec) => TaskEntry::new(
-                        Box::new(task_spec.to_task_scope(servers_addr.clone(), sys_addr.clone())),
-                        item_id,
-                    ),
-                    _ => {
-                        let with_ctx = RunnableWithComms {
-                            ctx: Comms {
-                                servers_addr: servers_addr.clone(),
-                                sys: sys_addr.clone(),
-                            },
-                            runnable,
-                        };
-                        TaskEntry::new(Box::new(with_ctx), item_id)
-                    }
+        let mut tasks = vec![];
+
+        for runnable in self.tasks.into_iter() {
+            let content_id = runnable.content_id();
+
+            match runnable.node {
+                Runnable::Spec(task_spec) => {
+                    let path = task_spec.path().to_owned();
+                    let as_scope =
+                        task_spec.to_task_scope(servers_addr.clone(), capabilities_addr.clone());
+                    tasks.push(TaskEntry::new(Box::new(as_scope), content_id, path))
                 }
-            })
-            .collect::<Vec<TaskEntry>>();
+                _ => {
+                    let path = runnable.path().to_owned();
+                    let with_ctx = RunnableWithComms {
+                        ctx: Comms {
+                            servers_addr: servers_addr.clone(),
+                            capabilities: capabilities_addr.clone(),
+                        },
+                        runnable,
+                    };
+                    tasks.push(TaskEntry::new(Box::new(with_ctx), content_id, path))
+                }
+            }
+        }
+
         match self.run_kind {
-            RunKind::Sequence { opts } => TaskScope::seq(inner_tasks, opts, parent_id),
-            RunKind::Overlapping { opts } => TaskScope::all(inner_tasks, opts, parent_id),
+            RunKind::Sequence { opts } => TaskScope::seq(tasks, opts, parent_id),
+            RunKind::Overlapping { opts } => TaskScope::all(tasks, opts, parent_id),
+        }
+    }
+}
+
+pub fn build_tree(archy: &mut ArchyNode, tasks: &[Node]) {
+    for node in tasks {
+        let path_str = node.path().to_string();
+        let raw_label = node.as_tree_label();
+        match &node.node {
+            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&raw_label, &path_str)),
+            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&raw_label, &path_str)),
+            Runnable::Spec(runner) => {
+                let mut next = ArchyNode::new(&raw_label, &path_str);
+                build_tree(&mut next, &runner.tasks);
+                archy.nodes.push(next);
+            }
         }
     }
 }

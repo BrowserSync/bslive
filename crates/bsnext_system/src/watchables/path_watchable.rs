@@ -1,10 +1,10 @@
 use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use crate::any_watchable::AnyWatchable;
-use crate::route_watchable::RouteWatchable;
-use crate::server_watchable::ServerWatchable;
 use crate::tasks::task_spec::TaskSpec;
+use crate::watchables::any_watchable::AnyWatchable;
+use crate::watchables::route_watchable::RouteWatchable;
+use crate::watchables::server_watchable::ServerWatchable;
 use bsnext_input::route::Spec;
 use std::path::Path;
 

@@ -1,22 +1,29 @@
-use crate::task_report::TaskResult;
+use crate::NodePath;
+use crate::invocation_result::InvocationResult;
 use crate::task_trigger::TaskTrigger;
 use std::fmt::Debug;
 
 #[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "TaskResult")]
+#[rtype(result = "InvocationResult")]
 pub struct Invocation {
-    pub id: u64,
-    pub trigger: TaskTrigger,
+    node_path: NodePath,
+    trigger: TaskTrigger,
 }
 
 impl Invocation {
-    pub fn new(id: u64, trigger: TaskTrigger) -> Self {
-        Self { id, trigger }
+    pub fn trigger(&self) -> &TaskTrigger {
+        &self.trigger
     }
-    pub fn sqid(&self) -> String {
-        let sqids = sqids::Sqids::default();
-        sqids
-            .encode(&[self.id])
-            .unwrap_or_else(|_| self.id.to_string())
+    pub fn path(&self) -> &NodePath {
+        &self.node_path
+    }
+}
+
+impl Invocation {
+    pub fn new(node_path: &NodePath, trigger: TaskTrigger) -> Self {
+        Self {
+            node_path: node_path.to_owned(),
+            trigger,
+        }
     }
 }

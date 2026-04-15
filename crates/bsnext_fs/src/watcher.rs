@@ -22,6 +22,7 @@ pub fn create_watcher(
                 if event.paths.iter().any(|p| {
                     is_ignored_path_type(&p.as_path())
                         || is_auto_excluded(&cwd_c.as_path(), &p.as_path())
+                        || is_excluded_postfix(&p.as_path())
                 }) {
                     tracing::trace!(?event.paths, "[ignored]");
                     return;
@@ -45,53 +46,169 @@ pub fn create_watcher(
     })
 }
 
+/// Stable tracing target so cross-platform audits can filter with
+/// `RUST_LOG=bsnext_fs::platform_accepts=trace` (or `bsnext_fs=trace`).
+fn trace_platform_decision(
+    platform: &'static str,
+    branch: &'static str,
+    evt: &notify::Event,
+    accept: bool,
+) {
+    tracing::trace!(
+        target: "bsnext_fs::platform_accepts",
+        accept,
+        platform,
+        branch,
+        event_kind = ?evt.kind,
+    );
+}
+
+/// macOS (FSEvents) vs other Unix (inotify, etc.): almost the same rules; Linux additionally accepts
+/// [`DataChange::Any`] so data writes match macOS forwarding. Separate `platform` labels in
+/// [`trace_platform_decision`] keep audit logs comparable.
 #[cfg(not(target_os = "windows"))]
 fn platform_accepts(evt: &notify::Event) -> bool {
+    #[cfg(target_os = "macos")]
+    const PLATFORM: &str = "macos";
+    #[cfg(not(target_os = "macos"))]
+    const PLATFORM: &str = "unix";
+    platform_accepts_posix(evt, PLATFORM)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn platform_accepts_posix(evt: &notify::Event, platform: &'static str) -> bool {
     match evt.kind {
-        EventKind::Any => false,
-        EventKind::Access(..) => false,
-        EventKind::Create(..) => false,
+        EventKind::Any => {
+            trace_platform_decision(platform, "Any", evt, false);
+            false
+        }
+        EventKind::Access(kind) => {
+            trace_platform_decision(platform, "Access", evt, false);
+            let _ = kind;
+            false
+        }
+        EventKind::Create(kind) => {
+            trace_platform_decision(platform, "Create", evt, false);
+            let _ = kind;
+            false
+        }
         EventKind::Modify(modify) => match modify {
-            #[allow(clippy::match_like_matches_macro)]
-            ModifyKind::Data(data) => match data {
-                DataChange::Content => true,
-                _ => false,
-            },
-            #[allow(clippy::match_like_matches_macro)]
-            ModifyKind::Metadata(meta) => match meta {
-                MetadataKind::Any => true,
-                _ => false,
-            },
-            ModifyKind::Name(..) => false,
-            ModifyKind::Other => false,
-            ModifyKind::Any => false,
+            ModifyKind::Any => {
+                trace_platform_decision(platform, "Modify::Any", evt, false);
+                false
+            }
+            ModifyKind::Data(data) => {
+                let (accept, branch) = match data {
+                    DataChange::Content => (true, "Modify::Data::Content"),
+                    // Linux/inotify often reports writes as `Data(Any)`; macOS/FSEvents usually uses
+                    // `Data(Content)`. Accept `Any` on Linux only so forwards match macOS for the same UX.
+                    DataChange::Any => (cfg!(target_os = "linux"), "Modify::Data::Any"),
+                    DataChange::Size => (false, "Modify::Data::Size"),
+                    DataChange::Other => (false, "Modify::Data::Other"),
+                };
+                trace_platform_decision(platform, branch, evt, accept);
+                accept
+            }
+            ModifyKind::Metadata(meta) => {
+                let (accept, branch) = match meta {
+                    MetadataKind::Any => (true, "Modify::Metadata::Any"),
+                    MetadataKind::AccessTime => (false, "Modify::Metadata::AccessTime"),
+                    MetadataKind::WriteTime => (false, "Modify::Metadata::WriteTime"),
+                    MetadataKind::Permissions => (false, "Modify::Metadata::Permissions"),
+                    MetadataKind::Ownership => (false, "Modify::Metadata::Ownership"),
+                    MetadataKind::Extended => (false, "Modify::Metadata::Extended"),
+                    MetadataKind::Other => (false, "Modify::Metadata::Other"),
+                };
+                trace_platform_decision(platform, branch, evt, accept);
+                accept
+            }
+            ModifyKind::Name(mode) => {
+                trace_platform_decision(platform, "Modify::Name", evt, false);
+                let _ = mode;
+                false
+            }
+            ModifyKind::Other => {
+                trace_platform_decision(platform, "Modify::Other", evt, false);
+                false
+            }
         },
-        EventKind::Remove(..) => false,
-        EventKind::Other => false,
+        EventKind::Remove(kind) => {
+            trace_platform_decision(platform, "Remove", evt, false);
+            let _ = kind;
+            false
+        }
+        EventKind::Other => {
+            trace_platform_decision(platform, "EventKind::Other", evt, false);
+            false
+        }
     }
 }
 
 #[cfg(target_os = "windows")]
 fn platform_accepts(evt: &notify::Event) -> bool {
+    const PLATFORM: &str = "windows";
     match evt.kind {
-        EventKind::Any => false,
-        EventKind::Access(..) => false,
-        EventKind::Create(..) => false,
+        EventKind::Any => {
+            trace_platform_decision(PLATFORM, "Any", evt, false);
+            false
+        }
+        EventKind::Access(kind) => {
+            trace_platform_decision(PLATFORM, "Access", evt, false);
+            let _ = kind;
+            false
+        }
+        EventKind::Create(kind) => {
+            trace_platform_decision(PLATFORM, "Create", evt, false);
+            let _ = kind;
+            false
+        }
         EventKind::Modify(modify) => match modify {
-            ModifyKind::Any => true,
-            ModifyKind::Data(data) => match data {
-                DataChange::Content => true,
-                _ => false,
-            },
-            ModifyKind::Metadata(meta) => match meta {
-                MetadataKind::Any => true,
-                _ => false,
-            },
-            ModifyKind::Name(..) => false,
-            ModifyKind::Other => false,
+            ModifyKind::Any => {
+                trace_platform_decision(PLATFORM, "Modify::Any", evt, true);
+                true
+            }
+            ModifyKind::Data(data) => {
+                let (accept, branch) = match data {
+                    DataChange::Content => (true, "Modify::Data::Content"),
+                    DataChange::Any => (false, "Modify::Data::Any"),
+                    DataChange::Size => (false, "Modify::Data::Size"),
+                    DataChange::Other => (false, "Modify::Data::Other"),
+                };
+                trace_platform_decision(PLATFORM, branch, evt, accept);
+                accept
+            }
+            ModifyKind::Metadata(meta) => {
+                let (accept, branch) = match meta {
+                    MetadataKind::Any => (true, "Modify::Metadata::Any"),
+                    MetadataKind::AccessTime => (false, "Modify::Metadata::AccessTime"),
+                    MetadataKind::WriteTime => (false, "Modify::Metadata::WriteTime"),
+                    MetadataKind::Permissions => (false, "Modify::Metadata::Permissions"),
+                    MetadataKind::Ownership => (false, "Modify::Metadata::Ownership"),
+                    MetadataKind::Extended => (false, "Modify::Metadata::Extended"),
+                    MetadataKind::Other => (false, "Modify::Metadata::Other"),
+                };
+                trace_platform_decision(PLATFORM, branch, evt, accept);
+                accept
+            }
+            ModifyKind::Name(mode) => {
+                trace_platform_decision(PLATFORM, "Modify::Name", evt, false);
+                let _ = mode;
+                false
+            }
+            ModifyKind::Other => {
+                trace_platform_decision(PLATFORM, "Modify::Other", evt, false);
+                false
+            }
         },
-        EventKind::Remove(..) => false,
-        EventKind::Other => false,
+        EventKind::Remove(kind) => {
+            trace_platform_decision(PLATFORM, "Remove", evt, false);
+            let _ = kind;
+            false
+        }
+        EventKind::Other => {
+            trace_platform_decision(PLATFORM, "EventKind::Other", evt, false);
+            false
+        }
     }
 }
 
@@ -105,14 +222,51 @@ mod test {
         let excluded = is_auto_excluded(&cwd, &change);
         assert_eq!(excluded, true);
     }
+    #[test]
+    fn test_postfix() {
+        let change = Path::new("/Users/shaneosbourne/.index.html.swp");
+        let excluded = is_excluded_postfix(&change);
+        assert_eq!(excluded, true);
+    }
+    #[test]
+    fn test_vim_4913() {
+        let p1 = Path::new("/some/path/4913");
+        assert_eq!(is_ignored_path_type(&p1), true);
+        let p2 = Path::new("/some/path/5036");
+        assert_eq!(is_ignored_path_type(&p2), true);
+        let p3 = Path::new("/some/path/6020");
+        assert_eq!(is_ignored_path_type(&p3), true);
+        let p4 = Path::new("/some/path/4912");
+        assert_eq!(is_ignored_path_type(&p4), false);
+        let p5 = Path::new("/some/path/not_a_number");
+        assert_eq!(is_ignored_path_type(&p5), false);
+        let p6 = Path::new("/some/path/4913.txt");
+        assert_eq!(is_ignored_path_type(&p6), false);
+        let p7 = Path::new("/some/path/6143"); // 11th value in sequence
+        assert_eq!(is_ignored_path_type(&p7), false);
+    }
 }
 
 fn is_ignored_path_type<P: AsRef<Path>>(subject: &P) -> bool {
-    subject
-        .as_ref()
-        .as_os_str()
-        .as_encoded_bytes()
-        .ends_with(b"~")
+    let path_ref = subject.as_ref();
+    let encoded = path_ref.as_os_str().as_encoded_bytes();
+
+    // vim backup stuff
+    if encoded.ends_with(b"~") {
+        return true;
+    }
+
+    // vim 4913 test files (used on linux/unix to check directory permissions)
+    // Starts at 4913 and increments by 123 if it already exists.
+    // We only check for the first 10 increments as it's highly unlikely
+    // that Vim will cycle through more than that in practice.
+    match path_ref.file_name().map(|name| name.as_encoded_bytes()) {
+        Some(
+            b"4913" | b"5036" | b"5159" | b"5282" | b"5405" | b"5528" | b"5651" | b"5774" | b"5897"
+            | b"6020",
+        ) => true,
+        _ => false,
+    }
 }
 
 // todo: If a folder is explicitly watched, these rules should be ignored
@@ -140,4 +294,15 @@ fn is_auto_excluded<P: AsRef<Path>>(cwd: &P, subject: &P) -> bool {
         Some(Component::ParentDir) => unreachable!("here? ParentDir"),
     })
     .unwrap_or(false)
+}
+
+fn is_excluded_postfix<P: AsRef<Path>>(subject: &P) -> bool {
+    let path_ref = subject.as_ref();
+    match path_ref.extension().map(|x| x.as_encoded_bytes()) {
+        // vim swap stuff
+        Some(b"swp") => true,
+        Some(b"swo") => true,
+        Some(b"swn") => true,
+        _ => false,
+    }
 }

@@ -1,6 +1,6 @@
-use crate::path_monitor::{PathMonitor, PathMonitorMeta, StopPathMonitor};
-use crate::path_watchable::PathWatchable;
-use crate::BsSystem;
+use crate::system::BsSystem;
+use crate::watchables::path_monitor::{PathMonitor, PathMonitorMeta, StopPathMonitor};
+use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::{DebounceDuration, Spec};
@@ -19,7 +19,7 @@ pub struct MonitorPathWatchables {
 impl actix::Handler<MonitorPathWatchables> for BsSystem {
     type Result = ();
 
-    #[tracing::instrument(skip_all, name = "Handler->MonitorPathWatchables->BsSystem")]
+    #[tracing::instrument(skip_all, name = "MonitorPathWatchables->BsSystem")]
     fn handle(&mut self, msg: MonitorPathWatchables, ctx: &mut Self::Context) -> Self::Result {
         debug!("{}", file!());
 

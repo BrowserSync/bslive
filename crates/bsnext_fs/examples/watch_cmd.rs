@@ -1,28 +1,26 @@
-use actix::{Actor, ActorFutureExt, ResponseActFuture, WrapFuture};
+use actix::{Actor, WrapFuture};
 use bsnext_fs::actor::FsWatcher;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
-use bsnext_fs::{FsEvent, FsEventContext, FsEventKind};
+use bsnext_fs::{FsEvent, FsEventContext};
+use bsnext_tracing::{
+    init_tracing, LineNumberOption, LogHttp, LogLevel, OutputFormat, WriteOption,
+};
 use std::ffi::OsString;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::time::Duration;
-use tokio::process::Command;
 
 #[actix_rt::main]
 async fn main() -> anyhow::Result<()> {
-    let str = bsnext_tracing::level(
-        Some(bsnext_tracing::LogLevel::Trace),
-        bsnext_tracing::LogHttp::Off,
-    );
-    let with = format!("{str},watch_cmd=trace");
-    bsnext_tracing::raw_tracing::init_tracing_subscriber(
-        &with,
-        bsnext_tracing::OutputFormat::Normal,
-        bsnext_tracing::WriteOption::None,
-        bsnext_tracing::LineNumberOption::None,
+    let _g = init_tracing(
+        Some(LogLevel::Trace),
+        LogHttp::Off,
+        OutputFormat::Normal,
+        WriteOption::None,
+        LineNumberOption::None,
     );
     let (File(file), Dir(dir)) = mock_path("mocks/01.txt");
-    let ex = Example::from_str("echo 'hello world!' && printenv")?;
+    let ex = Example::from_str("echo 'hello world!'")?;
     let recip = ex.start();
     let fs = FsWatcher::new(&dir, FsEventContext::default(), recip.recipient());
     let addr = fs.start();
@@ -70,89 +68,12 @@ impl Actor for Example {
 }
 
 impl actix::Handler<FsEvent> for Example {
-    type Result = ResponseActFuture<Self, ()>;
+    type Result = ();
 
-    fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) {
         tracing::info!(running = self.running, " ++ incoming");
         tracing::info!(cmd = self.cmd.0.to_str());
-        let FsEvent { kind, .. } = msg;
-        let running = self.running;
-        let valid_trigger = match kind {
-            FsEventKind::Change(ch) => {
-                tracing::debug!("    change {:?}", ch.relative);
-                true
-            }
-            FsEventKind::PathAdded(path) => {
-                tracing::debug!("    PathAdded {} ", path.path.display());
-                false
-            }
-            FsEventKind::PathRemoved(_) => {
-                tracing::debug!("    PathRemoved");
-                false
-            }
-            FsEventKind::PathNotFoundError(_) => {
-                tracing::debug!("    PathNotFoundError");
-                false
-            }
-        };
-        let will_run = valid_trigger && !running;
-        tracing::debug!(valid_trigger, running, "will possibly run?");
-        if !will_run {
-            tracing::debug!(valid_trigger, "will not run for this");
-            return Box::pin(
-                async {
-                    ();
-                }
-                .into_actor(self),
-            );
-        };
-        let index = self.run_count + 1;
-        let cmd = self.cmd.to_os_string();
-        self.running = true;
-        tracing::debug!(index, "✍️ running = true");
-        self.run_count = index;
-        let fut = async move {
-            tracing::debug!(index = index, "Will run...");
-            let mut f1 = Command::new("sh")
-                .kill_on_drop(true)
-                .arg("-c")
-                .arg(cmd)
-                .env("TERM", "xterm-256color") // Set terminal type
-                .env("CLICOLOR_FORCE", "1") // Force colors in many Unix tools
-                .env("CLICOLOR", "1") // Enable colors
-                .env("COLORTERM", "truecolor") // Indicate full color support
-                .spawn()
-                .expect("ls command failed to start");
-            let pid = f1.id();
-            let sleep = tokio::time::sleep(Duration::from_secs(10));
-            tokio::pin!(sleep);
-            loop {
-                tokio::select! {
-                    _ = &mut sleep => {
-                        println!("⌛️ operation timed out");
-                        break;
-                    }
-                    _ = f1.wait() => {
-                        println!("✅ operation completed");
-                        break;
-                    }
-                }
-            }
-            if let Some(pid) = pid {
-                let _ = kill_tree::tokio::kill_tree(pid).await;
-                println!("child tree killed");
-            }
-            tracing::debug!("✅ Run complete");
-        };
-
-        Box::pin(
-            fut.into_actor(self) // converts future to ActorFuture
-                .map(|_res, act, _ctx| {
-                    tracing::debug!(index = act.run_count, "✍️ running = false");
-                    act.running = false;
-                    ()
-                }),
-        )
+        tracing::info!(?msg.kind);
     }
 }
 

@@ -19,7 +19,7 @@ pub struct StartFromExample {
 }
 
 impl SystemStart for StartFromExample {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         // todo: mimic this for other kinds of startup - basically allow 'port' to be given and respected
         let identity =
             ServerIdentity::from_port_or_named(self.port).map_err(|e| Box::new(e.into()))?;

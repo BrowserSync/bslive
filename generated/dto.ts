@@ -5,6 +5,7 @@
 export type InvocationIdDTO = string;
 
 export interface ArchyNode {
+	id: string;
 	label: string;
 	nodes: ArchyNode[];
 }
@@ -138,13 +139,11 @@ export interface SseDTOOpts {
 }
 
 export interface StderrLineDTO {
-	task_id: string;
 	line: string;
 	prefix?: string;
 }
 
 export interface StdoutLineDTO {
-	task_id: string;
 	line: string;
 	prefix?: string;
 }
@@ -161,28 +160,37 @@ export type TaskActionStageDTO =
 	| { kind: "Ended", payload: {
 	tree: ArchyNode;
 	report: TaskReportDTO;
+	report_map: Record<string, TaskReportDTO>;
 }}
 	| { kind: "Error", payload?: undefined };
 
 export interface TaskActionDTO {
-	id: string;
 	stage: TaskActionStageDTO;
 }
 
-export type TaskStatusDTO = 
+export type TaskConclusionDTO = 
 	| { kind: "Ok", payload?: undefined }
 	| { kind: "Err", payload: string }
 	| { kind: "Cancelled", payload?: undefined };
 
 export interface TaskResultDTO {
-	status: TaskStatusDTO;
+	conclusion: TaskConclusionDTO;
 	invocation_id: InvocationIdDTO;
 	task_reports: TaskReportDTO[];
 }
 
 export interface TaskReportDTO {
 	result: TaskResultDTO;
-	id: string;
+}
+
+export interface TaskTreePreview {
+	tree: ArchyNode;
+	will_exec: boolean;
+}
+
+export interface TaskTreeSummary {
+	tree: ArchyNode;
+	report_map: Record<string, TaskReportDTO>;
 }
 
 export interface WatchingDTO {
@@ -227,7 +235,9 @@ export type ExternalEventsDTO =
 	| { kind: "InputFileChanged", payload: FileChangedDTO }
 	| { kind: "InputAccepted", payload: InputAcceptedDTO }
 	| { kind: "OutputLine", payload: OutputLineDTO }
-	| { kind: "TaskAction", payload: TaskActionDTO };
+	| { kind: "TaskAction", payload: TaskActionDTO }
+	| { kind: "TaskTreePreview", payload: TaskTreePreview }
+	| { kind: "TaskTreeSummary", payload: TaskTreeSummary };
 
 /** @discriminator kind */
 export type InputErrorDTO = 

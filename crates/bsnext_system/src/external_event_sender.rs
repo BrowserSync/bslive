@@ -1,17 +1,18 @@
-use crate::invoke_scope::{RequestEventSender, TaggedEvent};
+use crate::capabilities::output_channel::RequestOutputChannel;
+use crate::capabilities::TaggedEvent;
 use actix::{Handler, Recipient, ResponseFuture, Running};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::task_report::{InvocationId, TaskResult};
+use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_trigger::TaskTriggerSource;
 
 pub struct ExternalEventSenderWithLogging {
-    pub request: Recipient<RequestEventSender>,
+    pub request: Recipient<RequestOutputChannel>,
 }
 
 impl ExternalEventSenderWithLogging {
-    pub fn new(request: Recipient<RequestEventSender>) -> Self {
+    pub fn new(request: Recipient<RequestOutputChannel>) -> Self {
         Self { request }
     }
 }
@@ -33,14 +34,15 @@ impl actix::Actor for ExternalEventSenderWithLogging {
 }
 
 impl Handler<Invocation> for ExternalEventSenderWithLogging {
-    type Result = ResponseFuture<TaskResult>;
+    type Result = ResponseFuture<InvocationResult>;
 
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        let id = invocation.id;
         let addr = self.request.clone();
-        let events: Vec<AnyEvent> = match invocation.trigger.variant {
-            TaskTriggerSource::FsChanges { changes, .. } => {
-                let as_strings = changes
+        let p = invocation.path().to_owned();
+        let events: Vec<AnyEvent> = match invocation.trigger().source() {
+            TaskTriggerSource::FsChanges(trigger) => {
+                let as_strings = trigger
+                    .changes()
                     .iter()
                     .map(|p| p.to_string_lossy().to_string())
                     .collect::<Vec<String>>();
@@ -51,20 +53,20 @@ impl Handler<Invocation> for ExternalEventSenderWithLogging {
                     },
                 ))]
             }
-            TaskTriggerSource::Exec => vec![],
+            TaskTriggerSource::Exec(..) => vec![],
         };
         Box::pin(async move {
-            let Ok(output) = addr.send(RequestEventSender { id }).await else {
+            let Ok(Ok(output)) = addr.send(RequestOutputChannel).await else {
                 todo!("can this actually fail?");
             };
             for evt in events {
-                let tagged = TaggedEvent::new(id, evt);
+                let tagged = TaggedEvent::new(evt);
                 match output.sender.send(tagged).await {
                     Ok(_) => tracing::trace!("sent"),
                     Err(e) => tracing::error!("{e}"),
                 };
             }
-            TaskResult::ok(InvocationId(0))
+            InvocationResult::ok(p)
         })
     }
 }

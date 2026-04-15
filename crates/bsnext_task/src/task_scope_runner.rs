@@ -1,7 +1,8 @@
 use crate::RunKind;
 use crate::as_actor::AsActor;
 use crate::invocation::Invocation;
-use crate::task_report::{ExpectedLen, InvocationId, TaskReport, TaskResult};
+use crate::invocation_result::InvocationResult;
+use crate::task_report::{ExpectedLen, TaskReport};
 use crate::task_scope::TaskScope;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, Running, WrapFuture};
 use futures_util::FutureExt;
@@ -9,7 +10,7 @@ use std::sync::Arc;
 use tokio::select;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
-use tracing::{Instrument, Span, debug};
+use tracing::debug;
 
 /// Represents a task group runner responsible for managing and executing a set of tasks.
 ///
@@ -48,15 +49,13 @@ impl actix::Actor for TaskScopeRunner {
 }
 
 impl Handler<Invocation> for TaskScopeRunner {
-    type Result = ResponseActFuture<Self, TaskResult>;
+    type Result = ResponseActFuture<Self, InvocationResult>;
 
-    #[tracing::instrument(skip_all, name = "Invocation", fields(id = invocation.sqid()))]
+    #[tracing::instrument(skip_all, name = "Invocation")]
     fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        let sqid = invocation.sqid();
-        let Invocation { trigger, .. } = invocation;
-        let span = Span::current();
-        let gg = Arc::new(span.clone());
-        let ggg = gg.clone();
+        let sqid = "TaskScopeRunner:sqid";
+        let trigger = invocation.trigger().to_owned();
+        let node_path = invocation.path().to_owned();
 
         let Some(group) = self.task_scope.take() else {
             todo!("how to handle a concurrent request here?");
@@ -67,36 +66,37 @@ impl Handler<Invocation> for TaskScopeRunner {
         let run_kind = group.run_kind().clone();
         let tasks = group.tasks();
 
-        tracing::info!(
-            group.sqid = sqid,
-            group.len = expected_len,
-            group.kind = ?run_kind,
-            group.exit_on_failure = exit_on_failure,
+        tracing::debug!(
+            bs.group.sqid = sqid,
+            bs.group.node_path = %node_path,
+            bs.group.len = expected_len,
+            bs.group.kind = ?run_kind,
+            bs.group.exit_on_failure = exit_on_failure,
         );
 
         let future = async move {
             let mut done: Vec<(usize, TaskReport)> = vec![];
-            let _e = ggg.enter();
+            // let span = gg.clone();
             // let inner = channels;
             match run_kind {
                 RunKind::Sequence { opts: _ } => {
                     for (index, task_entry) in tasks.into_iter().enumerate() {
-                        let id = task_entry.id();
+                        let node_path = task_entry.path().to_owned();
+
                         let boxed_actor = Box::new(task_entry).into_task_recipient();
-                        let one_task = Invocation::new(id, trigger.clone());
-                        let sqid = one_task.sqid();
+                        let one_task = Invocation::new(&node_path, trigger.clone());
 
                         match boxed_actor.send(one_task).await {
                             Ok(result) => {
                                 let is_ok = result.is_ok();
-                                done.push((index, result.to_report(id)));
+                                done.push((index, result.to_report(node_path.to_owned())));
                                 if is_ok {
                                     debug!(
                                         "index {index} completed, will move to next text in seq"
                                     );
                                 } else if exit_on_failure {
                                     debug!(
-                                        "❌ stopping after index {index} sqid: {sqid} ran, because it did not complete successfully."
+                                        "❌ stopping after index {index} ran, because it did not complete successfully."
                                     );
                                     break;
                                 } else {
@@ -121,24 +121,24 @@ impl Handler<Invocation> for TaskScopeRunner {
                     let token = CancellationToken::new();
                     let sem = Arc::new(Semaphore::new(opts.max_concurrent_items as usize));
                     let mut jhs = Vec::new();
-                    for (index, as_actor) in tasks.into_iter().enumerate() {
+                    for (index, task_entry) in tasks.into_iter().enumerate() {
                         let parent_token = token.clone();
                         let child_token = parent_token.child_token();
-                        let id = as_actor.id();
-                        let actor = Box::new(as_actor).into_task_recipient();
+                        let node_path = task_entry.path().clone();
+                        let actor = Box::new(task_entry).into_task_recipient();
                         let jh = tokio::spawn({
                             let semaphore = sem.clone();
-                            let one_task = Invocation::new(id, trigger.clone());
+                            let one_task = Invocation::new(&node_path, trigger.clone());
                             async move {
                                 if child_token.is_cancelled() {
-                                    let v = TaskResult::cancelled();
-                                    return (index, id, Ok::<_, _>(v));
+                                    let v = InvocationResult::cancelled();
+                                    return (index, node_path, Ok::<_, _>(v));
                                 };
                                 let _permit = semaphore.acquire().await.unwrap();
+                                let node_path_clone = node_path.clone();
                                 let task_run = actor
                                     .send(one_task)
-                                    .instrument(Span::current())
-                                    .map(move |task_result| (index, id, task_result));
+                                    .map(move |task_result| (index, node_path_clone, task_result));
                                 let output = select! {
                                     result = task_run => {
                                         match (&result, fail_early) {
@@ -160,8 +160,8 @@ impl Handler<Invocation> for TaskScopeRunner {
                                     }
                                     _ = child_token.cancelled() => {
                                         debug!("child_token was cancelled");
-                                        let v = TaskResult::cancelled();
-                                        (index, id, Ok::<_, _>(v))
+                                        let v = InvocationResult::cancelled();
+                                        (index, node_path, Ok::<_, _>(v))
                                     }
                                 };
                                 drop(_permit);
@@ -174,7 +174,7 @@ impl Handler<Invocation> for TaskScopeRunner {
                     for jh in jhs {
                         match jh.await {
                             Ok((index, id, Ok(result))) => {
-                                done.push((index, result.to_report(id)));
+                                done.push((index, result.to_report(id.to_owned())));
                             }
                             Ok((index, _, Err(mailbox_error))) => {
                                 tracing::error!(
@@ -191,7 +191,6 @@ impl Handler<Invocation> for TaskScopeRunner {
             done
         };
         Box::pin(future.into_actor(self).map(move |res, _actor, _ctx| {
-            let _e = gg.enter();
             debug!("actual len: {}", res.len());
             debug!("expected len: {}", expected_len);
 
@@ -213,11 +212,11 @@ impl Handler<Invocation> for TaskScopeRunner {
             );
 
             match (all_ran, all_good, exit_on_failure) {
-                (true, true, _) => TaskResult::ok_tasks(InvocationId(0), reports),
-                (true, false, true) => TaskResult::err_tasks(InvocationId(0), failed_only, reports),
-                (true, false, false) => TaskResult::ok_tasks(InvocationId(0), reports),
-                (false, _, _) => TaskResult::err_partial_tasks(
-                    InvocationId(0),
+                (true, true, _) => InvocationResult::ok_tasks(node_path, reports),
+                (true, false, true) => InvocationResult::err_tasks(node_path, failed_only, reports),
+                (true, false, false) => InvocationResult::ok_tasks(node_path, reports),
+                (false, _, _) => InvocationResult::err_partial_tasks(
+                    node_path,
                     reports,
                     ExpectedLen(expected_len),
                 ),

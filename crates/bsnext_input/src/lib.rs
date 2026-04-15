@@ -4,7 +4,7 @@ use crate::startup::StartupContext;
 use crate::yml::YamlError;
 use bsnext_fs_helpers::{DirError, FsWriteError};
 use miette::JSONReportHandler;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::net::AddrParseError;
 use std::path::{Path, PathBuf};
@@ -17,6 +17,7 @@ pub mod path_def;
 pub mod playground;
 pub mod route;
 
+pub mod bs_live_built_in_task;
 pub mod route_cli;
 pub mod route_manifest;
 pub mod server_config;
@@ -36,6 +37,8 @@ pub struct Input {
     pub watchers: Vec<MultiWatch>,
     #[serde(default)]
     pub run: BTreeMap<String, Vec<RunOptItem>>,
+    #[serde(default)]
+    pub config: InputConfig,
 }
 
 impl Input {
@@ -115,6 +118,20 @@ impl FromStr for Input {
             InputError::YamlError(err)
         })
     }
+}
+
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub struct InputConfig {
+    pub infer_watchers: InferWatchers,
+}
+
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub enum InferWatchers {
+    None,
+    Routes,
+    Servers,
+    #[default]
+    RoutesAndServers,
 }
 
 #[derive(Debug)]

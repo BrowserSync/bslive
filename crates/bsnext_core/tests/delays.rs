@@ -4,7 +4,6 @@ use bsnext_core::server::router::common::{from_yaml, into_state, test_proxy, uri
 use bsnext_input::route::{ProxyRoute, RouteKind};
 use bsnext_input::server_config::ServerConfig;
 use bsnext_input::Input;
-use insta::assert_debug_snapshot;
 
 // #[tokio::test]
 // async fn test_delays() -> Result<(), anyhow::Error> {

@@ -1,12 +1,15 @@
 use crate::archy::ArchyNode;
 use crate::external_events::{
-    ExternalEventsDTO, InvocationIdDTO, TaskActionDTO, TaskActionStageDTO, TaskReportDTO,
-    TaskResultDTO, TaskStatusDTO,
+    ExternalEventsDTO, InvocationIdDTO, TaskActionDTO, TaskActionStageDTO, TaskConclusionDTO,
+    TaskReportDTO, TaskResultDTO,
 };
 use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
-use bsnext_task::task_report::{TaskReport, TaskResult, TaskStatus};
+use bsnext_task::invocation_result::{InvocationConclusion, InvocationResult};
+use bsnext_task::task_report::TaskReport;
+use bsnext_task::NodePath;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use typeshare::typeshare;
@@ -34,6 +37,7 @@ pub enum InternalEvents {
 pub struct TaskReportAndTree {
     pub report: TaskReport,
     pub tree: ArchyNode,
+    pub report_map: HashMap<NodePath, TaskReport>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,21 +54,28 @@ pub enum TaskActionStage {
 }
 
 impl TaskActionStage {
-    pub fn started(id: u64, tree: ArchyNode) -> AnyEvent {
+    pub fn started(tree: ArchyNode) -> AnyEvent {
         // let action = TaskAction {
         //     id,
         //     stage: TaskActionStage::Started { tree },
         // };
         let dto = TaskActionDTO {
-            id: id.to_string(),
             stage: TaskActionStageDTO::Started { tree },
         };
         AnyEvent::External(ExternalEventsDTO::TaskAction(dto))
     }
-    pub fn complete(id: u64, tree: ArchyNode, report: TaskReport) -> AnyEvent {
+    pub fn complete(
+        tree: ArchyNode,
+        report: TaskReport,
+        report_map: HashMap<NodePath, TaskReport>,
+    ) -> AnyEvent {
+        let report_map_dto = report_map
+            .iter()
+            .map(|(k, v)| (k.to_string(), TaskReportDTO::from(v.clone())))
+            .collect();
         let dto = TaskActionDTO {
-            id: id.to_string(),
             stage: TaskActionStageDTO::Ended {
+                report_map: report_map_dto,
                 tree,
                 report: TaskReportDTO::from(report),
             },
@@ -76,20 +87,19 @@ impl TaskActionStage {
 impl From<TaskReport> for TaskReportDTO {
     fn from(value: TaskReport) -> Self {
         TaskReportDTO {
-            id: value.id.to_string(),
             result: TaskResultDTO::from(value.result),
         }
     }
 }
 
-impl From<TaskResult> for TaskResultDTO {
-    fn from(value: TaskResult) -> Self {
+impl From<InvocationResult> for TaskResultDTO {
+    fn from(value: InvocationResult) -> Self {
         TaskResultDTO {
-            invocation_id: InvocationIdDTO(value.invocation_id.0.to_string()),
-            status: match value.status {
-                TaskStatus::Ok(_) => TaskStatusDTO::Ok,
-                TaskStatus::Err(e) => TaskStatusDTO::Err(e.to_string()),
-                TaskStatus::Cancelled => TaskStatusDTO::Cancelled,
+            invocation_id: InvocationIdDTO(value.node_path.to_string()),
+            conclusion: match value.conclusion {
+                InvocationConclusion::Ok(_) => TaskConclusionDTO::Ok,
+                InvocationConclusion::Err(e) => TaskConclusionDTO::Err(e.to_string()),
+                InvocationConclusion::Cancelled => TaskConclusionDTO::Cancelled,
             },
             task_reports: value
                 .task_reports
@@ -212,9 +222,12 @@ pub struct Available(pub Vec<String>);
 
 impl Display for Available {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.0.is_empty() {
+            return Ok(());
+        }
         write!(
             f,
-            "{}",
+            "Available: {}",
             self.0
                 .iter()
                 .map(|x| format!("\"{}\"", x))
@@ -228,7 +241,7 @@ impl Display for Available {
 pub enum InitialTaskError {
     #[error("initial tasks did not complete, as determined from report. TODO: access report here for better errors")]
     FailedReport,
-    #[error("Task(s) {expected} not found. Available: {available}")]
+    #[error("Task(s) {expected} not found. {available}")]
     MissingTask {
         expected: Expected,
         available: Available,

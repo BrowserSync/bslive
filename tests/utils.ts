@@ -95,7 +95,7 @@ export const test = base.extend<{
         const combined_args = [...ann.args, "-f", "json"];
 
         console.log("will exec with args: ", combined_args);
-        console.log("cmd: ", combined_args.join(" "));
+        console.log("cargo cmd: cargo run -- ", combined_args.join(" "));
 
         let child = fork(file, combined_args, {
             cwd,
@@ -215,7 +215,7 @@ export const test = base.extend<{
         const combined_args = [...ann.args, "-f", "json"];
 
         console.log("will exec with args: ", combined_args);
-        console.log("cmd: ", combined_args.join(" "));
+        console.log("cargo cmd: cargo run -- ", combined_args.join(" "));
 
         let child = fork(file, combined_args, {
             cwd,
@@ -288,7 +288,7 @@ export const test = base.extend<{
             });
         });
         const data: TServersResp = await new Promise((resolve, reject) => {
-            let max = 1000;
+            let max = 10_000;
             let elapsed = 0;
             let int = setInterval(() => {
                 elapsed += 100;

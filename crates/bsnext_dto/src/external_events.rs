@@ -1,9 +1,12 @@
-use crate::archy::{archy, ArchyNode, Prefix};
+use crate::archy::{archy, overlay_results, ArchyNode, Prefix};
 use crate::{
     FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, OutputLineDTO, ServerIdentityDTO,
     ServersChangedDTO, StderrLineDTO, StdoutLineDTO, StoppedWatchingDTO, WatchingDTO,
 };
 use bsnext_output::OutputWriterTrait;
+use bsnext_task::task_report::TaskReport;
+use bsnext_task::NodePath;
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 use typeshare::typeshare;
@@ -22,13 +25,41 @@ pub enum ExternalEventsDTO {
     InputAccepted(InputAcceptedDTO),
     OutputLine(OutputLineDTO),
     TaskAction(TaskActionDTO),
+    TaskTreePreview(TaskTreePreview),
+    TaskTreeSummary(TaskTreeSummary),
 }
 
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TaskActionDTO {
-    pub id: String,
     pub stage: TaskActionStageDTO,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TaskTreePreview {
+    pub tree: ArchyNode,
+    pub will_exec: bool,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TaskTreeSummary {
+    pub tree: ArchyNode,
+    pub report_map: HashMap<String, TaskReportDTO>,
+}
+
+impl TaskTreeSummary {
+    pub fn from_report(tree: ArchyNode, report_map: &HashMap<NodePath, TaskReport>) -> Self {
+        let report_map_dto = report_map
+            .iter()
+            .map(|(k, v)| (k.to_string(), TaskReportDTO::from(v.clone())))
+            .collect();
+        Self {
+            tree,
+            report_map: report_map_dto,
+        }
+    }
 }
 
 /// @discriminator kind
@@ -42,6 +73,7 @@ pub enum TaskActionStageDTO {
     Ended {
         tree: ArchyNode,
         report: TaskReportDTO,
+        report_map: HashMap<String, TaskReportDTO>,
     },
     Error,
 }
@@ -50,14 +82,13 @@ pub enum TaskActionStageDTO {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TaskReportDTO {
     pub result: TaskResultDTO,
-    pub id: String,
 }
 
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TaskResultDTO {
     #[allow(dead_code)]
-    pub status: TaskStatusDTO,
+    pub conclusion: TaskConclusionDTO,
     #[allow(dead_code)]
     pub invocation_id: InvocationIdDTO,
     #[allow(dead_code)]
@@ -67,7 +98,7 @@ pub struct TaskResultDTO {
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
-pub enum TaskStatusDTO {
+pub enum TaskConclusionDTO {
     Ok,
     Err(String),
     Cancelled,
@@ -78,19 +109,11 @@ pub enum TaskStatusDTO {
 pub struct InvocationIdDTO(pub String);
 
 impl ExternalEventsDTO {
-    pub fn stdout_line(task_id: u64, line: String, prefix: Option<String>) -> Self {
-        Self::OutputLine(crate::OutputLineDTO::Stdout(StdoutLineDTO {
-            task_id: task_id.to_string(),
-            line,
-            prefix,
-        }))
+    pub fn stdout_line(line: String, prefix: Option<String>) -> Self {
+        Self::OutputLine(crate::OutputLineDTO::Stdout(StdoutLineDTO { line, prefix }))
     }
-    pub fn stderr_line(task_id: u64, line: String, prefix: Option<String>) -> Self {
-        Self::OutputLine(crate::OutputLineDTO::Stderr(StderrLineDTO {
-            task_id: task_id.to_string(),
-            line,
-            prefix,
-        }))
+    pub fn stderr_line(line: String, prefix: Option<String>) -> Self {
+        Self::OutputLine(crate::OutputLineDTO::Stderr(StderrLineDTO { line, prefix }))
     }
 }
 
@@ -124,8 +147,43 @@ impl OutputWriterTrait for ExternalEventsDTO {
                 print_stderr_line(sink, stderr)
             }
             ExternalEventsDTO::TaskAction(action) => print_task_action(sink, action),
+            ExternalEventsDTO::TaskTreePreview(TaskTreePreview {
+                tree,
+                will_exec: false,
+            }) => print_task_tree(sink, tree),
+            ExternalEventsDTO::TaskTreePreview(TaskTreePreview {
+                tree,
+                will_exec: true,
+            }) => print_task_tree_preview(sink, tree),
+            ExternalEventsDTO::TaskTreeSummary(TaskTreeSummary { tree, report_map }) => {
+                print_task_tree_summary(sink, tree, report_map)
+            }
         }
     }
+}
+
+fn print_task_tree<W: Write>(w: &mut W, tree: &ArchyNode) -> anyhow::Result<()> {
+    let s = archy(tree, Prefix::None);
+    write!(w, "{s}")?;
+    Ok(())
+}
+
+fn print_task_tree_preview<W: Write>(w: &mut W, tree: &ArchyNode) -> anyhow::Result<()> {
+    let s = archy(tree, Prefix::None);
+    write!(w, "{s}")?;
+    writeln!(w, "continuing after 2 seconds...")?;
+    Ok(())
+}
+
+fn print_task_tree_summary<W: Write>(
+    w: &mut W,
+    tree: &ArchyNode,
+    report_map: &HashMap<String, TaskReportDTO>,
+) -> anyhow::Result<()> {
+    let tree_with_results = overlay_results(tree, report_map);
+    let s = archy(&tree_with_results, Prefix::None);
+    write!(w, "{s}")?;
+    Ok(())
 }
 
 pub fn print_servers_changed<W>(
@@ -235,13 +293,18 @@ pub fn print_task_action<W: Write>(w: &mut W, action_dto: &TaskActionDTO) -> any
             // let s = archy(tree, Prefix::None);
             // write!(w, "{s}")?;
         }
-        TaskActionStageDTO::Ended { report, tree } => match report.result.status {
-            TaskStatusDTO::Ok => {}
-            TaskStatusDTO::Err(_) => {
-                let s = archy(tree, Prefix::None);
+        TaskActionStageDTO::Ended {
+            report,
+            tree,
+            report_map,
+        } => match report.result.conclusion {
+            TaskConclusionDTO::Ok => {}
+            TaskConclusionDTO::Err(_) => {
+                let tree_with_results = overlay_results(tree, report_map);
+                let s = archy(&tree_with_results, Prefix::None);
                 write!(w, "{s}")?;
             }
-            TaskStatusDTO::Cancelled => {}
+            TaskConclusionDTO::Cancelled => {}
         },
         TaskActionStageDTO::Error => {}
     }

@@ -1,66 +1,58 @@
-use actix::{Actor, Addr, Handler, ResponseFuture};
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
+use crate::capabilities::servers_addr::RequestServersAddr;
+use actix::{Actor, Handler, Recipient, ResponseFuture};
 use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::task_report::{InvocationId, TaskResult};
-use bsnext_task::task_trigger::TaskTriggerSource;
+use bsnext_task::invocation_result::InvocationResult;
+use bsnext_task::task_trigger::{FsChangesTrigger, TaskTriggerSource};
 
-pub struct NotifyServers {
-    addr: Addr<ServersSupervisor>,
+pub struct NotifyServersReady {
+    addr: Recipient<RequestServersAddr>,
 }
 
-impl NotifyServers {
-    pub fn new(addr: Addr<ServersSupervisor>) -> Self {
+impl NotifyServersReady {
+    pub fn new(addr: Recipient<RequestServersAddr>) -> Self {
         Self { addr }
     }
 }
 
-impl Actor for NotifyServers {
+impl Actor for NotifyServersReady {
     type Context = actix::Context<Self>;
-
-    fn started(&mut self, _ctx: &mut Self::Context) {
-        tracing::debug!(actor.lifecycle = "started", "NotifyServers");
-    }
-
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        tracing::debug!(actor.lifecycle = "stopped", "NotifyServers");
-    }
 }
 
-impl Handler<Invocation> for NotifyServers {
-    type Result = ResponseFuture<TaskResult>;
+impl Handler<Invocation> for NotifyServersReady {
+    type Result = ResponseFuture<InvocationResult>;
 
-    fn handle(
-        &mut self,
-        Invocation { trigger, .. }: Invocation,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        tracing::debug!("NotifyServers::TaskCommand");
+    fn handle(&mut self, invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
+        tracing::debug!("NotifyServersReady::TaskCommand");
         let addr = self.addr.clone();
-        match trigger.variant {
-            TaskTriggerSource::FsChanges {
-                changes,
-                fs_event_context,
-                ..
-            } => addr.do_send(FilesChanged {
-                paths: changes.clone(),
-                ctx: fs_event_context,
-            }),
-            TaskTriggerSource::Exec => {
-                todo!("I cannot accept this")
+        let spec_id = invocation.path().to_owned();
+        let source = invocation.trigger().source();
+        Box::pin({
+            let source = source.clone();
+            async move {
+                let f = match source {
+                    TaskTriggerSource::FsChanges(trigger) => do_it(addr, &trigger).await,
+                    TaskTriggerSource::Exec(..) => {
+                        todo!("I cannot accept this")
+                    }
+                };
+                match f {
+                    Ok(_) => InvocationResult::ok(spec_id),
+                    Err(_) => InvocationResult::err_message(spec_id, "couldn't notify servers"),
+                }
             }
-        }
-        Box::pin(async { TaskResult::ok(InvocationId(0)) })
+        })
     }
 }
 
-pub struct NotifyServersNoOp;
-impl Actor for NotifyServersNoOp {
-    type Context = actix::Context<Self>;
-}
-impl Handler<Invocation> for NotifyServersNoOp {
-    type Result = ResponseFuture<TaskResult>;
-    fn handle(&mut self, _invocation: Invocation, _ctx: &mut Self::Context) -> Self::Result {
-        Box::pin(async { TaskResult::ok(InvocationId(0)) })
-    }
+async fn do_it(
+    addr: Recipient<RequestServersAddr>,
+    trigger: &FsChangesTrigger,
+) -> anyhow::Result<()> {
+    let next = addr.send(RequestServersAddr).await??;
+    next.do_send(FilesChanged {
+        paths: trigger.changes().to_owned(),
+        ctx: trigger.fs_ctx().to_owned(),
+    });
+    Ok(())
 }

@@ -49,8 +49,8 @@ impl Debounce {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, PartialOrd, Eq, Ord)]
 pub struct FsEventContext {
-    pub id: u64,
-    pub origin_id: u64,
+    id: u64,
+    origin_id: u64,
 }
 
 impl FsEventContext {

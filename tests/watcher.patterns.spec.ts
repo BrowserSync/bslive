@@ -31,8 +31,7 @@ test.describe(
                         kind: "Stdout",
                         payload: {
                             line: "something inside examples/watch/src/ changed",
-                            prefix: "[kW5WSJ]",
-                            task_id: "12843725078283625749",
+                            prefix: "KVg7Ke.0.EH7eBa",
                         },
                     },
                 },

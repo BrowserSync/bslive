@@ -22,3 +22,5 @@ servers:
       log: info
 watchers: []
 run: {}
+config:
+  infer_watchers: RoutesAndServers

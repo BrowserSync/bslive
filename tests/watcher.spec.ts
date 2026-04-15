@@ -106,8 +106,7 @@ test.describe(
                         kind: "Stdout",
                         payload: {
                             line: "examples/watch/src/index.html changed",
-                            prefix: "[sbA12j]",
-                            task_id: "5686553582802980224",
+                            prefix: "s1JJWT.0.3mAYfD",
                         },
                     },
                 },
@@ -128,7 +127,6 @@ test.describe(
                         payload: {
                             line: "01.txt changed",
                             prefix: "[my-custom-prefix]",
-                            task_id: "3194562813731631287",
                         },
                     },
                 },
@@ -149,7 +147,6 @@ test.describe(
                         payload: {
                             line: "02.txt changed",
                             prefix: "custom-name",
-                            task_id: "6772696062706127968",
                         },
                     },
                 },
@@ -169,7 +166,6 @@ test.describe(
                         kind: "Stdout",
                         payload: {
                             line: "03.txt changed",
-                            task_id: "11740891780066705752",
                         },
                     },
                 },

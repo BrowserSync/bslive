@@ -17,7 +17,7 @@ pub async fn export_cmd(
     let ctx = StartupContext::from_cwd(Some(cwd));
     tracing::debug!("StartupContext: {:?}", ctx);
 
-    let start_kind = StartKind::from_args(fs_opts, input_opts, start_command).input(&ctx);
+    let start_kind = StartKind::from_args(fs_opts, input_opts, start_command).resolve_input(&ctx);
 
     match start_kind {
         Err(e) => todo!(
@@ -43,5 +43,6 @@ pub async fn export_cmd(
         }
         Ok(SystemStartArgs::PathWithInvalidInput { .. }) => todo!("handle PathWithInvalidInput?"),
         Ok(SystemStartArgs::RunOnly { .. }) => todo!("handle PathWithInvalidInput?"),
+        Ok(SystemStartArgs::InputOnlyDeferred { .. }) => todo!("not yet..."),
     }
 }

@@ -1,3 +1,4 @@
+use crate::bs_live_built_in_task::BsLiveBuiltInTask;
 use crate::path_def::PathDef;
 use crate::route_cli::RouteCli;
 use crate::watch_opts::WatchOpts;
@@ -97,6 +98,7 @@ impl Route {
     pub fn as_filepath(&self) -> PathBuf {
         let next = PathBuf::from(self.path.as_str());
 
+        #[allow(clippy::cmp_owned)]
         let next = if next == PathBuf::from("/") {
             next.join("index.html")
         } else {
@@ -361,7 +363,7 @@ impl ShRunOptItem {
 )]
 #[serde(untagged)]
 pub enum RunOptItem {
-    BsLive { bslive: BsLiveRunner },
+    BsLive { bslive: BsLiveBuiltInTask },
     Sh(ShRunOptItem),
     All(RunAll),
     Seq(RunSeq),
@@ -429,9 +431,14 @@ impl RunAll {
     Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
 pub struct RunAllOpts {
+    #[serde(default = "default_max")]
     pub max: u8,
     #[serde(default)]
     pub exit_on_fail: bool,
+}
+
+fn default_max() -> u8 {
+    5
 }
 
 impl RunAllOpts {
@@ -446,7 +453,7 @@ impl RunAllOpts {
 impl Default for RunAllOpts {
     fn default() -> Self {
         Self {
-            max: 5,
+            max: default_max(),
             exit_on_fail: false,
         }
     }
@@ -505,25 +512,6 @@ pub enum PrefixOpt {
 impl Default for PrefixOpt {
     fn default() -> Self {
         Self::Bool(true)
-    }
-}
-
-#[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
-)]
-pub enum BsLiveRunner {
-    #[serde(rename = "notify-server")]
-    NotifyServer,
-    #[serde(rename = "ext-event")]
-    PublishExternalEvent,
-}
-
-impl Display for BsLiveRunner {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BsLiveRunner::NotifyServer => write!(f, "BsLiveRunner::NotifyServer"),
-            BsLiveRunner::PublishExternalEvent => write!(f, "BsLiveRunner::ExtEvent"),
-        }
     }
 }
 

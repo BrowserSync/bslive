@@ -1,40 +1,68 @@
-use crate::start::start_kind::fs_write_input;
-use bsnext_fs_helpers::WriteMode;
+use crate::watch::watch_sub_opts::WatchSubOpts;
 use bsnext_input::path_def::PathDef;
-use bsnext_input::route::{DirRoute, Opts, Route, RouteKind};
+use bsnext_input::route::{DirRoute, MultiWatch, Opts, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
-use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
-use bsnext_input::target::TargetKind;
-use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
+use bsnext_input::startup::{Lazy, StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::{InferWatchers, Input, InputError, PathDefinition, PathDefs, PathError};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
-pub struct StartFromTrailingArgs {
+pub struct StartFromPaths {
     pub paths: Vec<String>,
     pub write_input: bool,
     pub port: Option<u16>,
     pub force: bool,
     pub route_opts: Opts,
+    pub watch_sub_opts: WatchSubOpts,
 }
 
-impl SystemStart for StartFromTrailingArgs {
-    fn input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        let identity =
-            ServerIdentity::from_port_or_named(self.port).map_err(|e| Box::new(e.into()))?;
-        let input = from_dir_paths(&ctx.cwd, &self.paths, &self.route_opts, identity)
-            .map_err(|e| Box::new(e.into()))?;
-        let write_mode = if self.force {
-            WriteMode::Override
-        } else {
-            WriteMode::Safe
-        };
-        if self.write_input {
-            let path = fs_write_input(&ctx.cwd, &input, TargetKind::Yaml, &write_mode)
+impl SystemStart for StartFromPaths {
+    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+        let span = tracing::debug_span!("StartFromTrailingArgs::resolve_input");
+        let _g = span.entered();
+
+        let port = self.port;
+        let paths = self.paths.clone();
+        let route_opts = self.route_opts.clone();
+        let cwd = ctx.cwd.clone();
+
+        // defer the lookup of directories or ports because a 'before' task might have sideeffects
+        let lazy = move |mut input: Input| -> Result<Input, Box<InputError>> {
+            let identity =
+                ServerIdentity::from_port_or_named(port).map_err(|e| Box::new(e.into()))?;
+
+            let server_config = from_dir_paths(&cwd, &paths, &route_opts, identity)
                 .map_err(|e| Box::new(e.into()))?;
-            Ok(SystemStartArgs::PathWithInput { input, path })
-        } else {
-            Ok(SystemStartArgs::InputOnly { input })
+
+            tracing::debug!("Adding a `server_config`");
+            input.servers.push(server_config);
+
+            Ok(input)
+        };
+
+        let mut input_stub = Input::default();
+
+        'watch_overrides: {
+            // if there is some explicit --watch.paths given, we want to ONLY support that
+            let total = self.watch_sub_opts.paths.len() + self.watch_sub_opts.before.len();
+            if total == 0 {
+                tracing::debug!("not appending watchers since paths + before tasks were empty");
+                break 'watch_overrides;
+            }
+
+            let span = tracing::debug_span!(parent: None, "StartFromTrailingArgs watch_sub_opts");
+            let _g = span.entered();
+            tracing::debug!("{} paths to watch", self.watch_sub_opts.paths.len());
+            tracing::debug!("{} sh_commands to run", self.watch_sub_opts.run.len());
+            let multi = MultiWatch::from(self.watch_sub_opts.clone());
+            input_stub.watchers = vec![multi];
+            input_stub.config.infer_watchers = InferWatchers::None;
         }
+
+        Ok(SystemStartArgs::InputOnlyDeferred {
+            input: input_stub,
+            create: Lazy::new(Box::new(lazy)),
+        })
     }
 }
 
@@ -43,7 +71,7 @@ fn from_dir_paths<T: AsRef<str>>(
     paths: &[T],
     route_opts: &Opts,
     identity: ServerIdentity,
-) -> Result<Input, PathError> {
+) -> Result<ServerConfig, PathError> {
     let path_defs = paths
         .iter()
         .map(|p| {
@@ -99,7 +127,7 @@ fn from_dir_paths<T: AsRef<str>>(
             .collect(),
         ..Default::default()
     };
-    Ok(Input::from_server(server))
+    Ok(server)
 }
 
 #[cfg(test)]
@@ -109,20 +137,22 @@ mod test {
     fn test() -> anyhow::Result<()> {
         use tempfile::tempdir;
         let tmp_dir = tempdir()?;
-        let v = StartFromTrailingArgs {
+        let v = StartFromPaths {
             paths: vec![".".into()],
             write_input: false,
             port: Some(3000),
             force: false,
             route_opts: Default::default(),
+            watch_sub_opts: Default::default(),
         };
         let ctx = StartupContext {
             cwd: tmp_dir.path().to_path_buf(),
         };
-        let i = v.input(&ctx);
-        tmp_dir.close()?;
+        let i = v.resolve_input(&ctx);
         let start_args = i.unwrap();
-        if let SystemStartArgs::InputOnly { input } = start_args {
+        if let SystemStartArgs::InputOnlyDeferred { input, create } = start_args {
+            let input = create.exec(input)?;
+            tmp_dir.close()?;
             insta::assert_debug_snapshot!(input);
             insta::assert_yaml_snapshot!(input);
         } else {

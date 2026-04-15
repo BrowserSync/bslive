@@ -34,6 +34,7 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
     (events_sender, channel_future)
 }
 
+#[tracing::instrument]
 pub async fn with_sender(
     cwd: PathBuf,
     start_kind: StartKind,
@@ -44,7 +45,7 @@ pub async fn with_sender(
     let startup = start_system(cwd, start_kind, events_sender).await;
     match startup {
         // If the startup was successful, keep hold of the handle to keep the system running
-        Ok(Some(api)) => match api.handle.await {
+        Ok(Some(api)) => match api.handle().await {
             Ok(..) => Ok(()),
             Err(er) => Err(anyhow::anyhow!("{}", er)),
         },

@@ -21,9 +21,8 @@ test.describe(
                     payload: {
                         kind: "Stdout",
                         payload: {
-                            task_id: "11547041707440023642",
                             line: "t1",
-                            prefix: "[Yskbag]",
+                            prefix: "cHBgje.0.yzQkcw.0.G0rXKy",
                         },
                     },
                 },
@@ -32,9 +31,8 @@ test.describe(
                     payload: {
                         kind: "Stdout",
                         payload: {
-                            task_id: "1771583503751589290",
                             line: "t2",
-                            prefix: "[Fp4O58]",
+                            prefix: "cHBgje.0.yzQkcw.1.izQ8ML",
                         },
                     },
                 },
@@ -63,29 +61,34 @@ test.describe(
     () => {
         test("running 2 commands on cli", async ({ run }) => {
             // bs.stdout
-            const lines = await run.waitForOutput("TaskTreeDisplay", 1);
+            const lines = await run.waitForOutput("TaskTreePreview", 1);
             expect(lines).toStrictEqual([
                 {
-                    kind: "TaskTreeDisplay",
+                    kind: "TaskTreePreview",
                     payload: {
                         tree: {
-                            label: "[bM] Seq: 1 task(s)",
+                            id: "voCKol",
+                            label: "[voCKol] seq: 1",
                             nodes: [
                                 {
-                                    label: "[mp6u7r] Seq: 2 task(s)",
+                                    id: "voCKol.0.aPjCfW",
+                                    label: "[voCKol.0.aPjCfW] seq: 2",
                                     nodes: [
                                         {
-                                            label: "[pW6OUa] − Runnable::Sh echo 'dry-t1'",
+                                            id: "voCKol.0.aPjCfW.0.4uPDw3",
+                                            label: "[voCKol.0.aPjCfW.0.4uPDw3] ShCmd echo 'dry-t1'",
                                             nodes: [],
                                         },
                                         {
-                                            label: "[K4AiCF] − Runnable::Sh echo 'dry-t2'",
+                                            id: "voCKol.0.aPjCfW.1.K4LKHN",
+                                            label: "[voCKol.0.aPjCfW.1.K4LKHN] ShCmd echo 'dry-t2'",
                                             nodes: [],
                                         },
                                     ],
                                 },
                             ],
                         },
+                        will_exec: false,
                     },
                 },
             ]);

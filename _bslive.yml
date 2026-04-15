@@ -1,10 +1,10 @@
 run:
   other:
     - seq:
-        - sh: 'echo otehr!'
+        - sh: 'echo other!'
   default:
     - seq:
-        - sh: 'echo defualt!'
+        - sh: 'echo default!'
 servers:
   - port: 3003
     routes:

@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "Watching",
+    "payload": {
+      "paths": [
+        "examples/watch/src"
+      ],
+      "debounce": {
+        "kind": "buffered",
+        "ms": "300"
+      }
+    }
+  }
+]

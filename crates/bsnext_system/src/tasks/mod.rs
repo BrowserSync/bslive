@@ -1,118 +1,100 @@
 use crate::external_event_sender::ExternalEventSenderWithLogging;
-use crate::tasks::notify_servers::{NotifyServers, NotifyServersNoOp};
+use crate::tasks::notify_servers::NotifyServersReady;
 use crate::tasks::sh_cmd::ShCmd;
 use crate::tasks::task_spec::{TaskSpec, TreeDisplay};
-use crate::BsSystem;
-use actix::{Actor, Addr, Recipient};
-use bs_live_task::BsLiveTask;
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
-use bsnext_dto::archy::ArchyNode;
-use bsnext_input::route::{BsLiveRunner, RunAll, RunOptItem, RunSeq};
+use actix::{Actor, Recipient};
+use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
+use bsnext_input::route::{RunAll, RunOptItem, RunSeq};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
-use bsnext_task::task_report::TaskReport;
-use bsnext_task::{OverlappingOpts, SequenceOpts};
-use std::collections::HashMap;
+use bsnext_task::{ContentId, NodePath, OverlappingOpts, SequenceOpts};
+use comms::Comms;
+use into_recipient::IntoRecipient;
+use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-pub mod bs_live_task;
+pub mod comms;
+mod into_recipient;
 pub mod notify_servers;
+pub mod resolve;
 pub mod sh_cmd;
 pub mod task_comms;
 pub mod task_spec;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
-pub enum Runnable {
-    BsLiveTask(BsLiveTask),
-    Sh(ShCmd),
-    Many(TaskSpec),
+pub struct Node {
+    node: Runnable,
+    path: NodePath,
 }
 
-#[derive(Debug)]
-pub struct RunnableWithComms {
-    runnable: Runnable,
-    ctx: Comms,
+impl Node {
+    pub fn content_id(&self) -> ContentId {
+        self.node.content_id()
+    }
+    pub fn path(&self) -> &NodePath {
+        &self.path
+    }
 }
 
-#[derive(Debug, Clone)]
-pub struct Comms {
-    servers_addr: Option<Addr<ServersSupervisor>>,
-    sys: Addr<BsSystem>,
-}
-
-pub trait IntoRecipient {
-    fn into_recipient(self: Self, addr: &Addr<BsSystem>) -> Recipient<Invocation>;
-}
-
-impl AsActor for RunnableWithComms {
-    fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
-        match self.runnable {
-            Runnable::BsLiveTask(BsLiveTask::NotifyServer) => match self.ctx.servers_addr {
-                None => {
-                    let s = NotifyServersNoOp;
-                    let s = s.start();
-                    s.recipient()
-                }
-                Some(addr) => {
-                    let s = NotifyServers::new(addr.clone());
-                    let s = s.start();
-                    s.recipient()
-                }
-            },
-            Runnable::BsLiveTask(BsLiveTask::PublishExternalEvent) => {
-                let actor = ExternalEventSenderWithLogging::new(self.ctx.sys.recipient());
-                let addr = actor.start();
-                addr.recipient()
-            }
-            Runnable::Sh(sh) => sh.into_recipient(&self.ctx.sys),
-            Runnable::Many(_) => unreachable!("The conversion to Task happens elsewhere"),
+impl TreeDisplay for Node {
+    fn as_tree_label(&self) -> String {
+        let p = &self.path;
+        let leaf_label = match &self.node {
+            Runnable::BsLiveTask(bs) => format!("{bs}"),
+            Runnable::Sh(sh) => format!("{sh}"),
+            Runnable::Spec(_) => String::new(),
+        };
+        match &self.node {
+            Runnable::BsLiveTask(_) => format!("[{p}] {leaf_label}"),
+            Runnable::Sh(_) => format!("[{p}] {leaf_label}"),
+            Runnable::Spec(spec) => spec.as_tree_label(),
         }
     }
 }
 
-fn append_with_reports(archy: &mut ArchyNode, tasks: &[Runnable], hm: &HashMap<u64, TaskReport>) {
-    for (index_position, runnable) in tasks.iter().enumerate() {
-        let id = runnable.as_id_with(Index(index_position as u64));
-        let sqid = runnable.as_sqid(id);
-        let label_with_id = match hm.get(&id) {
-            None => format!(
-                "[{sqid}] − {}",
-                runnable.as_tree_label(Index(index_position as u64))
-            ),
-            Some(report) => {
-                if runnable.is_group() {
-                    runnable.as_tree_label(Index(index_position as u64))
-                } else {
-                    format!(
-                        "[{sqid}] {} {}",
-                        if report.is_ok() { "✅" } else { "❌" },
-                        runnable.as_tree_label(Index(index_position as u64))
-                    )
-                }
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+pub enum Runnable {
+    BsLiveTask(BsLiveBuiltInTask),
+    Sh(ShCmd),
+    Spec(TaskSpec),
+}
+
+impl Display for Runnable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Runnable::BsLiveTask(_) => write!(f, "Runnable::BsLiveTask"),
+            Runnable::Sh(_) => write!(f, "Runnable::Sh"),
+            Runnable::Spec(spec) if spec.is_seq() => {
+                write!(f, "Runnable::Spec (seq)")
             }
-        };
-        let raw_label = match hm.get(&id) {
-            None => format!("{}", runnable.as_tree_label(Index(index_position as u64))),
-            Some(report) => {
-                if runnable.is_group() {
-                    runnable.as_tree_label(Index(index_position as u64))
-                } else {
-                    format!(
-                        "{} {}",
-                        if report.is_ok() { "✅" } else { "❌" },
-                        runnable.as_tree_label(Index(index_position as u64))
-                    )
-                }
+            Runnable::Spec(_spec) => {
+                write!(f, "Runnable::Spec (all)")
             }
-        };
-        match runnable {
-            Runnable::BsLiveTask(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
-            Runnable::Sh(_) => archy.nodes.push(ArchyNode::new(&label_with_id)),
-            Runnable::Many(runner) => {
-                let mut next = ArchyNode::new(&raw_label);
-                append_with_reports(&mut next, &runner.tasks, hm);
-                archy.nodes.push(next);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RunnableWithComms {
+    runnable: Node,
+    ctx: Comms,
+}
+
+impl AsActor for RunnableWithComms {
+    fn into_task_recipient(self: Box<Self>) -> Recipient<Invocation> {
+        match self.runnable.node {
+            Runnable::BsLiveTask(BsLiveBuiltInTask::NotifyServer) => {
+                let a = NotifyServersReady::new(self.ctx.capabilities.recipient());
+                let actor = a.start();
+                actor.recipient()
             }
+            Runnable::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent) => {
+                let actor = ExternalEventSenderWithLogging::new(self.ctx.capabilities.recipient());
+                let addr = actor.start();
+                addr.recipient()
+            }
+            Runnable::Sh(sh) => sh.into_recipient(&self.ctx.capabilities),
+            Runnable::Spec(_) => unreachable!("The conversion to Task happens elsewhere"),
         }
     }
 }
@@ -122,36 +104,25 @@ impl Runnable {
         match self {
             Runnable::BsLiveTask(_) => false,
             Runnable::Sh(_) => false,
-            Runnable::Many(_) => true,
+            Runnable::Spec(_) => true,
         }
     }
-    pub fn as_id(&self) -> u64 {
+    pub fn content_id(&self) -> ContentId {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
-        hasher.finish()
-    }
-    pub fn as_id_with(&self, Index(index): Index) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        index.hash(&mut hasher);
-        hasher.finish()
-    }
-    pub fn as_sqid(&self, id: u64) -> String {
-        let sqids = sqids::Sqids::default();
-        let sqid = sqids.encode(&[id]).unwrap_or_else(|_| id.to_string());
-        sqid.get(0..6).map(String::from).unwrap_or(sqid)
+        ContentId::new(hasher.finish())
     }
 }
-
-pub struct Index(pub u64);
 
 impl From<&RunOptItem> for Runnable {
     fn from(value: &RunOptItem) -> Self {
         match value {
             RunOptItem::BsLive { bslive } => match bslive {
-                BsLiveRunner::NotifyServer => Self::BsLiveTask(BsLiveTask::NotifyServer),
-                BsLiveRunner::PublishExternalEvent => {
-                    Self::BsLiveTask(BsLiveTask::PublishExternalEvent)
+                BsLiveBuiltInTask::NotifyServer => {
+                    Self::BsLiveTask(BsLiveBuiltInTask::NotifyServer)
+                }
+                BsLiveBuiltInTask::PublishExternalEvent => {
+                    Self::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent)
                 }
             },
             RunOptItem::Sh(sh) => Self::Sh(ShCmd::from(sh)),
@@ -162,14 +133,14 @@ impl From<&RunOptItem> for Runnable {
                     max_concurrent_items: run_all_opts.max,
                     exit_on_failure: run_all_opts.exit_on_fail,
                 };
-                Self::Many(TaskSpec::all(&items, opts))
+                Self::Spec(TaskSpec::all(&items, opts))
             }
             RunOptItem::Seq(RunSeq { seq, seq_opts }) => {
                 let items: Vec<_> = seq.iter().map(Runnable::from).collect();
                 let opts = SequenceOpts {
                     exit_on_failure: seq_opts.exit_on_fail,
                 };
-                Self::Many(TaskSpec::seq_opts(&items, opts))
+                Self::Spec(TaskSpec::seq_opts(&items, opts))
             }
         }
     }
