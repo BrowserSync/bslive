@@ -22,6 +22,7 @@ pub fn create_watcher(
                 if event.paths.iter().any(|p| {
                     is_ignored_path_type(&p.as_path())
                         || is_auto_excluded(&cwd_c.as_path(), &p.as_path())
+                        || is_excluded_postfix(&p.as_path())
                 }) {
                     tracing::trace!(?event.paths, "[ignored]");
                     return;
@@ -221,6 +222,12 @@ mod test {
         let excluded = is_auto_excluded(&cwd, &change);
         assert_eq!(excluded, true);
     }
+    #[test]
+    fn test_postfix() {
+        let change = Path::new("/Users/shaneosbourne/.index.html.swp");
+        let excluded = is_excluded_postfix(&change);
+        assert_eq!(excluded, true);
+    }
 }
 
 fn is_ignored_path_type<P: AsRef<Path>>(subject: &P) -> bool {
@@ -256,4 +263,15 @@ fn is_auto_excluded<P: AsRef<Path>>(cwd: &P, subject: &P) -> bool {
         Some(Component::ParentDir) => unreachable!("here? ParentDir"),
     })
     .unwrap_or(false)
+}
+
+fn is_excluded_postfix<P: AsRef<Path>>(subject: &P) -> bool {
+    let path_ref = subject.as_ref();
+    match path_ref.extension().map(|x| x.as_encoded_bytes()) {
+        // vim swap stuff
+        Some(b"swp") => true,
+        Some(b"swo") => true,
+        Some(b"swn") => true,
+        _ => false
+    }
 }
