@@ -11,7 +11,7 @@ use bsnext_fs::{
     Debounce, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathDescription,
     PathDescriptionOwned,
 };
-use bsnext_input::route::FilterKind;
+use bsnext_input::route::PathPattern;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -113,14 +113,14 @@ impl actix::Actor for PathMonitor {
 
             // additional filter from options?
             let spec_opts = self.path_watchable.spec_opts();
-            if let Some(filter) = &spec_opts.filter {
+            if let Some(filter) = &spec_opts.only {
                 filters.push(filter.clone());
             }
 
             // create the watcher now
             let watcher = to_watcher(
                 &self.cwd,
-                Some(&FilterKind::List(filters)),
+                Some(&PathPattern::List(filters)),
                 spec_opts.ignore.as_ref(),
                 self.fs_ctx,
                 ctx.address().recipient(),
@@ -154,7 +154,7 @@ impl actix::Actor for PathMonitor {
 
 struct PathAndFilter<'a> {
     path: &'a Path,
-    filter_kind: Option<FilterKind>,
+    filter_kind: Option<PathPattern>,
 }
 
 impl<'a> PathAndFilter<'a> {
@@ -162,7 +162,7 @@ impl<'a> PathAndFilter<'a> {
         if let Some((before, ..)) = p.split_once("*") {
             PathAndFilter {
                 path: Path::new(before),
-                filter_kind: Some(FilterKind::Glob {
+                filter_kind: Some(PathPattern::Glob {
                     glob: p.to_string(),
                 }),
             }
@@ -192,9 +192,9 @@ impl PathFilter for PathAndFilter<'_> {
     }
 }
 
-fn convert(fk: &FilterKind) -> Vec<Filter> {
+fn convert(fk: &PathPattern) -> Vec<Filter> {
     match fk {
-        FilterKind::StringDefault(string_default) => {
+        PathPattern::StringDefault(string_default) => {
             if string_default.contains("*") {
                 let is_abs = Path::new(&string_default).is_absolute();
                 let glob = globset::GlobBuilder::new(string_default)
@@ -225,10 +225,10 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
                 }]
             }
         }
-        FilterKind::Extension { ext } => vec![Filter::Extension {
+        PathPattern::Extension { ext } => vec![Filter::Extension {
             ext: ext.to_string(),
         }],
-        FilterKind::Glob { glob } => {
+        PathPattern::Glob { glob } => {
             let is_abs = Path::new(&glob).is_absolute();
             let matcher = globset::GlobBuilder::new(glob)
                 .literal_separator(true)
@@ -253,8 +253,8 @@ fn convert(fk: &FilterKind) -> Vec<Filter> {
                 }
             }
         }
-        FilterKind::List(items) => items.iter().flat_map(convert).collect::<Vec<_>>(),
-        FilterKind::Any { any } => vec![Filter::Any {
+        PathPattern::List(items) => items.iter().flat_map(convert).collect::<Vec<_>>(),
+        PathPattern::Any { any } => vec![Filter::Any {
             any: any.to_string(),
         }],
     }
@@ -324,8 +324,8 @@ impl Handler<FsEvent> for PathMonitor {
 
 fn to_watcher(
     cwd: &Path,
-    filter: Option<&FilterKind>,
-    ignore: Option<&FilterKind>,
+    filter: Option<&PathPattern>,
+    ignore: Option<&PathPattern>,
     fs_ctx: FsEventContext,
     receiver: Recipient<FsEvent>,
 ) -> FsWatcher {

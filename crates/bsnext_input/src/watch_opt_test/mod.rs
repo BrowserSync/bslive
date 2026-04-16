@@ -1,5 +1,5 @@
 use crate::route::{
-    DebounceDuration, FilterKind, RunAll, RunAllOpts, RunOptItem, RunSeq, SeqOpts, ShRunOptItem,
+    DebounceDuration, PathPattern, RunAll, RunAllOpts, RunOptItem, RunSeq, SeqOpts, ShRunOptItem,
     Spec,
 };
 use crate::watch_opts::WatchOpts;
@@ -9,11 +9,11 @@ fn test_watch_opts_debounce() {
     let input = r#"
     debounce:
       ms: 200
-    filter: "**/*.css"
+    only: "**/*.css"
     "#;
     let expected = WatchOpts::Spec(Spec {
         debounce: Some(DebounceDuration::Ms(200)),
-        filter: Some(FilterKind::StringDefault("**/*.css".into())),
+        only: Some(PathPattern::StringDefault("**/*.css".into())),
         ignore: None,
         run: None,
         before: None,
@@ -25,11 +25,11 @@ fn test_watch_opts_debounce() {
 #[test]
 fn test_watch_opts_inline_filter() {
     let input = r#"
-    filter: "**/*.css"
+    only: "**/*.css"
     "#;
     let expected = WatchOpts::Spec(Spec {
         debounce: None,
-        filter: Some(FilterKind::StringDefault("**/*.css".into())),
+        only: Some(PathPattern::StringDefault("**/*.css".into())),
         ignore: None,
         run: None,
         before: None,
@@ -41,12 +41,12 @@ fn test_watch_opts_inline_filter() {
 #[test]
 fn test_watch_opts_explicit_filter_ext() {
     let input = r#"
-    filter:
+    only:
       ext: "css"
     "#;
     let expected = WatchOpts::Spec(Spec {
         debounce: None,
-        filter: Some(FilterKind::Extension {
+        only: Some(PathPattern::Extension {
             ext: "css".to_string(),
         }),
         ignore: None,
@@ -59,12 +59,12 @@ fn test_watch_opts_explicit_filter_ext() {
 #[test]
 fn test_watch_opts_explicit_filter_glob() {
     let input = r#"
-    filter:
+    only:
       glob: "**/*.css"
     "#;
     let expected = WatchOpts::Spec(Spec {
         debounce: None,
-        filter: Some(FilterKind::Glob {
+        only: Some(PathPattern::Glob {
             glob: "**/*.css".into(),
         }),
         ignore: None,

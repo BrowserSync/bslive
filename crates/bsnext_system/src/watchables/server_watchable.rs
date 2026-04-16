@@ -18,13 +18,13 @@ pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
         .iter()
         .flat_map(|server_config| {
             server_config.watchers.iter().map(|watcher| {
-                let task_spec = watcher.opts.as_ref().and_then(to_task_spec);
+                let task_spec = watcher.spec.as_ref().and_then(to_task_spec);
                 let path_bufs = watcher.dirs.as_pathbufs();
 
                 ServerWatchable {
                     server_identity: server_config.identity.clone(),
                     dirs: path_bufs,
-                    spec: watcher.opts.clone().unwrap_or_default(),
+                    spec: watcher.spec.clone().unwrap_or_default(),
                     task_spec,
                 }
             })

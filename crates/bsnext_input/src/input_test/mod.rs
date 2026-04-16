@@ -1,5 +1,5 @@
 use crate::route::{
-    CompressionOpts, CorsOpts, DebounceDuration, DelayKind, DelayOpts, FilterKind, MultiWatch,
+    CompressionOpts, CorsOpts, DebounceDuration, DelayKind, DelayOpts, MultiWatch, PathPattern,
     Route, Spec, WatcherDirs,
 };
 use crate::watch_opts::WatchOpts;
@@ -215,7 +215,7 @@ fn test_deserialize_watch() {
         c.opts.watch,
         WatchOpts::Spec(Spec {
             debounce: Some(DebounceDuration::Ms(2000)),
-            filter: None,
+            only: None,
             ignore: None,
             run: None,
             before: None,
@@ -233,7 +233,7 @@ servers:
     - dirs: ./other
       debounce:
         ms: 2000
-      filter:
+      only:
         ext: "**/*.css"
 "#;
     let c: Input = serde_yaml::from_str(input).unwrap();
@@ -242,13 +242,13 @@ servers:
         vec![
             MultiWatch {
                 dirs: WatcherDirs::Single("./".to_string()),
-                opts: Some(Spec::default())
+                spec: Some(Spec::default())
             },
             MultiWatch {
                 dirs: WatcherDirs::Single("./other".to_string()),
-                opts: Some(Spec {
+                spec: Some(Spec {
                     debounce: Some(DebounceDuration::Ms(2000)),
-                    filter: Some(FilterKind::Extension {
+                    only: Some(PathPattern::Extension {
                         ext: "**/*.css".to_string()
                     }),
                     ..Default::default()
@@ -267,7 +267,7 @@ servers:
 //     - dirs: ./other
 //       debounce:
 //         ms: 2000
-//       filter:
+//       only:
 //         ext: "**/*.css"
 //       run:
 //         - sh: echo lol

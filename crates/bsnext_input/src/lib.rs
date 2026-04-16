@@ -1,4 +1,4 @@
-use crate::route::{BeforeRunOptItem, MultiWatch, RunOptItem};
+use crate::route::{BeforeRunOptItem, DebounceDuration, MultiWatch, PathPattern, RunOptItem};
 use crate::server_config::{ServerConfig, ServerIdentity};
 use crate::startup::StartupContext;
 use crate::yml::YamlError;
@@ -52,7 +52,7 @@ impl Input {
         let root_tasks = self
             .watchers
             .iter()
-            .flat_map(|watcher| watcher.opts.as_ref().and_then(|spec| spec.before.clone()))
+            .flat_map(|watcher| watcher.spec.as_ref().and_then(|spec| spec.before.clone()))
             .flatten()
             .map(BeforeRunOptItem::into_run_opt);
 
@@ -64,7 +64,7 @@ impl Input {
                     .watchers
                     .iter()
                     .filter_map(|watcher| {
-                        watcher.opts.as_ref().and_then(|spec| spec.before.clone())
+                        watcher.spec.as_ref().and_then(|spec| spec.before.clone())
                     })
                     .flatten()
             })
@@ -123,6 +123,9 @@ impl FromStr for Input {
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct InputConfig {
     pub infer_watchers: InferWatchers,
+    pub global_fs_ignore: Option<PathPattern>,
+    pub global_fs_only: Option<PathPattern>,
+    pub global_fs_debounce: Option<DebounceDuration>,
 }
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]

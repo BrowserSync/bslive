@@ -1,6 +1,6 @@
 use crate::tasks::task_spec::TaskSpec;
 use crate::watchables::server_watchable::to_task_spec;
-use bsnext_input::route::{DirRoute, FilterKind, RawRoute, RouteKind, Spec, SseOpts};
+use bsnext_input::route::{DirRoute, PathPattern, RawRoute, RouteKind, Spec, SseOpts};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::watch_opts::WatchOpts;
 use bsnext_input::Input;
@@ -36,7 +36,19 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
 
                     let identity = server_config.identity.clone();
 
-                    let spec = to_spec(&r.opts.watch);
+                    let mut spec = to_spec(&r.opts.watch);
+
+                    // respect a given spec's 'ignore' (eg: if provided by user), otherwise try to use
+                    spec.ignore = spec
+                        .ignore
+                        .or_else(|| input.config.global_fs_ignore.to_owned());
+
+                    // respect a given spec's 'only' (eg: if provided by user), otherwise try to use
+                    spec.only = spec.only.or_else(|| input.config.global_fs_only.to_owned());
+
+                    // respect a given spec's 'debounce' (eg: if provided by user), otherwise try to use the global
+                    spec.debounce = spec.debounce.or_else(|| input.config.global_fs_debounce);
+
                     let run = to_task_spec(&spec);
                     let route_path = r.path.as_str().to_owned();
 
@@ -72,7 +84,7 @@ pub fn to_spec(wo: &WatchOpts) -> Spec {
         WatchOpts::Bool(enabled) if *enabled => Spec::default(),
         WatchOpts::InlineGlob(glob) => Spec {
             debounce: None,
-            filter: Some(FilterKind::Glob {
+            only: Some(PathPattern::Glob {
                 glob: glob.to_string(),
             }),
             ignore: None,

@@ -260,13 +260,22 @@ fn is_ignored_path_type<P: AsRef<Path>>(subject: &P) -> bool {
     // Starts at 4913 and increments by 123 if it already exists.
     // We only check for the first 10 increments as it's highly unlikely
     // that Vim will cycle through more than that in practice.
-    match path_ref.file_name().map(|name| name.as_encoded_bytes()) {
+    let bytes = path_ref.file_name().map(|name| name.as_encoded_bytes());
+    matches!(
+        bytes,
         Some(
-            b"4913" | b"5036" | b"5159" | b"5282" | b"5405" | b"5528" | b"5651" | b"5774" | b"5897"
-            | b"6020",
-        ) => true,
-        _ => false,
-    }
+            b"4913"
+                | b"5036"
+                | b"5159"
+                | b"5282"
+                | b"5405"
+                | b"5528"
+                | b"5651"
+                | b"5774"
+                | b"5897"
+                | b"6020",
+        )
+    )
 }
 
 // todo: If a folder is explicitly watched, these rules should be ignored

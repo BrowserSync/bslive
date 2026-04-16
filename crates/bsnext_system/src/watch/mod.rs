@@ -1,6 +1,6 @@
 use crate::watch::watch_sub_opts::WatchSubOpts;
 use bsnext_core::shared_args::LoggingOpts;
-use bsnext_input::route::MultiWatch;
+use bsnext_input::route::{MultiWatch, PathPattern};
 use bsnext_tracing::OutputFormat;
 use watch_runner::WatchRunnerStr;
 
@@ -20,6 +20,15 @@ pub struct WatchCommand {
     /// if true, listed commands will execute once before watching starts
     #[arg(long)]
     pub initial: bool,
+    /// how long to buffer changes for
+    #[arg(long)]
+    pub debounce: Option<usize>,
+    /// paths to ignore
+    #[arg(long, num_args(0..))]
+    pub ignore: Vec<PathPattern>,
+    /// patterns to allow - when given, paths MUST match one of these
+    #[arg(long, num_args(0..))]
+    pub only: Vec<PathPattern>,
     /// provide this flag to disable command prefixes
     #[arg(long = "no-prefix", default_value = "false")]
     pub no_prefix: bool,
@@ -37,7 +46,10 @@ impl From<WatchCommand> for MultiWatch {
             paths: value.paths,
             run: value.run,
             before: value.before,
+            ignore: value.ignore,
+            only: value.only,
             initial: value.initial,
+            debounce: value.debounce,
         };
         MultiWatch::from(sub_opts)
     }

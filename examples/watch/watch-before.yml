@@ -2,7 +2,7 @@ servers:
   - name: 'watch-before-tasks'
     watchers:
       - dirs: examples/watch/src
-        filter:
+        only:
           ext: 'css'
         before:
           - sh: echo "watchers.before.before"

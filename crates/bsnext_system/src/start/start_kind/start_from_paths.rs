@@ -18,7 +18,7 @@ pub struct StartFromPaths {
 
 impl SystemStart for StartFromPaths {
     fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        let span = tracing::debug_span!("StartFromTrailingArgs::resolve_input");
+        let span = tracing::debug_span!("StartFromPaths::resolve_input");
         let _g = span.entered();
 
         let port = self.port;
@@ -40,30 +40,57 @@ impl SystemStart for StartFromPaths {
             Ok(input)
         };
 
-        let mut input_stub = Input::default();
+        let explicit_watch_count =
+            self.watch_sub_opts.paths.len() + self.watch_sub_opts.before.len();
 
-        'watch_overrides: {
-            // if there is some explicit --watch.paths given, we want to ONLY support that
-            let total = self.watch_sub_opts.paths.len() + self.watch_sub_opts.before.len();
-            if total == 0 {
-                tracing::debug!("not appending watchers since paths + before tasks were empty");
-                break 'watch_overrides;
-            }
-
-            let span = tracing::debug_span!(parent: None, "StartFromTrailingArgs watch_sub_opts");
-            let _g = span.entered();
-            tracing::debug!("{} paths to watch", self.watch_sub_opts.paths.len());
-            tracing::debug!("{} sh_commands to run", self.watch_sub_opts.run.len());
-            let multi = MultiWatch::from(self.watch_sub_opts.clone());
-            input_stub.watchers = vec![multi];
-            input_stub.config.infer_watchers = InferWatchers::None;
-        }
+        let input = if explicit_watch_count > 0 {
+            with_explicit_paths(&self.watch_sub_opts)
+        } else {
+            with_inferred_watchers(&self.watch_sub_opts)
+        };
 
         Ok(SystemStartArgs::InputOnlyDeferred {
-            input: input_stub,
+            input,
             create: Lazy::new(Box::new(lazy)),
         })
     }
+}
+
+/// when we have given explicit paths on the command line, we are opting out of inferred watchers,
+/// for example, the following command would normally create a watcher for the path 'public'
+///   `bslive public`
+/// however, if we want to watch something else, we need a way to opt-out of the inferred ones, like:
+///   `bslive public --watch.paths src`
+///                      ^ in this case, we only want to watch 'src' and prevent inferred things later.
+fn with_explicit_paths(opts: &WatchSubOpts) -> Input {
+    let mut input = Input::default();
+    let span = tracing::debug_span!(parent: None, "StartFromPaths watch_overrides");
+    let _g = span.entered();
+    tracing::debug!("{} paths to watch", opts.paths.len());
+    tracing::debug!("{} sh_commands to run", opts.run.len());
+    let multi = MultiWatch::from(opts.clone());
+    input.watchers = vec![multi];
+    input.config.infer_watchers = InferWatchers::None;
+    input
+}
+
+/// in this second scenario, we're probably starting a server without explicit watch paths given as CLI args.
+///   eg: `bslive .`
+/// this means we'll watch the directory, but it might accidentally end up watching a noisy build folder or similar
+/// in that case, we still want to forward --ignore and --only args, but nothing else to allow the user to opt-out
+///   eg: `bslive . --only dist/*.html`
+fn with_inferred_watchers(opts: &WatchSubOpts) -> Input {
+    let mut input = Input::default();
+    let span = tracing::debug_span!(parent: None, "StartFromPaths global_overrides");
+    let _g = span.entered();
+    tracing::debug!("{} ignore add", opts.ignore.len());
+    let multi = MultiWatch::from(opts.clone());
+    if let Some(spec_from_cli) = multi.spec {
+        input.config.global_fs_ignore = spec_from_cli.ignore;
+        input.config.global_fs_only = spec_from_cli.only;
+        input.config.global_fs_debounce = spec_from_cli.debounce;
+    }
+    input
 }
 
 fn from_dir_paths<T: AsRef<str>>(

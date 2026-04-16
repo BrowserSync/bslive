@@ -2,7 +2,7 @@ servers:
   - name: npm-watcher
     watchers:
       - dir: examples/watcher
-        filter:
+        only:
           - examples/watcher/package.json
         run:
           - sh: echo '--> changed' $BSLIVE_FILES

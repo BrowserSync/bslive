@@ -292,7 +292,7 @@ pub enum DelayKind {
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, serde::Deserialize, serde::Serialize,
 )]
 pub enum DebounceDuration {
     #[serde(rename = "ms")]
@@ -303,12 +303,31 @@ pub enum DebounceDuration {
     Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
 #[serde(untagged)]
-pub enum FilterKind {
+pub enum PathPattern {
+    /// Use this when you have only an unknown string to process.
     StringDefault(String),
-    Extension { ext: String },
-    Glob { glob: String },
-    Any { any: String },
-    List(Vec<FilterKind>),
+    Extension {
+        ext: String,
+    },
+    Glob {
+        glob: String,
+    },
+    Any {
+        any: String,
+    },
+    List(Vec<PathPattern>),
+}
+
+impl FromStr for PathPattern {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let next = s.trim();
+        if next.is_empty() {
+            return Err(anyhow::anyhow!("path patterns cannot be empty"));
+        }
+        Ok(Self::StringDefault(next.to_owned()))
+    }
 }
 
 #[derive(
@@ -325,8 +344,8 @@ pub enum FilterKind {
 )]
 pub struct Spec {
     pub debounce: Option<DebounceDuration>,
-    pub filter: Option<FilterKind>,
-    pub ignore: Option<FilterKind>,
+    pub only: Option<PathPattern>,
+    pub ignore: Option<PathPattern>,
     pub run: Option<Vec<RunOptItem>>,
     pub before: Option<Vec<BeforeRunOptItem>>,
 }
@@ -521,7 +540,7 @@ impl Default for PrefixOpt {
 pub struct MultiWatch {
     pub dirs: WatcherDirs,
     #[serde(flatten)]
-    pub opts: Option<Spec>,
+    pub spec: Option<Spec>,
 }
 
 #[derive(

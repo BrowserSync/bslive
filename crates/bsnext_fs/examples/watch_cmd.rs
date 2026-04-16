@@ -1,4 +1,4 @@
-use actix::{Actor, WrapFuture};
+use actix::Actor;
 use bsnext_fs::actor::FsWatcher;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{FsEvent, FsEventContext};

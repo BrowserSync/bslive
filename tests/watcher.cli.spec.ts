@@ -204,3 +204,123 @@ test.describe(
         });
     },
 );
+
+test.describe(
+    "start command + watcher with ignore",
+    {
+        annotation: {
+            type: cli({
+                args: [
+                    "start",
+                    "examples/watch/src",
+                    "--watch.ignore",
+                    "**/02.txt",
+                    "--watch.run",
+                    "bslive:notify-server",
+                ],
+            }),
+            description: "",
+        },
+    },
+    () => {
+        test("ignores changes to 02.txt but not 01.txt", async ({
+            page,
+            bs,
+            request,
+        }) => {
+            await bs.waitForOutput("Watching");
+            await page.goto(bs.path("/"));
+
+            // Install mock handler
+            await page.evaluate(installMockHandler);
+
+            // 1. touch ignored file
+            bs.touch("examples/watch/src/02.txt");
+
+            // wait a bit to ensure no reload happens
+            await page.waitForTimeout(1000);
+
+            // Verify no calls yet
+            let calls = await page.evaluate(readCalls);
+            expect(calls).toStrictEqual([]);
+
+            // 2. touch non-ignored file
+            bs.touch("examples/watch/src/01.txt");
+
+            // Wait for the reloadPage call
+            await page.waitForFunction(() => {
+                return window.__playwright?.calls?.length === 1;
+            });
+
+            // Verify the calls
+            calls = await page.evaluate(readCalls);
+            expect(calls).toStrictEqual([
+                [
+                    {
+                        kind: "reloadPage",
+                    },
+                ],
+            ]);
+        });
+    },
+);
+
+test.describe(
+    "start command + watcher with only",
+    {
+        annotation: {
+            type: cli({
+                args: [
+                    "start",
+                    "examples/watch/src",
+                    "--watch.only",
+                    ".html",
+                    "--watch.run",
+                    "bslive:notify-server",
+                ],
+            }),
+            description: "",
+        },
+    },
+    () => {
+        test("ignores changes to index.html but not 01.txt", async ({
+            page,
+            bs,
+            request,
+        }) => {
+            await bs.waitForOutput("Watching");
+            await page.goto(bs.path("/"));
+
+            // Install mock handler
+            await page.evaluate(installMockHandler);
+
+            // 1. touch ignored file
+            bs.touch("examples/watch/src/02.txt");
+
+            // wait a bit to ensure no reload happens
+            await page.waitForTimeout(1000);
+
+            // Verify no calls yet
+            let calls = await page.evaluate(readCalls);
+            expect(calls).toStrictEqual([]);
+
+            // 2. touch non-ignored file
+            bs.touch("examples/watch/src/index.html");
+
+            // Wait for the reloadPage call
+            await page.waitForFunction(() => {
+                return window.__playwright?.calls?.length === 1;
+            });
+
+            // Verify the calls
+            calls = await page.evaluate(readCalls);
+            expect(calls).toStrictEqual([
+                [
+                    {
+                        kind: "reloadPage",
+                    },
+                ],
+            ]);
+        });
+    },
+);
