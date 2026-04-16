@@ -76,6 +76,7 @@ impl StartKind {
             StartKind::FromInputPaths(StartFromInputPaths {
                 input_paths: input_opts.input.clone(),
                 port: cmd.port,
+                no_watch: cmd.no_watch,
             })
         }
     }

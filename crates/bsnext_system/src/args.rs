@@ -33,6 +33,7 @@ pub struct Args {
     #[clap(flatten)]
     pub watch_opts: WatchSubOpts,
 
+    /// pass '--no-watch' to prevent auto watchers. can't be used with 'input'
     #[clap(long)]
     pub no_watch: bool,
 

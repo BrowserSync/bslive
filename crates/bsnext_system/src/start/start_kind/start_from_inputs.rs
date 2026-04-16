@@ -1,7 +1,7 @@
 use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
 
 use crate::input_fs::from_input_path;
-use bsnext_input::{Input, InputArgs, InputCtx, InputError};
+use bsnext_input::{Input, InputArgs, InputCtx, InputError, WatchGlobalConfig};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -9,11 +9,12 @@ use std::path::{Path, PathBuf};
 pub struct StartFromInputPaths {
     pub input_paths: Vec<String>,
     pub port: Option<u16>,
+    pub no_watch: bool,
 }
 
 impl SystemStart for StartFromInputPaths {
     fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        from_input_paths(ctx, &self.input_paths, &self.port)
+        from_input_paths(ctx, &self.input_paths, &self.port, self.no_watch)
     }
 }
 
@@ -34,6 +35,7 @@ fn from_input_paths<T: AsRef<str>>(
     ctx: &StartupContext,
     inputs: &[T],
     port: &Option<u16>,
+    no_watch: bool,
 ) -> Result<SystemStartArgs, Box<InputError>> {
     let cwd = &ctx.cwd;
     let input_candidates = inputs
@@ -86,10 +88,15 @@ fn from_input_paths<T: AsRef<str>>(
     let initial_ctx = InputCtx::new(&[], Some(input_args), ctx, Some(input_path));
     let result = from_input_path(input_path, &initial_ctx);
     match result {
-        Ok(input) => Ok(SystemStartArgs::PathWithInput {
-            path: input_path.to_path_buf(),
-            input,
-        }),
+        Ok(mut input) => {
+            if no_watch {
+                input.config.watchers = WatchGlobalConfig::Disabled;
+            }
+            Ok(SystemStartArgs::PathWithInput {
+                path: input_path.to_path_buf(),
+                input,
+            })
+        }
         Err(e) => match *e {
             InputError::YamlError(yaml_error) => Ok(SystemStartArgs::PathWithInvalidInput {
                 path: input_path.to_path_buf(),

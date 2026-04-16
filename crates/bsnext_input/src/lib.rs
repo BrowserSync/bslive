@@ -129,6 +129,7 @@ pub struct InputConfig {
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
 pub enum WatchGlobalConfig {
     Enabled { infer: InferWatchers },
     Disabled,
@@ -383,4 +384,33 @@ impl Display for PathDefinition {
 
 pub fn rand_word() -> String {
     random_word::gen(random_word::Lang::En).to_string()
+}
+
+#[cfg(test)]
+mod watch_global_config_test {
+    use super::*;
+    #[test]
+    fn test_deserialize_watch_global_config_disabled() {
+        let yaml_routes = r#"
+watchers: null
+"#;
+
+        let config: InputConfig = serde_yaml::from_str(yaml_routes).unwrap();
+        assert!(matches!(config.watchers, WatchGlobalConfig::Disabled));
+    }
+    #[test]
+    fn test_deserialize_watch_global_config_infer_variants() {
+        let yaml_routes = r#"
+watchers:
+  infer: Routes
+"#;
+
+        let config: InputConfig = serde_yaml::from_str(yaml_routes).unwrap();
+        assert!(matches!(
+            config.watchers,
+            WatchGlobalConfig::Enabled {
+                infer: InferWatchers::Routes
+            }
+        ));
+    }
 }
