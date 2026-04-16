@@ -24,6 +24,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
         logging: Default::default(),
         format: Default::default(),
         watch_sub_opts: Default::default(),
+        no_watch: false,
     };
 
     let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);

@@ -23,7 +23,9 @@ servers:
 watchers: []
 run: {}
 config:
-  infer_watchers: RoutesAndServers
+  watchers:
+    Enabled:
+      infer: RoutesAndServers
   global_fs_ignore: ~
   global_fs_only: ~
   global_fs_debounce: ~

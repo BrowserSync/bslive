@@ -33,6 +33,9 @@ pub struct Args {
     #[clap(flatten)]
     pub watch_opts: WatchSubOpts,
 
+    #[clap(long)]
+    pub no_watch: bool,
+
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub trailing: Vec<String>,
 }

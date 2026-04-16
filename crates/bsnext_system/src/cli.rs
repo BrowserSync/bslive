@@ -1,5 +1,4 @@
 use crate::args::{Args, SubCommands};
-
 use crate::export::export_cmd;
 use crate::start;
 use crate::start::start_command::StartCommand;
@@ -81,6 +80,7 @@ where
             watch_sub_opts: args.watch_opts,
             logging,
             format,
+            no_watch: args.no_watch,
         })
     });
 
@@ -110,6 +110,7 @@ async fn async_init(
                 watch_sub_opts: Default::default(),
                 logging,
                 format,
+                no_watch: true,
             };
             let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
             let result = export_cmd(&cwd, &args.fs_opts, &args.input_opts, &cmd, &start_cmd).await;

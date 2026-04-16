@@ -26,6 +26,10 @@ pub struct StartCommand {
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub trailing: Vec<String>,
 
+    /// disable all auto-watching
+    #[clap(long)]
+    pub no_watch: bool,
+
     /// additional watchers
     #[clap(flatten)]
     pub watch_sub_opts: WatchSubOpts,

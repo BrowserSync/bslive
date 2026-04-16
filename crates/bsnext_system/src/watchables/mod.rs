@@ -4,7 +4,7 @@ use crate::watchables::path_watchable::PathWatchable;
 use crate::watchables::route_watchable::to_route_watchables;
 use crate::watchables::server_watchable::to_server_watchables;
 use actix::Addr;
-use bsnext_input::{InferWatchers, Input};
+use bsnext_input::{InferWatchers, Input, WatchGlobalConfig};
 use monitor_path_watchables::MonitorPathWatchables;
 use tracing::debug;
 
@@ -36,27 +36,30 @@ impl BsSystem {
             .iter()
             .map(|w| PathWatchable::Any(w.to_owned()));
 
-        let watchables: Vec<_> = match input.config.infer_watchers {
-            InferWatchers::None => {
-                debug!("processing {} any watchables", any.len());
-                any.collect()
-            }
-            InferWatchers::Routes => {
-                debug!("processing {} route watchables", routes.len());
-                debug!("processing {} any watchables", any.len());
-                routes.chain(any).collect()
-            }
-            InferWatchers::Servers => {
-                debug!("processing {} server watchables", servers.len());
-                debug!("processing {} any watchables", any.len());
-                servers.chain(any).collect()
-            }
-            InferWatchers::RoutesAndServers => {
-                debug!("processing {} route watchables", routes.len());
-                debug!("processing {} server watchables", servers.len());
-                debug!("processing {} any watchables", any.len());
-                routes.chain(servers).chain(any).collect()
-            }
+        let watchables: Vec<_> = match &input.config.watchers {
+            WatchGlobalConfig::Enabled { infer } => match infer {
+                InferWatchers::None => {
+                    debug!("processing {} any watchables", any.len());
+                    any.collect()
+                }
+                InferWatchers::Routes => {
+                    debug!("processing {} route watchables", routes.len());
+                    debug!("processing {} any watchables", any.len());
+                    routes.chain(any).collect()
+                }
+                InferWatchers::Servers => {
+                    debug!("processing {} server watchables", servers.len());
+                    debug!("processing {} any watchables", any.len());
+                    servers.chain(any).collect()
+                }
+                InferWatchers::RoutesAndServers => {
+                    debug!("processing {} route watchables", routes.len());
+                    debug!("processing {} server watchables", servers.len());
+                    debug!("processing {} any watchables", any.len());
+                    routes.chain(servers).chain(any).collect()
+                }
+            },
+            WatchGlobalConfig::Disabled => vec![],
         };
 
         let cwd = self.cwd.clone();

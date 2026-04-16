@@ -324,3 +324,38 @@ test.describe(
         });
     },
 );
+
+test.describe(
+    "start command with --no-watch",
+    {
+        annotation: {
+            type: cli({
+                args: ["start", "examples/watch/src", "--no-watch"],
+            }),
+            description: "",
+        },
+    },
+    () => {
+        test("does not watch for changes", async ({ page, bs, request }) => {
+            // Wait for the server to be ready, but it should NOT print "Watching"
+            await page.goto(bs.path("/"));
+
+            // Install mock handler
+            await page.evaluate(installMockHandler);
+
+            // touch a file
+            bs.touch("examples/watch/src/01.txt");
+
+            // wait a bit to ensure no reload happens
+            await page.waitForTimeout(1000);
+
+            // Verify no calls
+            let calls = await page.evaluate(readCalls);
+            expect(calls).toStrictEqual([]);
+
+            // Also verify that "Watching" was not in the output
+            const allMessages = bs.messages.map((m) => m.kind);
+            expect(allMessages).not.toContain("Watching");
+        });
+    },
+);

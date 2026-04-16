@@ -3,7 +3,9 @@ use bsnext_input::path_def::PathDef;
 use bsnext_input::route::{DirRoute, MultiWatch, Opts, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::startup::{Lazy, StartupContext, SystemStart, SystemStartArgs};
-use bsnext_input::{InferWatchers, Input, InputError, PathDefinition, PathDefs, PathError};
+use bsnext_input::{
+    InferWatchers, Input, InputError, PathDefinition, PathDefs, PathError, WatchGlobalConfig,
+};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -14,6 +16,7 @@ pub struct StartFromPaths {
     pub force: bool,
     pub route_opts: Opts,
     pub watch_sub_opts: WatchSubOpts,
+    pub no_watch: bool,
 }
 
 impl SystemStart for StartFromPaths {
@@ -40,13 +43,18 @@ impl SystemStart for StartFromPaths {
             Ok(input)
         };
 
-        let explicit_watch_count =
-            self.watch_sub_opts.paths.len() + self.watch_sub_opts.before.len();
-
-        let input = if explicit_watch_count > 0 {
-            with_explicit_paths(&self.watch_sub_opts)
+        let input = if self.no_watch {
+            let mut input = Input::default();
+            input.config.watchers = WatchGlobalConfig::Disabled;
+            input
         } else {
-            with_inferred_watchers(&self.watch_sub_opts)
+            let explicit_watch_count =
+                self.watch_sub_opts.paths.len() + self.watch_sub_opts.before.len();
+            if explicit_watch_count > 0 {
+                with_explicit_paths(&self.watch_sub_opts)
+            } else {
+                with_inferred_watchers(&self.watch_sub_opts)
+            }
         };
 
         Ok(SystemStartArgs::InputOnlyDeferred {
@@ -70,7 +78,9 @@ fn with_explicit_paths(opts: &WatchSubOpts) -> Input {
     tracing::debug!("{} sh_commands to run", opts.run.len());
     let multi = MultiWatch::from(opts.clone());
     input.watchers = vec![multi];
-    input.config.infer_watchers = InferWatchers::None;
+    input.config.watchers = WatchGlobalConfig::Enabled {
+        infer: InferWatchers::None,
+    };
     input
 }
 
@@ -171,6 +181,7 @@ mod test {
             force: false,
             route_opts: Default::default(),
             watch_sub_opts: Default::default(),
+            no_watch: false,
         };
         let ctx = StartupContext {
             cwd: tmp_dir.path().to_path_buf(),

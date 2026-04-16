@@ -51,6 +51,7 @@ impl StartKind {
                     cors: cmd.cors.then_some(CorsOpts::Cors(true)),
                     ..Default::default()
                 },
+                no_watch: cmd.no_watch,
             });
         }
 

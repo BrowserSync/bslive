@@ -122,10 +122,24 @@ impl FromStr for Input {
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct InputConfig {
-    pub infer_watchers: InferWatchers,
+    pub watchers: WatchGlobalConfig,
     pub global_fs_ignore: Option<PathPattern>,
     pub global_fs_only: Option<PathPattern>,
     pub global_fs_debounce: Option<DebounceDuration>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub enum WatchGlobalConfig {
+    Enabled { infer: InferWatchers },
+    Disabled,
+}
+
+impl Default for WatchGlobalConfig {
+    fn default() -> Self {
+        Self::Enabled {
+            infer: InferWatchers::default(),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]

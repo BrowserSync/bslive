@@ -25,6 +25,12 @@ pub struct WatchSubOpts {
     pub initial: bool,
 }
 
+impl WatchSubOpts {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+}
+
 impl From<WatchSubOpts> for MultiWatch {
     fn from(value: WatchSubOpts) -> Self {
         let span = tracing::debug_span!("creating MultiWatch");

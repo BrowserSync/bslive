@@ -47,7 +47,9 @@ Input {
     watchers: [],
     run: {},
     config: InputConfig {
-        infer_watchers: RoutesAndServers,
+        watchers: Enabled {
+            infer: RoutesAndServers,
+        },
         global_fs_ignore: None,
         global_fs_only: None,
         global_fs_debounce: None,
