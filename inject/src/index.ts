@@ -1,10 +1,11 @@
 import { filter, map, merge, Observable, share, switchMap } from "rxjs";
-import { Producer } from "./producers/producer";
-import { ws } from "./producers/ws";
-import { consolePlugin, NULL_CONSOLE } from "./sinks/console";
-import { domPlugin } from "./sinks/dom";
-import { InjectConfig } from "@browsersync/generated/dto";
-import { injectConfigSchema } from "@browsersync/generated/schema";
+import { Producer } from "./producers/producer.js";
+import { ws } from "./producers/ws.js";
+import { consolePlugin, NULL_CONSOLE } from "./sinks/console.js";
+import { domPlugin } from "./sinks/dom.js";
+import { InjectConfig } from "@browsersync/generated/dto.js";
+import { injectConfigSchema } from "@browsersync/generated/schema.js";
+import { overlayPlugin } from "./sinks/overlay.js";
 
 ((injectConfig) => {
     injectConfigSchema.parse(injectConfig);
@@ -31,12 +32,6 @@ import { injectConfigSchema } from "@browsersync/generated/schema";
         map((x) => x.payload)
     );
 
-    // prettier-ignore
-    const change$ = clientEvent$.pipe(
-        filter((x) => x.kind === "Change"),
-        map(x => x.payload)
-    );
-
     /**
      * Side effects - this is where we react to incoming WS events
      */
@@ -46,6 +41,7 @@ import { injectConfigSchema } from "@browsersync/generated/schema";
                 const sinks: Observable<unknown>[] = [
                     domPlugin.resetSink(domEvents$, domApis, config),
                     consolePlugin.resetSink(logEvent$, log, config),
+                    overlayPlugin.resetSink(clientEvent$, [log], config),
                 ];
                 return merge(...sinks);
             }),

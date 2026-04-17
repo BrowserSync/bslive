@@ -1,8 +1,12 @@
 import { css } from "lit";
 
 export const base = css`
+    * {
+        box-sizing: border-box;
+    }
     pre {
         margin: 0;
+        padding: 0;
     }
     a {
         color: var(--theme-txt-color);

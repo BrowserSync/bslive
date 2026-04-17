@@ -4,7 +4,7 @@ import {
     GetActiveServersResponseDTO,
     ServerDesc,
     ServerDTO,
-} from "@browsersync/generated/dto";
+} from "@browsersync/generated/dto.js";
 
 class BsDebug extends LitElement {
     @property({ type: Object })

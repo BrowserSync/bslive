@@ -1,6 +1,6 @@
 use crate::capabilities::servers_addr::RequestServersAddr;
 use actix::{Actor, Handler, Recipient, ResponseFuture};
-use bsnext_core::servers_supervisor::file_changed_handler::FilesChanged;
+use bsnext_core::servers_supervisor::file_changed_handler::{FilesChanged, ServersNotification};
 use bsnext_task::invocation::Invocation;
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_trigger::{FsChangesTrigger, TaskTriggerSource};
@@ -50,9 +50,9 @@ async fn do_it(
     trigger: &FsChangesTrigger,
 ) -> anyhow::Result<()> {
     let next = addr.send(RequestServersAddr).await??;
-    next.do_send(FilesChanged {
+    next.do_send(ServersNotification::FilesChanged(FilesChanged {
         paths: trigger.changes().to_owned(),
         ctx: trigger.fs_ctx().to_owned(),
-    });
+    }));
     Ok(())
 }

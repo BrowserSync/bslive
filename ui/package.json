@@ -5,6 +5,9 @@
     "description": "",
     "main": "index.js",
     "type": "module",
+    "exports": {
+        "./components/*": "./src/components/*"
+    },
     "scripts": {
         "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm",
         "dev": "npm run build:client -- --watch"

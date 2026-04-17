@@ -1,4 +1,4 @@
-import { ClientEvent, ConnectInfo } from "@browsersync/generated/dto";
+import { ClientEvent, ConnectInfo } from "@browsersync/generated/dto.js";
 import { Observable } from "rxjs";
 
 export interface Producer {

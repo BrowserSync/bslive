@@ -1,6 +1,9 @@
 use crate::server::handler_change::{Change, ChangeWithSpan};
+use crate::server::handler_notification::Notification;
 use crate::servers_supervisor::actor::ServersSupervisor;
+use actix::AsyncContext;
 use bsnext_fs::FsEventContext;
+use bsnext_input::bs_live_built_in_task::ClientNotification;
 use std::path::PathBuf;
 
 #[derive(actix::Message)]
@@ -54,6 +57,30 @@ impl actix::Handler<FilesChanged> for ServersSupervisor {
                     tracing::debug!("child identity didn't match msg.ctx.id");
                     tracing::debug!("  -   child: {}", child.identity.as_id());
                     tracing::debug!("  - msg.ctx: {}", msg.ctx.id());
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, actix::Message)]
+#[rtype(result = "()")]
+pub enum ServersNotification {
+    FilesChanged(FilesChanged),
+    ClientNotification(ClientNotification),
+}
+
+impl actix::Handler<ServersNotification> for ServersSupervisor {
+    type Result = ();
+
+    fn handle(&mut self, msg: ServersNotification, ctx: &mut Self::Context) -> Self::Result {
+        tracing::debug!("looking at {} handlers", self.handlers.len());
+        match msg {
+            ServersNotification::FilesChanged(fc) => ctx.notify(fc),
+            ServersNotification::ClientNotification(notification) => {
+                for child in self.handlers.values() {
+                    let server_msg = Notification::Any(notification.to_owned());
+                    child.actor_address.do_send(server_msg);
                 }
             }
         }

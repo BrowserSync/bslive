@@ -5,6 +5,8 @@ use std::str::FromStr;
     Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
 pub enum BsLiveBuiltInTask {
+    #[serde(rename = "notify-clients")]
+    NotifyClients(ClientNotification),
     #[serde(rename = "notify-server")]
     NotifyServer,
     #[serde(rename = "ext-event")]
@@ -14,10 +16,18 @@ pub enum BsLiveBuiltInTask {
 impl FromStr for BsLiveBuiltInTask {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "notify-server" => Ok(Self::NotifyServer),
-            "ext-event" => Ok(Self::PublishExternalEvent),
-            _ => Err(anyhow::anyhow!("not a valid bslive builtin task")),
+        match s.split_once(":") {
+            Some(("notify-clients", message)) => Ok(Self::NotifyClients(
+                ClientNotification::DisplayMessage(DisplayMessage {
+                    message: message.to_owned(),
+                    reason: None,
+                }),
+            )),
+            _ => match s {
+                "notify-server" => Ok(Self::NotifyServer),
+                "ext-event" => Ok(Self::PublishExternalEvent),
+                _ => Err(anyhow::anyhow!("not a valid bslive builtin task")),
+            },
         }
     }
 }
@@ -26,9 +36,25 @@ impl Display for BsLiveBuiltInTask {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             BsLiveBuiltInTask::NotifyServer => write!(f, "BsLiveTask::NotifyServer"),
+            BsLiveBuiltInTask::NotifyClients(..) => write!(f, "BsLiveTask::NotifyClients"),
             BsLiveBuiltInTask::PublishExternalEvent => {
                 write!(f, "BsLiveTask::PublishExternalEvent")
             }
         }
     }
+}
+
+#[derive(
+    Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub enum ClientNotification {
+    DisplayMessage(DisplayMessage),
+}
+
+#[derive(
+    Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
+)]
+pub struct DisplayMessage {
+    pub message: String,
+    pub reason: Option<String>,
 }

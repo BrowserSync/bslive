@@ -41,6 +41,10 @@ var debounceDTOSchema = z.object({
   kind: z.string(),
   ms: z.string()
 });
+var displayMessageDTOSchema = z.object({
+  message: z.string(),
+  reason: z.string().optional()
+});
 var fileChangedDTOSchema = z.object({
   path: z.string()
 });
@@ -235,6 +239,10 @@ var clientEventSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Config"),
     payload: clientConfigDTOSchema
+  }),
+  z.object({
+    kind: z.literal("DisplayMessage"),
+    payload: displayMessageDTOSchema
   })
 ]);
 var eventLevelSchema = z.nativeEnum(EventLevel);
@@ -443,6 +451,7 @@ export {
   clientEventSchema,
   connectInfoSchema,
   debounceDTOSchema,
+  displayMessageDTOSchema,
   eventLevelSchema,
   externalEventsDTOSchema,
   fileChangedDTOSchema,

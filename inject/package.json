@@ -3,7 +3,9 @@
     "version": "0.26.0",
     "description": "",
     "main": "index.js",
+    "type": "module",
     "scripts": {
+        "build:dev": "esbuild dev/dev.ts --bundle --outdir=dev/dist --format=esm",
         "build:client": "esbuild src/index.ts --bundle --outdir=dist --format=esm --minify --metafile=dist/meta.json",
         "dev": "npm run build:client -- --sourcemap=inline --watch",
         "build:debug": "npm run build:client -- --sourcemap=inline"
@@ -13,6 +15,7 @@
     "license": "ISC",
     "dependencies": {
         "rxjs": "^7.8.1",
-        "zod": "^3.22.4"
+        "zod": "^3.22.4",
+        "lit": "^3.3.2"
     }
 }

@@ -1,11 +1,11 @@
 import { filter, ignoreElements, map, Observable, tap } from "rxjs";
-import { changeDTOSchema } from "@browsersync/generated/schema";
-import { ClientConfigDTO, ClientEvent } from "@browsersync/generated/dto";
-import { Sink } from "./sink";
-import { Reloader } from "../../vendor/live-reload/src/reloader";
-import { Timer } from "../../vendor/live-reload/src/timer";
-import { ConsoleApi } from "./console";
-import { changedPath } from "./dom/changed-path";
+import { changeDTOSchema } from "@browsersync/generated/schema.js";
+import { ClientConfigDTO, ClientEvent } from "@browsersync/generated/dto.js";
+import { Sink } from "./sink.js";
+import { Reloader } from "../../vendor/live-reload/src/reloader.js";
+import { Timer } from "../../vendor/live-reload/src/timer.js";
+import { ConsoleApi } from "./console.js";
+import { changedPath } from "./dom/changed-path.js";
 
 export const domPlugin: Sink<ClientEvent, [ConsoleApi, Reloader]> = {
     name: "dom plugin",

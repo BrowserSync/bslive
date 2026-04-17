@@ -1,6 +1,6 @@
-import { Producer } from "./producer";
+import { Producer } from "./producer.js";
 import { webSocket } from "rxjs/webSocket";
-import { ClientEvent } from "@browsersync/generated/dto";
+import { ClientEvent } from "@browsersync/generated/dto.js";
 import { retry } from "rxjs";
 
 export function ws(): Producer {

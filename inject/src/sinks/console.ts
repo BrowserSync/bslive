@@ -1,6 +1,6 @@
-import { ClientConfigDTO, LogLevelDTO } from "@browsersync/generated/dto";
+import { ClientConfigDTO, LogLevelDTO } from "@browsersync/generated/dto.js";
 import { ignoreElements, Observable, scan, Subject, tap } from "rxjs";
-import { Sink } from "./sink";
+import { Sink } from "./sink.js";
 
 export interface ConsoleEvent {
     level: LogLevelDTO;

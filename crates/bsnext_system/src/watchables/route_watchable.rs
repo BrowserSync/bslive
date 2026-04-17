@@ -47,7 +47,7 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                     spec.only = spec.only.or_else(|| input.config.global_fs_only.to_owned());
 
                     // respect a given spec's 'debounce' (eg: if provided by user), otherwise try to use the global
-                    spec.debounce = spec.debounce.or_else(|| input.config.global_fs_debounce);
+                    spec.debounce = spec.debounce.or(input.config.global_fs_debounce);
 
                     let run = to_task_spec(&spec);
                     let route_path = r.path.as_str().to_owned();

@@ -1,4 +1,5 @@
 use crate::external_event_sender::ExternalEventSenderWithLogging;
+use crate::tasks::notify_clients::NotifyClientsReady;
 use crate::tasks::notify_servers::NotifyServersReady;
 use crate::tasks::sh_cmd::ShCmd;
 use crate::tasks::task_spec::{TaskSpec, TreeDisplay};
@@ -15,6 +16,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub mod comms;
 mod into_recipient;
+pub mod notify_clients;
 pub mod notify_servers;
 pub mod resolve;
 pub mod sh_cmd;
@@ -88,6 +90,11 @@ impl AsActor for RunnableWithComms {
                 let actor = a.start();
                 actor.recipient()
             }
+            Runnable::BsLiveTask(BsLiveBuiltInTask::NotifyClients(client)) => {
+                let a = NotifyClientsReady::new(self.ctx.capabilities.recipient(), client);
+                let actor = a.start();
+                actor.recipient()
+            }
             Runnable::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent) => {
                 let actor = ExternalEventSenderWithLogging::new(self.ctx.capabilities.recipient());
                 let addr = actor.start();
@@ -123,6 +130,9 @@ impl From<&RunOptItem> for Runnable {
                 }
                 BsLiveBuiltInTask::PublishExternalEvent => {
                     Self::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent)
+                }
+                BsLiveBuiltInTask::NotifyClients(notify_clients) => {
+                    Self::BsLiveTask(BsLiveBuiltInTask::NotifyClients(notify_clients.to_owned()))
                 }
             },
             RunOptItem::Sh(sh) => Self::Sh(ShCmd::from(sh)),

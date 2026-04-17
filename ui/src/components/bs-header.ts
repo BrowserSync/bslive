@@ -1,7 +1,7 @@
 import { css, html, LitElement } from "lit";
 import { property } from "lit/decorators.js";
-import { ServerDTO } from "@browsersync/generated/dto";
-import { base } from "../../styles/base.css";
+import { ServerDTO } from "@browsersync/generated/dto.js";
+import { base } from "../../styles/base.css.js";
 
 class BsHeader extends LitElement {
     @property({ type: Object })
