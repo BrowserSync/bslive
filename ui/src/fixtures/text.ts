@@ -1,0 +1,6 @@
+export const LARGE_CODE = `Lorem ipsum dolor sit amet, consectetur adipisicing elit. Enim laudantium obcaecati voluptatem? Accusantium ad beatae dolorum, fugiat neque rem saepe totam ut. Commodi ex ipsam laudantium obcaecati reiciendis velit, vero!
+Lorem ipsum dolor sit amet, consectetur adipisicing elit. Enim laudantium obcaecati voluptatem? Accusantium ad beatae dolorum, fugiat neque rem saepe totam ut. Commodi ex ipsam laudantium obcaecati reiciendis velit, vero!
+Lorem ipsum dolor sit amet, consectetur adipisicing elit. Enim laudantium obcaecati voluptatem? Accusantium ad beatae dolorum, fugiat neque rem saepe totam ut. Commodi ex ipsam laudantium obcaecati reiciendis velit, vero!
+Lorem ipsum dolor sit amet, consectetur adipisicing elit. Enim laudantium obcaecati voluptatem? Accusantium ad beatae dolorum, fugiat neque rem saepe totam ut. Commodi ex ipsam laudantium obcaecati reiciendis velit, vero!
+Lorem ipsum dolor sit amet, consectetur adipisicing elit. Enim laudantium obcaecati voluptatem? Accusantium ad beatae dolorum, fugiat neque rem saepe totam ut. Commodi ex ipsam laudantium obcaecati reiciendis velit, vero!
+Lorem ipsum dolor sit amet, consectetur adipisicing elit. Enim laudantium obcaecati voluptatem? Accusantium ad beatae dolorum, fugiat neque rem saepe totam ut. Commodi ex ipsam laudantium obcaecati reiciendis velit, vero!`;

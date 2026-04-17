@@ -461,6 +461,14 @@ pub enum ClientEvent {
     Change(ChangeDTO),
     WsConnection(ClientConfigDTO),
     Config(ClientConfigDTO),
+    DisplayMessage(DisplayMessageDTO),
+}
+
+#[typeshare::typeshare]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DisplayMessageDTO {
+    pub message: String,
+    pub reason: Option<String>,
 }
 
 #[typeshare::typeshare]

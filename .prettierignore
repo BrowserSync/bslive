@@ -2,3 +2,5 @@ ui/dist
 inject/dist
 inject/vendor
 generated/
+package-lock.json
+package.json

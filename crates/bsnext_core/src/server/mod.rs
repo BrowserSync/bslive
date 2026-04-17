@@ -3,6 +3,7 @@ pub mod error;
 pub mod handler_change;
 pub mod handler_client_config;
 pub mod handler_listen;
+pub mod handler_notification;
 pub mod handler_patch;
 pub mod handler_routes_updated;
 pub mod handler_stop;

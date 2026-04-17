@@ -31,6 +31,11 @@ export interface DebounceDTO {
 	ms: string;
 }
 
+export interface DisplayMessageDTO {
+	message: string;
+	reason?: string;
+}
+
 export interface FileChangedDTO {
 	path: string;
 }
@@ -219,7 +224,8 @@ export enum ChangeKind {
 export type ClientEvent = 
 	| { kind: "Change", payload: ChangeDTO }
 	| { kind: "WsConnection", payload: ClientConfigDTO }
-	| { kind: "Config", payload: ClientConfigDTO };
+	| { kind: "Config", payload: ClientConfigDTO }
+	| { kind: "DisplayMessage", payload: DisplayMessageDTO };
 
 export enum EventLevel {
 	External = "BSLIVE_EXTERNAL",

@@ -1,7 +1,7 @@
 // todo: the checks are lifted directly from live reload, we should not use them, but are a good starting point
-import { ChangeDTO } from "@browsersync/generated/dto";
-import { ConsoleApi } from "../console";
-import { Reloader } from "../../../vendor/live-reload/src/reloader";
+import { ChangeDTO } from "@browsersync/generated/dto.js";
+import { ConsoleApi } from "../console.js";
+import { Reloader } from "../../../vendor/live-reload/src/reloader.js";
 
 export const IMAGES_REGEX = /\.(jpe?g|png|gif|svg)$/i;
 

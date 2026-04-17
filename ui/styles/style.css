@@ -1,14 +1,5 @@
 @import url("reset.css");
-
-:root {
-    --brand-blue: #0f2634;
-    --brand-grey: #6d6d6d;
-    --brand-red: #f24747;
-    --brand-white: #ffffff;
-
-    --theme-txt-color: var(--brand-blue);
-    --theme-page-color: var(--brand-white);
-}
+@import url("tokens.css");
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,

@@ -40,6 +40,11 @@ export const debounceDTOSchema = z.object({
     ms: z.string(),
 });
 
+export const displayMessageDTOSchema = z.object({
+    message: z.string(),
+    reason: z.string().optional(),
+});
+
 export const fileChangedDTOSchema = z.object({
     path: z.string(),
 });
@@ -256,6 +261,10 @@ export const clientEventSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("Config"),
         payload: clientConfigDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("DisplayMessage"),
+        payload: displayMessageDTOSchema,
     }),
 ]);
 

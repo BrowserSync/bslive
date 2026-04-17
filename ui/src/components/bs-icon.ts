@@ -1,6 +1,6 @@
 import { css, html, LitElement } from "lit";
 import { property } from "lit/decorators.js";
-import { base } from "../../styles/base.css";
+import { base } from "../../styles/base.css.js";
 
 class BsIcon extends LitElement {
     @property({ type: String, attribute: "icon-name" })
@@ -22,11 +22,11 @@ class BsIcon extends LitElement {
     get icon() {
         switch (this.iconName) {
             case "logo":
-                return html` <svg class="svg-icon" part="svg">
+                return html`<svg class="svg-icon" part="svg">
                     <use xlink:href="#svg-logo"></use>
                 </svg>`;
             case "wordmark":
-                return html` <svg class="svg-icon" part="svg">
+                return html`<svg class="svg-icon" part="svg">
                     <use xlink:href="#svg-wordmark"></use>
                 </svg>`;
             default:
@@ -35,8 +35,7 @@ class BsIcon extends LitElement {
     }
 
     render() {
-        return html`
-            <svg
+        return html`<svg
                 xmlns="http://www.w3.org/2000/svg"
                 xmlns:xlink="http://www.w3.org/1999/xlink"
                 style="display:none"
@@ -158,9 +157,16 @@ class BsIcon extends LitElement {
                     />
                 </symbol>
             </svg>
-            ${this.icon}
-        `;
+            ${this.icon}`;
     }
 }
 
 customElements.define("bs-icon", BsIcon);
+
+export function logo() {
+    return html`<bs-icon icon-name="logo"></bs-icon>`;
+}
+
+export function wordmark() {
+    return html`<bs-icon icon-name="wordmark"></bs-icon>`;
+}

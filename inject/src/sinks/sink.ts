@@ -3,8 +3,8 @@ import {
     ClientConfigDTO,
     ClientEvent,
     LogLevelDTO,
-} from "@browsersync/generated/dto";
-import { ConsoleApi } from "./console";
+} from "@browsersync/generated/dto.js";
+import { ConsoleApi } from "./console.js";
 
 interface LogEffect {
     kind: "log";

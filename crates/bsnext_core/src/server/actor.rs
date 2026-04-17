@@ -46,6 +46,9 @@ impl ServerActor {
 
         (shutdown_complete, axum_server_handle_clone, client_sender)
     }
+    pub fn client_sender(&self) -> Option<&tokio::sync::broadcast::Sender<ClientEvent>> {
+        self.signals.as_ref().and_then(|s| s.client_sender.as_ref())
+    }
 }
 
 impl actix::Actor for ServerActor {

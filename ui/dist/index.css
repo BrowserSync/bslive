@@ -39,8 +39,9 @@ h6 {
   isolation: isolate;
 }
 
-/* styles/style.css */
+/* styles/tokens.css */
 :root {
+  --brand-blue: #0f2634;
   --brand-blue: #0f2634;
   --brand-grey: #6d6d6d;
   --brand-red: #f24747;
@@ -48,6 +49,8 @@ h6 {
   --theme-txt-color: var(--brand-blue);
   --theme-page-color: var(--brand-white);
 }
+
+/* styles/style.css */
 body {
   font-family:
     -apple-system,
