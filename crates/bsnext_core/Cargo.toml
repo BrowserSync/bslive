@@ -21,7 +21,6 @@ bsnext_tracing = { path = "../bsnext_tracing" }
 bsnext_query = { path = "../bsnext_query" }
 
 axum-server = { version = "0.6.0", features = ["tls-rustls"] }
-axum-extra = { version = "0.9.3", features = ["typed-header"] }
 hyper-tls = { version = "0.6.0" }
 hyper-util = { version = "0.1.1", features = ["client-legacy"] }
 

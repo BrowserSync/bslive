@@ -1,11 +1,12 @@
 use crate::system::BsSystem;
 use crate::watchables::any_watchable::AnyWatchable;
-use crate::watchables::path_monitor::{PathMonitor, PathMonitorMeta};
 use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::Spec;
 use bsnext_input::InputCtx;
+use bsnext_monitor::path_monitor::PathMonitor;
+use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -37,13 +38,22 @@ impl actix::Handler<MonitorInput> for BsSystem {
         };
 
         let ctx = FsEventContext::for_root();
+        let paths = vec![msg.path.to_path_buf()];
         let pw = PathWatchable::Any(AnyWatchable {
-            dirs: vec![msg.path.to_path_buf()],
+            dirs: paths.clone(),
             spec: Spec::default(),
             task_spec: None,
         });
 
-        let input_path_monitor = PathMonitor::new(sys, debounce, self.cwd.clone(), ctx, pw);
+        let input_path_monitor = PathMonitor::new(
+            sys,
+            debounce,
+            self.cwd.clone(),
+            ctx,
+            pw.spec().clone(),
+            paths,
+        );
+
         let meta = PathMonitorMeta::from(&input_path_monitor);
 
         tracing::debug!("starting input monitor");

@@ -45,7 +45,7 @@ impl Display for PathWatchable {
 }
 
 impl PathWatchable {
-    pub fn spec_opts(&self) -> &Spec {
+    pub fn spec(&self) -> &Spec {
         match self {
             PathWatchable::Server(server) => &server.spec,
             PathWatchable::Route(route) => &route.spec,

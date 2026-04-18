@@ -12,7 +12,6 @@ pub mod any_watchable;
 mod handle_fs_event_grouping;
 pub mod input_monitor;
 pub mod monitor_path_watchables;
-pub mod path_monitor;
 pub mod path_watchable;
 pub mod route_watchable;
 pub mod server_watchable;

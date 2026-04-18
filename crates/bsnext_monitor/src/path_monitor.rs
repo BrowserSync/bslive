@@ -1,4 +1,3 @@
-use crate::watchables::path_watchable::PathWatchable;
 use actix::{ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
@@ -11,7 +10,7 @@ use bsnext_fs::{
     Debounce, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathDescription,
     PathDescriptionOwned,
 };
-use bsnext_input::route::PathPattern;
+use bsnext_input::route::{PathPattern, Spec};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -24,8 +23,9 @@ pub struct PathMonitor {
     pub(crate) addrs: Vec<Addr<FsWatcher>>,
     pub(crate) recipient: Recipient<FsEventGrouping>,
     pub(crate) fs_ctx: FsEventContext,
-    pub(crate) path_watchable: PathWatchable,
     pub(crate) debounce: Debounce,
+    pub spec: Spec,
+    pub watch_paths: Vec<PathBuf>,
     inner_sender: tokio::sync::mpsc::Sender<FsEvent>,
     inner_receiver: Option<tokio::sync::mpsc::Receiver<FsEvent>>,
 }
@@ -36,7 +36,8 @@ impl PathMonitor {
         debounce: Debounce,
         cwd: PathBuf,
         fs_ctx: FsEventContext,
-        path_watchable: PathWatchable,
+        spec: Spec,
+        watch_paths: Vec<PathBuf>,
     ) -> Self {
         let (inner_sender, inner_receiver) = mpsc::channel::<FsEvent>(1);
         Self {
@@ -45,30 +46,61 @@ impl PathMonitor {
             cwd,
             addrs: vec![],
             fs_ctx,
-            path_watchable,
+            spec,
+            watch_paths,
             inner_sender,
             inner_receiver: Some(inner_receiver),
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct PathMonitorMeta {
-    #[allow(dead_code)]
-    pub cwd: PathBuf,
-    pub fs_ctx: FsEventContext,
-    #[allow(dead_code)]
-    pub path_watchable: PathWatchable,
-    pub debounce: Debounce,
-}
+impl actix::Actor for PathMonitor {
+    type Context = actix::Context<Self>;
 
-impl From<&PathMonitor> for PathMonitorMeta {
-    fn from(value: &PathMonitor) -> Self {
-        Self {
-            path_watchable: value.path_watchable.clone(),
-            cwd: value.cwd.clone(),
-            fs_ctx: value.fs_ctx,
-            debounce: value.debounce,
+    fn started(&mut self, ctx: &mut Self::Context) {
+        for single_path in &self.watch_paths {
+            let as_str = single_path.to_string_lossy();
+            let PathAndFilter { path, filter_kind } = PathAndFilter::new(&as_str);
+
+            // create a filter list, first using the optional filter given above
+            let mut filters = filter_kind.into_iter().collect::<Vec<_>>();
+
+            // additional filter from options?
+            if let Some(filter) = &self.spec.only {
+                filters.push(filter.clone());
+            }
+
+            // create the watcher now
+            let watcher = to_watcher(
+                &self.cwd,
+                Some(&PathPattern::List(filters)),
+                self.spec.ignore.as_ref(),
+                self.fs_ctx,
+                ctx.address().recipient(),
+            );
+
+            let watcher_addr = watcher.start();
+
+            self.addrs.push(watcher_addr.clone());
+
+            watcher_addr.do_send(RequestWatchPath {
+                path: path.to_path_buf(),
+            });
+        }
+
+        let Some(receiver) = self.inner_receiver.take() else {
+            panic!("impossible?")
+        };
+
+        match self.debounce {
+            Debounce::Trailing { duration } => {
+                let stream = ReceiverStream::new(receiver).debounce(duration);
+                <Self as StreamHandler<FsEvent>>::add_stream(stream, ctx);
+            }
+            Debounce::Buffered { duration } => {
+                let stream = ReceiverStream::new(receiver).buffered_debounce(duration);
+                <Self as StreamHandler<Vec<FsEvent>>>::add_stream(stream, ctx);
+            }
         }
     }
 }
@@ -97,58 +129,6 @@ impl StreamHandler<Vec<FsEvent>> for PathMonitor {
             .collect::<Vec<_>>();
         self.recipient
             .do_send(FsEventGrouping::buffered_change(outgoing, self.fs_ctx))
-    }
-}
-
-impl actix::Actor for PathMonitor {
-    type Context = actix::Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        for single_path in &self.path_watchable.watch_paths() {
-            let as_str = single_path.to_string_lossy();
-            let PathAndFilter { path, filter_kind } = PathAndFilter::new(&as_str);
-
-            // create a filter list, first using the optional filter given above
-            let mut filters = filter_kind.into_iter().collect::<Vec<_>>();
-
-            // additional filter from options?
-            let spec_opts = self.path_watchable.spec_opts();
-            if let Some(filter) = &spec_opts.only {
-                filters.push(filter.clone());
-            }
-
-            // create the watcher now
-            let watcher = to_watcher(
-                &self.cwd,
-                Some(&PathPattern::List(filters)),
-                spec_opts.ignore.as_ref(),
-                self.fs_ctx,
-                ctx.address().recipient(),
-            );
-
-            let watcher_addr = watcher.start();
-            let watcher_addr_clone = watcher_addr.clone();
-
-            self.addrs.push(watcher_addr);
-
-            watcher_addr_clone.do_send(RequestWatchPath {
-                path: path.to_path_buf(),
-            });
-        }
-        let Some(receiver) = self.inner_receiver.take() else {
-            panic!("impossible?")
-        };
-        let debounce = self.debounce;
-        match debounce {
-            Debounce::Trailing { duration } => {
-                let stream = ReceiverStream::new(receiver).debounce(duration);
-                <Self as StreamHandler<FsEvent>>::add_stream(stream, ctx);
-            }
-            Debounce::Buffered { duration } => {
-                let stream = ReceiverStream::new(receiver).buffered_debounce(duration);
-                <Self as StreamHandler<Vec<FsEvent>>>::add_stream(stream, ctx);
-            }
-        }
     }
 }
 

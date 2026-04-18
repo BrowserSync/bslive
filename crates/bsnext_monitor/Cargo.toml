@@ -4,3 +4,11 @@ version = "0.26.0"
 edition = "2024"
 
 [dependencies]
+bsnext_fs = { path = "../bsnext_fs" }
+bsnext_input = { path = "../bsnext_input" }
+actix = { workspace = true }
+actix-rt = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tracing = { workspace = true }
+globset = { workspace = true }

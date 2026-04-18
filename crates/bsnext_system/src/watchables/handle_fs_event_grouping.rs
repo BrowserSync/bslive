@@ -5,7 +5,6 @@ use crate::system::BsSystem;
 use crate::tasks::task_comms::TaskComms;
 use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
-use crate::watchables::path_monitor::PathMonitorMeta;
 use crate::watchables::path_watchable::PathWatchable;
 use actix::{Addr, AsyncContext};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
@@ -18,6 +17,7 @@ use bsnext_fs::{
 };
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
+use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
 use bsnext_task::task_trigger::FsChangesTrigger;
 use tracing::{debug_span, info};
 

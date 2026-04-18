@@ -1,9 +1,10 @@
 use crate::system::BsSystem;
-use crate::watchables::path_monitor::{PathMonitor, PathMonitorMeta, StopPathMonitor};
 use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::{DebounceDuration, Spec};
+use bsnext_monitor::path_monitor::{PathMonitor, StopPathMonitor};
+use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -45,6 +46,11 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             let span = debug_span!("{}", index);
             let _guard = span.enter();
             let watchable_hash = any_watchable.as_id();
+            let paths = any_watchable
+                .watch_paths()
+                .into_iter()
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>();
             tracing::trace!(?watchable_hash);
 
             let fs_ctx_id = match any_watchable {
@@ -55,10 +61,10 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             tracing::trace!(?fs_ctx_id);
 
             let fs_ctx = FsEventContext::new(fs_ctx_id, watchable_hash);
-            let opts = any_watchable.spec_opts();
-            tracing::trace!(?opts);
+            let spec = any_watchable.spec();
+            tracing::trace!(?spec);
 
-            let duration = match opts {
+            let duration = match spec {
                 Spec {
                     debounce: Some(DebounceDuration::Ms(ms)),
                     ..
@@ -75,7 +81,8 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
                 debounce,
                 msg.cwd.clone(),
                 fs_ctx,
-                (*any_watchable).clone(),
+                spec.clone(),
+                paths,
             );
 
             let meta = PathMonitorMeta::from(&monitor);
