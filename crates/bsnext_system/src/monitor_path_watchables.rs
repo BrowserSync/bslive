@@ -1,21 +1,15 @@
 use crate::system::BsSystem;
-use crate::watchables::path_watchable::PathWatchable;
+use crate::tasks::task_spec::TaskSpec;
 use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::{DebounceDuration, Spec};
 use bsnext_monitor::path_monitor::{PathMonitor, StopPathMonitor};
 use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
+use bsnext_monitor::watchables::path_watchable::PathWatchable;
+use bsnext_monitor::watchables::MonitorPathWatchables;
 use std::collections::BTreeSet;
-use std::path::PathBuf;
 use std::time::Duration;
 use tracing::{debug, debug_span};
-
-#[derive(actix::Message)]
-#[rtype(result = "()")]
-pub struct MonitorPathWatchables {
-    pub watchables: Vec<PathWatchable>,
-    pub cwd: PathBuf,
-}
 
 impl actix::Handler<MonitorPathWatchables> for BsSystem {
     type Result = ();
@@ -116,11 +110,33 @@ struct InsertMonitor(PathWatchable, Addr<PathMonitor>, PathMonitorMeta);
 impl actix::Handler<InsertMonitor> for BsSystem {
     type Result = ();
 
-    fn handle(&mut self, msg: InsertMonitor, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        InsertMonitor(watchable, addr, meta): InsertMonitor,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
         let span = debug_span!("InsertMonitor");
         let _guard = span.enter();
-        debug!("{}", msg.0);
-        self.any_monitors.insert(msg.0, (msg.1, msg.2));
+        debug!("{}", watchable);
+        let fs_ctx = meta.fs_ctx;
+        let task_spec = to_task_spec(&meta.spec);
+        self.any_monitors.insert(watchable, (addr, meta));
+        if let Some(spec) = task_spec {
+            self.specs.insert(fs_ctx, spec);
+        }
         debug!("+ Monitor count {}", self.any_monitors.len());
     }
+}
+
+/// Convert task items into a sequential execution configuration.
+/// tl;dr: Forces tasks to run in sequential order rather than concurrently.
+///
+/// Creates a runner that executes tasks strictly one after another to match user
+/// expectations when defining task lists in declarative formats (yaml/json).
+pub fn to_task_spec(spec: &Spec) -> Option<TaskSpec> {
+    // if the 'run' key was given, it's a list of steps.
+    let run = spec.run.as_ref()?;
+
+    // otherwise, construct a runner
+    Some(TaskSpec::seq_from(run))
 }

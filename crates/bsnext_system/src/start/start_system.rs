@@ -1,11 +1,11 @@
 #![allow(clippy::result_large_err)]
 use crate::api::BsSystemApi;
+use crate::input_monitor::MonitorInput;
 use crate::start::start_kind::StartKind;
 use crate::system::{
     run_jobs, setup_jobs_only, setup_servers_only, BsSystem, RunDryOk, RunOk, SetupOk,
     SetupServersOk,
 };
-use crate::watchables::input_monitor::MonitorInput;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
 };
@@ -13,6 +13,7 @@ use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
 use bsnext_dto::{DidStart, StartupError};
 use bsnext_input::startup::{RunMode, SystemStart, SystemStartArgs};
 use bsnext_input::InputCtx;
+use bsnext_monitor::watchables::accept_watchables;
 use std::future::ready;
 use std::path::PathBuf;
 use tokio::sync::oneshot;
@@ -79,7 +80,7 @@ impl Handler<Start> for BsSystem {
                             input_ctx,
                         });
                         // todo: where to better sequence these side-effects?
-                        actor.accept_watchables(&input, addr);
+                        accept_watchables(actor.cwd.clone(), &input, addr.recipient());
                         Ok(DidStart::Started(servers))
                     },
                 ))
@@ -99,7 +100,7 @@ impl Handler<Start> for BsSystem {
                             debug!("errored: {:?}", errored);
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        actor.accept_watchables(&res.input, addr);
+                        accept_watchables(actor.cwd.clone(), &res.input, addr.recipient());
                         Ok(DidStart::Started(res.servers))
                     },
                 ))
@@ -137,7 +138,7 @@ impl Handler<Start> for BsSystem {
                             debug!("errored: {:?}", errored);
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        actor.accept_watchables(&res.input, addr);
+                        accept_watchables(actor.cwd.clone(), &res.input, addr.recipient());
                         Ok(DidStart::Started(res.servers))
                     },
                 ))

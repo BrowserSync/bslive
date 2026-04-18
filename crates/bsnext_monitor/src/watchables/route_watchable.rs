@@ -1,9 +1,7 @@
-use crate::tasks::task_spec::TaskSpec;
-use crate::watchables::server_watchable::to_task_spec;
+use bsnext_input::Input;
 use bsnext_input::route::{DirRoute, PathPattern, RawRoute, RouteKind, Spec, SseOpts};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::watch_opts::WatchOpts;
-use bsnext_input::Input;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
@@ -12,7 +10,6 @@ pub struct RouteWatchable {
     pub route_path: String,
     pub dir: PathBuf,
     pub spec: Spec,
-    pub task_spec: Option<TaskSpec>,
 }
 
 pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
@@ -49,7 +46,6 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                     // respect a given spec's 'debounce' (eg: if provided by user), otherwise try to use the global
                     spec.debounce = spec.debounce.or(input.config.global_fs_debounce);
 
-                    let run = to_task_spec(&spec);
                     let route_path = r.path.as_str().to_owned();
 
                     let route_watchable = RouteWatchable {
@@ -57,7 +53,6 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                         route_path,
                         dir: pb,
                         spec,
-                        task_spec: run,
                     };
 
                     tracing::trace!(?route_watchable);

@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use crate::tasks::task_spec::TaskSpec;
 use crate::watchables::any_watchable::AnyWatchable;
 use crate::watchables::route_watchable::RouteWatchable;
 use crate::watchables::server_watchable::ServerWatchable;
@@ -64,13 +63,5 @@ impl PathWatchable {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
         hasher.finish()
-    }
-
-    pub fn task_spec(&self) -> Option<&TaskSpec> {
-        match self {
-            PathWatchable::Server(server) => server.task_spec.as_ref(),
-            PathWatchable::Route(route) => route.task_spec.as_ref(),
-            PathWatchable::Any(any) => any.task_spec.as_ref(),
-        }
     }
 }

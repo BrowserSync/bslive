@@ -1,22 +1,23 @@
 use crate::capabilities::Capabilities;
 use crate::fs_task_tracker::FsTaskTracker;
+use crate::input_monitor::InputMonitor;
 use crate::invoke_scope::{InvokeScope, Invoker};
 use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
 use crate::servers::ResolveServers;
 use crate::tasks::resolve::ResolveInitialTasks;
 use crate::tasks::task_spec::TaskSpec;
-use crate::watchables::input_monitor::InputMonitor;
-use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext, ResponseFuture, Running};
 use actix_rt::Arbiter;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::external_events::{ExternalEventsDTO, TaskTreePreview, TaskTreeSummary};
 use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
 use bsnext_dto::GetActiveServersResponse;
+use bsnext_fs::FsEventContext;
 use bsnext_input::startup::{StartupContext, TopLevelRunMode};
 use bsnext_input::Input;
 use bsnext_monitor::path_monitor::PathMonitor;
 use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
+use bsnext_monitor::watchables::path_watchable::PathWatchable;
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -31,6 +32,7 @@ pub struct BsSystem {
     servers_addr: Addr<ServersSupervisor>,
     any_event_sender: Sender<AnyEvent>,
     pub(crate) input_monitors: Option<InputMonitor>,
+    pub(crate) specs: HashMap<FsEventContext, TaskSpec>,
     pub(crate) any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
     pub(crate) fs_task_tracker: Addr<FsTaskTracker>,
     pub(crate) invoker_addr: Addr<Invoker>,
@@ -96,6 +98,7 @@ impl BsSystem {
             fs_task_tracker,
             cwd,
             start_context,
+            specs: HashMap::default(),
         }
     }
 

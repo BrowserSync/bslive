@@ -1,12 +1,12 @@
 use crate::system::BsSystem;
-use crate::watchables::any_watchable::AnyWatchable;
-use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::Spec;
 use bsnext_input::InputCtx;
 use bsnext_monitor::path_monitor::PathMonitor;
 use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
+use bsnext_monitor::watchables::any_watchable::AnyWatchable;
+use bsnext_monitor::watchables::path_watchable::PathWatchable;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -42,7 +42,6 @@ impl actix::Handler<MonitorInput> for BsSystem {
         let pw = PathWatchable::Any(AnyWatchable {
             dirs: paths.clone(),
             spec: Spec::default(),
-            task_spec: None,
         });
 
         let input_path_monitor = PathMonitor::new(

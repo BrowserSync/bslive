@@ -5,7 +5,6 @@ use crate::system::BsSystem;
 use crate::tasks::task_comms::TaskComms;
 use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
-use crate::watchables::path_watchable::PathWatchable;
 use actix::{Addr, AsyncContext};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::external_events::ExternalEventsDTO;
@@ -90,12 +89,6 @@ impl BsSystem {
                 .find(|(.., (_addr, PathMonitorMeta { ref fs_ctx, .. }))| fs_ctx == incoming)
                 .map(|(.., (_addr, meta))| meta)
         }
-    }
-    fn path_watchable(&self, incoming: &FsEventContext) -> Option<&PathWatchable> {
-        self.any_monitors
-            .iter()
-            .find(|(.., (_path_monitor, PathMonitorMeta { ref fs_ctx, .. }))| fs_ctx == incoming)
-            .map(|(pw, ..)| pw)
     }
     #[tracing::instrument(skip_all)]
     fn handle_buffered(
@@ -207,23 +200,16 @@ impl BsSystem {
 
     #[tracing::instrument(skip_all)]
     fn task_spec_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskSpec {
-        let Some(path_watchable) = self.path_watchable(fs_event_ctx) else {
-            tracing::error!("did not find a matching monitor");
-            return TaskSpec::seq(&[]);
-        };
-
-        info!("matching monitor, path_watchable: {}", path_watchable);
-        info!("matching fs_event_ctx: {:?}", fs_event_ctx);
-
-        let custom_task_spec = path_watchable.task_spec();
-        if custom_task_spec.is_none() {
-            info!("no custom tasks given, NotifyServer + ExtEvent will be defaults");
-        }
-        custom_task_spec.map(ToOwned::to_owned).unwrap_or_else(|| {
+        if let Some(spec) = self.specs.get(fs_event_ctx) {
+            info!("matching task_spec: {:?}", spec);
+            info!("matching fs_event_ctx: {:?}", fs_event_ctx);
+            spec.to_owned()
+        } else {
+            info!("creating a default task spec on the fly because fs_event_ctx didn't match");
             TaskSpec::seq(&[
                 Runnable::BsLiveTask(BsLiveBuiltInTask::NotifyServer),
                 Runnable::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent),
             ])
-        })
+        }
     }
 }
