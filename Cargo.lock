@@ -593,6 +593,7 @@ name = "bsnext_input"
 version = "0.26.0"
 dependencies = [
  "anyhow",
+ "bsnext_fs",
  "bsnext_fs_helpers",
  "bsnext_guards",
  "bsnext_resp",

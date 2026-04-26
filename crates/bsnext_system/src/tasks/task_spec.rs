@@ -4,7 +4,7 @@ use crate::tasks::{Node, Runnable, RunnableWithComms};
 use actix::Addr;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
-use bsnext_input::route::RunOptItem;
+use bsnext_input::route::{RunOptItem, WatchSpec};
 use bsnext_task::task_entry::TaskEntry;
 use bsnext_task::task_scope::TaskScope;
 use bsnext_task::{
@@ -31,6 +31,12 @@ pub struct TaskSpec {
     run_kind: RunKind,
     tasks: Vec<Node>,
     path: NodePath,
+}
+
+impl TaskSpec {
+    pub fn opt_from(watch_spec: &WatchSpec) -> Option<TaskSpec> {
+        watch_spec.run.as_ref().map(|run| TaskSpec::seq_from(run))
+    }
 }
 
 impl TaskSpec {

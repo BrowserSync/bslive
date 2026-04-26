@@ -1,6 +1,6 @@
 use crate::route::{
     CompressionOpts, CorsOpts, DebounceDuration, DelayKind, DelayOpts, MultiWatch, PathPattern,
-    Route, Spec, WatcherDirs,
+    Route, WatchSpec, WatcherDirs,
 };
 use crate::watch_opts::WatchOpts;
 use crate::Input;
@@ -213,7 +213,7 @@ fn test_deserialize_watch() {
     let c: Route = serde_yaml::from_str(input).unwrap();
     assert_eq!(
         c.opts.watch,
-        WatchOpts::Spec(Spec {
+        WatchOpts::Spec(WatchSpec {
             debounce: Some(DebounceDuration::Ms(2000)),
             only: None,
             ignore: None,
@@ -242,11 +242,11 @@ servers:
         vec![
             MultiWatch {
                 dirs: WatcherDirs::Single("./".to_string()),
-                spec: Some(Spec::default())
+                spec: Some(WatchSpec::default())
             },
             MultiWatch {
                 dirs: WatcherDirs::Single("./other".to_string()),
-                spec: Some(Spec {
+                spec: Some(WatchSpec {
                     debounce: Some(DebounceDuration::Ms(2000)),
                     only: Some(PathPattern::Extension {
                         ext: "**/*.css".to_string()

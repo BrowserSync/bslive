@@ -1,7 +1,7 @@
 use crate::capabilities::Capabilities;
 use crate::fs_task_tracker::FsTaskTracker;
-use crate::input_monitor::InputMonitor;
 use crate::invoke_scope::{InvokeScope, Invoker};
+use crate::monitor_input::InputMonitor;
 use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
 use crate::servers::ResolveServers;
 use crate::tasks::resolve::ResolveInitialTasks;
@@ -12,14 +12,10 @@ use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::external_events::{ExternalEventsDTO, TaskTreePreview, TaskTreeSummary};
 use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
 use bsnext_dto::GetActiveServersResponse;
-use bsnext_fs::FsEventContext;
 use bsnext_input::startup::{StartupContext, TopLevelRunMode};
 use bsnext_input::Input;
-use bsnext_monitor::path_monitor::PathMonitor;
-use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
-use bsnext_monitor::watchables::path_watchable::PathWatchable;
+use bsnext_monitor::Monitor;
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
@@ -32,9 +28,8 @@ pub struct BsSystem {
     servers_addr: Addr<ServersSupervisor>,
     any_event_sender: Sender<AnyEvent>,
     pub(crate) input_monitors: Option<InputMonitor>,
-    pub(crate) specs: HashMap<FsEventContext, TaskSpec>,
-    pub(crate) any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
     pub(crate) fs_task_tracker: Addr<FsTaskTracker>,
+    pub(crate) monitor: Addr<Monitor>,
     pub(crate) invoker_addr: Addr<Invoker>,
     pub(crate) cwd: PathBuf,
     pub(crate) start_context: StartupContext,
@@ -87,18 +82,19 @@ impl BsSystem {
         );
         let invoker_addr = invoker.start();
         let fs_task_tracker = FsTaskTracker::new(invoker_addr.clone().recipient()).start();
+        let monitor = Monitor::new();
+        let monitor = monitor.start();
         BsSystem {
             self_addr: None,
             capabilities_addr,
             servers_addr,
             any_event_sender,
             input_monitors: None,
-            any_monitors: Default::default(),
+            monitor,
             invoker_addr,
             fs_task_tracker,
             cwd,
             start_context,
-            specs: HashMap::default(),
         }
     }
 

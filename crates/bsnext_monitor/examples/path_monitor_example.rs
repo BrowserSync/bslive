@@ -1,7 +1,8 @@
 use actix::{Actor, ResponseFuture};
 use actix_rt::System;
-use bsnext_fs::{FsEvent, FsEventContext, FsEventGrouping};
-use bsnext_input::route::{DebounceDuration, Spec};
+use bsnext_fs::{FsEvent, FsEventContext};
+use bsnext_input::route::{DebounceDuration, WatchSpec};
+use bsnext_monitor::FsEventGrouping;
 use bsnext_monitor::path_monitor::PathMonitor;
 use std::env::current_dir;
 use std::process;
@@ -53,7 +54,7 @@ async fn async_main() -> i32 {
     let reciever = actor.clone().recipient();
     let cwd = current_dir().unwrap();
     let fs_context = FsEventContext::default();
-    let spec = Spec {
+    let spec = WatchSpec {
         debounce: Some(DebounceDuration::Ms(0)),
         ..Default::default()
     };

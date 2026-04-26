@@ -3,6 +3,8 @@ use crate::path_def::PathDef;
 use crate::route_cli::RouteCli;
 use crate::watch_opts::WatchOpts;
 use crate::when_guard::{WhenBodyGuard, WhenGuard};
+use crate::InputConfig;
+use bsnext_fs::Debounce;
 use bsnext_resp::cache_opts::CacheOpts;
 use bsnext_resp::inject_opts::InjectOpts;
 use matchit::InsertError;
@@ -12,6 +14,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Duration;
 
 #[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Route {
@@ -299,6 +302,16 @@ pub enum DebounceDuration {
     Ms(u64),
 }
 
+impl From<DebounceDuration> for Debounce {
+    fn from(debounce_duration: DebounceDuration) -> Self {
+        match debounce_duration {
+            DebounceDuration::Ms(ms) => Debounce::Buffered {
+                duration: Duration::from_millis(ms),
+            },
+        }
+    }
+}
+
 #[derive(
     Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize, serde::Serialize,
 )]
@@ -342,12 +355,27 @@ impl FromStr for PathPattern {
     serde::Deserialize,
     serde::Serialize,
 )]
-pub struct Spec {
+pub struct WatchSpec {
     pub debounce: Option<DebounceDuration>,
     pub only: Option<PathPattern>,
     pub ignore: Option<PathPattern>,
     pub run: Option<Vec<RunOptItem>>,
     pub before: Option<Vec<BeforeRunOptItem>>,
+}
+
+impl WatchSpec {
+    pub fn with_globals(mut self, config: &InputConfig) -> Self {
+        // respect a given spec's 'ignore' (eg: if provided by user), otherwise try to use
+        self.ignore = self.ignore.or_else(|| config.global_fs_ignore.to_owned());
+
+        // respect a given spec's 'only' (eg: if provided by user), otherwise try to use
+        self.only = self.only.or_else(|| config.global_fs_only.to_owned());
+
+        // respect a given spec's 'debounce' (eg: if provided by user), otherwise try to use the global
+        self.debounce = self.debounce.or(config.global_fs_debounce);
+
+        self
+    }
 }
 
 #[derive(
@@ -540,7 +568,7 @@ impl Default for PrefixOpt {
 pub struct MultiWatch {
     pub dirs: WatcherDirs,
     #[serde(flatten)]
-    pub spec: Option<Spec>,
+    pub spec: Option<WatchSpec>,
 }
 
 #[derive(

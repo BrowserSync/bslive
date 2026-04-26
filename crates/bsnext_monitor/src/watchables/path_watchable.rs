@@ -4,7 +4,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use crate::watchables::any_watchable::AnyWatchable;
 use crate::watchables::route_watchable::RouteWatchable;
 use crate::watchables::server_watchable::ServerWatchable;
-use bsnext_input::route::Spec;
+use bsnext_input::route::WatchSpec;
 use std::path::Path;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
@@ -44,11 +44,11 @@ impl Display for PathWatchable {
 }
 
 impl PathWatchable {
-    pub fn spec(&self) -> &Spec {
+    pub fn spec(&self) -> &WatchSpec {
         match self {
-            PathWatchable::Server(server) => &server.spec,
-            PathWatchable::Route(route) => &route.spec,
-            PathWatchable::Any(any) => &any.spec,
+            PathWatchable::Server(server) => &server.watch_spec,
+            PathWatchable::Route(route) => &route.watch_spec,
+            PathWatchable::Any(any) => &any.watch_spec,
         }
     }
     pub fn watch_paths(&self) -> Vec<&Path> {

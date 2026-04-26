@@ -11,14 +11,15 @@ use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
-    BufferedChangeEvent, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathAddedEvent,
+    BufferedChangeEvent, Debounce, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathDescriptionOwned, PathEvent,
 };
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
+use bsnext_input::route::WatchSpec;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
+use bsnext_monitor::{FsEventGrouping, Group};
 use bsnext_task::task_trigger::FsChangesTrigger;
-use tracing::{debug_span, info};
+use tracing::{debug, debug_span, info};
 
 impl actix::Handler<FsEventGrouping> for BsSystem {
     type Result = ();
@@ -27,13 +28,20 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
         let addr = ctx.address();
         let span = debug_span!("Handler->FsEventGrouping->BsSystem");
         let _guard = span.enter();
-        let next = match msg {
-            FsEventGrouping::Singular(fs_event) => self.handle_fs_event(fs_event, addr),
-            FsEventGrouping::BufferedChange(buff) => {
-                if let Some((task_trigger, task_spec)) = self.handle_buffered(buff) {
+        let debounce = msg.debounce;
+        let watch_spec = msg.watch_spec;
+        let next = match msg.group {
+            Group::Singular(fs_event) => {
+                tracing::debug!("will handle single event");
+                self.handle_fs_event(fs_event, addr, debounce)
+            }
+            Group::BufferedChange(buff) => {
+                if let Some((task_trigger, task_spec)) = self.handle_buffered(buff, watch_spec) {
                     tracing::debug!("will trigger task runner");
                     self.fs_task_tracker
                         .do_send(TriggerFsTask::new(task_spec, task_trigger));
+                } else {
+                    tracing::debug!("will NOT trigger task runner");
                 }
                 None
             }
@@ -46,7 +54,12 @@ impl actix::Handler<FsEventGrouping> for BsSystem {
 }
 
 impl BsSystem {
-    fn handle_fs_event(&mut self, fs_event: FsEvent, addr: Addr<Self>) -> Option<AnyEvent> {
+    fn handle_fs_event(
+        &mut self,
+        fs_event: FsEvent,
+        addr: Addr<Self>,
+        debounce: Debounce,
+    ) -> Option<AnyEvent> {
         match &fs_event.kind {
             FsEventKind::Change(ch) if fs_event.fs_event_ctx.is_root() => {
                 tracing::info!("fs_event_ctx=root");
@@ -69,33 +82,18 @@ impl BsSystem {
                 let evt = self.handle_any_change(&fs_event.fs_event_ctx, inner);
                 Some(evt)
             }
-            FsEventKind::PathAdded(path) => {
-                let Some(pw) = self.monitor_meta(&fs_event.fs_event_ctx) else {
-                    tracing::error!(evt=?fs_event, "missing monitor meta data");
-                    return None;
-                };
-                self.handle_path_added(path, pw)
-            }
+            FsEventKind::PathAdded(path) => self.handle_path_added(path, &debounce),
             FsEventKind::PathRemoved(path) => self.handle_path_removed(path),
             FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),
-        }
-    }
-    fn monitor_meta(&self, incoming: &FsEventContext) -> Option<&PathMonitorMeta> {
-        if incoming.is_root() {
-            self.input_monitors.as_ref().map(|m| &m.monitor_meta)
-        } else {
-            self.any_monitors
-                .iter()
-                .find(|(.., (_addr, PathMonitorMeta { ref fs_ctx, .. }))| fs_ctx == incoming)
-                .map(|(.., (_addr, meta))| meta)
         }
     }
     #[tracing::instrument(skip_all)]
     fn handle_buffered(
         &mut self,
         buf: BufferedChangeEvent,
+        watch_spec: WatchSpec,
     ) -> Option<(FsChangesTrigger, TaskSpec)> {
-        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_ctx, ?buf);
+        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_event_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
             if let Some(fp) = mon.input_ctx.file_path() {
@@ -121,8 +119,8 @@ impl BsSystem {
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();
 
-        let task_spec = self.task_spec_for_fs_event(&change.fs_ctx);
-        let trigger = FsChangesTrigger::new(paths, change.fs_ctx);
+        let task_spec = self.task_spec_for_fs_event(&watch_spec);
+        let trigger = FsChangesTrigger::new(paths, change.fs_event_ctx);
 
         Some((trigger, task_spec))
     }
@@ -171,9 +169,9 @@ impl BsSystem {
             Some(input),
         )
     }
-    fn handle_path_added(&self, path: &PathAddedEvent, meta: &PathMonitorMeta) -> Option<AnyEvent> {
+    fn handle_path_added(&self, path: &PathAddedEvent, debounce: &Debounce) -> Option<AnyEvent> {
         Some(AnyEvent::External(ExternalEventsDTO::Watching(
-            WatchingDTO::from_path_buf(&path.path, meta.debounce),
+            WatchingDTO::from_path_buf(&path.path, *debounce),
         )))
     }
 
@@ -199,13 +197,13 @@ impl BsSystem {
     }
 
     #[tracing::instrument(skip_all)]
-    fn task_spec_for_fs_event(&self, fs_event_ctx: &FsEventContext) -> TaskSpec {
-        if let Some(spec) = self.specs.get(fs_event_ctx) {
+    fn task_spec_for_fs_event(&self, watch_spec: &WatchSpec) -> TaskSpec {
+        if let Some(spec) = TaskSpec::opt_from(watch_spec) {
             info!("matching task_spec: {:?}", spec);
-            info!("matching fs_event_ctx: {:?}", fs_event_ctx);
+            info!("matching fs_event_ctx: {:?}", watch_spec);
             spec.to_owned()
         } else {
-            info!("creating a default task spec on the fly because fs_event_ctx didn't match");
+            debug!("creating a default task spec on the fly because fs_event_ctx didn't match any task specs");
             TaskSpec::seq(&[
                 Runnable::BsLiveTask(BsLiveBuiltInTask::NotifyServer),
                 Runnable::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent),

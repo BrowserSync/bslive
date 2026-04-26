@@ -31,7 +31,6 @@ async fn main() -> anyhow::Result<()> {
 
 #[derive(Default)]
 struct Example {
-    run_count: usize,
     running: bool,
     cmd: Cmd,
 }
@@ -40,7 +39,6 @@ impl Example {
     pub fn from_str<A: AsRef<str>>(cmd: A) -> anyhow::Result<Self> {
         Ok(Self {
             running: false,
-            run_count: 0,
             cmd: Cmd(OsString::try_from(cmd.as_ref())?),
         })
     }

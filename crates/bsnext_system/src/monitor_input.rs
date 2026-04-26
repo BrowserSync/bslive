@@ -1,7 +1,7 @@
 use crate::system::BsSystem;
 use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
-use bsnext_input::route::Spec;
+use bsnext_input::route::WatchSpec;
 use bsnext_input::InputCtx;
 use bsnext_monitor::path_monitor::PathMonitor;
 use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
@@ -41,7 +41,7 @@ impl actix::Handler<MonitorInput> for BsSystem {
         let paths = vec![msg.path.to_path_buf()];
         let pw = PathWatchable::Any(AnyWatchable {
             dirs: paths.clone(),
-            spec: Spec::default(),
+            watch_spec: WatchSpec::default(),
         });
 
         let input_path_monitor = PathMonitor::new(

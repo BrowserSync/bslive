@@ -1,5 +1,5 @@
 use bsnext_input::Input;
-use bsnext_input::route::Spec;
+use bsnext_input::route::WatchSpec;
 use bsnext_input::server_config::ServerIdentity;
 use std::path::PathBuf;
 
@@ -7,7 +7,7 @@ use std::path::PathBuf;
 pub struct ServerWatchable {
     pub server_identity: ServerIdentity,
     pub dirs: Vec<PathBuf>,
-    pub spec: Spec,
+    pub watch_spec: WatchSpec,
 }
 
 pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
@@ -21,7 +21,7 @@ pub fn to_server_watchables(input: &Input) -> Vec<ServerWatchable> {
                 ServerWatchable {
                     server_identity: server_config.identity.clone(),
                     dirs: path_bufs,
-                    spec: watcher.spec.clone().unwrap_or_default(),
+                    watch_spec: watcher.spec.clone().unwrap_or_default(),
                 }
             })
         })

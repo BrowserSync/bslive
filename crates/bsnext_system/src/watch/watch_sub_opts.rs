@@ -1,7 +1,7 @@
 use crate::watch::watch_runner::WatchRunnerStr;
 use bsnext_input::route::{
-    BeforeRunOptItem, DebounceDuration, MultiWatch, PathPattern, RunOptItem, ShRunOptItem, Spec,
-    WatcherDirs,
+    BeforeRunOptItem, DebounceDuration, MultiWatch, PathPattern, RunOptItem, ShRunOptItem,
+    WatchSpec, WatcherDirs,
 };
 
 #[derive(Debug, Default, Clone, clap::Parser)]
@@ -112,7 +112,7 @@ impl From<WatchSubOpts> for MultiWatch {
             .debounce
             .map(|duration| DebounceDuration::Ms(duration as u64));
 
-        let spec = Spec {
+        let spec = WatchSpec {
             before: queue,
             run: run_opts,
             debounce,

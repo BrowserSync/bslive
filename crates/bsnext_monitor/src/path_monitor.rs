@@ -1,3 +1,4 @@
+use crate::FsEventGrouping;
 use actix::{ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
@@ -7,10 +8,9 @@ use bsnext_fs::stop_handler::StopWatcher;
 use bsnext_fs::stream::StreamOpsExt;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
 use bsnext_fs::{
-    Debounce, FsEvent, FsEventContext, FsEventGrouping, FsEventKind, PathDescription,
-    PathDescriptionOwned,
+    Debounce, FsEvent, FsEventContext, FsEventKind, PathDescription, PathDescriptionOwned,
 };
-use bsnext_input::route::{PathPattern, Spec};
+use bsnext_input::route::{PathPattern, WatchSpec};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -24,7 +24,7 @@ pub struct PathMonitor {
     pub(crate) recipient: Recipient<FsEventGrouping>,
     pub(crate) fs_ctx: FsEventContext,
     pub(crate) debounce: Debounce,
-    pub spec: Spec,
+    pub watch_spec: WatchSpec,
     pub watch_paths: Vec<PathBuf>,
     inner_sender: tokio::sync::mpsc::Sender<FsEvent>,
     inner_receiver: Option<tokio::sync::mpsc::Receiver<FsEvent>>,
@@ -32,21 +32,21 @@ pub struct PathMonitor {
 
 impl PathMonitor {
     pub fn new(
-        sys: Recipient<FsEventGrouping>,
+        recipient: Recipient<FsEventGrouping>,
         debounce: Debounce,
         cwd: PathBuf,
         fs_ctx: FsEventContext,
-        spec: Spec,
+        watch_spec: WatchSpec,
         watch_paths: Vec<PathBuf>,
     ) -> Self {
         let (inner_sender, inner_receiver) = mpsc::channel::<FsEvent>(1);
         Self {
-            recipient: sys,
+            recipient,
             debounce,
             cwd,
             addrs: vec![],
             fs_ctx,
-            spec,
+            watch_spec,
             watch_paths,
             inner_sender,
             inner_receiver: Some(inner_receiver),
@@ -66,7 +66,7 @@ impl actix::Actor for PathMonitor {
             let mut filters = filter_kind.into_iter().collect::<Vec<_>>();
 
             // additional filter from options?
-            if let Some(filter) = &self.spec.only {
+            if let Some(filter) = &self.watch_spec.only {
                 filters.push(filter.clone());
             }
 
@@ -74,7 +74,7 @@ impl actix::Actor for PathMonitor {
             let watcher = to_watcher(
                 &self.cwd,
                 Some(&PathPattern::List(filters)),
-                self.spec.ignore.as_ref(),
+                self.watch_spec.ignore.as_ref(),
                 self.fs_ctx,
                 ctx.address().recipient(),
             );
@@ -107,12 +107,18 @@ impl actix::Actor for PathMonitor {
 
 impl StreamHandler<FsEvent> for PathMonitor {
     fn handle(&mut self, event: FsEvent, _ctx: &mut Context<PathMonitor>) {
-        self.recipient.do_send(FsEventGrouping::Singular(event))
+        debug!("StreamHandler<FsEvent> for PathMonitor");
+        self.recipient.do_send(FsEventGrouping::singular(
+            event,
+            self.watch_spec.clone(),
+            self.debounce,
+        ))
     }
 }
 
 impl StreamHandler<Vec<FsEvent>> for PathMonitor {
     fn handle(&mut self, events: Vec<FsEvent>, _ctx: &mut Context<PathMonitor>) {
+        debug!("StreamHandler<Vec<FsEvent>> for PathMonitor");
         debug!("  └ got {} events to process", events.len());
         // let now = Instant::now();
         // let original_len = events.len();
@@ -127,8 +133,12 @@ impl StreamHandler<Vec<FsEvent>> for PathMonitor {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        self.recipient
-            .do_send(FsEventGrouping::buffered_change(outgoing, self.fs_ctx))
+        self.recipient.do_send(FsEventGrouping::buffered_change(
+            outgoing,
+            self.fs_ctx,
+            self.watch_spec.clone(),
+            self.debounce,
+        ))
     }
 }
 
@@ -296,7 +306,9 @@ impl Handler<FsEvent> for PathMonitor {
             }
             _ => {
                 // todo: any need to buffer these?
-                self.recipient.do_send(FsEventGrouping::Singular(msg))
+                debug!("Sending some other event");
+                let output = FsEventGrouping::singular(msg, self.watch_spec.clone(), self.debounce);
+                self.recipient.do_send(output)
             }
         }
     }

@@ -1,3 +1,4 @@
+use crate::FsEventGrouping;
 use crate::watchables::any_watchable::to_any_watchables;
 use crate::watchables::path_watchable::PathWatchable;
 use crate::watchables::route_watchable::to_route_watchables;
@@ -17,10 +18,15 @@ pub mod server_watchable;
 pub struct MonitorPathWatchables {
     pub watchables: Vec<PathWatchable>,
     pub cwd: PathBuf,
+    pub recipient: Recipient<FsEventGrouping>,
 }
 
 #[tracing::instrument(skip_all, name = "accept_watchables")]
-pub fn accept_watchables(cwd: PathBuf, input: &Input, addr: Recipient<MonitorPathWatchables>) {
+pub fn accept_watchables(
+    cwd: PathBuf,
+    input: &Input,
+    recipient: Recipient<FsEventGrouping>,
+) -> MonitorPathWatchables {
     let route_watchables = to_route_watchables(input);
     let server_watchables = to_server_watchables(input);
     let any_watchables = to_any_watchables(input);
@@ -68,6 +74,10 @@ pub fn accept_watchables(cwd: PathBuf, input: &Input, addr: Recipient<MonitorPat
         watchables.len(),
         cwd.display()
     );
-    let msg = MonitorPathWatchables { watchables, cwd };
-    addr.do_send(msg);
+
+    MonitorPathWatchables {
+        watchables,
+        cwd,
+        recipient,
+    }
 }

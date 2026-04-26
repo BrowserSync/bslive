@@ -19,7 +19,7 @@ pub enum Debounce {
 
 impl Default for Debounce {
     fn default() -> Self {
-        Self::Trailing {
+        Self::Buffered {
             duration: Duration::from_millis(300),
         }
     }
@@ -171,29 +171,10 @@ impl<'a> From<&'a PathDescription<'_>> for PathDescriptionOwned {
     }
 }
 
-#[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "()")]
-pub enum FsEventGrouping {
-    Singular(FsEvent),
-    BufferedChange(BufferedChangeEvent),
-}
-
-impl FsEventGrouping {
-    pub fn buffered_change(
-        events: Vec<PathDescriptionOwned>,
-        fs_event_context: FsEventContext,
-    ) -> Self {
-        Self::BufferedChange(BufferedChangeEvent {
-            events,
-            fs_ctx: fs_event_context,
-        })
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct BufferedChangeEvent {
     pub events: Vec<PathDescriptionOwned>,
-    pub fs_ctx: FsEventContext,
+    pub fs_event_ctx: FsEventContext,
 }
 
 impl BufferedChangeEvent {
@@ -206,12 +187,12 @@ impl BufferedChangeEvent {
                     .filter(|x| x.absolute != path)
                     .map(ToOwned::to_owned)
                     .collect(),
-                fs_ctx: self.fs_ctx,
+                fs_event_ctx: self.fs_event_ctx,
             }
         } else {
             Self {
                 events: self.events,
-                fs_ctx: self.fs_ctx,
+                fs_event_ctx: self.fs_event_ctx,
             }
         }
     }

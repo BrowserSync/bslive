@@ -1,6 +1,7 @@
 #![allow(clippy::result_large_err)]
 use crate::api::BsSystemApi;
-use crate::input_monitor::MonitorInput;
+use crate::monitor_any::MonitorAny;
+use crate::monitor_input::MonitorInput;
 use crate::start::start_kind::StartKind;
 use crate::system::{
     run_jobs, setup_jobs_only, setup_servers_only, BsSystem, RunDryOk, RunOk, SetupOk,
@@ -13,7 +14,6 @@ use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
 use bsnext_dto::{DidStart, StartupError};
 use bsnext_input::startup::{RunMode, SystemStart, SystemStartArgs};
 use bsnext_input::InputCtx;
-use bsnext_monitor::watchables::accept_watchables;
 use std::future::ready;
 use std::path::PathBuf;
 use tokio::sync::oneshot;
@@ -79,8 +79,7 @@ impl Handler<Start> for BsSystem {
                             cwd: actor.cwd.clone(),
                             input_ctx,
                         });
-                        // todo: where to better sequence these side-effects?
-                        accept_watchables(actor.cwd.clone(), &input, addr.recipient());
+                        ctx.notify(MonitorAny::new(input.clone()));
                         Ok(DidStart::Started(servers))
                     },
                 ))
@@ -92,7 +91,7 @@ impl Handler<Start> for BsSystem {
                 let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
+                    move |res: Result<SetupOk, anyhow::Error>, _actor, ctx| {
                         let res = res?;
                         debug!("✅ setup jobs completed");
                         let errored = ChildResult::first_server_error(&res.child_results);
@@ -100,7 +99,7 @@ impl Handler<Start> for BsSystem {
                             debug!("errored: {:?}", errored);
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        accept_watchables(actor.cwd.clone(), &res.input, addr.recipient());
+                        ctx.notify(MonitorAny::new(res.input.clone()));
                         Ok(DidStart::Started(res.servers))
                     },
                 ))
@@ -130,7 +129,7 @@ impl Handler<Start> for BsSystem {
                 };
 
                 Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<SetupOk, anyhow::Error>, actor, _ctx| {
+                    move |res: Result<SetupOk, anyhow::Error>, _actor, ctx| {
                         let res = res?;
                         debug!("✅ setup jobs completed");
                         let errored = ChildResult::first_server_error(&res.child_results);
@@ -138,7 +137,7 @@ impl Handler<Start> for BsSystem {
                             debug!("errored: {:?}", errored);
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
-                        accept_watchables(actor.cwd.clone(), &res.input, addr.recipient());
+                        ctx.notify(MonitorAny::new(res.input.clone()));
                         Ok(DidStart::Started(res.servers))
                     },
                 ))

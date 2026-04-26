@@ -1,11 +1,11 @@
 use bsnext_input::Input;
-use bsnext_input::route::Spec;
+use bsnext_input::route::WatchSpec;
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub struct AnyWatchable {
     pub dirs: Vec<PathBuf>,
-    pub spec: Spec,
+    pub watch_spec: WatchSpec,
 }
 
 pub fn to_any_watchables(input: &Input) -> Vec<AnyWatchable> {
@@ -17,7 +17,7 @@ pub fn to_any_watchables(input: &Input) -> Vec<AnyWatchable> {
 
             AnyWatchable {
                 dirs: path_bufs,
-                spec: watcher.spec.clone().unwrap_or_default(),
+                watch_spec: watcher.spec.clone().unwrap_or_default(),
             }
         })
         .collect()

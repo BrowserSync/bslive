@@ -1,20 +1,29 @@
-use crate::system::BsSystem;
-use crate::tasks::task_spec::TaskSpec;
-use actix::{Actor, Addr, AsyncContext};
+use crate::Monitor;
+use crate::path_monitor::{PathMonitor, StopPathMonitor};
+use crate::path_monitor_meta::PathMonitorMeta;
+use crate::watchables::MonitorPathWatchables;
+use crate::watchables::path_watchable::PathWatchable;
+use actix::{Actor, Addr, AsyncContext, ResponseFuture};
 use bsnext_fs::{Debounce, FsEventContext};
-use bsnext_input::route::{DebounceDuration, Spec};
-use bsnext_monitor::path_monitor::{PathMonitor, StopPathMonitor};
-use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
-use bsnext_monitor::watchables::path_watchable::PathWatchable;
-use bsnext_monitor::watchables::MonitorPathWatchables;
 use std::collections::BTreeSet;
-use std::time::Duration;
 use tracing::{debug, debug_span};
 
-impl actix::Handler<MonitorPathWatchables> for BsSystem {
-    type Result = ();
+#[derive(actix::Message)]
+#[rtype(result = "()")]
+pub struct DropMonitor(pub PathWatchable);
 
-    #[tracing::instrument(skip_all, name = "MonitorPathWatchables->BsSystem")]
+#[derive(actix::Message)]
+#[rtype(result = "()")]
+pub struct InsertMonitor(
+    pub PathWatchable,
+    pub Addr<PathMonitor>,
+    pub PathMonitorMeta,
+);
+
+impl actix::Handler<MonitorPathWatchables> for Monitor {
+    type Result = ResponseFuture<()>;
+
+    #[tracing::instrument(skip_all, name = "MonitorPathWatchables->Monitor")]
     fn handle(&mut self, msg: MonitorPathWatchables, ctx: &mut Self::Context) -> Self::Result {
         debug!("{}", file!());
 
@@ -58,20 +67,11 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             let spec = any_watchable.spec();
             tracing::trace!(?spec);
 
-            let duration = match spec {
-                Spec {
-                    debounce: Some(DebounceDuration::Ms(ms)),
-                    ..
-                } => Duration::from_millis(*ms),
-                _ => Duration::from_millis(300),
-            };
-            tracing::trace!(?duration);
-
-            let debounce = Debounce::Buffered { duration };
+            let debounce = spec.debounce.map(Debounce::from).unwrap_or_default();
             tracing::trace!(?debounce);
 
             let monitor = PathMonitor::new(
-                ctx.address().recipient(),
+                msg.recipient.clone(),
                 debounce,
                 msg.cwd.clone(),
                 fs_ctx,
@@ -82,18 +82,16 @@ impl actix::Handler<MonitorPathWatchables> for BsSystem {
             let meta = PathMonitorMeta::from(&monitor);
             tracing::trace!(?meta);
 
-            let monitor = monitor.start();
+            let monitor_addr = monitor.start();
 
-            ctx.notify(InsertMonitor((*any_watchable).clone(), monitor, meta))
+            ctx.notify(InsertMonitor((*any_watchable).clone(), monitor_addr, meta))
         }
+
+        Box::pin(async move {})
     }
 }
 
-#[derive(actix::Message)]
-#[rtype(result = "()")]
-struct DropMonitor(PathWatchable);
-
-impl actix::Handler<DropMonitor> for BsSystem {
+impl actix::Handler<DropMonitor> for Monitor {
     type Result = ();
 
     fn handle(&mut self, msg: DropMonitor, _ctx: &mut Self::Context) -> Self::Result {
@@ -103,11 +101,7 @@ impl actix::Handler<DropMonitor> for BsSystem {
     }
 }
 
-#[derive(actix::Message)]
-#[rtype(result = "()")]
-struct InsertMonitor(PathWatchable, Addr<PathMonitor>, PathMonitorMeta);
-
-impl actix::Handler<InsertMonitor> for BsSystem {
+impl actix::Handler<InsertMonitor> for Monitor {
     type Result = ();
 
     fn handle(
@@ -118,25 +112,7 @@ impl actix::Handler<InsertMonitor> for BsSystem {
         let span = debug_span!("InsertMonitor");
         let _guard = span.enter();
         debug!("{}", watchable);
-        let fs_ctx = meta.fs_ctx;
-        let task_spec = to_task_spec(&meta.spec);
         self.any_monitors.insert(watchable, (addr, meta));
-        if let Some(spec) = task_spec {
-            self.specs.insert(fs_ctx, spec);
-        }
         debug!("+ Monitor count {}", self.any_monitors.len());
     }
-}
-
-/// Convert task items into a sequential execution configuration.
-/// tl;dr: Forces tasks to run in sequential order rather than concurrently.
-///
-/// Creates a runner that executes tasks strictly one after another to match user
-/// expectations when defining task lists in declarative formats (yaml/json).
-pub fn to_task_spec(spec: &Spec) -> Option<TaskSpec> {
-    // if the 'run' key was given, it's a list of steps.
-    let run = spec.run.as_ref()?;
-
-    // otherwise, construct a runner
-    Some(TaskSpec::seq_from(run))
 }

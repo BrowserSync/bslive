@@ -1,6 +1,6 @@
 use crate::route::{
     DebounceDuration, PathPattern, RunAll, RunAllOpts, RunOptItem, RunSeq, SeqOpts, ShRunOptItem,
-    Spec,
+    WatchSpec,
 };
 use crate::watch_opts::WatchOpts;
 
@@ -11,7 +11,7 @@ fn test_watch_opts_debounce() {
       ms: 200
     only: "**/*.css"
     "#;
-    let expected = WatchOpts::Spec(Spec {
+    let expected = WatchOpts::Spec(WatchSpec {
         debounce: Some(DebounceDuration::Ms(200)),
         only: Some(PathPattern::StringDefault("**/*.css".into())),
         ignore: None,
@@ -27,7 +27,7 @@ fn test_watch_opts_inline_filter() {
     let input = r#"
     only: "**/*.css"
     "#;
-    let expected = WatchOpts::Spec(Spec {
+    let expected = WatchOpts::Spec(WatchSpec {
         debounce: None,
         only: Some(PathPattern::StringDefault("**/*.css".into())),
         ignore: None,
@@ -44,7 +44,7 @@ fn test_watch_opts_explicit_filter_ext() {
     only:
       ext: "css"
     "#;
-    let expected = WatchOpts::Spec(Spec {
+    let expected = WatchOpts::Spec(WatchSpec {
         debounce: None,
         only: Some(PathPattern::Extension {
             ext: "css".to_string(),
@@ -62,7 +62,7 @@ fn test_watch_opts_explicit_filter_glob() {
     only:
       glob: "**/*.css"
     "#;
-    let expected = WatchOpts::Spec(Spec {
+    let expected = WatchOpts::Spec(WatchSpec {
         debounce: None,
         only: Some(PathPattern::Glob {
             glob: "**/*.css".into(),
@@ -83,7 +83,7 @@ fn test_watch_opts_run_seq() {
       - sh: echo 2
       - sh: echo 3
     "#;
-    let expected = Spec {
+    let expected = WatchSpec {
         run: Some(vec![
             RunOptItem::Sh(ShRunOptItem::new("echo 1")),
             RunOptItem::Sh(ShRunOptItem::new("echo 2")),
@@ -91,7 +91,7 @@ fn test_watch_opts_run_seq() {
         ]),
         ..Default::default()
     };
-    let actual: Spec = serde_yaml::from_str(input).unwrap();
+    let actual: WatchSpec = serde_yaml::from_str(input).unwrap();
     assert_eq!(expected, actual);
 }
 
@@ -104,7 +104,7 @@ fn test_watch_opts_run_all() {
          - sh: echo 2
          - sh: echo 3
     "#;
-    let expected = Spec {
+    let expected = WatchSpec {
         run: Some(vec![RunOptItem::All(RunAll::new(vec![
             RunOptItem::Sh(ShRunOptItem::new("echo 1")),
             RunOptItem::Sh(ShRunOptItem::new("echo 2")),
@@ -112,7 +112,7 @@ fn test_watch_opts_run_all() {
         ]))]),
         ..Default::default()
     };
-    let actual: Spec = serde_yaml::from_str(input).unwrap();
+    let actual: WatchSpec = serde_yaml::from_str(input).unwrap();
     assert_eq!(expected, actual);
 }
 
@@ -126,7 +126,7 @@ fn test_watch_opts_run_all_nested() {
         - sh: echo 3
         - sh: echo 4
     "#;
-    let expected = Spec {
+    let expected = WatchSpec {
         run: Some(vec![
             RunOptItem::Sh(ShRunOptItem::new("echo 1")),
             RunOptItem::All(RunAll::new(vec![
@@ -137,7 +137,7 @@ fn test_watch_opts_run_all_nested() {
         ]),
         ..Default::default()
     };
-    let actual: Spec = serde_yaml::from_str(input).unwrap();
+    let actual: WatchSpec = serde_yaml::from_str(input).unwrap();
     assert_eq!(expected, actual);
 }
 
@@ -153,7 +153,7 @@ fn test_watch_opts_run_all_max_concurrency() {
         opts:
           max: 10
     "#;
-    let expected = Spec {
+    let expected = WatchSpec {
         run: Some(vec![
             RunOptItem::Sh(ShRunOptItem::new("echo 1")),
             RunOptItem::All(RunAll::with_opts(
@@ -167,7 +167,7 @@ fn test_watch_opts_run_all_max_concurrency() {
         ]),
         ..Default::default()
     };
-    let actual: Spec = serde_yaml::from_str(input).unwrap();
+    let actual: WatchSpec = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -182,7 +182,7 @@ fn test_watch_opts_run_seq_exit() {
         opts:
           exit_on_fail: false
     "#;
-    let expected = Spec {
+    let expected = WatchSpec {
         run: Some(vec![RunOptItem::Seq(RunSeq::with_opts(
             vec![
                 RunOptItem::Sh(ShRunOptItem::new("echo 2")),
@@ -195,6 +195,6 @@ fn test_watch_opts_run_seq_exit() {
         ))]),
         ..Default::default()
     };
-    let actual: Spec = serde_yaml::from_str(input).unwrap();
+    let actual: WatchSpec = serde_yaml::from_str(input).unwrap();
     assert_eq!(actual, expected);
 }

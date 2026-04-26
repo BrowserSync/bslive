@@ -1,5 +1,5 @@
 use bsnext_input::Input;
-use bsnext_input::route::{DirRoute, PathPattern, RawRoute, RouteKind, Spec, SseOpts};
+use bsnext_input::route::{DirRoute, PathPattern, RawRoute, RouteKind, SseOpts, WatchSpec};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::watch_opts::WatchOpts;
 use std::path::{Path, PathBuf};
@@ -9,7 +9,7 @@ pub struct RouteWatchable {
     pub server_identity: ServerIdentity,
     pub route_path: String,
     pub dir: PathBuf,
-    pub spec: Spec,
+    pub watch_spec: WatchSpec,
 }
 
 pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
@@ -20,9 +20,9 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
             server_config
                 .routes
                 .iter()
-                .filter(|r| r.opts.watch.is_enabled())
-                .filter_map(|r| {
-                    let output = match &r.kind {
+                .filter(|route| route.opts.watch.is_enabled())
+                .filter_map(|route| {
+                    let output = match &route.kind {
                         RouteKind::Raw(route) => maybe_source_file(route).map(PathBuf::from),
                         RouteKind::Dir(DirRoute { dir, .. }) => Some(PathBuf::from(dir)),
                         RouteKind::Proxy(_) => None,
@@ -32,27 +32,14 @@ pub fn to_route_watchables(input: &Input) -> Vec<RouteWatchable> {
                     let pb = output?;
 
                     let identity = server_config.identity.clone();
-
-                    let mut spec = to_spec(&r.opts.watch);
-
-                    // respect a given spec's 'ignore' (eg: if provided by user), otherwise try to use
-                    spec.ignore = spec
-                        .ignore
-                        .or_else(|| input.config.global_fs_ignore.to_owned());
-
-                    // respect a given spec's 'only' (eg: if provided by user), otherwise try to use
-                    spec.only = spec.only.or_else(|| input.config.global_fs_only.to_owned());
-
-                    // respect a given spec's 'debounce' (eg: if provided by user), otherwise try to use the global
-                    spec.debounce = spec.debounce.or(input.config.global_fs_debounce);
-
-                    let route_path = r.path.as_str().to_owned();
+                    let watch_spec = to_watch_spec(&route.opts.watch).with_globals(&input.config);
+                    let route_path = route.path.as_str().to_owned();
 
                     let route_watchable = RouteWatchable {
                         server_identity: identity,
                         route_path,
                         dir: pb,
-                        spec,
+                        watch_spec,
                     };
 
                     tracing::trace!(?route_watchable);
@@ -73,11 +60,11 @@ pub fn maybe_source_file(raw_route: &RawRoute) -> Option<&Path> {
     }
 }
 
-pub fn to_spec(wo: &WatchOpts) -> Spec {
+pub fn to_watch_spec(wo: &WatchOpts) -> WatchSpec {
     match wo {
         WatchOpts::Bool(enabled) if !*enabled => unreachable!("should be handled..."),
-        WatchOpts::Bool(enabled) if *enabled => Spec::default(),
-        WatchOpts::InlineGlob(glob) => Spec {
+        WatchOpts::Bool(enabled) if *enabled => WatchSpec::default(),
+        WatchOpts::InlineGlob(glob) => WatchSpec {
             debounce: None,
             only: Some(PathPattern::Glob {
                 glob: glob.to_string(),
