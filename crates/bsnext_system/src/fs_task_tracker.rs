@@ -6,7 +6,6 @@ use bsnext_dto::internal::TaskReportAndTree;
 use bsnext_fs::FsEventContext;
 use bsnext_task::task_trigger::{FsChangesTrigger, TaskTrigger, TaskTriggerSource};
 use std::collections::HashMap;
-use tokio::sync::oneshot::Receiver;
 use tracing::Level;
 
 #[derive(Debug)]
@@ -56,7 +55,17 @@ impl Handler<TriggerFsTask> for FsTaskTracker {
         let invoke_spec = InvokeScope::new(task_trigger, task_spec, tx);
         self.spec_invoker.do_send(invoke_spec);
 
-        Box::pin(run(rx).into_actor(self).map(move |_resp, actor, _ctx| {
+        let fut = async move {
+            let output = rx.await?;
+            if output.report.is_ok() {
+                tracing::debug!("✅TriggerFsTaskEvent triggered a invoke scope and succeeded")
+            } else {
+                tracing::debug!("❌ TriggerFsTaskEvent triggered a invoke scope and failed")
+            }
+            Ok::<_, anyhow::Error>(())
+        };
+
+        Box::pin(fut.into_actor(self).map(move |_resp, actor, _ctx| {
             actor.task_spec_mapping.remove(&cloned_id);
         }))
     }
@@ -81,16 +90,6 @@ fn debug_trigger(trigger: &FsChangesTrigger) {
             tracing::trace!(?pb);
         }
     }
-}
-
-async fn run(rx: Receiver<TaskReportAndTree>) -> anyhow::Result<()> {
-    let output = rx.await?;
-    if output.report.is_ok() {
-        tracing::debug!("✅TriggerFsTaskEvent triggered a invoke scope and succeeded")
-    } else {
-        tracing::debug!("❌ TriggerFsTaskEvent triggered a invoke scope and failed")
-    }
-    Ok(())
 }
 
 /// Message to trigger execution of a filesystem-watched task.

@@ -1,4 +1,4 @@
-use crate::FsEventGrouping;
+use crate::FsGroup;
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
@@ -24,14 +24,14 @@ pub struct PathMonitor {
     pub(crate) debounce: Debounce,
     pub(crate) watch_spec: WatchSpec,
     addrs: Vec<Addr<FsWatcher>>,
-    recipient: Recipient<FsEventGrouping>,
+    recipient: Recipient<FsGroup>,
     inner_sender: tokio::sync::mpsc::Sender<FsEvent>,
     inner_receiver: Option<tokio::sync::mpsc::Receiver<FsEvent>>,
 }
 
 impl PathMonitor {
     pub fn new(
-        recipient: Recipient<FsEventGrouping>,
+        recipient: Recipient<FsGroup>,
         debounce: Debounce,
         cwd: PathBuf,
         fs_ctx: FsEventContext,
@@ -115,7 +115,7 @@ impl actix::Handler<WatchPaths> for PathMonitor {
 impl StreamHandler<FsEvent> for PathMonitor {
     fn handle(&mut self, event: FsEvent, _ctx: &mut Context<PathMonitor>) {
         debug!("StreamHandler<FsEvent> for PathMonitor");
-        self.recipient.do_send(FsEventGrouping::singular(
+        self.recipient.do_send(FsGroup::singular(
             event,
             self.watch_spec.clone(),
             self.debounce,
@@ -140,7 +140,7 @@ impl StreamHandler<Vec<FsEvent>> for PathMonitor {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        self.recipient.do_send(FsEventGrouping::buffered_change(
+        self.recipient.do_send(FsGroup::buffered_change(
             outgoing,
             self.fs_ctx,
             self.watch_spec.clone(),
@@ -314,7 +314,7 @@ impl Handler<FsEvent> for PathMonitor {
             _ => {
                 // todo: any need to buffer these?
                 debug!("Sending some other event");
-                let output = FsEventGrouping::singular(msg, self.watch_spec.clone(), self.debounce);
+                let output = FsGroup::singular(msg, self.watch_spec.clone(), self.debounce);
                 self.recipient.do_send(output)
             }
         }

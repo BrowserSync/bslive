@@ -1,4 +1,5 @@
-use crate::input_fs::{from_input_path, ResolvedInputOutcome};
+use crate::input_fs::from_input_path;
+use bsnext_input::input_fs::ResolvedInputOutcome;
 use bsnext_input::startup::{
     RunMode, StartupContext, SystemStart, SystemStartArgs, TopLevelRunMode,
 };

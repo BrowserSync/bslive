@@ -2,7 +2,7 @@ use actix::{Actor, ResponseFuture};
 use actix_rt::System;
 use bsnext_fs::{FsEvent, FsEventContext};
 use bsnext_input::route::{DebounceDuration, WatchSpec};
-use bsnext_monitor::FsEventGrouping;
+use bsnext_monitor::FsGroup;
 use bsnext_monitor::path_monitor::{PathMonitor, WatchPaths};
 use std::env::current_dir;
 use std::process;
@@ -34,7 +34,7 @@ fn main() {
 async fn async_main() -> anyhow::Result<i32> {
     #[derive(Default)]
     struct Consumer {
-        events: Vec<FsEventGrouping>,
+        events: Vec<FsGroup>,
     }
 
     #[derive(actix::Message, Debug, Clone)]
@@ -45,10 +45,10 @@ async fn async_main() -> anyhow::Result<i32> {
         type Context = actix::Context<Self>;
     }
 
-    impl actix::Handler<FsEventGrouping> for Consumer {
+    impl actix::Handler<FsGroup> for Consumer {
         type Result = ();
 
-        fn handle(&mut self, msg: FsEventGrouping, _ctx: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, msg: FsGroup, _ctx: &mut Self::Context) -> Self::Result {
             self.events.push(msg);
         }
     }
@@ -62,11 +62,11 @@ async fn async_main() -> anyhow::Result<i32> {
     }
 
     #[derive(actix::Message, Debug, Clone)]
-    #[rtype(result = "Vec<FsEventGrouping>")]
+    #[rtype(result = "Vec<FsGroup>")]
     struct Read;
 
     impl actix::Handler<Read> for Consumer {
-        type Result = Vec<FsEventGrouping>;
+        type Result = Vec<FsGroup>;
 
         fn handle(&mut self, _msg: Read, _ctx: &mut Self::Context) -> Self::Result {
             self.events.clone()

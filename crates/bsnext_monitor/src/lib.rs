@@ -28,7 +28,7 @@ impl actix::Actor for Monitor {
 
 #[derive(actix::Message, Debug, Clone)]
 #[rtype(result = "()")]
-pub struct FsEventGrouping {
+pub struct FsGroup {
     pub watch_spec: WatchSpec,
     pub debounce: Debounce,
     pub group: Group,
@@ -40,9 +40,9 @@ pub enum Group {
     BufferedChange(BufferedChangeEvent),
 }
 
-impl FsEventGrouping {
+impl FsGroup {
     pub fn singular(evt: FsEvent, watch_spec: WatchSpec, debounce: Debounce) -> Self {
-        FsEventGrouping {
+        FsGroup {
             debounce,
             group: Group::Singular(evt),
             watch_spec,

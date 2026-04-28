@@ -17,14 +17,14 @@ use bsnext_fs::{
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::route::WatchSpec;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use bsnext_monitor::{FsEventGrouping, Group};
+use bsnext_monitor::{FsGroup, Group};
 use bsnext_task::task_trigger::FsChangesTrigger;
 use tracing::{debug, debug_span, info};
 
-impl actix::Handler<FsEventGrouping> for BsSystem {
+impl actix::Handler<FsGroup> for BsSystem {
     type Result = ();
 
-    fn handle(&mut self, msg: FsEventGrouping, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: FsGroup, ctx: &mut Self::Context) -> Self::Result {
         let addr = ctx.address();
         let span = debug_span!("Handler->FsEventGrouping->BsSystem");
         let _guard = span.enter();
