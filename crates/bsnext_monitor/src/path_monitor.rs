@@ -1,5 +1,5 @@
 use crate::FsEventGrouping;
-use actix::{ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
+use actix::{Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
 use bsnext_fs::buffered_debounce::BufferedStreamOpsExt;
@@ -20,12 +20,11 @@ use tracing::{debug, debug_span};
 #[derive(Debug)]
 pub struct PathMonitor {
     pub(crate) cwd: PathBuf,
-    pub(crate) addrs: Vec<Addr<FsWatcher>>,
-    pub(crate) recipient: Recipient<FsEventGrouping>,
     pub(crate) fs_ctx: FsEventContext,
     pub(crate) debounce: Debounce,
-    pub watch_spec: WatchSpec,
-    pub watch_paths: Vec<PathBuf>,
+    pub(crate) watch_spec: WatchSpec,
+    addrs: Vec<Addr<FsWatcher>>,
+    recipient: Recipient<FsEventGrouping>,
     inner_sender: tokio::sync::mpsc::Sender<FsEvent>,
     inner_receiver: Option<tokio::sync::mpsc::Receiver<FsEvent>>,
 }
@@ -37,7 +36,6 @@ impl PathMonitor {
         cwd: PathBuf,
         fs_ctx: FsEventContext,
         watch_spec: WatchSpec,
-        watch_paths: Vec<PathBuf>,
     ) -> Self {
         let (inner_sender, inner_receiver) = mpsc::channel::<FsEvent>(1);
         Self {
@@ -47,7 +45,6 @@ impl PathMonitor {
             addrs: vec![],
             fs_ctx,
             watch_spec,
-            watch_paths,
             inner_sender,
             inner_receiver: Some(inner_receiver),
         }
@@ -56,9 +53,19 @@ impl PathMonitor {
 
 impl actix::Actor for PathMonitor {
     type Context = actix::Context<Self>;
+}
 
-    fn started(&mut self, ctx: &mut Self::Context) {
-        for single_path in &self.watch_paths {
+#[derive(actix::Message, Debug, Clone)]
+#[rtype(result = "()")]
+pub struct WatchPaths {
+    pub paths: Vec<PathBuf>,
+}
+
+impl actix::Handler<WatchPaths> for PathMonitor {
+    type Result = ();
+
+    fn handle(&mut self, msg: WatchPaths, ctx: &mut Self::Context) -> Self::Result {
+        for single_path in &msg.paths {
             let as_str = single_path.to_string_lossy();
             let PathAndFilter { path, filter_kind } = PathAndFilter::new(&as_str);
 

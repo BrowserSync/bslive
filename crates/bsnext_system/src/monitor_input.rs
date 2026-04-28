@@ -3,8 +3,7 @@ use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::WatchSpec;
 use bsnext_input::InputCtx;
-use bsnext_monitor::path_monitor::PathMonitor;
-use bsnext_monitor::path_monitor_meta::PathMonitorMeta;
+use bsnext_monitor::path_monitor::{PathMonitor, WatchPaths};
 use bsnext_monitor::watchables::any_watchable::AnyWatchable;
 use bsnext_monitor::watchables::path_watchable::PathWatchable;
 use std::path::PathBuf;
@@ -14,7 +13,6 @@ use std::time::Duration;
 pub struct InputMonitor {
     #[allow(dead_code)]
     pub addr: Addr<PathMonitor>,
-    pub monitor_meta: PathMonitorMeta,
     pub input_ctx: InputCtx,
 }
 
@@ -44,16 +42,8 @@ impl actix::Handler<MonitorInput> for BsSystem {
             watch_spec: WatchSpec::default(),
         });
 
-        let input_path_monitor = PathMonitor::new(
-            sys,
-            debounce,
-            self.cwd.clone(),
-            ctx,
-            pw.spec().clone(),
-            paths,
-        );
-
-        let meta = PathMonitorMeta::from(&input_path_monitor);
+        let input_path_monitor =
+            PathMonitor::new(sys, debounce, self.cwd.clone(), ctx, pw.spec().clone());
 
         tracing::debug!("starting input monitor");
 
@@ -61,9 +51,10 @@ impl actix::Handler<MonitorInput> for BsSystem {
 
         let input_monitor = InputMonitor {
             input_ctx: msg.input_ctx.clone(),
-            addr: input_watcher_addr,
-            monitor_meta: meta,
+            addr: input_watcher_addr.clone(),
         };
+
+        input_watcher_addr.do_send(WatchPaths { paths });
 
         self.input_monitors = Some(input_monitor);
     }

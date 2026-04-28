@@ -1,5 +1,4 @@
 use crate::path_monitor::PathMonitor;
-use crate::path_monitor_meta::PathMonitorMeta;
 use crate::watchables::path_watchable::PathWatchable;
 use actix::Addr;
 use bsnext_fs::{BufferedChangeEvent, Debounce, FsEvent, FsEventContext, PathDescriptionOwned};
@@ -8,18 +7,17 @@ use std::collections::HashMap;
 
 pub mod monitor_path_watchables;
 pub mod path_monitor;
-pub mod path_monitor_meta;
 pub mod watchables;
 
 #[derive(Debug, Default)]
 pub struct Monitor {
-    any_monitors: HashMap<PathWatchable, (Addr<PathMonitor>, PathMonitorMeta)>,
+    path_monitors: HashMap<PathWatchable, Addr<PathMonitor>>,
 }
 
 impl Monitor {
     pub fn new() -> Self {
         Self {
-            any_monitors: Default::default(),
+            path_monitors: Default::default(),
         }
     }
 }

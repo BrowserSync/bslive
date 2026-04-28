@@ -12,3 +12,4 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tracing = { workspace = true }
 globset = { workspace = true }
+anyhow = { workspace = true }

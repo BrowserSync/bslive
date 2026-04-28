@@ -1,11 +1,11 @@
 use crate::Monitor;
-use crate::path_monitor::{PathMonitor, StopPathMonitor};
-use crate::path_monitor_meta::PathMonitorMeta;
+use crate::path_monitor::{PathMonitor, StopPathMonitor, WatchPaths};
 use crate::watchables::MonitorPathWatchables;
 use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext, ResponseFuture};
 use bsnext_fs::{Debounce, FsEventContext};
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 use tracing::{debug, debug_span};
 
 #[derive(actix::Message)]
@@ -14,11 +14,7 @@ pub struct DropMonitor(pub PathWatchable);
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
-pub struct InsertMonitor(
-    pub PathWatchable,
-    pub Addr<PathMonitor>,
-    pub PathMonitorMeta,
-);
+pub struct InsertMonitor(pub PathWatchable, pub Addr<PathMonitor>, pub Vec<PathBuf>);
 
 impl actix::Handler<MonitorPathWatchables> for Monitor {
     type Result = ResponseFuture<()>;
@@ -27,7 +23,7 @@ impl actix::Handler<MonitorPathWatchables> for Monitor {
     fn handle(&mut self, msg: MonitorPathWatchables, ctx: &mut Self::Context) -> Self::Result {
         debug!("{}", file!());
 
-        let existing = self.any_monitors.keys().collect::<BTreeSet<_>>();
+        let existing = self.path_monitors.keys().collect::<BTreeSet<_>>();
         let incoming = msg.watchables.iter().collect::<BTreeSet<_>>();
 
         let in_both = incoming.intersection(&existing).collect::<Vec<_>>();
@@ -39,7 +35,7 @@ impl actix::Handler<MonitorPathWatchables> for Monitor {
         debug!("{} monitors to add", to_add.len());
 
         for any_watchable in to_remove {
-            if let Some((path_monitor_addr, _)) = self.any_monitors.get(any_watchable) {
+            if let Some(path_monitor_addr) = self.path_monitors.get(any_watchable) {
                 path_monitor_addr.do_send(StopPathMonitor);
                 ctx.notify(DropMonitor((*any_watchable).clone()))
             }
@@ -70,21 +66,21 @@ impl actix::Handler<MonitorPathWatchables> for Monitor {
             let debounce = spec.debounce.map(Debounce::from).unwrap_or_default();
             tracing::trace!(?debounce);
 
-            let monitor = PathMonitor::new(
+            let path_monitor = PathMonitor::new(
                 msg.recipient.clone(),
                 debounce,
                 msg.cwd.clone(),
                 fs_ctx,
                 spec.clone(),
-                paths,
             );
 
-            let meta = PathMonitorMeta::from(&monitor);
-            tracing::trace!(?meta);
+            let path_monitor_addr = path_monitor.start();
 
-            let monitor_addr = monitor.start();
-
-            ctx.notify(InsertMonitor((*any_watchable).clone(), monitor_addr, meta))
+            ctx.notify(InsertMonitor(
+                (*any_watchable).clone(),
+                path_monitor_addr,
+                paths,
+            ))
         }
 
         Box::pin(async move {})
@@ -96,8 +92,8 @@ impl actix::Handler<DropMonitor> for Monitor {
 
     fn handle(&mut self, msg: DropMonitor, _ctx: &mut Self::Context) -> Self::Result {
         tracing::trace!(watchable=?msg.0, "DropMonitor");
-        self.any_monitors.remove(&msg.0);
-        tracing::trace!("dropped, Monitor count {}", self.any_monitors.len());
+        self.path_monitors.remove(&msg.0);
+        tracing::trace!("dropped, Monitor count {}", self.path_monitors.len());
     }
 }
 
@@ -106,13 +102,14 @@ impl actix::Handler<InsertMonitor> for Monitor {
 
     fn handle(
         &mut self,
-        InsertMonitor(watchable, addr, meta): InsertMonitor,
+        InsertMonitor(watchable, addr, paths): InsertMonitor,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let span = debug_span!("InsertMonitor");
         let _guard = span.enter();
         debug!("{}", watchable);
-        self.any_monitors.insert(watchable, (addr, meta));
-        debug!("+ Monitor count {}", self.any_monitors.len());
+        self.path_monitors.insert(watchable, addr.clone());
+        debug!("+ Monitor count {}", self.path_monitors.len());
+        addr.do_send(WatchPaths { paths });
     }
 }
