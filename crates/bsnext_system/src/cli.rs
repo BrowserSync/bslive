@@ -1,11 +1,9 @@
 use crate::args::{Args, SubCommands};
-use crate::export::export_cmd;
 use crate::start;
 use crate::start::start_command::StartCommand;
 use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
-use bsnext_core::shared_args::LoggingOpts;
 use bsnext_input::route::MultiWatch;
 use bsnext_input::Input;
 use bsnext_output::OutputWriters;
@@ -71,7 +69,7 @@ where
         OutputFormat::Json => OutputWriters::Json,
     };
 
-    let command = args.command.unwrap_or_else(move || {
+    let sub_command = args.command.unwrap_or_else(move || {
         SubCommands::Start(StartCommand {
             cors: false,
             port: args.port,
@@ -84,9 +82,9 @@ where
         })
     });
 
-    tracing::debug!("subcommand = {:?}", command);
+    tracing::debug!("subcommand = {:?}", sub_command);
     let _guard = debug_span!("parent").entered();
-    let r = async_init(command, writer, logging, format, args_c, cwd).await;
+    let r = async_init(sub_command, writer, args_c, cwd).await;
     drop(_guard);
     drop(tracing_guard);
     r
@@ -95,32 +93,12 @@ where
 async fn async_init(
     command: SubCommands,
     writer: OutputWriters,
-    logging: LoggingOpts,
-    format: OutputFormat,
     args: Args,
     cwd: PathBuf,
 ) -> Result<(), anyhow::Error> {
     match command {
-        SubCommands::Export(cmd) => {
-            let start_cmd = StartCommand {
-                cors: false,
-                port: None,
-                trailing: cmd.trailing.clone(),
-                proxies: vec![],
-                watch_sub_opts: Default::default(),
-                logging,
-                format,
-                no_watch: true,
-            };
-            let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
-            let result = export_cmd(&cwd, &args.fs_opts, &args.input_opts, &cmd, &start_cmd).await;
-            bsnext_output::stdout::completion_writer(writer, result)
-        }
-        SubCommands::Example(example) => {
-            todo!("{:?}", example);
-        }
         SubCommands::Start(start) => {
-            let start_kind = StartKind::from_args(&args.fs_opts, &args.input_opts, &start);
+            let start_kind = start.as_start_kind(&args.fs_opts, &args.input_opts);
             start_stdout_wrapper(start_kind, cwd, writer).await
         }
         SubCommands::Watch(watch) => {
@@ -131,7 +109,7 @@ async fn async_init(
             start_stdout_wrapper(start_kind, cwd, writer).await
         }
         SubCommands::Run(run) => {
-            let start_kind = StartKind::from_run_args(&args.fs_opts, &args.input_opts, run);
+            let start_kind = run.as_start_kind(&args.input_opts);
             start_stdout_wrapper(start_kind, cwd, writer)
                 .instrument(debug_span!("SubCommands::Run").or_current())
                 .await

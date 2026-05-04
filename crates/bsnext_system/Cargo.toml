@@ -16,13 +16,10 @@ bsnext_core = { path = "../bsnext_core" }
 bsnext_fs = { path = "../bsnext_fs" }
 bsnext_fs_helpers = { path = "../bsnext_fs_helpers" }
 bsnext_dto = { path = "../bsnext_dto" }
-bsnext_example = { path = "../bsnext_example" }
 bsnext_output = { path = "../bsnext_output" }
 bsnext_task = { path = "../bsnext_task" }
 bsnext_monitor = { path = "../bsnext_monitor" }
-rand = "0.8.5"
 kill_tree = { workspace = true }
-sqids = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }

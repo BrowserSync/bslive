@@ -151,7 +151,7 @@ impl BsSystem {
         let ctx = self
             .input_monitors
             .as_ref()
-            .map(|x| x.input_ctx.clone())
+            .map(|input_monitor| input_monitor.input_ctx.clone())
             .unwrap_or_default();
 
         let input = from_input_path(&inner.absolute, &ctx);

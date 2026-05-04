@@ -1,5 +1,4 @@
 workspace.members = [
-    "bslive",
     "bsnext",
     "crates/*",
 ]

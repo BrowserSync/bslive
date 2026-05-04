@@ -1,7 +1,10 @@
 pub mod resolve_spec;
 
-use bsnext_core::shared_args::LoggingOpts;
+use crate::start::start_kind::run_from_input::RunFromInputPaths;
+use crate::start::start_kind::StartKind;
+use bsnext_core::shared_args::{InputOpts, LoggingOpts};
 use bsnext_input::route::{RunAll, RunOptItem, RunSeq, ShRunOptItem};
+use bsnext_input::startup::{RunMode, TopLevelRunMode};
 use bsnext_input::Input;
 use bsnext_tracing::OutputFormat;
 
@@ -37,35 +40,67 @@ pub struct RunCommand {
 }
 
 impl RunCommand {
-    #[tracing::instrument]
-    pub fn as_input(&self) -> Input {
-        let mut input = Input::default();
-        let mut list_of_commands: Vec<RunOptItem> = vec![];
+    pub fn as_start_kind(&self, input_opts: &InputOpts) -> StartKind {
+        let from_cmd = as_input(self);
 
-        {
-            for (index, sh) in self.sh_commands.iter().enumerate() {
-                tracing::info!(index = index, sh = sh, name = "None", prefix = "None");
-                list_of_commands.push(RunOptItem::Sh(ShRunOptItem {
-                    sh: sh.clone(),
-                    name: None,
-                    prefix: None,
-                }));
-            }
-        }
-        if list_of_commands.is_empty() {
-            return input;
-        };
-        let mut items = vec![];
-        if self.all {
-            let run_all = RunAll::new(list_of_commands);
-            items.push(RunOptItem::All(run_all));
+        tracing::debug!(self.trailing = ?self.trailing);
+        tracing::debug!(self.sh_commands = ?self.sh_commands);
+        tracing::debug!(self.all = ?self.all);
+
+        let named = if self.trailing.is_empty() {
+            vec!["default".to_string()]
         } else {
-            let run_seq = RunSeq::new(list_of_commands);
-            items.push(RunOptItem::Seq(run_seq));
-        }
-        input.run.insert("default".to_string(), items);
-        input
+            self.trailing.to_owned()
+        };
+
+        // dry takes precedence
+        let run_mode = if self.dry {
+            RunMode::Dry
+        } else {
+            RunMode::Exec {
+                preview: self.preview,
+                summary: self.summary,
+            }
+        };
+        let top_level = TopLevelRunMode::Seq;
+        StartKind::Run(RunFromInputPaths::new(
+            from_cmd,
+            input_opts.input.clone(),
+            named,
+            run_mode,
+            top_level,
+        ))
     }
+}
+
+#[tracing::instrument]
+fn as_input(run: &RunCommand) -> Input {
+    let mut input = Input::default();
+    let mut list_of_commands: Vec<RunOptItem> = vec![];
+
+    {
+        for (index, sh) in run.sh_commands.iter().enumerate() {
+            tracing::info!(index = index, sh = sh, name = "None", prefix = "None");
+            list_of_commands.push(RunOptItem::Sh(ShRunOptItem {
+                sh: sh.clone(),
+                name: None,
+                prefix: None,
+            }));
+        }
+    }
+    if list_of_commands.is_empty() {
+        return input;
+    };
+    let mut items = vec![];
+    if run.all {
+        let run_all = RunAll::new(list_of_commands);
+        items.push(RunOptItem::All(run_all));
+    } else {
+        let run_seq = RunSeq::new(list_of_commands);
+        items.push(RunOptItem::Seq(run_seq));
+    }
+    input.run.insert("default".to_string(), items);
+    input
 }
 
 #[cfg(test)]

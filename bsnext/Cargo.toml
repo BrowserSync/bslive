@@ -7,5 +7,4 @@ edition = "2021"
 bsnext_system = { path = "../crates/bsnext_system" }
 
 actix-rt = { workspace = true }
-anyhow = { workspace = true }
 tokio = { workspace = true }

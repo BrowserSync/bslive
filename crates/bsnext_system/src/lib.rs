@@ -2,7 +2,6 @@ mod api;
 pub mod args;
 pub mod capabilities;
 pub mod cli;
-mod export;
 mod external_event_sender;
 mod fs_task_tracker;
 mod handle_fs_event_grouping;
