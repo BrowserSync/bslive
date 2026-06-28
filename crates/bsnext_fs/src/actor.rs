@@ -50,11 +50,11 @@ impl FsWatcher {
     }
 
     pub fn with_filter(&mut self, f: Filter) {
-        tracing::debug!("adding filter {:?}", f);
+        tracing::debug!("adding filter {}", f);
         self.filters.push(f)
     }
     pub fn with_ignore(&mut self, f: Filter) {
-        tracing::debug!("adding ignore {:?}", f);
+        tracing::debug!("adding ignore {}", f);
         self.ignore.push(f)
     }
 

@@ -1,6 +1,5 @@
-use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_dto::internal::AnyEvent;
-use bsnext_system::start::start_command::StartCommand;
+use bsnext_system::start::start_kind::start_from_inputs::StartFromInputPaths;
 use bsnext_system::start::start_kind::StartKind;
 use bsnext_system::start::start_system::start_system;
 use std::fs;
@@ -27,21 +26,20 @@ servers:
 
     let tmp_dir = tempfile::tempdir().unwrap();
     let index_file = tmp_dir.path().join("bslive.yaml");
+    let index_file_str = index_file.to_string_lossy().to_string();
     fs::write(&index_file, input).expect("can write?");
 
     let cwd = PathBuf::from(tmp_dir.path());
 
-    let start = StartCommand {
-        cors: false,
+    let start = StartFromInputPaths {
+        input_paths: vec![index_file_str],
         port: None,
-        trailing: vec![],
-        proxies: vec![],
-        ..Default::default()
+        no_watch: false,
     };
 
     let (events_sender, _) = mpsc::channel::<AnyEvent>(1);
 
-    let start_kind = StartKind::from_args(&FsOpts::default(), &InputOpts::default(), &start);
+    let start_kind = StartKind::FromInputPaths(start);
     let api = start_system(cwd, start_kind, events_sender)
         .await
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;

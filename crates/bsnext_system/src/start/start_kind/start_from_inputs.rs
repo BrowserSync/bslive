@@ -5,7 +5,6 @@ use bsnext_input::{Input, InputArgs, InputCtx, InputError, WatchGlobalConfig};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
-// todo: must ensure StartFromInputPaths
 pub struct StartFromInputPaths {
     pub input_paths: Vec<String>,
     pub port: Option<u16>,

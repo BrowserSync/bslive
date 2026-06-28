@@ -67,7 +67,9 @@ impl actix::Handler<WatchPaths> for PathMonitor {
     fn handle(&mut self, msg: WatchPaths, ctx: &mut Self::Context) -> Self::Result {
         for single_path in &msg.paths {
             let as_str = single_path.to_string_lossy();
+            tracing::debug!(?as_str, "before split");
             let PathAndFilter { path, filter_kind } = PathAndFilter::new(&as_str);
+            tracing::debug!(?path, ?filter_kind, "will split");
 
             // create a filter list, first using the optional filter given above
             let mut filters = filter_kind.into_iter().collect::<Vec<_>>();
@@ -90,9 +92,9 @@ impl actix::Handler<WatchPaths> for PathMonitor {
 
             self.addrs.push(watcher_addr.clone());
 
-            watcher_addr.do_send(RequestWatchPath {
-                path: path.to_path_buf(),
-            });
+            let pb = path.to_path_buf();
+            tracing::debug!(?pb, ?path, "as pb");
+            watcher_addr.do_send(RequestWatchPath { path: pb });
         }
 
         let Some(receiver) = self.inner_receiver.take() else {
@@ -156,19 +158,61 @@ struct PathAndFilter<'a> {
 
 impl<'a> PathAndFilter<'a> {
     pub fn new(p: &'a str) -> Self {
-        if let Some((before, ..)) = p.split_once("*") {
-            PathAndFilter {
+        match p.split_once("*") {
+            // for cases like '**/*.toml' or '*.css'
+            Some(("", ..)) => PathAndFilter {
+                path: Path::new("."),
+                filter_kind: Some(PathPattern::Glob {
+                    glob: p.to_string(),
+                }),
+            },
+            Some((before, ..)) => PathAndFilter {
                 path: Path::new(before),
                 filter_kind: Some(PathPattern::Glob {
                     glob: p.to_string(),
                 }),
-            }
-        } else {
-            PathAndFilter {
+            },
+            None => PathAndFilter {
                 path: Path::new(p),
                 filter_kind: None,
-            }
+            },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_path_and_filter_with_glob() {
+        let input = "abc/*.css";
+        let result = PathAndFilter::new(input);
+
+        assert_eq!(result.path, Path::new("abc/"));
+        assert!(matches!(result.filter_kind, Some(PathPattern::Glob { .. })));
+
+        if let Some(PathPattern::Glob { glob }) = result.filter_kind {
+            assert_eq!(glob, "abc/*.css");
+        }
+    }
+
+    #[test]
+    fn test_path_and_filter_without_glob() {
+        let input = "abc/style.css";
+        let result = PathAndFilter::new(input);
+
+        assert_eq!(result.path, Path::new("abc/style.css"));
+        assert!(result.filter_kind.is_none());
+    }
+
+    #[test]
+    fn test_glob_without_path() {
+        let input = "**/*.toml";
+        let result = PathAndFilter::new(input);
+
+        assert_eq!(result.path, Path::new("."));
+        // assert!(result.filter_kind.is_none());
     }
 }
 
@@ -203,12 +247,12 @@ fn convert(fk: &PathPattern) -> Vec<Filter> {
                     Ok(pattern) if is_abs => vec![Filter::Glob {
                         glob: pattern,
                         raw: string_default.to_string(),
-                        scope: FilterScope::Abs,
+                        scope: FilterScope::Absolute,
                     }],
                     Ok(pattern) => vec![Filter::Glob {
                         glob: pattern,
                         raw: string_default.to_string(),
-                        scope: FilterScope::Rel,
+                        scope: FilterScope::Relative,
                     }],
                     Err(e) => {
                         tracing::error!("could not use glob {:?}", string_default);
@@ -236,12 +280,12 @@ fn convert(fk: &PathPattern) -> Vec<Filter> {
                 Ok(pattern) if is_abs => vec![Filter::Glob {
                     glob: pattern,
                     raw: glob.to_string(),
-                    scope: FilterScope::Abs,
+                    scope: FilterScope::Absolute,
                 }],
                 Ok(pattern) => vec![Filter::Glob {
                     glob: pattern,
                     raw: glob.to_string(),
-                    scope: FilterScope::Rel,
+                    scope: FilterScope::Relative,
                 }],
                 Err(e) => {
                     tracing::error!("could not use glob '{:?}'", glob);
@@ -333,14 +377,14 @@ fn to_watcher(
     if let Some(filter_kind) = &filter {
         let filters = convert(filter_kind);
         for filter in filters {
-            debug!(filter = ?filter, "append filter");
+            debug!(filter = %filter, "append filter");
             watcher.with_filter(filter);
         }
     }
     if let Some(ignore_filter_kind) = &ignore {
         let ignores = convert(ignore_filter_kind);
         for ignore in ignores {
-            debug!(ignore = ?ignore, "with ignore");
+            debug!(ignore = %ignore, "with ignore");
             watcher.with_ignore(ignore);
         }
     }

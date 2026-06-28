@@ -19,6 +19,7 @@ impl Handler<RequestWatchPath> for FsWatcher {
             todo!("Can this ever be reached?");
         };
 
+        tracing::debug!(?self.cwd, ?msg.path, "will watch msg.path");
         match watcher.watch(&msg.path, RecursiveMode::Recursive) {
             Ok(_) => {
                 // tracing::debug!(path = ?msg.path, "👀 watching! {} receivers", self.receivers.len());

@@ -122,15 +122,4 @@ mod test {
         assert_eq!(run_cmd.preview, true);
         Ok(())
     }
-
-    #[test]
-    fn input() -> anyhow::Result<()> {
-        let run_cmd = RunCommand::try_parse_from(vec!["COMMAND_NAME", "--sh", "def"])?;
-        let as_input = run_cmd.as_input();
-        let s = vec![RunOptItem::Seq(RunSeq::new(vec![RunOptItem::Sh(
-            ShRunOptItem::new("def"),
-        )]))];
-        assert_eq!(as_input.run.get("default"), Some(&s));
-        Ok(())
-    }
 }

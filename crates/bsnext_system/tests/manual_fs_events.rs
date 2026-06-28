@@ -1,8 +1,7 @@
-use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::AnyEvent;
 use bsnext_fs::FsEvent;
-use bsnext_system::start::start_command::StartCommand;
+use bsnext_system::start::start_kind::start_from_inputs::StartFromInputPaths;
 use bsnext_system::start::start_kind::StartKind;
 use bsnext_system::start::start_system::start_system;
 use futures_util::future::join;
@@ -33,21 +32,19 @@ servers:
           raw: "body { background: cyan }"
     "#;
     fs::write(&index_file, input).expect("can write?");
+    let index_file_str = index_file.to_string_lossy().to_string();
 
     let cwd = PathBuf::from(tmp_dir.path());
 
     let (events_sender, events_receiver) = mpsc::channel::<AnyEvent>(2);
-    let start = StartCommand {
-        cors: false,
+
+    let start = StartFromInputPaths {
+        no_watch: true,
+        input_paths: vec![index_file_str],
         port: None,
-        proxies: vec![],
-        trailing: vec![],
-        logging: Default::default(),
-        format: Default::default(),
-        watch_sub_opts: Default::default(),
-        no_watch: false,
     };
-    let start_kind = StartKind::from_args(&FsOpts::default(), &InputOpts::default(), &start);
+
+    let start_kind = StartKind::FromInputPaths(start);
     let api = start_system(cwd, start_kind, events_sender)
         .await
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;

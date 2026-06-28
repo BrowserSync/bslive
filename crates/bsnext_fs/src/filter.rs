@@ -1,4 +1,5 @@
 use crate::PathDescription;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub enum Filter {
@@ -15,10 +16,36 @@ pub enum Filter {
         any: String,
     },
 }
+
+impl Display for Filter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Filter::None => String::from("Filter::None"),
+            Filter::Extension { ext } => format!("Filter::Extension({})", ext),
+            Filter::Glob {
+                raw,
+                scope,
+                glob: _,
+            } => format!("Filter::Glob Raw({}) Scope({})", raw, scope),
+            Filter::Any { any } => format!("Filter::Any({})", any),
+        };
+        write!(f, "{}", str)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum FilterScope {
-    Abs,
-    Rel,
+    Absolute,
+    Relative,
+}
+
+impl Display for FilterScope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FilterScope::Absolute => write!(f, "FilterScope::Absolute"),
+            FilterScope::Relative => write!(f, "FilterScope::Relative"),
+        }
+    }
 }
 
 impl PathFilter for Filter {
@@ -33,7 +60,7 @@ impl PathFilter for Filter {
             }
             Filter::Glob { glob, scope, raw } => {
                 let target = match (scope, pd.relative) {
-                    (FilterScope::Rel, Some(rel)) => rel,
+                    (FilterScope::Relative, Some(rel)) => rel,
                     _ => pd.absolute,
                 };
                 let compare = target.to_string_lossy().to_string();

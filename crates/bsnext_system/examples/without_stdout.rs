@@ -1,6 +1,7 @@
 use bsnext_core::shared_args::{FsOpts, InputOpts};
 use bsnext_dto::internal::AnyEvent;
 use bsnext_system::start::start_command::StartCommand;
+use bsnext_system::start::start_kind::start_from_paths::StartFromPaths;
 use bsnext_system::start::start_kind::StartKind;
 use bsnext_system::start::start_system::start_system;
 use std::fs;
@@ -16,19 +17,18 @@ pub async fn main() -> Result<(), anyhow::Error> {
     let cwd = PathBuf::from(tmp_dir.path());
     let as_str = cwd.to_string_lossy().to_string();
 
-    let start = StartCommand {
-        cors: false,
+    let start = StartFromPaths {
         port: None,
-        trailing: vec![as_str],
-        proxies: vec![],
-        logging: Default::default(),
-        format: Default::default(),
+        force: false,
+        paths: vec![as_str],
         watch_sub_opts: Default::default(),
         no_watch: false,
+        write_input: false,
+        route_opts: Default::default(),
     };
 
     let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);
-    let start_kind = StartKind::from_args(&FsOpts::default(), &InputOpts::default(), &start);
+    let start_kind = StartKind::FromPaths(start);
     let api = start_system(cwd, start_kind, events_sender)
         .await
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
