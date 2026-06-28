@@ -5,7 +5,7 @@ use bsnext_dto::internal::{AnyEvent, ChildResult, ServerError};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_input::startup::StartupContext;
 use bsnext_input::{Input, InputCtx};
-use bsnext_monitor::watchables::accept_watchables;
+use bsnext_path_monitor::watchables::accept_watchables;
 use tracing::debug;
 
 #[derive(Debug, actix::Message)]

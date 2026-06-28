@@ -610,7 +610,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "bsnext_monitor"
+name = "bsnext_output"
+version = "0.26.0"
+dependencies = [
+ "anyhow",
+ "tracing",
+]
+
+[[package]]
+name = "bsnext_path_monitor"
 version = "0.26.0"
 dependencies = [
  "actix",
@@ -621,14 +629,6 @@ dependencies = [
  "globset",
  "tokio",
  "tokio-stream",
- "tracing",
-]
-
-[[package]]
-name = "bsnext_output"
-version = "0.26.0"
-dependencies = [
- "anyhow",
  "tracing",
 ]
 
@@ -676,8 +676,8 @@ dependencies = [
  "bsnext_input",
  "bsnext_js",
  "bsnext_md",
- "bsnext_monitor",
  "bsnext_output",
+ "bsnext_path_monitor",
  "bsnext_task",
  "bsnext_tracing",
  "bsnext_yaml",

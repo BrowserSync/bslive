@@ -14,7 +14,7 @@ use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_input::startup::{StartupContext, TopLevelRunMode};
 use bsnext_input::Input;
-use bsnext_monitor::Monitor;
+use bsnext_path_monitor::Monitor;
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
 use std::path::PathBuf;
 use std::time::Duration;

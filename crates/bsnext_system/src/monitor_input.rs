@@ -3,9 +3,9 @@ use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::WatchSpec;
 use bsnext_input::InputCtx;
-use bsnext_monitor::path_monitor::{PathMonitor, WatchPaths};
-use bsnext_monitor::watchables::any_watchable::AnyWatchable;
-use bsnext_monitor::watchables::path_watchable::PathWatchable;
+use bsnext_path_monitor::path_monitor::{PathMonitor, WatchPaths};
+use bsnext_path_monitor::watchables::any_watchable::AnyWatchable;
+use bsnext_path_monitor::watchables::path_watchable::PathWatchable;
 use std::path::PathBuf;
 use std::time::Duration;
 

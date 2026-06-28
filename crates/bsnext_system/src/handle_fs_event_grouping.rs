@@ -17,7 +17,7 @@ use bsnext_fs::{
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::route::WatchSpec;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use bsnext_monitor::{FsGroup, Group};
+use bsnext_path_monitor::{FsGroup, Group};
 use bsnext_task::task_trigger::FsChangesTrigger;
 use tracing::{debug, debug_span, info};
 

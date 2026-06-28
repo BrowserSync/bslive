@@ -2,7 +2,7 @@ use crate::system::BsSystem;
 use actix::{ActorFutureExt, AsyncContext};
 use actix::{ResponseActFuture, WrapFuture};
 use bsnext_input::Input;
-use bsnext_monitor::watchables::accept_watchables;
+use bsnext_path_monitor::watchables::accept_watchables;
 use tracing::debug_span;
 
 /// Message to monitor file system paths based on the current input configuration.

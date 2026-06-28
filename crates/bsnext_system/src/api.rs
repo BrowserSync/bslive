@@ -6,7 +6,7 @@ use bsnext_dto::internal::ServerError;
 use bsnext_dto::ActiveServer;
 use bsnext_fs::{Debounce, FsEvent};
 use bsnext_input::route::WatchSpec;
-use bsnext_monitor::FsGroup;
+use bsnext_path_monitor::FsGroup;
 use tokio::sync::oneshot;
 
 #[derive(Debug)]

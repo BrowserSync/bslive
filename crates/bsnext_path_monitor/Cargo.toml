@@ -1,5 +1,5 @@
 [package]
-name = "bsnext_monitor"
+name = "bsnext_path_monitor"
 version = "0.26.0"
 edition = "2024"
 
