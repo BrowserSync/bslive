@@ -2,8 +2,9 @@ use actix::{Actor, ResponseFuture};
 use actix_rt::System;
 use bsnext_fs::{FsEvent, FsEventContext};
 use bsnext_input::route::{DebounceDuration, WatchSpec};
-use bsnext_path_monitor::FsGroup;
-use bsnext_path_monitor::path_monitor::{PathMonitor, WatchPaths};
+use bsnext_path_monitor::PathMonitorEvent;
+use bsnext_path_monitor::path_monitor::PathMonitor;
+use bsnext_path_monitor::watch_paths_msg::WatchPaths;
 use std::env::current_dir;
 use std::process;
 use std::time::Duration;
@@ -31,62 +32,61 @@ fn main() {
     }
 }
 
+#[derive(Default)]
+struct Consumer {
+    events: Vec<PathMonitorEvent>,
+}
+
+#[derive(actix::Message, Debug, Clone)]
+#[rtype(result = "()")]
+struct Ping;
+
+impl actix::Actor for Consumer {
+    type Context = actix::Context<Self>;
+}
+
+impl actix::Handler<PathMonitorEvent> for Consumer {
+    type Result = ();
+
+    fn handle(&mut self, msg: PathMonitorEvent, _ctx: &mut Self::Context) -> Self::Result {
+        self.events.push(msg);
+    }
+}
+
+impl actix::Handler<Ping> for Consumer {
+    type Result = ResponseFuture<()>;
+
+    fn handle(&mut self, _msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(async {})
+    }
+}
+
+#[derive(actix::Message, Debug, Clone)]
+#[rtype(result = "Vec<PathMonitorEvent>")]
+struct Read;
+
+impl actix::Handler<Read> for Consumer {
+    type Result = Vec<PathMonitorEvent>;
+
+    fn handle(&mut self, _msg: Read, _ctx: &mut Self::Context) -> Self::Result {
+        self.events.clone()
+    }
+}
+
 async fn async_main() -> anyhow::Result<i32> {
-    #[derive(Default)]
-    struct Consumer {
-        events: Vec<FsGroup>,
-    }
-
-    #[derive(actix::Message, Debug, Clone)]
-    #[rtype(result = "()")]
-    struct Ping;
-
-    impl actix::Actor for Consumer {
-        type Context = actix::Context<Self>;
-    }
-
-    impl actix::Handler<FsGroup> for Consumer {
-        type Result = ();
-
-        fn handle(&mut self, msg: FsGroup, _ctx: &mut Self::Context) -> Self::Result {
-            self.events.push(msg);
-        }
-    }
-
-    impl actix::Handler<Ping> for Consumer {
-        type Result = ResponseFuture<()>;
-
-        fn handle(&mut self, _msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
-            Box::pin(async {})
-        }
-    }
-
-    #[derive(actix::Message, Debug, Clone)]
-    #[rtype(result = "Vec<FsGroup>")]
-    struct Read;
-
-    impl actix::Handler<Read> for Consumer {
-        type Result = Vec<FsGroup>;
-
-        fn handle(&mut self, _msg: Read, _ctx: &mut Self::Context) -> Self::Result {
-            self.events.clone()
-        }
-    }
-
     let consumer = Consumer::default();
     let actor = consumer.start();
-    let reciever = actor.clone().recipient();
+    let receiver = actor.clone().recipient();
     let cwd = current_dir().unwrap();
     let fs_context = FsEventContext::default();
-    let debounce = bsnext_fs::Debounce::Buffered {
-        duration: Duration::from_millis(0),
-    };
+    let debounce_duration = DebounceDuration::Ms { ms: 0 };
+    let debounce = bsnext_fs::Debounce::from(debounce_duration);
     let spec = WatchSpec {
-        debounce: Some(DebounceDuration::Ms(0)),
-        ..Default::default()
+        debounce: Some(debounce_duration),
+        ..WatchSpec::default()
     };
 
-    let monitor = PathMonitor::new(reciever, debounce, cwd, fs_context, spec);
+    let monitor = PathMonitor::new(receiver, debounce, cwd, fs_context, spec);
     let monitor_actor = monitor.start();
     monitor_actor.send(WatchPaths { paths: vec![] }).await?;
     let _did_wait = actor.send(Ping).await;
@@ -95,7 +95,8 @@ async fn async_main() -> anyhow::Result<i32> {
         .await;
     let r = Read;
     tokio::time::sleep(Duration::from_millis(10)).await;
-    let events = actor.send(r).await?;
+    let events: Vec<_> = actor.send(r).await?;
+    dbg!(&events);
     assert_eq!(events.len(), 1);
     Ok(0)
 }

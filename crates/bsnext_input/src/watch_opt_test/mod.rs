@@ -1,6 +1,6 @@
 use crate::route::{
     DebounceDuration, PathPattern, RunAll, RunAllOpts, RunOptItem, RunSeq, SeqOpts, ShRunOptItem,
-    WatchSpec,
+    Strategy, WatchSpec,
 };
 use crate::watch_opts::WatchOpts;
 
@@ -12,7 +12,51 @@ fn test_watch_opts_debounce() {
     only: "**/*.css"
     "#;
     let expected = WatchOpts::Spec(WatchSpec {
-        debounce: Some(DebounceDuration::Ms(200)),
+        debounce: Some(DebounceDuration::Ms { ms: 200 }),
+        only: Some(PathPattern::StringDefault("**/*.css".into())),
+        ignore: None,
+        run: None,
+        before: None,
+    });
+    let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_watch_opts_debounce_with_trailing() {
+    let input = r#"
+    debounce:
+      ms: 200
+      strategy: trailing
+    only: "**/*.css"
+    "#;
+    let expected = WatchOpts::Spec(WatchSpec {
+        debounce: Some(DebounceDuration::MsStrategy {
+            ms: 200,
+            strategy: Strategy::Trailing,
+        }),
+        only: Some(PathPattern::StringDefault("**/*.css".into())),
+        ignore: None,
+        run: None,
+        before: None,
+    });
+    let actual: WatchOpts = serde_yaml::from_str(input).unwrap();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_watch_opts_debounce_with_buffered() {
+    let input = r#"
+    debounce:
+      ms: 200
+      strategy: buffered
+    only: "**/*.css"
+    "#;
+    let expected = WatchOpts::Spec(WatchSpec {
+        debounce: Some(DebounceDuration::MsStrategy {
+            ms: 200,
+            strategy: Strategy::Buffered,
+        }),
         only: Some(PathPattern::StringDefault("**/*.css".into())),
         ignore: None,
         run: None,

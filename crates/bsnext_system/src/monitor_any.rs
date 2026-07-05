@@ -1,8 +1,8 @@
 use crate::system::BsSystem;
+use crate::watchables::MonitorPathWatchables;
 use actix::{ActorFutureExt, AsyncContext};
 use actix::{ResponseActFuture, WrapFuture};
 use bsnext_input::Input;
-use bsnext_path_monitor::watchables::accept_watchables;
 use tracing::debug_span;
 
 /// Message to monitor file system paths based on the current input configuration.
@@ -35,11 +35,11 @@ impl actix::Handler<MonitorAny> for BsSystem {
     fn handle(&mut self, msg: MonitorAny, ctx: &mut Self::Context) -> Self::Result {
         let cwd = self.cwd.clone();
         let recip = ctx.address().recipient();
-        let monitor = self.monitor.clone();
+        let monitor = self.path_monitors.clone();
 
         let future = async move {
             let input = msg.input;
-            let msg = accept_watchables(cwd, &input, recip);
+            let msg = MonitorPathWatchables::new(cwd, &input, recip);
             monitor.send(msg).await?;
             Ok::<_, anyhow::Error>(())
         };

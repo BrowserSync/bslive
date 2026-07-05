@@ -2,6 +2,7 @@ use crate::capabilities::Capabilities;
 use crate::fs_task_tracker::FsTaskTracker;
 use crate::invoke_scope::{InvokeScope, Invoker};
 use crate::monitor_input::InputMonitor;
+use crate::path_monitors::PathMonitors;
 use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
 use crate::servers::ResolveServers;
 use crate::tasks::resolve::ResolveInitialTasks;
@@ -14,7 +15,6 @@ use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_input::startup::{StartupContext, TopLevelRunMode};
 use bsnext_input::Input;
-use bsnext_path_monitor::Monitor;
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -29,7 +29,7 @@ pub struct BsSystem {
     any_event_sender: Sender<AnyEvent>,
     pub(crate) input_monitors: Option<InputMonitor>,
     pub(crate) fs_task_tracker: Addr<FsTaskTracker>,
-    pub(crate) monitor: Addr<Monitor>,
+    pub(crate) path_monitors: Addr<PathMonitors>,
     pub(crate) invoker_addr: Addr<Invoker>,
     pub(crate) cwd: PathBuf,
     pub(crate) start_context: StartupContext,
@@ -82,7 +82,7 @@ impl BsSystem {
         );
         let invoker_addr = invoker.start();
         let fs_task_tracker = FsTaskTracker::new(invoker_addr.clone().recipient()).start();
-        let monitor = Monitor::new();
+        let monitor = PathMonitors::new();
         let monitor = monitor.start();
         BsSystem {
             self_addr: None,
@@ -90,7 +90,7 @@ impl BsSystem {
             servers_addr,
             any_event_sender,
             input_monitors: None,
-            monitor,
+            path_monitors: monitor,
             invoker_addr,
             fs_task_tracker,
             cwd,

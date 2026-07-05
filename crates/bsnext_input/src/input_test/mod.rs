@@ -214,7 +214,7 @@ fn test_deserialize_watch() {
     assert_eq!(
         c.opts.watch,
         WatchOpts::Spec(WatchSpec {
-            debounce: Some(DebounceDuration::Ms(2000)),
+            debounce: Some(DebounceDuration::Ms { ms: 2000 }),
             only: None,
             ignore: None,
             run: None,
@@ -247,7 +247,7 @@ servers:
             MultiWatch {
                 dirs: WatcherDirs::Single("./other".to_string()),
                 spec: Some(WatchSpec {
-                    debounce: Some(DebounceDuration::Ms(2000)),
+                    debounce: Some(DebounceDuration::Ms { ms: 2000 }),
                     only: Some(PathPattern::Extension {
                         ext: "**/*.css".to_string()
                     }),

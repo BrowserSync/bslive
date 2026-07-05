@@ -108,9 +108,9 @@ impl From<WatchSubOpts> for MultiWatch {
             PathPattern::List(value.only)
         });
 
-        let debounce = value
-            .debounce
-            .map(|duration| DebounceDuration::Ms(duration as u64));
+        let debounce = value.debounce.map(|duration| DebounceDuration::Ms {
+            ms: (duration as u64),
+        });
 
         let spec = WatchSpec {
             before: queue,

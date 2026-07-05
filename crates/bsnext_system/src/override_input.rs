@@ -1,11 +1,11 @@
 use crate::servers::ResolveServers;
 use crate::system::BsSystem;
+use crate::watchables::MonitorPathWatchables;
 use actix::{ActorFutureExt, AsyncContext, ResponseActFuture, WrapFuture};
 use bsnext_dto::internal::{AnyEvent, ChildResult, ServerError};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_input::startup::StartupContext;
 use bsnext_input::{Input, InputCtx};
-use bsnext_path_monitor::watchables::accept_watchables;
 use tracing::debug;
 
 #[derive(Debug, actix::Message)]
@@ -36,7 +36,9 @@ impl actix::Handler<OverrideInput> for BsSystem {
                     Err(err) => Err(ServerError::Unknown(err.to_string())),
                 };
                 // todo: only process the override if valid?
-                accept_watchables(actor.cwd.clone(), &input_clone, addr.recipient());
+                let msg =
+                    MonitorPathWatchables::new(actor.cwd.clone(), &input_clone, addr.recipient());
+                actor.path_monitors.do_send(msg);
                 actor.update_ctx(&input_clone, &start_ctx_clone);
                 output
             });

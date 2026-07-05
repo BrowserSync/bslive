@@ -297,19 +297,96 @@ pub enum DelayKind {
 #[derive(
     Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, serde::Deserialize, serde::Serialize,
 )]
+#[serde(untagged)]
 pub enum DebounceDuration {
-    #[serde(rename = "ms")]
-    Ms(u64),
+    MsStrategy { ms: u64, strategy: Strategy },
+    Ms { ms: u64 },
+}
+
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, serde::Deserialize, serde::Serialize,
+)]
+pub enum Strategy {
+    #[serde(rename = "buffered")]
+    Buffered,
+    #[serde(rename = "trailing")]
+    Trailing,
 }
 
 impl From<DebounceDuration> for Debounce {
     fn from(debounce_duration: DebounceDuration) -> Self {
         match debounce_duration {
-            DebounceDuration::Ms(ms) => Debounce::Buffered {
+            DebounceDuration::MsStrategy {
+                ms,
+                strategy: Strategy::Buffered,
+            } => Debounce::Buffered {
+                duration: Duration::from_millis(ms),
+            },
+            DebounceDuration::Ms { ms } => Debounce::Buffered {
+                duration: Duration::from_millis(ms),
+            },
+            DebounceDuration::MsStrategy {
+                ms,
+                strategy: Strategy::Trailing,
+            } => Debounce::Trailing {
                 duration: Duration::from_millis(ms),
             },
         }
     }
+}
+
+#[cfg(test)]
+mod debounce_duration_tests {
+    use super::*;
+    use serde::{de, Deserialize, Deserializer};
+
+    #[test]
+    fn test_debounce_duration_ms_trailing() {
+        #[derive(serde::Deserialize, Debug)]
+        struct A {
+            a: DebounceDuration,
+        }
+        let yaml = r#"
+a:
+  ms: 12
+  strategy: ase
+"#;
+        let result: A = serde_yaml::from_str(yaml).unwrap();
+        dbg!(result);
+
+        // assert_eq!(result, DebounceDuration::MsTrailing(250));
+    }
+
+    //     #[test]
+    //     fn test_debounce_duration_ms_buffered() {
+    //         let yaml = r#"
+    // ms_buffered: 500
+    // "#;
+    //         let result: DebounceDuration = serde_yaml::from_str(yaml).unwrap();
+    //         assert_eq!(result, DebounceDuration::MsBuffered(500));
+    //     }
+    //
+    //     #[test]
+    //     fn test_debounce_duration_converts_to_buffered() {
+    //         let debounce: Debounce = DebounceDuration::Ms(100).into();
+    //         assert_eq!(
+    //             debounce,
+    //             Debounce::Buffered {
+    //                 duration: Duration::from_millis(100)
+    //             }
+    //         );
+    //     }
+    //
+    //     #[test]
+    //     fn test_debounce_duration_converts_to_trailing() {
+    //         let debounce: Debounce = DebounceDuration::MsTrailing(150).into();
+    //         assert_eq!(
+    //             debounce,
+    //             Debounce::Trailing {
+    //                 duration: Duration::from_millis(150)
+    //             }
+    //         );
+    //     }
 }
 
 #[derive(

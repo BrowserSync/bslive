@@ -1,15 +1,15 @@
-use crate::FsGroup;
+use crate::PathMonitorEvent;
+use crate::path_and_filter::PathAndFilter;
+use crate::watch_paths_msg::WatchPaths;
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
 use bsnext_fs::buffered_debounce::BufferedStreamOpsExt;
-use bsnext_fs::filter::{Filter, FilterScope, PathFilter};
+use bsnext_fs::filter::{Filter, FilterScope};
 use bsnext_fs::stop_handler::StopWatcher;
 use bsnext_fs::stream::StreamOpsExt;
 use bsnext_fs::watch_path_handler::RequestWatchPath;
-use bsnext_fs::{
-    Debounce, FsEvent, FsEventContext, FsEventKind, PathDescription, PathDescriptionOwned,
-};
+use bsnext_fs::{Debounce, FsEvent, FsEventContext, FsEventKind, PathDescriptionOwned};
 use bsnext_input::route::{PathPattern, WatchSpec};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -24,14 +24,14 @@ pub struct PathMonitor {
     pub(crate) debounce: Debounce,
     pub(crate) watch_spec: WatchSpec,
     addrs: Vec<Addr<FsWatcher>>,
-    recipient: Recipient<FsGroup>,
+    recipient: Recipient<PathMonitorEvent>,
     inner_sender: tokio::sync::mpsc::Sender<FsEvent>,
     inner_receiver: Option<tokio::sync::mpsc::Receiver<FsEvent>>,
 }
 
 impl PathMonitor {
     pub fn new(
-        recipient: Recipient<FsGroup>,
+        recipient: Recipient<PathMonitorEvent>,
         debounce: Debounce,
         cwd: PathBuf,
         fs_ctx: FsEventContext,
@@ -53,12 +53,6 @@ impl PathMonitor {
 
 impl actix::Actor for PathMonitor {
     type Context = actix::Context<Self>;
-}
-
-#[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "()")]
-pub struct WatchPaths {
-    pub paths: Vec<PathBuf>,
 }
 
 impl actix::Handler<WatchPaths> for PathMonitor {
@@ -117,7 +111,7 @@ impl actix::Handler<WatchPaths> for PathMonitor {
 impl StreamHandler<FsEvent> for PathMonitor {
     fn handle(&mut self, event: FsEvent, _ctx: &mut Context<PathMonitor>) {
         debug!("StreamHandler<FsEvent> for PathMonitor");
-        self.recipient.do_send(FsGroup::singular(
+        self.recipient.do_send(PathMonitorEvent::singular(
             event,
             self.watch_spec.clone(),
             self.debounce,
@@ -142,7 +136,7 @@ impl StreamHandler<Vec<FsEvent>> for PathMonitor {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        self.recipient.do_send(FsGroup::buffered_change(
+        self.recipient.do_send(PathMonitorEvent::buffered_change(
             outgoing,
             self.fs_ctx,
             self.watch_spec.clone(),
@@ -151,89 +145,7 @@ impl StreamHandler<Vec<FsEvent>> for PathMonitor {
     }
 }
 
-struct PathAndFilter<'a> {
-    path: &'a Path,
-    filter_kind: Option<PathPattern>,
-}
-
-impl<'a> PathAndFilter<'a> {
-    pub fn new(p: &'a str) -> Self {
-        match p.split_once("*") {
-            // for cases like '**/*.toml' or '*.css'
-            Some(("", ..)) => PathAndFilter {
-                path: Path::new("."),
-                filter_kind: Some(PathPattern::Glob {
-                    glob: p.to_string(),
-                }),
-            },
-            Some((before, ..)) => PathAndFilter {
-                path: Path::new(before),
-                filter_kind: Some(PathPattern::Glob {
-                    glob: p.to_string(),
-                }),
-            },
-            None => PathAndFilter {
-                path: Path::new(p),
-                filter_kind: None,
-            },
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_path_and_filter_with_glob() {
-        let input = "abc/*.css";
-        let result = PathAndFilter::new(input);
-
-        assert_eq!(result.path, Path::new("abc/"));
-        assert!(matches!(result.filter_kind, Some(PathPattern::Glob { .. })));
-
-        if let Some(PathPattern::Glob { glob }) = result.filter_kind {
-            assert_eq!(glob, "abc/*.css");
-        }
-    }
-
-    #[test]
-    fn test_path_and_filter_without_glob() {
-        let input = "abc/style.css";
-        let result = PathAndFilter::new(input);
-
-        assert_eq!(result.path, Path::new("abc/style.css"));
-        assert!(result.filter_kind.is_none());
-    }
-
-    #[test]
-    fn test_glob_without_path() {
-        let input = "**/*.toml";
-        let result = PathAndFilter::new(input);
-
-        assert_eq!(result.path, Path::new("."));
-        // assert!(result.filter_kind.is_none());
-    }
-}
-
-impl PathFilter for PathAndFilter<'_> {
-    fn any(&self, pd: &PathDescription) -> bool {
-        match &self.filter_kind {
-            None => {
-                if self.path == pd.absolute {
-                    return true;
-                }
-                pd.relative.map(|rel| rel == self.path).unwrap_or(false)
-            }
-            Some(filter) => {
-                let filters = convert(filter);
-                filters.iter().any(|x| x.any(pd))
-            }
-        }
-    }
-}
-
-fn convert(fk: &PathPattern) -> Vec<Filter> {
+pub(crate) fn pattern_to_filter_list(fk: &PathPattern) -> Vec<Filter> {
     match fk {
         PathPattern::StringDefault(string_default) => {
             if string_default.contains("*") {
@@ -294,48 +206,13 @@ fn convert(fk: &PathPattern) -> Vec<Filter> {
                 }
             }
         }
-        PathPattern::List(items) => items.iter().flat_map(convert).collect::<Vec<_>>(),
+        PathPattern::List(items) => items
+            .iter()
+            .flat_map(pattern_to_filter_list)
+            .collect::<Vec<_>>(),
         PathPattern::Any { any } => vec![Filter::Any {
             any: any.to_string(),
         }],
-    }
-}
-
-#[test]
-fn test_e2e_filtering() {
-    use bsnext_fs::{Abs, Cwd};
-    let abs = Abs("/user/shakyshane/abc/style.css");
-    let cwd = Cwd("/user/shakyshane");
-    let dirs = [
-        (&abs, &cwd, "abc/*.css", true),
-        (&abs, &cwd, "**/*.css", true),
-        (&abs, &cwd, "def/*.css", false),
-        (&abs, &cwd, "abc/style.css", true),
-        (&abs, &cwd, "/user/shakyshane/abc/style.css", true),
-        (&abs, &cwd, "/user/shakyshane/abc/*.css", true),
-        (&abs, &cwd, "/user/shakyshane/abc/*.{css,txt}", true),
-        (&abs, &cwd, "/user/shakyshane/abc/*.{txt}", false),
-        (&abs, &cwd, "/user/shakyshane/**/*.css", true),
-        (&abs, &cwd, "/user/shakyshane/*.css", false),
-        (&abs, &cwd, "**/abc/*.css", true),
-        (&abs, &cwd, "**/def/*.css", false),
-        (&abs, &cwd, "abc/**/*.css", true),
-        (&abs, &cwd, "def/**/*.css", false),
-        (&abs, &cwd, "*.css", false),
-        (&abs, &cwd, "style.css", false),
-        (&abs, &cwd, "abc/s*.css", true),
-        (&abs, &cwd, "abc/style.*", true),
-        (&abs, &cwd, "*/style.css", true),
-    ];
-    for (abs, cwd, dir, expected) in dirs {
-        let change = PathDescription::from_cwd(abs, cwd);
-        let v = PathAndFilter::new(dir);
-        let actual = v.any(&change);
-        assert_eq!(
-            actual, expected,
-            "dir was: {}, result should be {}",
-            dir, expected
-        );
     }
 }
 
@@ -358,7 +235,8 @@ impl Handler<FsEvent> for PathMonitor {
             _ => {
                 // todo: any need to buffer these?
                 debug!("Sending some other event");
-                let output = FsGroup::singular(msg, self.watch_spec.clone(), self.debounce);
+                let output =
+                    PathMonitorEvent::singular(msg, self.watch_spec.clone(), self.debounce);
                 self.recipient.do_send(output)
             }
         }
@@ -375,14 +253,14 @@ fn to_watcher(
     let mut watcher = FsWatcher::new(cwd, fs_ctx, receiver);
 
     if let Some(filter_kind) = &filter {
-        let filters = convert(filter_kind);
+        let filters = pattern_to_filter_list(filter_kind);
         for filter in filters {
             debug!(filter = %filter, "append filter");
             watcher.with_filter(filter);
         }
     }
     if let Some(ignore_filter_kind) = &ignore {
-        let ignores = convert(ignore_filter_kind);
+        let ignores = pattern_to_filter_list(ignore_filter_kind);
         for ignore in ignores {
             debug!(ignore = %ignore, "with ignore");
             watcher.with_ignore(ignore);

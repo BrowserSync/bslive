@@ -1,6 +1,6 @@
-use bsnext_input::Input;
 use bsnext_input::route::WatchSpec;
 use bsnext_input::server_config::ServerIdentity;
+use bsnext_input::Input;
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]

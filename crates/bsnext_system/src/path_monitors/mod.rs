@@ -1,12 +1,29 @@
-use crate::Monitor;
-use crate::path_monitor::{PathMonitor, StopPathMonitor, WatchPaths};
-use crate::watchables::MonitorPathWatchables;
 use crate::watchables::path_watchable::PathWatchable;
+use crate::watchables::MonitorPathWatchables;
 use actix::{Actor, Addr, AsyncContext, ResponseFuture};
 use bsnext_fs::{Debounce, FsEventContext};
-use std::collections::BTreeSet;
+use bsnext_path_monitor::path_monitor::{PathMonitor, StopPathMonitor};
+use bsnext_path_monitor::watch_paths_msg::WatchPaths;
+use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use tracing::{debug, debug_span};
+
+#[derive(Debug, Default)]
+pub struct PathMonitors {
+    path_monitors: HashMap<PathWatchable, Addr<PathMonitor>>,
+}
+
+impl PathMonitors {
+    pub fn new() -> Self {
+        Self {
+            path_monitors: Default::default(),
+        }
+    }
+}
+
+impl actix::Actor for PathMonitors {
+    type Context = actix::Context<Self>;
+}
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
@@ -16,7 +33,7 @@ pub struct DropMonitor(pub PathWatchable);
 #[rtype(result = "()")]
 pub struct InsertMonitor(pub PathWatchable, pub Addr<PathMonitor>, pub Vec<PathBuf>);
 
-impl actix::Handler<MonitorPathWatchables> for Monitor {
+impl actix::Handler<MonitorPathWatchables> for PathMonitors {
     type Result = ResponseFuture<()>;
 
     #[tracing::instrument(skip_all, name = "MonitorPathWatchables->Monitor")]
@@ -87,7 +104,7 @@ impl actix::Handler<MonitorPathWatchables> for Monitor {
     }
 }
 
-impl actix::Handler<DropMonitor> for Monitor {
+impl actix::Handler<DropMonitor> for PathMonitors {
     type Result = ();
 
     fn handle(&mut self, msg: DropMonitor, _ctx: &mut Self::Context) -> Self::Result {
@@ -97,7 +114,7 @@ impl actix::Handler<DropMonitor> for Monitor {
     }
 }
 
-impl actix::Handler<InsertMonitor> for Monitor {
+impl actix::Handler<InsertMonitor> for PathMonitors {
     type Result = ();
 
     fn handle(
