@@ -7,7 +7,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::net::SocketAddr;
 use std::str::FromStr;
 
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ServerConfig {
     #[serde(flatten)]
     pub identity: ServerIdentity,

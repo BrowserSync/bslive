@@ -1,8 +1,7 @@
 use crate::input_fs::from_input_path;
+use crate::start::SystemStart;
 use bsnext_input::input_fs::ResolvedInputOutcome;
-use bsnext_input::startup::{
-    RunMode, StartupContext, SystemStart, SystemStartArgs, TopLevelRunMode,
-};
+use bsnext_input::startup::{RunMode, StartupContext, SystemStartArgs, TopLevelRunMode};
 use bsnext_input::{Input, InputError};
 
 #[derive(Debug, Clone)]
@@ -49,6 +48,7 @@ impl SystemStart for RunFromInputPaths {
             }
             ResolvedInputOutcome::Empty => None,
         };
+
         let input = match input_from_file {
             None => {
                 tracing::debug!("using run_cmd values only");

@@ -1,8 +1,9 @@
+use crate::start::SystemStart;
 use crate::watch::watch_sub_opts::WatchSubOpts;
 use bsnext_input::path_def::PathDef;
 use bsnext_input::route::{DirRoute, MultiWatch, Opts, Route, RouteKind};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
-use bsnext_input::startup::{Lazy, StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::startup::{StartupContext, SystemStartArgs};
 use bsnext_input::{
     InferWatchers, Input, InputError, PathDefinition, PathDefs, PathError, WatchGlobalConfig,
 };
@@ -11,57 +12,104 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub struct StartFromPaths {
     pub paths: Vec<String>,
-    pub write_input: bool,
     pub port: Option<u16>,
-    pub force: bool,
     pub route_opts: Opts,
     pub watch_sub_opts: WatchSubOpts,
     pub no_watch: bool,
 }
 
 impl SystemStart for StartFromPaths {
-    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        let span = tracing::debug_span!("StartFromPaths::resolve_input");
-        let _g = span.entered();
-
-        let port = self.port;
-        let paths = self.paths.clone();
-        let route_opts = self.route_opts.clone();
-        let cwd = ctx.cwd.clone();
-
-        // defer the lookup of directories or ports because a 'before' task might have sideeffects
-        let lazy = move |mut input: Input| -> Result<Input, Box<InputError>> {
-            let identity =
-                ServerIdentity::from_port_or_named(port).map_err(|e| Box::new(e.into()))?;
-
-            let server_config = from_dir_paths(&cwd, &paths, &route_opts, identity)
-                .map_err(|e| Box::new(e.into()))?;
-
-            tracing::debug!("Adding a `server_config`");
-            input.servers.push(server_config);
-
-            Ok(input)
-        };
-
-        let input = if self.no_watch {
-            let mut input = Input::default();
-            input.config.watchers = WatchGlobalConfig::Disabled;
-            input
-        } else {
-            let explicit_watch_count =
-                self.watch_sub_opts.paths.len() + self.watch_sub_opts.before.len();
-            if explicit_watch_count > 0 {
-                with_explicit_paths(&self.watch_sub_opts)
-            } else {
-                with_inferred_watchers(&self.watch_sub_opts)
-            }
-        };
-
-        Ok(SystemStartArgs::InputOnlyDeferred {
-            input,
-            create: Lazy::new(Box::new(lazy)),
-        })
+    fn resolve_input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+        // let span = tracing::debug_span!("StartFromPaths::resolve_input");
+        // let _g = span.entered();
+        //
+        // let port = self.port;
+        // let paths = self.paths.clone();
+        // let route_opts = self.route_opts.clone();
+        // let cwd = ctx.cwd.clone();
+        //
+        // // defer the lookup of directories or ports because a 'before' task might have sideeffects
+        // let lazy = move |mut input: Input| -> Result<Input, Box<InputError>> {
+        //     let identity =
+        //         ServerIdentity::from_port_or_named(port).map_err(|e| Box::new(e.into()))?;
+        //
+        //     let server_config = server_config_from_paths(&cwd, &paths, &route_opts, identity)
+        //         .map_err(|e| Box::new(e.into()))?;
+        //
+        //     tracing::debug!("Adding a `server_config`");
+        //     input.servers.push(server_config);
+        //
+        //     Ok(input)
+        // };
+        //
+        // let input = if self.no_watch {
+        //     let mut input = Input::default();
+        //     input.config.watchers = WatchGlobalConfig::Disabled;
+        //     input
+        // } else {
+        //     let explicit_watch_count =
+        //         self.watch_sub_opts.paths.len() + self.watch_sub_opts.before.len();
+        //     if explicit_watch_count > 0 {
+        //         with_explicit_paths(&self.watch_sub_opts)
+        //     } else {
+        //         with_inferred_watchers(&self.watch_sub_opts)
+        //     }
+        // };
+        //
+        // Ok(SystemStartArgs::InputOnlyDeferred {
+        //     input,
+        //     create: Lazy::new(Box::new(lazy)),
+        // })
+        todo!("never...")
     }
+
+    // async fn start(&self) -> Result<DidStart, StartupError> {
+    // let system = BsSystem::new(events_sender.clone(), cwd, tx);
+    // let sys_addr = system.start();
+    // let mut input = if self.no_watch {
+    //     let mut input = Input::default();
+    //     input.config.watchers = WatchGlobalConfig::Disabled;
+    //     input
+    // } else {
+    //     let explicit_watch_count =
+    //         self.watch_sub_opts.paths.len() + self.watch_sub_opts.before.len();
+    //     if explicit_watch_count > 0 {
+    //         with_explicit_paths(&self.watch_sub_opts)
+    //     } else {
+    //         with_inferred_watchers(&self.watch_sub_opts)
+    //     }
+    // };
+    // let res = setup_jobs_only(addr.clone(), input.clone()).await?;
+    // let port = self.port;
+    // let paths = self.paths.clone();
+    // let route_opts = self.route_opts.clone();
+    // let cwd = ctx.cwd.clone();
+    //
+    // let identity = ServerIdentity::from_port_or_named(port)
+    //     .map_err(|e| StartupError::InputError(InputError::PortError(e)))?;
+    // let server_config = from_dir_paths(&cwd, &paths, &route_opts, identity)
+    //     .map_err(|e| StartupError::InputError(InputError::PathError(e)))?;
+    //
+    // tracing::debug!("Adding a `server_config` on the fly");
+    // input.servers.push(server_config);
+    //
+    // let SetupServersOk {
+    //     servers,
+    //     child_results,
+    // } = setup_servers_only(server_addr.clone(), input.clone()).await?;
+    //
+    // // let notif = ServerChangesetDTO::from_changes(&servers, &child_results);
+    // let errored = ChildResult::first_server_error(&child_results);
+    //
+    // // dbg!(&notif);
+    //
+    // if let Some(server_error) = errored {
+    //     tracing::debug!("errored: {:?}", errored);
+    //     return Err(StartupError::ServerError((*server_error).to_owned()));
+    // }
+    // ctx.notify(MonitorAny::new(res.input.clone()));
+    // Ok(DidStart::Started)
+    // }
 }
 
 /// when we have given explicit paths on the command line, we are opting out of inferred watchers,
@@ -70,8 +118,7 @@ impl SystemStart for StartFromPaths {
 /// however, if we want to watch something else, we need a way to opt-out of the inferred ones, like:
 ///   `bslive public --watch.paths src`
 ///                      ^ in this case, we only want to watch 'src' and prevent inferred things later.
-fn with_explicit_paths(opts: &WatchSubOpts) -> Input {
-    let mut input = Input::default();
+pub fn with_explicit_paths(input: &mut Input, opts: &WatchSubOpts) {
     let span = tracing::debug_span!(parent: None, "StartFromPaths watch_overrides");
     let _g = span.entered();
     tracing::debug!("{} paths to watch", opts.paths.len());
@@ -81,7 +128,6 @@ fn with_explicit_paths(opts: &WatchSubOpts) -> Input {
     input.config.watchers = WatchGlobalConfig::Enabled {
         infer: InferWatchers::None,
     };
-    input
 }
 
 /// in this second scenario, we're probably starting a server without explicit watch paths given as CLI args.
@@ -89,8 +135,7 @@ fn with_explicit_paths(opts: &WatchSubOpts) -> Input {
 /// this means we'll watch the directory, but it might accidentally end up watching a noisy build folder or similar
 /// in that case, we still want to forward --ignore and --only args, but nothing else to allow the user to opt-out
 ///   eg: `bslive . --only dist/*.html`
-fn with_inferred_watchers(opts: &WatchSubOpts) -> Input {
-    let mut input = Input::default();
+pub fn with_inferred_watchers(input: &mut Input, opts: &WatchSubOpts) {
     let span = tracing::debug_span!(parent: None, "StartFromPaths global_overrides");
     let _g = span.entered();
     tracing::debug!("{} ignore add", opts.ignore.len());
@@ -100,10 +145,9 @@ fn with_inferred_watchers(opts: &WatchSubOpts) -> Input {
         input.config.global_fs_only = spec_from_cli.only;
         input.config.global_fs_debounce = spec_from_cli.debounce;
     }
-    input
 }
 
-fn from_dir_paths<T: AsRef<str>>(
+pub fn server_config_from_paths<T: AsRef<str>>(
     cwd: &Path,
     paths: &[T],
     route_opts: &Opts,
@@ -176,9 +220,7 @@ mod test {
         let tmp_dir = tempdir()?;
         let v = StartFromPaths {
             paths: vec![".".into()],
-            write_input: false,
             port: Some(3000),
-            force: false,
             route_opts: Default::default(),
             watch_sub_opts: Default::default(),
             no_watch: false,

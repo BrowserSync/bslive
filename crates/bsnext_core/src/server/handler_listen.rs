@@ -6,7 +6,7 @@ use crate::server::state::ServerState;
 use crate::servers_supervisor::get_servers_handler::{GetActiveServers, IncomingEvents};
 use actix::{Recipient, ResponseFuture};
 use actix_rt::Arbiter;
-use bsnext_dto::internal::ServerError;
+use bsnext_dto::server_events::ServerError;
 use bsnext_input::server_config::ServerIdentity;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, TcpListener};

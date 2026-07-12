@@ -4,8 +4,8 @@ use actix::ActorFutureExt;
 use actix::Handler;
 use actix::WrapFuture;
 use actix::{Actor, Addr, ResponseActFuture};
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
-use bsnext_dto::internal::{AnyEvent, TaskActionStage, TaskReportAndTree};
+use bsnext_dto::any_event::AnyEvent;
+use bsnext_dto::task_events::{TaskActionStage, TaskReportAndTree};
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::task_trigger::TaskTrigger;
@@ -15,19 +15,13 @@ use tokio::sync::mpsc::Sender;
 #[derive(Debug)]
 pub struct Invoker {
     capabilities_addr: Addr<Capabilities>,
-    servers_addr: Addr<ServersSupervisor>,
     any_event_sender: Sender<AnyEvent>,
 }
 
 impl Invoker {
-    pub fn new(
-        capabilities_addr: Addr<Capabilities>,
-        servers_addr: Addr<ServersSupervisor>,
-        any_event_sender: Sender<AnyEvent>,
-    ) -> Self {
+    pub fn new(capabilities_addr: Addr<Capabilities>, any_event_sender: Sender<AnyEvent>) -> Self {
         Self {
             capabilities_addr,
-            servers_addr,
             any_event_sender,
         }
     }
@@ -76,8 +70,7 @@ impl Handler<InvokeScope> for Invoker {
         let task_spec_clone = task_spec.clone();
         let node_path = task_spec.path().to_owned();
         let tree = task_spec.as_tree();
-        let scope =
-            task_spec.to_task_scope(self.servers_addr.clone(), self.capabilities_addr.clone());
+        let scope = task_spec.to_task_scope(self.capabilities_addr.clone());
         let top_level_scope = Box::new(scope).into_task_recipient();
         let done = msg.done;
         let c1 = self.any_event_sender.clone();

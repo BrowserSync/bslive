@@ -1,8 +1,8 @@
 use crate::capabilities::output_channel::RequestOutputChannel;
 use crate::capabilities::TaggedEvent;
 use actix::{Handler, Recipient, ResponseFuture, Running};
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::AnyEvent;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::invocation_result::InvocationResult;
 use bsnext_task::task_trigger::TaskTriggerSource;

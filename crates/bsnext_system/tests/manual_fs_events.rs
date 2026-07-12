@@ -1,5 +1,6 @@
+use bsnext_core::shared_args::InputOpts;
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::AnyEvent;
 use bsnext_fs::FsEvent;
 use bsnext_system::start::start_kind::start_from_inputs::StartFromInputPaths;
 use bsnext_system::start::start_kind::StartKind;
@@ -45,7 +46,8 @@ servers:
     };
 
     let start_kind = StartKind::FromInputPaths(start);
-    let api = start_system(cwd, start_kind, events_sender)
+    let input_opts = InputOpts::default();
+    let api = start_system(cwd, start_kind, input_opts, events_sender)
         .await
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 

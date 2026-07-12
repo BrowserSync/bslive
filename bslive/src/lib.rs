@@ -4,59 +4,11 @@
 #[macro_use]
 extern crate napi_derive;
 
-use bsnext_system::cli::from_args;
+use crate::async_start::AsyncStart;
 use napi::bindgen_prelude::{AbortSignal, AsyncTask};
-use napi::{Env, JsNumber};
 
-/// Launch in a blocking way
-#[allow(dead_code)]
-#[napi]
-fn start_blocking(args: Vec<String>) -> napi::bindgen_prelude::Result<i32> {
-    let sys = actix_rt::System::new();
-    let result = sys.block_on(async move {
-        match from_args(args).await {
-            Ok(_) => 0,
-            Err(_) => 1,
-        }
-    });
-    Ok(result)
-}
-
-pub struct AsyncStart {
-    args: Vec<String>,
-    rx: Option<tokio::sync::oneshot::Receiver<()>>,
-}
-
-impl napi::Task for AsyncStart {
-    type Output = i32;
-    type JsValue = JsNumber;
-
-    fn compute(&mut self) -> napi::Result<Self::Output> {
-        let sys = actix_rt::System::new();
-        let args = self.args.clone();
-        let rx = self.rx.take().expect("must be there");
-        let result = sys.block_on(async move {
-            tokio::select! {
-                _ = rx => {
-                    println!("did exit from one-shot");
-                    2
-                }
-                res = from_args(args) => {
-                    println!("did exit from server-shot");
-                    match res {
-                        Ok(_) => 0,
-                        Err(_) => 1,
-                    }
-                }
-            }
-        });
-        Ok(result)
-    }
-
-    fn resolve(&mut self, env: Env, output: Self::Output) -> napi::Result<Self::JsValue> {
-        env.create_int32(output)
-    }
-}
+mod async_start;
+mod blocking_start;
 
 #[napi(js_name = "BsSystem")]
 pub struct JsBsSystem {
@@ -88,7 +40,7 @@ impl JsBsSystem {
             system: BsSystem::new(),
         }
     }
-    #[napi]
+    #[napi(ts_return_type = "Promise<number>")]
     pub fn start(&mut self, args: Vec<String>, signal: AbortSignal) -> AsyncTask<AsyncStart> {
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
         self.system.sender = Some(tx);

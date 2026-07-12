@@ -83,6 +83,10 @@ export interface InputAcceptedDTO {
 	path: string;
 }
 
+export interface InputErrorDetailDTO {
+	error: string;
+}
+
 /** @discriminator kind */
 export type RouteKindDTO = 
 	| { kind: "Html", payload: {
@@ -110,6 +114,11 @@ export interface RouteDTO {
 	kind: RouteKindDTO;
 }
 
+export interface RouteIdentityDTO {
+	path: string;
+	kind_str: string;
+}
+
 /** @discriminator kind */
 export type ServerChange = 
 	| { kind: "Stopped", payload: {
@@ -130,17 +139,44 @@ export interface ServerChangeSet {
 	items: ServerChangeSetItem[];
 }
 
+/** @discriminator kind */
+export type ServerChangeDTO = 
+	| { kind: "Created", payload: {
+	identity: ServerIdentityDTO;
+	socket_addr: string;
+}}
+	| { kind: "Stopped", payload: {
+	identity: ServerIdentityDTO;
+}}
+	| { kind: "CreateErr", payload: {
+	error: string;
+}}
+	| { kind: "Patched", payload: {
+	identity: ServerIdentityDTO;
+	added: RouteIdentityDTO[];
+	changed: RouteIdentityDTO[];
+}}
+	| { kind: "PatchErr", payload: {
+	identity: ServerIdentityDTO;
+	error: string;
+}};
+
+export interface ServerChangesetDTO {
+	changeset: ServerChangeDTO[];
+	servers_resp: GetActiveServersResponseDTO;
+}
+
 export interface ServerDesc {
 	routes: RouteDTO[];
 	id: string;
 }
 
-export interface ServersChangedDTO {
-	servers_resp: GetActiveServersResponseDTO;
-}
-
 export interface SseDTOOpts {
 	body: string;
+}
+
+export interface StartupErrorDTO {
+	error: string;
 }
 
 export interface StderrLineDTO {
@@ -233,17 +269,19 @@ export enum EventLevel {
 
 /** @discriminator kind */
 export type ExternalEventsDTO = 
-	| { kind: "ServersChanged", payload: ServersChangedDTO }
-	| { kind: "Watching", payload: WatchingDTO }
-	| { kind: "WatchingStopped", payload: StoppedWatchingDTO }
 	| { kind: "FileChanged", payload: FileChangedDTO }
 	| { kind: "FilesChanged", payload: FilesChangedDTO }
+	| { kind: "OutputLine", payload: OutputLineDTO }
 	| { kind: "InputFileChanged", payload: FileChangedDTO }
 	| { kind: "InputAccepted", payload: InputAcceptedDTO }
-	| { kind: "OutputLine", payload: OutputLineDTO }
+	| { kind: "InputError", payload: InputErrorDetailDTO }
+	| { kind: "StartupError", payload: StartupErrorDTO }
+	| { kind: "ServerChangeset", payload: ServerChangesetDTO }
 	| { kind: "TaskAction", payload: TaskActionDTO }
 	| { kind: "TaskTreePreview", payload: TaskTreePreview }
-	| { kind: "TaskTreeSummary", payload: TaskTreeSummary };
+	| { kind: "TaskTreeSummary", payload: TaskTreeSummary }
+	| { kind: "Watching", payload: WatchingDTO }
+	| { kind: "WatchingStopped", payload: StoppedWatchingDTO };
 
 /** @discriminator kind */
 export type InputErrorDTO = 
@@ -262,16 +300,6 @@ export type InputErrorDTO =
 	| { kind: "MissingExtension", payload: string }
 	| { kind: "EmptyInput", payload: string }
 	| { kind: "BsLiveRules", payload: string };
-
-/** @discriminator kind */
-export type InternalEventsDTO = 
-	| { kind: "ServersChanged", payload: GetActiveServersResponseDTO }
-	| { kind: "TaskReport", payload: {
-	id: string;
-}}
-	| { kind: "TaskTreeDisplay", payload: {
-	tree: ArchyNode;
-}};
 
 /** @discriminator kind */
 export type OutputLineDTO = 

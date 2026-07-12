@@ -2,11 +2,11 @@ use crate::servers::ReadActiveServers;
 use crate::start::start_system::StopSystem;
 use crate::system::BsSystem;
 use actix::Addr;
-use bsnext_dto::internal::ServerError;
+use bsnext_dto::server_events::ServerError;
 use bsnext_dto::ActiveServer;
 use bsnext_fs::{Debounce, FsEvent};
 use bsnext_input::route::WatchSpec;
-use bsnext_path_monitor::PathMonitorEvent;
+use bsnext_path_monitor::PathMonitorChangeset;
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
@@ -16,9 +16,9 @@ pub struct BsSystemApi {
 }
 
 impl BsSystemApi {
-    pub fn new(sys_address: Addr<BsSystem>, handle: oneshot::Receiver<()>) -> Self {
+    pub fn new(sys_address: &Addr<BsSystem>, handle: oneshot::Receiver<()>) -> Self {
         Self {
-            sys_address,
+            sys_address: sys_address.clone(),
             handle,
         }
     }
@@ -45,7 +45,7 @@ impl BsSystemApi {
     }
 
     pub fn fs_event(&self, evt: FsEvent) {
-        self.sys_address.do_send(PathMonitorEvent::singular(
+        self.sys_address.do_send(PathMonitorChangeset::singular(
             evt,
             WatchSpec::default(),
             Debounce::default(),

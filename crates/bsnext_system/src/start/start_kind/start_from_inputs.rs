@@ -1,6 +1,7 @@
-use bsnext_input::startup::{StartupContext, SystemStart, SystemStartArgs};
+use bsnext_input::startup::{StartupContext, SystemStartArgs};
 
 use crate::input_fs::from_input_path;
+use crate::start::SystemStart;
 use bsnext_input::{Input, InputArgs, InputCtx, InputError, WatchGlobalConfig};
 use std::path::{Path, PathBuf};
 
@@ -30,7 +31,7 @@ impl SystemStart for StartFromInput {
     }
 }
 
-fn from_input_paths<T: AsRef<str>>(
+pub fn from_input_paths<T: AsRef<str>>(
     ctx: &StartupContext,
     inputs: &[T],
     port: &Option<u16>,

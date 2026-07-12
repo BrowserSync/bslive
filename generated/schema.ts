@@ -107,6 +107,10 @@ export const inputAcceptedDTOSchema = z.object({
     path: z.string(),
 });
 
+export const inputErrorDetailDTOSchema = z.object({
+    error: z.string(),
+});
+
 export const sseDTOOptsSchema = z.object({
     body: z.string(),
 });
@@ -151,6 +155,11 @@ export const routeKindDTOSchema = z.discriminatedUnion("kind", [
     }),
 ]);
 
+export const routeIdentityDTOSchema = z.object({
+    path: z.string(),
+    kind_str: z.string(),
+});
+
 export const serverChangeSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("Stopped"),
@@ -183,13 +192,55 @@ export const serverChangeSetSchema = z.object({
     items: z.array(serverChangeSetItemSchema),
 });
 
+export const serverChangeDTOSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("Created"),
+        payload: z.object({
+            identity: serverIdentityDTOSchema,
+            socket_addr: z.string(),
+        }),
+    }),
+    z.object({
+        kind: z.literal("Stopped"),
+        payload: z.object({
+            identity: serverIdentityDTOSchema,
+        }),
+    }),
+    z.object({
+        kind: z.literal("CreateErr"),
+        payload: z.object({
+            error: z.string(),
+        }),
+    }),
+    z.object({
+        kind: z.literal("Patched"),
+        payload: z.object({
+            identity: serverIdentityDTOSchema,
+            added: z.array(routeIdentityDTOSchema),
+            changed: z.array(routeIdentityDTOSchema),
+        }),
+    }),
+    z.object({
+        kind: z.literal("PatchErr"),
+        payload: z.object({
+            identity: serverIdentityDTOSchema,
+            error: z.string(),
+        }),
+    }),
+]);
+
+export const serverChangesetDTOSchema = z.object({
+    changeset: z.array(serverChangeDTOSchema),
+    servers_resp: getActiveServersResponseDTOSchema,
+});
+
 export const routeDTOSchema = z.object({
     path: z.string(),
     kind: routeKindDTOSchema,
 });
 
-export const serversChangedDTOSchema = z.object({
-    servers_resp: getActiveServersResponseDTOSchema,
+export const startupErrorDTOSchema = z.object({
+    error: z.string(),
 });
 
 export const stderrLineDTOSchema = z.object({
@@ -344,25 +395,6 @@ export const inputErrorDTOSchema = z.discriminatedUnion("kind", [
     }),
 ]);
 
-export const internalEventsDTOSchema = z.discriminatedUnion("kind", [
-    z.object({
-        kind: z.literal("ServersChanged"),
-        payload: getActiveServersResponseDTOSchema,
-    }),
-    z.object({
-        kind: z.literal("TaskReport"),
-        payload: z.object({
-            id: z.string(),
-        }),
-    }),
-    z.object({
-        kind: z.literal("TaskTreeDisplay"),
-        payload: z.object({
-            tree: archyNodeSchema,
-        }),
-    }),
-]);
-
 export const startupEventDTOSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("Started"),
@@ -434,24 +466,16 @@ export const externalEventsDTOSchema: z.ZodSchema<ExternalEventsDTO> = z.lazy(
     () =>
         z.discriminatedUnion("kind", [
             z.object({
-                kind: z.literal("ServersChanged"),
-                payload: serversChangedDTOSchema,
-            }),
-            z.object({
-                kind: z.literal("Watching"),
-                payload: watchingDTOSchema,
-            }),
-            z.object({
-                kind: z.literal("WatchingStopped"),
-                payload: stoppedWatchingDTOSchema,
-            }),
-            z.object({
                 kind: z.literal("FileChanged"),
                 payload: fileChangedDTOSchema,
             }),
             z.object({
                 kind: z.literal("FilesChanged"),
                 payload: filesChangedDTOSchema,
+            }),
+            z.object({
+                kind: z.literal("OutputLine"),
+                payload: outputLineDTOSchema,
             }),
             z.object({
                 kind: z.literal("InputFileChanged"),
@@ -462,8 +486,16 @@ export const externalEventsDTOSchema: z.ZodSchema<ExternalEventsDTO> = z.lazy(
                 payload: inputAcceptedDTOSchema,
             }),
             z.object({
-                kind: z.literal("OutputLine"),
-                payload: outputLineDTOSchema,
+                kind: z.literal("InputError"),
+                payload: inputErrorDetailDTOSchema,
+            }),
+            z.object({
+                kind: z.literal("StartupError"),
+                payload: startupErrorDTOSchema,
+            }),
+            z.object({
+                kind: z.literal("ServerChangeset"),
+                payload: serverChangesetDTOSchema,
             }),
             z.object({
                 kind: z.literal("TaskAction"),
@@ -476,6 +508,14 @@ export const externalEventsDTOSchema: z.ZodSchema<ExternalEventsDTO> = z.lazy(
             z.object({
                 kind: z.literal("TaskTreeSummary"),
                 payload: taskTreeSummarySchema,
+            }),
+            z.object({
+                kind: z.literal("Watching"),
+                payload: watchingDTOSchema,
+            }),
+            z.object({
+                kind: z.literal("WatchingStopped"),
+                payload: stoppedWatchingDTOSchema,
             }),
         ]),
 );

@@ -2,7 +2,6 @@ use crate::capabilities::Capabilities;
 use crate::tasks::comms::Comms;
 use crate::tasks::{Node, Runnable, RunnableWithComms};
 use actix::Addr;
-use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_dto::archy::ArchyNode;
 use bsnext_input::route::{RunOptItem, WatchSpec};
 use bsnext_task::task_entry::TaskEntry;
@@ -211,11 +210,7 @@ impl TreeDisplay for TaskSpec {
 }
 
 impl TaskSpec {
-    pub fn to_task_scope(
-        self,
-        servers_addr: Addr<ServersSupervisor>,
-        capabilities_addr: Addr<Capabilities>,
-    ) -> TaskScope {
+    pub fn to_task_scope(self, capabilities_addr: Addr<Capabilities>) -> TaskScope {
         let parent_id = self.as_id();
         let mut tasks = vec![];
 
@@ -225,15 +220,13 @@ impl TaskSpec {
             match runnable.node {
                 Runnable::Spec(task_spec) => {
                     let path = task_spec.path().to_owned();
-                    let as_scope =
-                        task_spec.to_task_scope(servers_addr.clone(), capabilities_addr.clone());
+                    let as_scope = task_spec.to_task_scope(capabilities_addr.clone());
                     tasks.push(TaskEntry::new(Box::new(as_scope), content_id, path))
                 }
                 _ => {
                     let path = runnable.path().to_owned();
                     let with_ctx = RunnableWithComms {
                         ctx: Comms {
-                            servers_addr: servers_addr.clone(),
                             capabilities: capabilities_addr.clone(),
                         },
                         runnable,

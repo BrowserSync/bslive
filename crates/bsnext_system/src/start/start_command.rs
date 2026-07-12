@@ -1,12 +1,28 @@
+use crate::api::BsSystemApi;
+use crate::run::resolve_spec::InvokeRunTasks;
 use crate::start::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
-use crate::start::start_kind::start_from_paths::StartFromPaths;
+use crate::start::start_kind::start_from_paths::{
+    server_config_from_paths, with_explicit_paths, with_inferred_watchers, StartFromPaths,
+};
 use crate::start::start_kind::StartKind;
+use crate::start::start_system::DidStart;
+use crate::start::SystemStart;
+use crate::system::{BsSystem, CommitInput, GetStartContext, ResolveInput};
+use crate::tasks::resolve::ResolveInitialTasks;
 use crate::watch::watch_sub_opts::WatchSubOpts;
-use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
+use actix::{Actor, Addr};
+use anyhow::Context;
+use bsnext_core::shared_args::{InputOpts, LoggingOpts};
+use bsnext_dto::any_event::AnyEvent;
+use bsnext_dto::StartupError;
 use bsnext_input::route::{CorsOpts, Opts, Route};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
-use bsnext_input::Input;
+use bsnext_input::startup::{StartupContext, SystemStartArgs};
+use bsnext_input::{Input, InputError, WatchGlobalConfig};
 use bsnext_tracing::OutputFormat;
+use std::path::{Path, PathBuf};
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
 
 #[derive(Debug, Default, Clone, clap::Parser)]
 pub struct StartCommand {
@@ -42,7 +58,7 @@ pub struct StartCommand {
 }
 
 impl StartCommand {
-    pub fn as_start_kind(&self, fs_opts: &FsOpts, input_opts: &InputOpts) -> StartKind {
+    pub fn as_start_kind(&self, input_opts: &InputOpts) -> StartKind {
         // todo: make the addition of a proxy + route opts easier?
         if !self.trailing.is_empty() {
             tracing::debug!(
@@ -52,9 +68,7 @@ impl StartCommand {
             );
             return StartKind::FromPaths(StartFromPaths {
                 paths: self.trailing.clone(),
-                write_input: fs_opts.write,
                 port: self.port,
-                force: fs_opts.force,
                 watch_sub_opts: self.watch_sub_opts.clone(),
                 route_opts: Opts {
                     cors: self.cors.then_some(CorsOpts::Cors(true)),
@@ -89,4 +103,110 @@ impl StartCommand {
             })
         }
     }
+}
+
+impl SystemStart for StartCommand {
+    fn resolve_input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+        todo!()
+    }
+
+    async fn start(
+        &self,
+        cwd: PathBuf,
+        input_opts: InputOpts,
+        sink: Sender<AnyEvent>,
+    ) -> Result<DidStart, StartupError> {
+        // let fs_opts = self.fs_opts.clone();
+        // let input_opts = self.input_opts.clone();
+        let (tx, rx) = oneshot::channel();
+        let system = BsSystem::new(sink.clone(), cwd.clone(), tx);
+        let addr = system.start();
+
+        let _startup_ctx = addr
+            .send(GetStartContext)
+            .await
+            .context("Trying to get ctx")?;
+
+        // prepare initial input before any tasks should run
+        let (mut input, resolution) = self.prepare_input(&addr, &input_opts).await?;
+
+        // now run any 'before' tasks run before we try anything.
+        initial_tasks(&addr, input.clone()).await?;
+
+        if input.servers.is_empty() {
+            let server_config = self.as_server_config(&cwd).await?;
+
+            // add the server config
+            input.servers.push(server_config);
+        }
+
+        // remember the ID of the input we are commiting
+        let _id = input.as_id();
+        let _r = addr.send(CommitInput::new(input)).await;
+
+        let api = BsSystemApi::new(&addr, rx);
+        Ok(DidStart::Started { api })
+    }
+}
+
+enum InputResolution {
+    Default,
+    UserDefined,
+}
+
+impl StartCommand {
+    async fn prepare_input(
+        &self,
+        addr: &Addr<BsSystem>,
+        input_opts: &InputOpts,
+    ) -> anyhow::Result<(Input, InputResolution)> {
+        // try to resolve input from disk
+        let input = addr
+            .send(ResolveInput::from_strs(&input_opts.input))
+            .await
+            .context("mailbox")??;
+
+        // otherwise, use a default input to start with...
+        let (mut input, resolution) = match input {
+            None => (Input::default(), InputResolution::Default),
+            Some(resolved) => (resolved.input, InputResolution::UserDefined),
+        };
+
+        if self.no_watch {
+            input.config.watchers = WatchGlobalConfig::Disabled;
+        } else {
+            let explicit_watch_count =
+                self.watch_sub_opts.paths.len() + self.watch_sub_opts.before.len();
+            if explicit_watch_count > 0 {
+                with_explicit_paths(&mut input, &self.watch_sub_opts);
+            } else {
+                with_inferred_watchers(&mut input, &self.watch_sub_opts);
+            }
+        };
+
+        Ok((input, resolution))
+    }
+
+    async fn as_server_config(&self, cwd: &Path) -> anyhow::Result<ServerConfig> {
+        let port = self.port;
+        let paths = self.trailing.clone();
+        let route_opts = Opts {
+            cors: self.cors.then_some(CorsOpts::Cors(true)),
+            ..Default::default()
+        };
+
+        let identity = ServerIdentity::from_port_or_named(port).context("port")?;
+
+        let server_config = server_config_from_paths(cwd, &paths, &route_opts, identity)
+            .context("server config")?;
+
+        Ok(server_config)
+    }
+}
+
+async fn initial_tasks(addr: &Addr<BsSystem>, input: Input) -> anyhow::Result<()> {
+    let spec = addr.send(ResolveInitialTasks::new(input)).await??;
+    let _report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
+    // let s = archy(&report_and_tree.tree, Prefix::None);
+    Ok(())
 }

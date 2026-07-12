@@ -1,7 +1,7 @@
 use bsnext_tracing::LogLevel;
 use std::cmp::PartialEq;
 
-#[derive(Debug, Default, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Hash, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ClientConfig {
     pub log: LogLevel,
 }
