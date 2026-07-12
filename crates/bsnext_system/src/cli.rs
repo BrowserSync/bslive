@@ -1,6 +1,5 @@
 use crate::args::{Args, SubCommands};
 use crate::start;
-use crate::start::start_command::StartCommand;
 use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
@@ -30,7 +29,6 @@ where
         std::env::set_var("RUST_LIB_BACKTRACE", "0");
     }
     let args = Args::parse_from(itr);
-    let args_c = args.clone();
     let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
 
     let logging = *args.logging();
@@ -73,57 +71,29 @@ where
         OutputFormat::Json => OutputWriters::Json,
     };
 
-    let sub_command = args.command.unwrap_or_else(move || {
-        SubCommands::Start(StartCommand {
-            cors: false,
-            port: args.port,
-            trailing: args.trailing.clone(),
-            proxies: vec![],
-            watch_sub_opts: args.watch_opts,
-            logging,
-            format,
-            no_watch: args.no_watch,
-        })
-    });
-
-    tracing::debug!("subcommand = {:?}", sub_command);
     let _guard = debug_span!("parent").entered();
     let (sender, fut) = stdout_channel(writer);
-    let result = async_init(sub_command, args_c, cwd, (sender, fut)).await;
+    let result = async_init(args, cwd, (sender, fut)).await;
     drop(_guard);
     drop(tracing_guard);
     result
 }
 
-/// The typical lifecycle when ran from a CLI environment
-pub async fn from_args_with_output<I, T>(itr: I) -> (anyhow::Result<()>, Vec<AnyEvent>)
+/// a way of running that will collect events and not exit until the program exits naturally
+pub async fn from_args_with_output<I, T>(
+    itr: I,
+    cwd: PathBuf,
+) -> (anyhow::Result<()>, Vec<AnyEvent>)
 where
     I: IntoIterator<Item = T> + std::fmt::Debug,
     T: Into<OsString> + Clone,
 {
     let args = Args::parse_from(itr);
-    let args_c = args.clone();
-    let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
 
-    let logging = *args.logging();
-    let format = args.format();
-
-    let sub_command = args.command.unwrap_or_else(move || {
-        SubCommands::Start(StartCommand {
-            cors: false,
-            port: args.port,
-            trailing: args.trailing.clone(),
-            proxies: vec![],
-            watch_sub_opts: args.watch_opts,
-            logging,
-            format,
-            no_watch: args.no_watch,
-        })
-    });
     let ready_future = futures::future::pending();
     let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(100);
 
-    let result = async_init(sub_command, args_c, cwd, (events_sender, ready_future)).await;
+    let result = async_init(args, cwd, (events_sender, ready_future)).await;
 
     // now consume all the events
     let mut events: Vec<AnyEvent> = Vec::new();
@@ -142,14 +112,15 @@ where
 }
 
 async fn async_init(
-    command: SubCommands,
     args: Args,
     cwd: PathBuf,
     (sender, fut): (Sender<AnyEvent>, impl Future<Output = ()> + 'static),
 ) -> Result<(), anyhow::Error> {
-    match command {
+    let fs_opts = args.fs_opts.clone();
+    let input_opts = args.input_opts.clone();
+    match args.command() {
         SubCommands::Start(start) => {
-            let start_kind = start.as_start_kind(&args.fs_opts, &args.input_opts);
+            let start_kind = start.as_start_kind(&fs_opts, &input_opts);
             start_wrapper(start_kind, cwd, (sender, fut)).await
         }
         SubCommands::Watch(watch) => {
@@ -160,7 +131,7 @@ async fn async_init(
             start_wrapper(start_kind, cwd, (sender, fut)).await
         }
         SubCommands::Run(run) => {
-            let start_kind = run.as_start_kind(&args.input_opts);
+            let start_kind = run.as_start_kind(&input_opts);
             start_wrapper(start_kind, cwd, (sender, fut))
                 .instrument(debug_span!("SubCommands::Run").or_current())
                 .await

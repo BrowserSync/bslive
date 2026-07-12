@@ -26,13 +26,14 @@ Use bslive to run groups of tasks and exit immediately after.
 /// # use bsnext_dto::external_events::has_output_line_matching;
 /// # let rt = actix_rt::System::new();
 /// # rt.block_on(async {
-/// # let args = r#"
+/// #   let args = r#"
 /// bslive run --sh "echo 1"
 /// # "#;
-/// # let words = shell_words::split(args).unwrap();
-/// # let (result, events) = from_args_with_output(words).await;
-/// # assert!(result.is_ok());
-/// # assert!(has_output_line_matching(&events, "1"));
+/// #   let words = shell_words::split(args).unwrap();
+/// #   let cwd = std::path::PathBuf::from(std::env::current_dir().unwrap().to_string_lossy().to_string());
+/// #   let (result, events) = from_args_with_output(words, cwd).await;
+/// #   assert!(result.is_ok());
+/// #   assert!(has_output_line_matching(&events, "1"));
 /// # });
 /// ```
 ///
