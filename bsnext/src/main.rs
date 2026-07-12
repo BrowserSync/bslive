@@ -5,6 +5,9 @@ use std::process;
 use bsnext_system::cli::from_args;
 
 fn main() {
+    unsafe {
+        std::env::set_var("RUST_LIB_BACKTRACE", "0");
+    }
     let code = System::with_tokio_rt(|| {
         // build system with a multi-thread tokio runtime.
         tokio::runtime::Builder::new_multi_thread()

@@ -60,10 +60,7 @@ impl Args {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum SubCommands {
-    /// Start the services
     Start(StartCommand),
-    /// Just use file watching
     Watch(WatchCommand),
-    /// Just run tasks
     Run(RunCommand),
 }

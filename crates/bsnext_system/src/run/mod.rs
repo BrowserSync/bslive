@@ -8,7 +8,34 @@ use bsnext_input::startup::{RunMode, TopLevelRunMode};
 use bsnext_input::Input;
 use bsnext_tracing::OutputFormat;
 
+fn about() -> String {
+    let s = r#"
+Use bslive to run groups of tasks and exit immediately after.
+    "#;
+    s.to_string()
+}
+
 #[derive(Debug, Clone, clap::Parser)]
+#[command(about = about(), long_about = None)]
+///
+/// # Examples
+/// Run a single command and exit immediately
+///
+/// ```rust
+/// # use bsnext_system::cli::from_args_with_output;
+/// # use bsnext_dto::external_events::has_output_line_matching;
+/// # let rt = actix_rt::System::new();
+/// # rt.block_on(async {
+/// # let args = r#"
+/// bslive run --sh "echo 1"
+/// # "#;
+/// # let words = shell_words::split(args).unwrap();
+/// # let (result, events) = from_args_with_output(words).await;
+/// # assert!(result.is_ok());
+/// # assert!(has_output_line_matching(&events, "1"));
+/// # });
+/// ```
+///
 pub struct RunCommand {
     /// commands to run
     pub trailing: Vec<String>,

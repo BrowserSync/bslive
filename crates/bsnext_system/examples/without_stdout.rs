@@ -1,52 +1,24 @@
-use bsnext_core::shared_args::{FsOpts, InputOpts};
-use bsnext_dto::internal::AnyEvent;
-use bsnext_system::start::start_command::StartCommand;
-use bsnext_system::start::start_kind::start_from_paths::StartFromPaths;
-use bsnext_system::start::start_kind::StartKind;
-use bsnext_system::start::start_system::start_system;
-use std::fs;
-use std::path::PathBuf;
-use tokio::sync::mpsc;
+use bsnext_dto::external_events::{has_output_line_matching, ExternalEventsDTO};
+use bsnext_system::cli::from_args_with_output;
+use std::process;
 
-#[actix_rt::main]
-pub async fn main() -> Result<(), anyhow::Error> {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let index_file = tmp_dir.path().join("index.html");
-    fs::write(&index_file, String::from("Hello world! (without-stdout)")).expect("can write?");
-
-    let cwd = PathBuf::from(tmp_dir.path());
-    let as_str = cwd.to_string_lossy().to_string();
-
-    let start = StartFromPaths {
-        port: None,
-        force: false,
-        paths: vec![as_str],
-        watch_sub_opts: Default::default(),
-        no_watch: false,
-        write_input: false,
-        route_opts: Default::default(),
-    };
-
-    let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(1);
-    let start_kind = StartKind::FromPaths(start);
-    let api = start_system(cwd, start_kind, events_sender)
-        .await
-        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-
-    let Some(api) = api else {
-        unreachable!("failed if we get here")
-    };
-
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-        if let Err(e) = api.stop().await {
-            tracing::error!(?e);
-        }
-    });
-
-    while let Some(evt) = events_receiver.recv().await {
-        dbg!(&evt);
+fn main() {
+    unsafe {
+        std::env::set_var("RUST_LIB_BACKTRACE", "0");
     }
+    let rt = actix_rt::System::new();
+    let code = rt.block_on(async_main());
+    process::exit(code)
+}
 
-    Ok(())
+async fn async_main() -> i32 {
+    let args = "bslive run --sh 'echo 1' --sh 'echo 2'";
+    let words = shell_words::split(args).unwrap();
+    let (r, events) = from_args_with_output(words).await;
+    assert!(has_output_line_matching(&events, "1"));
+    assert!(has_output_line_matching(&events, "2"));
+    match r {
+        Ok(_) => 0,
+        Err(_) => 1,
+    }
 }

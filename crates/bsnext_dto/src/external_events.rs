@@ -1,4 +1,5 @@
 use crate::archy::{archy, overlay_results, ArchyNode, Prefix};
+use crate::internal::AnyEvent;
 use crate::{
     FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, OutputLineDTO, ServerIdentityDTO,
     ServersChangedDTO, StderrLineDTO, StdoutLineDTO, StoppedWatchingDTO, WatchingDTO,
@@ -328,4 +329,12 @@ pub fn print_watching<W: Write>(w: &mut W, evt: &WatchingDTO) -> anyhow::Result<
         writeln!(w, "[watching {}] {}", evt.debounce, x)?;
     }
     Ok(())
+}
+
+pub fn has_output_line_matching(events: &[AnyEvent], expected: &str) -> bool {
+    events.iter().any(|e| {
+        matches!(e, AnyEvent::External(ExternalEventsDTO::OutputLine(OutputLineDTO::Stdout(
+                StdoutLineDTO { line, .. },
+            ))) if line == expected)
+    })
 }
