@@ -1,9 +1,9 @@
+use crate::any_event::AnyEvent;
 use crate::archy::{archy, overlay_results, ArchyNode, Prefix};
-use crate::internal::AnyEvent;
 use crate::{
-    FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, OutputLineDTO, ServerChangeDTO,
-    ServerChangesetDTO, ServerIdentityDTO, StderrLineDTO, StdoutLineDTO, StoppedWatchingDTO,
-    WatchingDTO,
+    FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, InputErrorDetailDTO, OutputLineDTO,
+    ServerChangeDTO, ServerChangesetDTO, ServerIdentityDTO, StartupErrorDTO, StderrLineDTO,
+    StdoutLineDTO, StoppedWatchingDTO, WatchingDTO,
 };
 use bsnext_output::OutputWriterTrait;
 use bsnext_task::task_report::TaskReport;
@@ -25,6 +25,8 @@ pub enum ExternalEventsDTO {
     FilesChanged(FilesChangedDTO),
     InputFileChanged(FileChangedDTO),
     InputAccepted(InputAcceptedDTO),
+    InputError(InputErrorDetailDTO),
+    StartupError(StartupErrorDTO),
     OutputLine(OutputLineDTO),
     TaskAction(TaskActionDTO),
     TaskTreePreview(TaskTreePreview),
@@ -164,6 +166,14 @@ impl OutputWriterTrait for ExternalEventsDTO {
                         tracing::error!(?e);
                     }
                 }
+                Ok(())
+            }
+            ExternalEventsDTO::InputError(InputErrorDetailDTO { error }) => {
+                writeln!(sink, "{error}")?;
+                Ok(())
+            }
+            ExternalEventsDTO::StartupError(StartupErrorDTO { error }) => {
+                writeln!(sink, "{error}")?;
                 Ok(())
             }
         }

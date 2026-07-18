@@ -83,6 +83,10 @@ export interface InputAcceptedDTO {
 	path: string;
 }
 
+export interface InputErrorDetailDTO {
+	error: string;
+}
+
 /** @discriminator kind */
 export type RouteKindDTO = 
 	| { kind: "Html", payload: {
@@ -169,6 +173,10 @@ export interface ServerDesc {
 
 export interface SseDTOOpts {
 	body: string;
+}
+
+export interface StartupErrorDTO {
+	error: string;
 }
 
 export interface StderrLineDTO {
@@ -268,6 +276,8 @@ export type ExternalEventsDTO =
 	| { kind: "FilesChanged", payload: FilesChangedDTO }
 	| { kind: "InputFileChanged", payload: FileChangedDTO }
 	| { kind: "InputAccepted", payload: InputAcceptedDTO }
+	| { kind: "InputError", payload: InputErrorDetailDTO }
+	| { kind: "StartupError", payload: StartupErrorDTO }
 	| { kind: "OutputLine", payload: OutputLineDTO }
 	| { kind: "TaskAction", payload: TaskActionDTO }
 	| { kind: "TaskTreePreview", payload: TaskTreePreview }
@@ -290,16 +300,6 @@ export type InputErrorDTO =
 	| { kind: "MissingExtension", payload: string }
 	| { kind: "EmptyInput", payload: string }
 	| { kind: "BsLiveRules", payload: string };
-
-/** @discriminator kind */
-export type InternalEventsDTO = 
-	| { kind: "ServersChanged", payload: GetActiveServersResponseDTO }
-	| { kind: "TaskReport", payload: {
-	id: string;
-}}
-	| { kind: "TaskTreeDisplay", payload: {
-	tree: ArchyNode;
-}};
 
 /** @discriminator kind */
 export type OutputLineDTO = 

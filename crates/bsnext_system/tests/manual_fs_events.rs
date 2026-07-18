@@ -1,5 +1,5 @@
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::AnyEvent;
 use bsnext_fs::FsEvent;
 use bsnext_system::start::start_kind::start_from_inputs::StartFromInputPaths;
 use bsnext_system::start::start_kind::StartKind;

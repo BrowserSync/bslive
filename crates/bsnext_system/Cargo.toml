@@ -29,9 +29,9 @@ actix = { workspace = true }
 actix-rt = { workspace = true }
 tracing = { workspace = true }
 tempfile = { workspace = true }
-globset = { workspace = true }
 shell-words = { workspace = true }
 futures-util = { workspace = true }
+miette = { workspace = true }
 futures = "0.3.30"
 
 [dev-dependencies]

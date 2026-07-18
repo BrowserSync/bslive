@@ -100,6 +100,9 @@ var injectConfigSchema = z.object({
 var inputAcceptedDTOSchema = z.object({
   path: z.string()
 });
+var inputErrorDetailDTOSchema = z.object({
+  error: z.string()
+});
 var sseDTOOptsSchema = z.object({
   body: z.string()
 });
@@ -218,6 +221,9 @@ var serverChangesetDTOSchema = z.object({
 var routeDTOSchema = z.object({
   path: z.string(),
   kind: routeKindDTOSchema
+});
+var startupErrorDTOSchema = z.object({
+  error: z.string()
 });
 var stderrLineDTOSchema = z.object({
   line: z.string(),
@@ -359,24 +365,6 @@ var inputErrorDTOSchema = z.discriminatedUnion("kind", [
     payload: z.string()
   })
 ]);
-var internalEventsDTOSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("ServersChanged"),
-    payload: getActiveServersResponseDTOSchema
-  }),
-  z.object({
-    kind: z.literal("TaskReport"),
-    payload: z.object({
-      id: z.string()
-    })
-  }),
-  z.object({
-    kind: z.literal("TaskTreeDisplay"),
-    payload: z.object({
-      tree: archyNodeSchema
-    })
-  })
-]);
 var startupEventDTOSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Started"),
@@ -467,6 +455,14 @@ var externalEventsDTOSchema = z.lazy(
       payload: inputAcceptedDTOSchema
     }),
     z.object({
+      kind: z.literal("InputError"),
+      payload: inputErrorDetailDTOSchema
+    }),
+    z.object({
+      kind: z.literal("StartupError"),
+      payload: startupErrorDTOSchema
+    }),
+    z.object({
       kind: z.literal("OutputLine"),
       payload: outputLineDTOSchema
     }),
@@ -501,7 +497,7 @@ export {
   injectConfigSchema,
   inputAcceptedDTOSchema,
   inputErrorDTOSchema,
-  internalEventsDTOSchema,
+  inputErrorDetailDTOSchema,
   invocationIdDTOSchema,
   logLevelDTOSchema,
   outputLineDTOSchema,
@@ -517,6 +513,7 @@ export {
   serverDescSchema,
   serverIdentityDTOSchema,
   sseDTOOptsSchema,
+  startupErrorDTOSchema,
   startupEventDTOSchema,
   stderrLineDTOSchema,
   stdoutLineDTOSchema,

@@ -5,19 +5,22 @@ use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::path::Path;
 
-use crate::internal::{ChildCreated, ChildResult, ServerError, StartupEvent};
 use bsnext_fs::Debounce;
 use bsnext_input::client_config::ClientConfig;
 use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
 use bsnext_input::route_manifest::RouteIdentity;
 use bsnext_tracing::LogLevel;
+use server_events::{ChildCreated, ChildResult, ServerError};
+use startup_events::StartupEvent;
 use typeshare::typeshare;
 
+pub mod any_event;
 pub mod archy;
 pub mod external_events;
-pub mod internal;
 pub mod internal_events;
+pub mod server_events;
 pub mod startup_events;
+pub mod task_events;
 
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
@@ -231,6 +234,18 @@ impl From<&StartupEvent> for StartupEventDTO {
 #[derive(Debug, serde::Serialize, Clone)]
 pub struct InputAcceptedDTO {
     pub path: String,
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct InputErrorDetailDTO {
+    pub error: String,
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct StartupErrorDTO {
+    pub error: String,
 }
 
 /// @discriminator kind

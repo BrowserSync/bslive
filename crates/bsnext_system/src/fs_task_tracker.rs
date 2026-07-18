@@ -2,7 +2,7 @@ use crate::invoke_scope::InvokeScope;
 use crate::tasks::task_spec::TaskSpec;
 use actix::ActorFutureExt;
 use actix::{Actor, Handler, Recipient, ResponseActFuture, WrapFuture};
-use bsnext_dto::internal::TaskReportAndTree;
+use bsnext_dto::task_events::TaskReportAndTree;
 use bsnext_fs::FsEventContext;
 use bsnext_task::task_trigger::{FsChangesTrigger, TaskTrigger, TaskTriggerSource};
 use std::collections::HashMap;

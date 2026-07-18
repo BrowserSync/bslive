@@ -2,7 +2,7 @@ use crate::system::BsSystem;
 use crate::watchables::MonitorPathWatchables;
 use actix::{ActorFutureExt, AsyncContext, ResponseActFuture, WrapFuture};
 use bsnext_core::servers_supervisor::resolve_servers::ResolveServers;
-use bsnext_dto::internal::{AnyEvent, ChildResult, ServerError};
+use bsnext_dto::server_events::{ChildResult, ServerError};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_input::startup::StartupContext;
 use bsnext_input::{Input, InputCtx};
@@ -12,7 +12,6 @@ use tracing::debug;
 #[rtype(result = "Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>")]
 pub struct OverrideInput {
     pub input: Input,
-    pub original_event: AnyEvent,
 }
 
 impl actix::Handler<OverrideInput> for BsSystem {

@@ -10,8 +10,10 @@ use crate::system::{
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
 };
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
+use bsnext_dto::internal_events::InternalEvents;
+use bsnext_dto::server_events::ChildResult;
 use bsnext_dto::{DidStart, ServerChangesetDTO, StartupError};
 use bsnext_input::startup::{RunMode, SystemStart, SystemStartArgs};
 use bsnext_input::InputCtx;
@@ -81,7 +83,7 @@ impl Handler<Start> for BsSystem {
                             ..
                         } = res.map_err(StartupError::Any)?;
                         let notif = ServerChangesetDTO::from_changes(&servers, &child_results);
-                        actor.publish_any_event(AnyEvent::External(
+                        actor.publish_external_event(AnyEvent::External(
                             ExternalEventsDTO::ServerChangeset(notif),
                         ));
                         debug!("✅ setup jobs completed");
@@ -107,7 +109,7 @@ impl Handler<Start> for BsSystem {
                         debug!("✅ setup jobs completed");
                         let notif =
                             ServerChangesetDTO::from_changes(&res.servers, &res.child_results);
-                        actor.publish_any_event(AnyEvent::External(
+                        actor.publish_external_event(AnyEvent::External(
                             ExternalEventsDTO::ServerChangeset(notif),
                         ));
                         let errored = ChildResult::first_server_error(&res.child_results);
@@ -149,7 +151,7 @@ impl Handler<Start> for BsSystem {
                         let res = res?;
                         let notif =
                             ServerChangesetDTO::from_changes(&res.servers, &res.child_results);
-                        actor.publish_any_event(AnyEvent::External(
+                        actor.publish_external_event(AnyEvent::External(
                             ExternalEventsDTO::ServerChangeset(notif),
                         ));
                         debug!("✅ setup jobs completed");
@@ -170,7 +172,7 @@ impl Handler<Start> for BsSystem {
                     cwd: self.cwd.clone(),
                     input_ctx: InputCtx::default(),
                 });
-                self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
+                self.publish_internal_event(InternalEvents::InputError(input_error));
                 let f = ready(Ok(DidStart::Started(Default::default()))).into_actor(self);
                 Box::pin(f)
             }

@@ -3,7 +3,7 @@ use crate::start;
 use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
-use bsnext_dto::internal::AnyEvent;
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_input::route::MultiWatch;
 use bsnext_input::Input;
 use bsnext_output::OutputWriters;

@@ -1,4 +1,3 @@
-use crate::internal::StartupEvent;
 use crate::{StartupError, StartupEventDTO};
 use bsnext_input::InputError;
 use bsnext_output::OutputWriterTrait;
@@ -43,4 +42,10 @@ impl OutputWriterTrait for StartupEvent {
         }
         Ok(())
     }
+}
+
+#[derive(Debug)]
+pub enum StartupEvent {
+    Started,
+    FailedStartup(StartupError),
 }

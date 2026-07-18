@@ -4,13 +4,12 @@ import { join } from "node:path";
 import * as z from "zod";
 import {
     externalEventsDTOSchema,
-    internalEventsDTOSchema,
     outputLineDTOSchema,
     serverChangesetDTOSchema,
 } from "../generated/schema.js";
 import { clearInterval } from "node:timers";
 
-const either = z.union([internalEventsDTOSchema, externalEventsDTOSchema]);
+const either = externalEventsDTOSchema;
 
 declare global {
     interface Window {

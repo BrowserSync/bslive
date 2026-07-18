@@ -1,7 +1,7 @@
 use crate::system::BsSystem;
 use actix::ResponseFuture;
 use bsnext_core::servers_supervisor::get_servers_handler::GetActiveServers;
-use bsnext_dto::internal::ServerError;
+use bsnext_dto::server_events::ServerError;
 use bsnext_dto::GetActiveServersResponse;
 #[derive(actix::Message)]
 #[rtype(result = "Result<GetActiveServersResponse, ServerError>")]

@@ -1,4 +1,4 @@
-use bsnext_dto::internal::AnyEvent;
+use bsnext_dto::any_event::AnyEvent;
 use tokio::sync::mpsc::Sender;
 
 #[derive(Debug, Clone)]

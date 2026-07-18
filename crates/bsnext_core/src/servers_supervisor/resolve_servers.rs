@@ -5,7 +5,7 @@ use crate::servers_supervisor::get_servers_handler::GetActiveServers;
 use crate::servers_supervisor::input_changed_handler::InputChanged;
 use crate::servers_supervisor::start_handler::ChildCreatedInsert;
 use actix::{Addr, AsyncContext, ResponseFuture};
-use bsnext_dto::internal::{ChildResult, ServerError};
+use bsnext_dto::server_events::{ChildResult, ServerError};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_input::Input;
 use tracing::debug;

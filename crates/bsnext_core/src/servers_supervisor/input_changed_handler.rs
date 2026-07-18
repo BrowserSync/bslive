@@ -4,7 +4,7 @@ use bsnext_input::Input;
 use std::future::Future;
 
 use crate::server::actor::ServerActor;
-use bsnext_dto::internal::ChildResult;
+use bsnext_dto::server_events::ChildResult;
 use std::pin::Pin;
 
 #[derive(actix::Message)]

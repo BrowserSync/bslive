@@ -1,6 +1,8 @@
 use crate::start::start_kind::StartKind;
 use crate::start::start_system::start_system;
-use bsnext_dto::internal::{AnyEvent, InternalEvents};
+use bsnext_dto::any_event::AnyEvent;
+use bsnext_dto::external_events::ExternalEventsDTO;
+use bsnext_dto::StartupErrorDTO;
 use bsnext_output::stdout::StdoutTarget;
 use bsnext_output::OutputWriters;
 use std::future::Future;
@@ -21,7 +23,6 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
         while let Some(evt) = events_receiver.recv().await {
             tracing::trace!(parent: None, ?evt, "stdout_channel recv()");
             let result = match evt {
-                AnyEvent::Internal(int) => writer.write_evt(&int, &mut sink.output()),
                 AnyEvent::External(ext) => writer.write_evt(&ext, &mut sink.output()),
             };
             match result {
@@ -53,7 +54,11 @@ pub async fn with_sender(
         Err(err) => {
             let as_str = err.to_string();
             let _ = ecc
-                .send(AnyEvent::Internal(InternalEvents::StartupError(err)))
+                .send(AnyEvent::External(ExternalEventsDTO::StartupError(
+                    StartupErrorDTO {
+                        error: as_str.clone(),
+                    },
+                )))
                 .await;
             Err(anyhow::anyhow!("{}", as_str))
         }

@@ -7,9 +7,9 @@ use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
 use actix::{Addr, AsyncContext};
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::internal::{AnyEvent, InternalEvents};
-use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
+use bsnext_dto::{InputErrorDetailDTO, StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
     BufferedChangeset, Debounce, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathDescriptionOwned, PathEvent,
@@ -33,7 +33,10 @@ impl actix::Handler<PathMonitorChangeset> for BsSystem {
         let next = match msg.changeset {
             Changeset::Singular(fs_event) => {
                 tracing::debug!("will handle single event");
-                self.handle_fs_event(fs_event, addr, debounce)
+                if let Some(evt) = self.handle_fs_event(fs_event, addr, debounce) {
+                    self.publish_external_event(AnyEvent::External(evt));
+                }
+                None
             }
             Changeset::BufferedChange(buff) => {
                 if let Some((task_trigger, task_spec)) = self.handle_buffered(buff, watch_spec) {
@@ -48,7 +51,7 @@ impl actix::Handler<PathMonitorChangeset> for BsSystem {
         };
         if let Some(any_event) = next {
             tracing::trace!("will publish any_event {:?}", any_event);
-            self.publish_any_event(any_event)
+            self.publish_external_event(any_event)
         }
     }
 }
@@ -59,23 +62,24 @@ impl BsSystem {
         fs_event: FsEvent,
         addr: Addr<Self>,
         debounce: Debounce,
-    ) -> Option<AnyEvent> {
+    ) -> Option<ExternalEventsDTO> {
         match &fs_event.kind {
             FsEventKind::Change(ch) if fs_event.fs_event_ctx.is_root() => {
                 tracing::info!("fs_event_ctx=root");
                 match self.handle_input_change(ch) {
                     // if the change included a new Input, use it
-                    (any_event, Some(input)) => {
+                    Ok((_, Some(input))) => {
                         tracing::info!("will override input");
-                        addr.do_send(OverrideInput {
-                            input,
-                            original_event: any_event,
-                        });
+                        addr.do_send(OverrideInput { input });
                         // return None here so that the event is not published yet (the updated Input will do it)
                         None
                     }
                     // otherwise publish the change as usual
-                    (evt, None) => Some(evt),
+                    Ok((evt, None)) => Some(evt),
+                    Err(e) => {
+                        println!("{e}");
+                        None
+                    }
                 }
             }
             FsEventKind::Change(inner) => {
@@ -133,19 +137,20 @@ impl BsSystem {
         &mut self,
         fs_event_ctx: &FsEventContext,
         inner: &PathDescriptionOwned,
-    ) -> AnyEvent {
+    ) -> ExternalEventsDTO {
         tracing::trace!(?inner, "Other file changed");
         self.servers().do_send(FileChanged {
             path: inner.absolute.clone(),
             ctx: *fs_event_ctx,
         });
-        AnyEvent::External(ExternalEventsDTO::FileChanged(
-            bsnext_dto::FileChangedDTO::from_path_buf(
-                inner.relative.as_ref().unwrap_or(&inner.absolute),
-            ),
+        ExternalEventsDTO::FileChanged(bsnext_dto::FileChangedDTO::from_path_buf(
+            inner.relative.as_ref().unwrap_or(&inner.absolute),
         ))
     }
-    fn handle_input_change(&mut self, inner: &PathDescriptionOwned) -> (AnyEvent, Option<Input>) {
+    fn handle_input_change(
+        &mut self,
+        inner: &PathDescriptionOwned,
+    ) -> Result<(ExternalEventsDTO, Option<Input>), Box<InputError>> {
         tracing::info!("InputFile file changed {:?}", inner);
 
         let ctx = self
@@ -158,30 +163,34 @@ impl BsSystem {
 
         let Ok(input) = input else {
             let err = input.unwrap_err();
-            return (AnyEvent::Internal(InternalEvents::InputError(*err)), None);
+            return Err(err);
         };
         let path_to_report = inner.relative.as_ref().unwrap_or(&inner.absolute);
 
-        (
-            AnyEvent::External(ExternalEventsDTO::InputFileChanged(
-                bsnext_dto::FileChangedDTO::from_path_buf(path_to_report),
+        Ok((
+            ExternalEventsDTO::InputFileChanged(bsnext_dto::FileChangedDTO::from_path_buf(
+                path_to_report,
             )),
             Some(input),
-        )
+        ))
     }
-    fn handle_path_added(&self, path: &PathAddedEvent, debounce: &Debounce) -> Option<AnyEvent> {
-        Some(AnyEvent::External(ExternalEventsDTO::Watching(
-            WatchingDTO::from_path_buf(&path.path, *debounce),
+    fn handle_path_added(
+        &self,
+        path: &PathAddedEvent,
+        debounce: &Debounce,
+    ) -> Option<ExternalEventsDTO> {
+        Some(ExternalEventsDTO::Watching(WatchingDTO::from_path_buf(
+            &path.path, *debounce,
         )))
     }
 
-    fn handle_path_removed(&mut self, path: &PathEvent) -> Option<AnyEvent> {
-        Some(AnyEvent::External(ExternalEventsDTO::WatchingStopped(
+    fn handle_path_removed(&mut self, path: &PathEvent) -> Option<ExternalEventsDTO> {
+        Some(ExternalEventsDTO::WatchingStopped(
             StoppedWatchingDTO::from_path_buf(&path.path),
-        )))
+        ))
     }
 
-    fn handle_path_not_found(&mut self, pdo: &PathEvent) -> Option<AnyEvent> {
+    fn handle_path_not_found(&mut self, pdo: &PathEvent) -> Option<ExternalEventsDTO> {
         let as_str = pdo.path.to_string_lossy().to_string();
         let cwd = self.cwd.clone();
         let abs = cwd.join(&as_str);
@@ -190,10 +199,13 @@ impl BsSystem {
             cwd: self.cwd.clone(),
             absolute: abs,
         };
-        let e = InputError::PathError(PathError::MissingPaths {
+        let err = InputError::PathError(PathError::MissingPaths {
             paths: PathDefs(vec![def]),
         });
-        Some(AnyEvent::Internal(InternalEvents::InputError(e)))
+
+        Some(ExternalEventsDTO::InputError(InputErrorDetailDTO {
+            error: err.to_string(),
+        }))
     }
 
     #[tracing::instrument(skip_all)]

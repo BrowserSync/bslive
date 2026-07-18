@@ -107,6 +107,10 @@ export const inputAcceptedDTOSchema = z.object({
     path: z.string(),
 });
 
+export const inputErrorDetailDTOSchema = z.object({
+    error: z.string(),
+});
+
 export const sseDTOOptsSchema = z.object({
     body: z.string(),
 });
@@ -233,6 +237,10 @@ export const serverChangesetDTOSchema = z.object({
 export const routeDTOSchema = z.object({
     path: z.string(),
     kind: routeKindDTOSchema,
+});
+
+export const startupErrorDTOSchema = z.object({
+    error: z.string(),
 });
 
 export const stderrLineDTOSchema = z.object({
@@ -387,25 +395,6 @@ export const inputErrorDTOSchema = z.discriminatedUnion("kind", [
     }),
 ]);
 
-export const internalEventsDTOSchema = z.discriminatedUnion("kind", [
-    z.object({
-        kind: z.literal("ServersChanged"),
-        payload: getActiveServersResponseDTOSchema,
-    }),
-    z.object({
-        kind: z.literal("TaskReport"),
-        payload: z.object({
-            id: z.string(),
-        }),
-    }),
-    z.object({
-        kind: z.literal("TaskTreeDisplay"),
-        payload: z.object({
-            tree: archyNodeSchema,
-        }),
-    }),
-]);
-
 export const startupEventDTOSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("Started"),
@@ -503,6 +492,14 @@ export const externalEventsDTOSchema: z.ZodSchema<ExternalEventsDTO> = z.lazy(
             z.object({
                 kind: z.literal("InputAccepted"),
                 payload: inputAcceptedDTOSchema,
+            }),
+            z.object({
+                kind: z.literal("InputError"),
+                payload: inputErrorDetailDTOSchema,
+            }),
+            z.object({
+                kind: z.literal("StartupError"),
+                payload: startupErrorDTOSchema,
             }),
             z.object({
                 kind: z.literal("OutputLine"),

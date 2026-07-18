@@ -12,9 +12,9 @@ use crate::runtime_ctx::RuntimeCtx;
 use crate::server::handler_listen::Listen;
 use crate::server::handler_patch::Patch;
 use crate::servers_supervisor::input_changed_handler::InputChangedResponse;
-use bsnext_dto::internal::{
+use bsnext_dto::server_events::PatchError;
+use bsnext_dto::server_events::{
     ChildCreated, ChildHandlerMinimal, ChildNotCreated, ChildNotPatched, ChildPatched, ChildResult,
-    PatchError,
 };
 use futures_util::future::join_all;
 use futures_util::FutureExt;

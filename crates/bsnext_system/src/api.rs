@@ -2,7 +2,7 @@ use crate::servers::ReadActiveServers;
 use crate::start::start_system::StopSystem;
 use crate::system::BsSystem;
 use actix::Addr;
-use bsnext_dto::internal::ServerError;
+use bsnext_dto::server_events::ServerError;
 use bsnext_dto::ActiveServer;
 use bsnext_fs::{Debounce, FsEvent};
 use bsnext_input::route::WatchSpec;
