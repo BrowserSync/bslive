@@ -1,5 +1,5 @@
 use bsnext_system::cli::from_args;
-use napi::{Env, JsNumber};
+use napi::Env;
 use std::env::current_dir;
 use std::path::PathBuf;
 
@@ -10,7 +10,7 @@ pub struct AsyncStart {
 
 impl napi::Task for AsyncStart {
     type Output = i32;
-    type JsValue = JsNumber;
+    type JsValue = i32;
 
     fn compute(&mut self) -> napi::Result<Self::Output> {
         let sys = actix_rt::System::new();
@@ -36,7 +36,7 @@ impl napi::Task for AsyncStart {
         Ok(result)
     }
 
-    fn resolve(&mut self, env: Env, output: Self::Output) -> napi::Result<Self::JsValue> {
-        env.create_int32(output)
+    fn resolve(&mut self, _: Env, output: Self::Output) -> napi::Result<Self::JsValue> {
+        napi::Result::Ok(output)
     }
 }
