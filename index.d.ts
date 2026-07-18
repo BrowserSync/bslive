@@ -8,7 +8,7 @@ export declare function startBlocking(args: Array<string>): number
 export type JsBsSystem = BsSystem
 export class BsSystem {
   constructor()
-  start(args: Array<string>, signal: AbortSignal): Promise<unknown>
+  start(args: Array<string>, signal: AbortSignal): Promise<number>
   send(arg: any): void
   stop(): void
 }

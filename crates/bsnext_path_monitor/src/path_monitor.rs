@@ -1,4 +1,4 @@
-use crate::PathMonitorEvent;
+use crate::PathMonitorChangeset;
 use crate::path_and_filter::PathAndFilter;
 use crate::watch_paths_msg::WatchPaths;
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
@@ -24,14 +24,14 @@ pub struct PathMonitor {
     pub(crate) debounce: Debounce,
     pub(crate) watch_spec: WatchSpec,
     addrs: Vec<Addr<FsWatcher>>,
-    recipient: Recipient<PathMonitorEvent>,
+    recipient: Recipient<PathMonitorChangeset>,
     inner_sender: tokio::sync::mpsc::Sender<FsEvent>,
     inner_receiver: Option<tokio::sync::mpsc::Receiver<FsEvent>>,
 }
 
 impl PathMonitor {
     pub fn new(
-        recipient: Recipient<PathMonitorEvent>,
+        recipient: Recipient<PathMonitorChangeset>,
         debounce: Debounce,
         cwd: PathBuf,
         fs_ctx: FsEventContext,
@@ -111,7 +111,7 @@ impl actix::Handler<WatchPaths> for PathMonitor {
 impl StreamHandler<FsEvent> for PathMonitor {
     fn handle(&mut self, event: FsEvent, _ctx: &mut Context<PathMonitor>) {
         debug!("StreamHandler<FsEvent> for PathMonitor");
-        self.recipient.do_send(PathMonitorEvent::singular(
+        self.recipient.do_send(PathMonitorChangeset::singular(
             event,
             self.watch_spec.clone(),
             self.debounce,
@@ -136,12 +136,13 @@ impl StreamHandler<Vec<FsEvent>> for PathMonitor {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        self.recipient.do_send(PathMonitorEvent::buffered_change(
-            outgoing,
-            self.fs_ctx,
-            self.watch_spec.clone(),
-            self.debounce,
-        ))
+        self.recipient
+            .do_send(PathMonitorChangeset::buffered_change(
+                outgoing,
+                self.fs_ctx,
+                self.watch_spec.clone(),
+                self.debounce,
+            ))
     }
 }
 
@@ -236,7 +237,7 @@ impl Handler<FsEvent> for PathMonitor {
                 // todo: any need to buffer these?
                 debug!("Sending some other event");
                 let output =
-                    PathMonitorEvent::singular(msg, self.watch_spec.clone(), self.debounce);
+                    PathMonitorChangeset::singular(msg, self.watch_spec.clone(), self.debounce);
                 self.recipient.do_send(output)
             }
         }

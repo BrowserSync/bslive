@@ -2,7 +2,7 @@ use actix::{Actor, ResponseFuture};
 use actix_rt::System;
 use bsnext_fs::{FsEvent, FsEventContext};
 use bsnext_input::route::{DebounceDuration, WatchSpec};
-use bsnext_path_monitor::PathMonitorEvent;
+use bsnext_path_monitor::PathMonitorChangeset;
 use bsnext_path_monitor::path_monitor::PathMonitor;
 use bsnext_path_monitor::watch_paths_msg::WatchPaths;
 use std::env::current_dir;
@@ -34,7 +34,7 @@ fn main() {
 
 #[derive(Default)]
 struct Consumer {
-    events: Vec<PathMonitorEvent>,
+    events: Vec<PathMonitorChangeset>,
 }
 
 #[derive(actix::Message, Debug, Clone)]
@@ -45,10 +45,10 @@ impl actix::Actor for Consumer {
     type Context = actix::Context<Self>;
 }
 
-impl actix::Handler<PathMonitorEvent> for Consumer {
+impl actix::Handler<PathMonitorChangeset> for Consumer {
     type Result = ();
 
-    fn handle(&mut self, msg: PathMonitorEvent, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: PathMonitorChangeset, _ctx: &mut Self::Context) -> Self::Result {
         self.events.push(msg);
     }
 }
@@ -62,11 +62,11 @@ impl actix::Handler<Ping> for Consumer {
 }
 
 #[derive(actix::Message, Debug, Clone)]
-#[rtype(result = "Vec<PathMonitorEvent>")]
+#[rtype(result = "Vec<PathMonitorChangeset>")]
 struct Read;
 
 impl actix::Handler<Read> for Consumer {
-    type Result = Vec<PathMonitorEvent>;
+    type Result = Vec<PathMonitorChangeset>;
 
     fn handle(&mut self, _msg: Read, _ctx: &mut Self::Context) -> Self::Result {
         self.events.clone()

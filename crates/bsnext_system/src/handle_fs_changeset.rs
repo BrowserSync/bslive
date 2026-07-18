@@ -11,31 +11,31 @@ use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, InternalEvents};
 use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
-    BufferedChangeEvent, Debounce, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
+    BufferedChangeset, Debounce, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathDescriptionOwned, PathEvent,
 };
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::route::WatchSpec;
 use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
-use bsnext_path_monitor::{Group, PathMonitorEvent};
+use bsnext_path_monitor::{Changeset, PathMonitorChangeset};
 use bsnext_task::task_trigger::FsChangesTrigger;
 use tracing::{debug, debug_span, info};
 
-impl actix::Handler<PathMonitorEvent> for BsSystem {
+impl actix::Handler<PathMonitorChangeset> for BsSystem {
     type Result = ();
 
-    fn handle(&mut self, msg: PathMonitorEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: PathMonitorChangeset, ctx: &mut Self::Context) -> Self::Result {
         let addr = ctx.address();
         let span = debug_span!("Handler->FsEventGrouping->BsSystem");
         let _guard = span.enter();
         let debounce = msg.debounce;
         let watch_spec = msg.watch_spec;
-        let next = match msg.group {
-            Group::Singular(fs_event) => {
+        let next = match msg.changeset {
+            Changeset::Singular(fs_event) => {
                 tracing::debug!("will handle single event");
                 self.handle_fs_event(fs_event, addr, debounce)
             }
-            Group::BufferedChange(buff) => {
+            Changeset::BufferedChange(buff) => {
                 if let Some((task_trigger, task_spec)) = self.handle_buffered(buff, watch_spec) {
                     tracing::debug!("will trigger task runner");
                     self.fs_task_tracker
@@ -90,10 +90,10 @@ impl BsSystem {
     #[tracing::instrument(skip_all)]
     fn handle_buffered(
         &mut self,
-        buf: BufferedChangeEvent,
+        buf: BufferedChangeset,
         watch_spec: WatchSpec,
     ) -> Option<(FsChangesTrigger, TaskSpec)> {
-        tracing::debug!(msg.event_count = buf.events.len(), msg.ctx = ?buf.fs_event_ctx, ?buf);
+        tracing::debug!(msg.event_count = buf.changes.len(), msg.ctx = ?buf.fs_event_ctx, ?buf);
 
         let change = if let Some(mon) = &self.input_monitors {
             if let Some(fp) = mon.input_ctx.file_path() {
@@ -106,7 +106,7 @@ impl BsSystem {
             buf
         };
 
-        if change.events.is_empty() {
+        if change.changes.is_empty() {
             tracing::debug!(
                 "Ignoring handle_buffered events because it was empty after removing input monitor"
             );
@@ -114,7 +114,7 @@ impl BsSystem {
         }
 
         let paths = change
-            .events
+            .changes
             .iter()
             .map(|evt| evt.absolute.to_owned())
             .collect::<Vec<_>>();

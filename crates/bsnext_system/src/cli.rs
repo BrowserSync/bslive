@@ -11,7 +11,6 @@ use bsnext_tracing::{
     init_tracing, init_tracing_with_otel, LineNumberOption, OutputFormat, WriteOption,
 };
 use clap::Parser;
-use std::env::current_dir;
 use std::ffi::OsString;
 use std::future::Future;
 use std::path::PathBuf;
@@ -20,16 +19,12 @@ use tokio::sync::mpsc::Sender;
 use tracing::{debug_span, Instrument};
 
 /// The typical lifecycle when ran from a CLI environment
-pub async fn from_args<I, T>(itr: I) -> Result<(), anyhow::Error>
+pub async fn from_args<I, T>(itr: I, cwd: PathBuf) -> Result<(), anyhow::Error>
 where
     I: IntoIterator<Item = T> + std::fmt::Debug,
     T: Into<OsString> + Clone,
 {
-    unsafe {
-        std::env::set_var("RUST_LIB_BACKTRACE", "0");
-    }
     let args = Args::parse_from(itr);
-    let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
 
     let logging = *args.logging();
     let write_log_opt = if logging.write_log {
@@ -80,7 +75,7 @@ where
 }
 
 /// a way of running that will collect events and not exit until the program exits naturally
-pub async fn from_args_with_output<I, T>(
+pub async fn from_args_with_buffered_output<I, T>(
     itr: I,
     cwd: PathBuf,
 ) -> (anyhow::Result<()>, Vec<AnyEvent>)

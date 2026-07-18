@@ -22,7 +22,7 @@ Use bslive to run groups of tasks and exit immediately after.
 /// Run a single command and exit immediately
 ///
 /// ```rust
-/// # use bsnext_system::cli::from_args_with_output;
+/// # use bsnext_system::cli::from_args_with_buffered_output;
 /// # use bsnext_dto::external_events::has_output_line_matching;
 /// # let rt = actix_rt::System::new();
 /// # rt.block_on(async {
@@ -31,7 +31,7 @@ Use bslive to run groups of tasks and exit immediately after.
 /// # "#;
 /// #   let words = shell_words::split(args).unwrap();
 /// #   let cwd = std::path::PathBuf::from(std::env::current_dir().unwrap().to_string_lossy().to_string());
-/// #   let (result, events) = from_args_with_output(words, cwd).await;
+/// #   let (result, events) = from_args_with_buffered_output(words, cwd).await;
 /// #   assert!(result.is_ok());
 /// #   assert!(has_output_line_matching(&events, "1"));
 /// # });

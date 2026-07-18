@@ -4,7 +4,7 @@ pub mod capabilities;
 pub mod cli;
 mod external_event_sender;
 mod fs_task_tracker;
-mod handle_fs_event_grouping;
+mod handle_fs_changeset;
 pub mod input_fs;
 mod invoke_scope;
 pub mod monitor_any;
