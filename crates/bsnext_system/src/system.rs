@@ -4,12 +4,12 @@ use crate::invoke_scope::{InvokeScope, Invoker};
 use crate::monitor_input::InputMonitor;
 use crate::path_monitors::PathMonitors;
 use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
-use crate::servers::ResolveServers;
 use crate::tasks::resolve::ResolveInitialTasks;
 use crate::tasks::task_spec::TaskSpec;
 use actix::{Actor, Addr, AsyncContext, ResponseFuture, Running};
 use actix_rt::Arbiter;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
+use bsnext_core::servers_supervisor::resolve_servers::ResolveServers;
 use bsnext_dto::external_events::{ExternalEventsDTO, TaskTreePreview, TaskTreeSummary};
 use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
 use bsnext_dto::GetActiveServersResponse;
@@ -147,13 +147,17 @@ impl actix::Handler<ExternalEventMsg> for BsSystem {
     }
 }
 
-pub async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupOk> {
+pub async fn setup_jobs(
+    addr: Addr<BsSystem>,
+    servers_addr: Addr<ServersSupervisor>,
+    input: Input,
+) -> anyhow::Result<SetupOk> {
     let clone = input.clone();
     let clone2 = input.clone();
 
     let spec = addr.send(ResolveInitialTasks::new(clone)).await??;
     let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
-    let (servers, child_results) = addr.send(ResolveServers::new(clone2)).await??;
+    let (servers, child_results) = servers_addr.send(ResolveServers::new(clone2)).await??;
     Ok(SetupOk {
         input,
         report_and_tree,
@@ -169,10 +173,10 @@ pub async fn setup_jobs_only(addr: Addr<BsSystem>, input: Input) -> anyhow::Resu
 }
 
 pub async fn setup_servers_only(
-    addr: Addr<BsSystem>,
+    servers_addr: Addr<ServersSupervisor>,
     input: Input,
 ) -> anyhow::Result<SetupServersOk> {
-    let (servers, child_results) = addr.send(ResolveServers::new(input)).await??;
+    let (servers, child_results) = servers_addr.send(ResolveServers::new(input)).await??;
     Ok(SetupServersOk {
         servers,
         child_results,

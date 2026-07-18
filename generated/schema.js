@@ -142,6 +142,10 @@ var routeKindDTOSchema = z.discriminatedUnion("kind", [
     })
   })
 ]);
+var routeIdentityDTOSchema = z.object({
+  path: z.string(),
+  kind_str: z.string()
+});
 var serverChangeSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("Stopped"),
@@ -171,12 +175,49 @@ var serverChangeSetItemSchema = z.object({
 var serverChangeSetSchema = z.object({
   items: z.array(serverChangeSetItemSchema)
 });
+var serverChangeDTOSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("Created"),
+    payload: z.object({
+      identity: serverIdentityDTOSchema,
+      socket_addr: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Stopped"),
+    payload: z.object({
+      identity: serverIdentityDTOSchema
+    })
+  }),
+  z.object({
+    kind: z.literal("CreateErr"),
+    payload: z.object({
+      error: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Patched"),
+    payload: z.object({
+      identity: serverIdentityDTOSchema,
+      added: z.array(routeIdentityDTOSchema),
+      changed: z.array(routeIdentityDTOSchema)
+    })
+  }),
+  z.object({
+    kind: z.literal("PatchErr"),
+    payload: z.object({
+      identity: serverIdentityDTOSchema,
+      error: z.string()
+    })
+  })
+]);
+var serverChangesetDTOSchema = z.object({
+  changeset: z.array(serverChangeDTOSchema),
+  servers_resp: getActiveServersResponseDTOSchema
+});
 var routeDTOSchema = z.object({
   path: z.string(),
   kind: routeKindDTOSchema
-});
-var serversChangedDTOSchema = z.object({
-  servers_resp: getActiveServersResponseDTOSchema
 });
 var stderrLineDTOSchema = z.object({
   line: z.string(),
@@ -398,8 +439,8 @@ var taskTreeSummarySchema = z.lazy(
 var externalEventsDTOSchema = z.lazy(
   () => z.discriminatedUnion("kind", [
     z.object({
-      kind: z.literal("ServersChanged"),
-      payload: serversChangedDTOSchema
+      kind: z.literal("ServerChangeset"),
+      payload: serverChangesetDTOSchema
     }),
     z.object({
       kind: z.literal("Watching"),
@@ -465,14 +506,16 @@ export {
   logLevelDTOSchema,
   outputLineDTOSchema,
   routeDTOSchema,
+  routeIdentityDTOSchema,
   routeKindDTOSchema,
+  serverChangeDTOSchema,
   serverChangeSchema,
   serverChangeSetItemSchema,
   serverChangeSetSchema,
+  serverChangesetDTOSchema,
   serverDTOSchema,
   serverDescSchema,
   serverIdentityDTOSchema,
-  serversChangedDTOSchema,
   sseDTOOptsSchema,
   startupEventDTOSchema,
   stderrLineDTOSchema,

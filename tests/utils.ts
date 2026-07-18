@@ -4,9 +4,9 @@ import { join } from "node:path";
 import * as z from "zod";
 import {
     externalEventsDTOSchema,
-    getActiveServersResponseDTOSchema,
     internalEventsDTOSchema,
     outputLineDTOSchema,
+    serverChangesetDTOSchema,
 } from "../generated/schema.js";
 import { clearInterval } from "node:timers";
 
@@ -47,7 +47,7 @@ interface NextArgs {
     stdout: { lines: { count: number; after: number } };
 }
 
-type TServersResp = z.infer<typeof getActiveServersResponseDTOSchema>;
+type TServersResp = z.infer<typeof serverChangesetDTOSchema>;
 
 export const test = base.extend<{
     run: {
@@ -299,7 +299,7 @@ export const test = base.extend<{
                     return clearInterval(int);
                 }
                 for (let line of parsedMessages) {
-                    if (line.kind === "ServersChanged") {
+                    if (line.kind === "ServerChangeset") {
                         resolve(line.payload as TServersResp);
                         clearInterval(int);
                         break;
@@ -307,7 +307,7 @@ export const test = base.extend<{
                 }
             }, 100);
         });
-        const servers = data.servers.map((s) => {
+        const servers = data.servers_resp.servers.map((s) => {
             return { url: "http://" + s.socket_addr, identity: s.identity };
         });
         await use({

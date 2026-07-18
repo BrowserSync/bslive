@@ -1,7 +1,7 @@
-use crate::servers::ResolveServers;
 use crate::system::BsSystem;
 use crate::watchables::MonitorPathWatchables;
 use actix::{ActorFutureExt, AsyncContext, ResponseActFuture, WrapFuture};
+use bsnext_core::servers_supervisor::resolve_servers::ResolveServers;
 use bsnext_dto::internal::{AnyEvent, ChildResult, ServerError};
 use bsnext_dto::GetActiveServersResponse;
 use bsnext_input::startup::StartupContext;
@@ -24,8 +24,8 @@ impl actix::Handler<OverrideInput> for BsSystem {
         let start_ctx_clone = self.start_context.clone();
         let addr = ctx.address();
         // let ctx_clone = self.st
-        let f = ctx
-            .address()
+        let f = self
+            .servers()
             .send(ResolveServers::new(msg.input))
             .into_actor(self)
             .map(move |res, actor, _ctx| {

@@ -1,8 +1,9 @@
 use crate::archy::{archy, overlay_results, ArchyNode, Prefix};
 use crate::internal::AnyEvent;
 use crate::{
-    FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, OutputLineDTO, ServerIdentityDTO,
-    ServersChangedDTO, StderrLineDTO, StdoutLineDTO, StoppedWatchingDTO, WatchingDTO,
+    FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, OutputLineDTO, ServerChangeDTO,
+    ServerChangesetDTO, ServerIdentityDTO, StderrLineDTO, StdoutLineDTO, StoppedWatchingDTO,
+    WatchingDTO,
 };
 use bsnext_output::OutputWriterTrait;
 use bsnext_task::task_report::TaskReport;
@@ -17,7 +18,7 @@ use typeshare::typeshare;
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
 pub enum ExternalEventsDTO {
-    ServersChanged(ServersChangedDTO),
+    ServerChangeset(ServerChangesetDTO),
     Watching(WatchingDTO),
     WatchingStopped(StoppedWatchingDTO),
     FileChanged(FileChangedDTO),
@@ -126,9 +127,6 @@ impl OutputWriterTrait for ExternalEventsDTO {
 
     fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
         match self {
-            ExternalEventsDTO::ServersChanged(servers_started) => {
-                print_servers_changed(sink, servers_started)
-            }
             ExternalEventsDTO::Watching(watching) => print_watching(sink, watching),
             ExternalEventsDTO::WatchingStopped(watching) => print_stopped_watching(sink, watching),
             ExternalEventsDTO::InputAccepted(input_accepted) => {
@@ -159,6 +157,15 @@ impl OutputWriterTrait for ExternalEventsDTO {
             ExternalEventsDTO::TaskTreeSummary(TaskTreeSummary { tree, report_map }) => {
                 print_task_tree_summary(sink, tree, report_map)
             }
+            ExternalEventsDTO::ServerChangeset(ServerChangesetDTO { changeset, .. }) => {
+                let lines = print_server_updates(changeset);
+                for line in lines {
+                    if let Err(e) = writeln!(sink, "{line}") {
+                        tracing::error!(?e);
+                    }
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -184,40 +191,6 @@ fn print_task_tree_summary<W: Write>(
     let tree_with_results = overlay_results(tree, report_map);
     let s = archy(&tree_with_results, Prefix::None);
     write!(w, "{s}")?;
-    Ok(())
-}
-
-pub fn print_servers_changed<W>(
-    w: &mut W,
-    servers_started: &ServersChangedDTO,
-) -> anyhow::Result<()>
-where
-    W: Write,
-{
-    let ServersChangedDTO {
-        servers_resp,
-        // changeset,
-    } = servers_started;
-
-    for server_dto in &servers_resp.servers {
-        match &server_dto.identity {
-            ServerIdentityDTO::Both { name, .. } => {
-                writeln!(w, "[server] [{}] http://{}", name, server_dto.socket_addr)?;
-            }
-            ServerIdentityDTO::Address { .. } => {
-                writeln!(w, "[server] http://{}", server_dto.socket_addr)?;
-            }
-            ServerIdentityDTO::Named { name } => {
-                writeln!(w, "[server] [{}] http://{}", name, &server_dto.socket_addr)?
-            }
-            ServerIdentityDTO::Port { .. } => {
-                writeln!(w, "[server] http://{}", &server_dto.socket_addr)?
-            }
-            ServerIdentityDTO::PortNamed { name, .. } => {
-                writeln!(w, "[server] [{}] http://{}", name, &server_dto.socket_addr)?
-            }
-        }
-    }
     Ok(())
 }
 
@@ -337,4 +310,74 @@ pub fn has_output_line_matching(events: &[AnyEvent], expected: &str) -> bool {
                 StdoutLineDTO { line, .. },
             ))) if line == expected)
     })
+}
+
+pub fn print_server_updates(evts: &[ServerChangeDTO]) -> Vec<String> {
+    evts.iter()
+        .flat_map(|r| match r {
+            ServerChangeDTO::Created {
+                identity,
+                socket_addr,
+            } => {
+                vec![format!(
+                    "[created] {}",
+                    server_display(identity, socket_addr),
+                )]
+            }
+            ServerChangeDTO::Stopped { identity } => {
+                vec![format!("[stopped] {}", iden(identity))]
+            }
+            ServerChangeDTO::CreateErr { error } => {
+                vec![format!("[server] did not create, reason: {}", error)]
+            }
+            ServerChangeDTO::Patched {
+                changed,
+                identity,
+                added,
+            } => {
+                let mut lines = vec![];
+                // todo: determine WHICH changes were actually applied (instead of saying everything was patched)
+                for x in changed {
+                    lines.push(format!("[patched] {} {:?}", iden(identity), x));
+                }
+                for x in added {
+                    lines.push(format!("[added] {} {:?}", iden(identity), x));
+                }
+                lines
+            }
+            ServerChangeDTO::PatchErr { error, identity } => {
+                vec![format!("[patch] error {} {} ", iden(identity), error)]
+            }
+        })
+        .collect()
+}
+
+fn server_display(identity_dto: &ServerIdentityDTO, socket_addr: &str) -> String {
+    match &identity_dto {
+        ServerIdentityDTO::Both { name, .. } => {
+            format!("[server] [{name}] http://{socket_addr}")
+        }
+        ServerIdentityDTO::Address { .. } => {
+            format!("[server] http://{socket_addr}")
+        }
+        ServerIdentityDTO::Named { name } => {
+            format!("[server] [{name}] http://{socket_addr}")
+        }
+        ServerIdentityDTO::Port { port } => {
+            format!("[server] [{port}] http://{socket_addr}")
+        }
+        ServerIdentityDTO::PortNamed { name, .. } => {
+            format!("[server] [{name}] http://{socket_addr}")
+        }
+    }
+}
+
+fn iden(identity_dto: &ServerIdentityDTO) -> String {
+    match identity_dto {
+        ServerIdentityDTO::Both { name, bind_address } => format!("[{name}] {bind_address}"),
+        ServerIdentityDTO::Address { bind_address } => bind_address.to_string(),
+        ServerIdentityDTO::Named { name } => format!("[{name}]"),
+        ServerIdentityDTO::Port { port } => format!("[{port}]"),
+        ServerIdentityDTO::PortNamed { port, name } => format!("[{name}] {port}"),
+    }
 }

@@ -110,6 +110,11 @@ export interface RouteDTO {
 	kind: RouteKindDTO;
 }
 
+export interface RouteIdentityDTO {
+	path: string;
+	kind_str: string;
+}
+
 /** @discriminator kind */
 export type ServerChange = 
 	| { kind: "Stopped", payload: {
@@ -130,13 +135,36 @@ export interface ServerChangeSet {
 	items: ServerChangeSetItem[];
 }
 
+/** @discriminator kind */
+export type ServerChangeDTO = 
+	| { kind: "Created", payload: {
+	identity: ServerIdentityDTO;
+	socket_addr: string;
+}}
+	| { kind: "Stopped", payload: {
+	identity: ServerIdentityDTO;
+}}
+	| { kind: "CreateErr", payload: {
+	error: string;
+}}
+	| { kind: "Patched", payload: {
+	identity: ServerIdentityDTO;
+	added: RouteIdentityDTO[];
+	changed: RouteIdentityDTO[];
+}}
+	| { kind: "PatchErr", payload: {
+	identity: ServerIdentityDTO;
+	error: string;
+}};
+
+export interface ServerChangesetDTO {
+	changeset: ServerChangeDTO[];
+	servers_resp: GetActiveServersResponseDTO;
+}
+
 export interface ServerDesc {
 	routes: RouteDTO[];
 	id: string;
-}
-
-export interface ServersChangedDTO {
-	servers_resp: GetActiveServersResponseDTO;
 }
 
 export interface SseDTOOpts {
@@ -233,7 +261,7 @@ export enum EventLevel {
 
 /** @discriminator kind */
 export type ExternalEventsDTO = 
-	| { kind: "ServersChanged", payload: ServersChangedDTO }
+	| { kind: "ServerChangeset", payload: ServerChangesetDTO }
 	| { kind: "Watching", payload: WatchingDTO }
 	| { kind: "WatchingStopped", payload: StoppedWatchingDTO }
 	| { kind: "FileChanged", payload: FileChangedDTO }

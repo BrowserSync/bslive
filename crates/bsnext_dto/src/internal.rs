@@ -3,7 +3,7 @@ use crate::external_events::{
     ExternalEventsDTO, InvocationIdDTO, TaskActionDTO, TaskActionStageDTO, TaskConclusionDTO,
     TaskReportDTO, TaskResultDTO,
 };
-use crate::{GetActiveServersResponse, GetActiveServersResponseDTO, StartupError};
+use crate::{GetActiveServersResponseDTO, StartupError};
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::InputError;
 use bsnext_task::invocation_result::{InvocationConclusion, InvocationResult};
@@ -21,16 +21,10 @@ pub enum AnyEvent {
 }
 #[derive(Debug)]
 pub enum InternalEvents {
-    ServersChanged {
-        server_resp: GetActiveServersResponse,
-        child_results: Vec<ChildResult>,
-    },
     InputError(InputError),
     StartupError(StartupError),
     TaskAction(TaskAction),
-    TaskSpecDisplay {
-        tree: ArchyNode,
-    },
+    TaskSpecDisplay { tree: ArchyNode },
 }
 
 #[derive(Debug, Clone)]

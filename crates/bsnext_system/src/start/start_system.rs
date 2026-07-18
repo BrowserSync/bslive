@@ -10,8 +10,9 @@ use crate::system::{
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
 };
+use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
-use bsnext_dto::{DidStart, StartupError};
+use bsnext_dto::{DidStart, ServerChangesetDTO, StartupError};
 use bsnext_input::startup::{RunMode, SystemStart, SystemStartArgs};
 use bsnext_input::InputCtx;
 use std::future::ready;
@@ -62,17 +63,27 @@ impl Handler<Start> for BsSystem {
     #[tracing::instrument(name = "BsSystem->Start", skip(self, msg, ctx))]
     fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
         let addr = ctx.address();
+        let servers_addr = self.servers().clone();
         match msg.kind.resolve_input(&self.start_context) {
             Ok(SystemStartArgs::PathWithInput { path, input }) => {
                 debug!("SystemStartArgs::PathWithInput");
 
                 let ids = input.ids();
                 let input_ctx = InputCtx::new(&ids, None, &self.start_context, Some(&path));
-                let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
+                let jobs = crate::system::setup_jobs(addr.clone(), servers_addr, input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
                     move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
-                        let SetupOk { servers, input, .. } = res.map_err(StartupError::Any)?;
+                        let SetupOk {
+                            servers,
+                            input,
+                            child_results,
+                            ..
+                        } = res.map_err(StartupError::Any)?;
+                        let notif = ServerChangesetDTO::from_changes(&servers, &child_results);
+                        actor.publish_any_event(AnyEvent::External(
+                            ExternalEventsDTO::ServerChangeset(notif),
+                        ));
                         debug!("✅ setup jobs completed");
                         ctx.notify(MonitorInput {
                             path: path.clone(),
@@ -88,12 +99,17 @@ impl Handler<Start> for BsSystem {
                 debug!("SystemStartArgs::InputOnly");
 
                 let addr = ctx.address();
-                let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
+                let jobs = crate::system::setup_jobs(addr.clone(), servers_addr, input.clone());
 
                 Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<SetupOk, anyhow::Error>, _actor, ctx| {
+                    move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
                         let res = res?;
                         debug!("✅ setup jobs completed");
+                        let notif =
+                            ServerChangesetDTO::from_changes(&res.servers, &res.child_results);
+                        actor.publish_any_event(AnyEvent::External(
+                            ExternalEventsDTO::ServerChangeset(notif),
+                        ));
                         let errored = ChildResult::first_server_error(&res.child_results);
                         if let Some(server_error) = errored {
                             debug!("errored: {:?}", errored);
@@ -118,7 +134,7 @@ impl Handler<Start> for BsSystem {
                     let SetupServersOk {
                         servers,
                         child_results,
-                    } = setup_servers_only(addr_clone, input.clone()).await?;
+                    } = setup_servers_only(servers_addr, input.clone()).await?;
                     let next = SetupOk {
                         input,
                         servers,
@@ -129,8 +145,13 @@ impl Handler<Start> for BsSystem {
                 };
 
                 Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<SetupOk, anyhow::Error>, _actor, ctx| {
+                    move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
                         let res = res?;
+                        let notif =
+                            ServerChangesetDTO::from_changes(&res.servers, &res.child_results);
+                        actor.publish_any_event(AnyEvent::External(
+                            ExternalEventsDTO::ServerChangeset(notif),
+                        ));
                         debug!("✅ setup jobs completed");
                         let errored = ChildResult::first_server_error(&res.child_results);
                         if let Some(server_error) = errored {
