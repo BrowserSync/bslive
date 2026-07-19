@@ -95,7 +95,7 @@ test.describe(
         test("custom output for index.html", async ({ page, bs, request }) => {
             await page.goto(bs.path("/"), { waitUntil: "networkidle" });
 
-            const o = await bs.waitForOutput("ServersChanged");
+            const o = await bs.waitForOutput("ServerChangeset");
             await page.waitForTimeout(50);
             bs.touch("examples/watch/src/index.html");
             const output = await bs.waitForOutput("OutputLine");
@@ -115,7 +115,7 @@ test.describe(
         test("custom output for 01.txt", async ({ page, bs, request }) => {
             await page.goto(bs.path("/"), { waitUntil: "networkidle" });
 
-            const o = await bs.waitForOutput("ServersChanged");
+            const o = await bs.waitForOutput("ServerChangeset");
             await page.waitForTimeout(50);
             bs.touch("examples/watch/src/01.txt");
             const output = await bs.waitForOutput("OutputLine");
@@ -135,7 +135,7 @@ test.describe(
         test("custom output for 02.txt", async ({ page, bs, request }) => {
             await page.goto(bs.path("/"), { waitUntil: "networkidle" });
 
-            const o = await bs.waitForOutput("ServersChanged");
+            const o = await bs.waitForOutput("ServerChangeset");
             await page.waitForTimeout(50);
             bs.touch("examples/watch/src/02.txt");
             const output = await bs.waitForOutput("OutputLine");
@@ -155,7 +155,7 @@ test.describe(
         test("without prefix", async ({ page, bs, request }) => {
             await page.goto(bs.path("/"), { waitUntil: "networkidle" });
 
-            const o = await bs.waitForOutput("ServersChanged");
+            const o = await bs.waitForOutput("ServerChangeset");
             bs.touch("examples/watch/src/03.txt");
             await page.waitForTimeout(50);
             const output = await bs.waitForOutput("OutputLine");

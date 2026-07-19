@@ -2,13 +2,41 @@ pub mod resolve_spec;
 
 use crate::start::start_kind::run_from_input::RunFromInputPaths;
 use crate::start::start_kind::StartKind;
-use bsnext_core::shared_args::{InputOpts, LoggingOpts};
+use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
 use bsnext_input::route::{RunAll, RunOptItem, RunSeq, ShRunOptItem};
 use bsnext_input::startup::{RunMode, TopLevelRunMode};
 use bsnext_input::Input;
 use bsnext_tracing::OutputFormat;
 
+fn about() -> String {
+    let s = r#"
+Use bslive to run groups of tasks and exit immediately after.
+    "#;
+    s.to_string()
+}
+
 #[derive(Debug, Clone, clap::Parser)]
+#[command(about = about(), long_about = None)]
+///
+/// # Examples
+/// Run a single command and exit immediately
+///
+/// ```rust
+/// # use bsnext_system::cli::from_args_with_buffered_output;
+/// # use bsnext_dto::external_events::has_output_line_matching;
+/// # let rt = actix_rt::System::new();
+/// # rt.block_on(async {
+/// #   let args = r#"
+/// bslive run --sh "echo 1"
+/// # "#;
+/// #   let words = shell_words::split(args).unwrap();
+/// #   let cwd = std::path::PathBuf::from(std::env::current_dir().unwrap().to_string_lossy().to_string());
+/// #   let (result, events) = from_args_with_buffered_output(words, cwd).await;
+/// #   assert!(result.is_ok());
+/// #   assert!(has_output_line_matching(&events, "1"));
+/// # });
+/// ```
+///
 pub struct RunCommand {
     /// commands to run
     pub trailing: Vec<String>,
@@ -40,7 +68,7 @@ pub struct RunCommand {
 }
 
 impl RunCommand {
-    pub fn as_start_kind(&self, input_opts: &InputOpts) -> StartKind {
+    pub fn as_start_kind(&self, _fs_opts: &FsOpts, input_opts: &InputOpts) -> StartKind {
         let from_cmd = as_input(self);
 
         tracing::debug!(self.trailing = ?self.trailing);

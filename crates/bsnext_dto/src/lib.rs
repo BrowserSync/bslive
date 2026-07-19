@@ -5,18 +5,22 @@ use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::path::Path;
 
-use crate::internal::{ServerError, StartupEvent};
 use bsnext_fs::Debounce;
 use bsnext_input::client_config::ClientConfig;
 use bsnext_input::route::{DirRoute, ProxyRoute, RawRoute, Route, RouteKind};
+use bsnext_input::route_manifest::RouteIdentity;
 use bsnext_tracing::LogLevel;
+use server_events::{ChildCreated, ChildResult, ServerError};
+use startup_events::StartupEvent;
 use typeshare::typeshare;
 
+pub mod any_event;
 pub mod archy;
 pub mod external_events;
-pub mod internal;
 pub mod internal_events;
+pub mod server_events;
 pub mod startup_events;
+pub mod task_events;
 
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
@@ -97,8 +101,95 @@ impl From<RouteKind> for RouteKindDTO {
 
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct ServersChangedDTO {
+pub struct ServerChangesetDTO {
+    pub changeset: Vec<ServerChangeDTO>,
     pub servers_resp: GetActiveServersResponseDTO,
+}
+
+impl ServerChangesetDTO {
+    pub fn from_changes(servers: &GetActiveServersResponse, changes: &[ChildResult]) -> Self {
+        let servers = servers.into();
+        let changeset = changes
+            .iter()
+            .map(|e| match e {
+                ChildResult::Created(ChildCreated { server_handler }) => ServerChangeDTO::Created {
+                    identity: ServerIdentityDTO::from(&server_handler.identity),
+                    socket_addr: server_handler.socket_addr.to_string(),
+                },
+                ChildResult::CreateErr(e) => ServerChangeDTO::CreateErr {
+                    error: e.server_error.to_string(),
+                },
+                ChildResult::Patched(child) => ServerChangeDTO::Patched {
+                    identity: ServerIdentityDTO::from(&child.server_handler.identity),
+                    changed: child
+                        .route_change_set
+                        .changed
+                        .iter()
+                        .map(RouteIdentityDTO::from)
+                        .collect(),
+                    added: child
+                        .route_change_set
+                        .added
+                        .iter()
+                        .map(RouteIdentityDTO::from)
+                        .collect(),
+                },
+                ChildResult::PatchErr(errored) => ServerChangeDTO::PatchErr {
+                    identity: ServerIdentityDTO::from(&errored.identity),
+                    error: errored.patch_error.to_string(),
+                },
+                ChildResult::Stopped(stopped) => ServerChangeDTO::Stopped {
+                    identity: ServerIdentityDTO::from(stopped),
+                },
+            })
+            .collect();
+        Self {
+            changeset,
+            servers_resp: servers,
+        }
+    }
+}
+
+#[typeshare]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, serde::Serialize)]
+pub struct RouteIdentityDTO {
+    pub path: String,
+    pub kind_str: String,
+}
+
+impl From<&'_ RouteIdentity> for RouteIdentityDTO {
+    fn from(value: &'_ RouteIdentity) -> Self {
+        Self {
+            path: value.path.clone(),
+            kind_str: value.kind_str.to_string(),
+        }
+    }
+}
+
+/// @discriminator kind
+#[typeshare]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "kind", content = "payload")]
+pub enum ServerChangeDTO {
+    Created {
+        identity: ServerIdentityDTO,
+        socket_addr: String,
+    },
+    Stopped {
+        identity: ServerIdentityDTO,
+    },
+    CreateErr {
+        error: String,
+    },
+    Patched {
+        identity: ServerIdentityDTO,
+        added: Vec<RouteIdentityDTO>,
+        changed: Vec<RouteIdentityDTO>,
+    },
+    PatchErr {
+        identity: ServerIdentityDTO,
+        error: String,
+    },
 }
 
 #[typeshare]
@@ -143,6 +234,18 @@ impl From<&StartupEvent> for StartupEventDTO {
 #[derive(Debug, serde::Serialize, Clone)]
 pub struct InputAcceptedDTO {
     pub path: String,
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct InputErrorDetailDTO {
+    pub error: String,
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct StartupErrorDTO {
+    pub error: String,
 }
 
 /// @discriminator kind
@@ -351,7 +454,7 @@ pub struct ActiveServer {
 
 #[derive(Debug)]
 pub enum DidStart {
-    Started(GetActiveServersResponse),
+    Started,
     WillExit,
 }
 

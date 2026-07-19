@@ -40,6 +40,26 @@ pub struct Args {
 }
 
 impl Args {
+    /// Chose the given command or just default to 'start'
+    pub(crate) fn command(self) -> SubCommands {
+        let logging = *self.logging();
+        let format = self.format();
+        self.command.unwrap_or_else(|| {
+            SubCommands::Start(StartCommand {
+                cors: false,
+                port: self.port,
+                trailing: self.trailing.clone(),
+                proxies: vec![],
+                watch_sub_opts: self.watch_opts,
+                logging,
+                format,
+                no_watch: self.no_watch,
+            })
+        })
+    }
+}
+
+impl Args {
     pub fn logging(&self) -> &LoggingOpts {
         match &self.command {
             Some(SubCommands::Watch(WatchCommand { logging, .. })) => logging,
@@ -60,10 +80,7 @@ impl Args {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum SubCommands {
-    /// Start the services
     Start(StartCommand),
-    /// Just use file watching
     Watch(WatchCommand),
-    /// Just run tasks
     Run(RunCommand),
 }

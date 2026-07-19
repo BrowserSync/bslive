@@ -1,9 +1,10 @@
 use crate::input_fs::from_input_path;
+use crate::start::SystemStart;
+use bsnext_dto::{DidStart, StartupError};
 use bsnext_input::input_fs::ResolvedInputOutcome;
-use bsnext_input::startup::{
-    RunMode, StartupContext, SystemStart, SystemStartArgs, TopLevelRunMode,
-};
+use bsnext_input::startup::{RunMode, StartupContext, SystemStartArgs, TopLevelRunMode};
 use bsnext_input::{Input, InputError};
+use std::future::Future;
 
 #[derive(Debug, Clone)]
 pub struct RunFromInputPaths {
@@ -69,5 +70,10 @@ impl SystemStart for RunFromInputPaths {
             run_mode: self.run_mode.clone(),
             top_level_run_mode: self.top_level_run_mode.clone(),
         })
+    }
+
+    fn start(&self, _ctx: &StartupContext) -> impl Future<Output = Result<DidStart, StartupError>> {
+        dbg!("I am here...");
+        futures::future::ready(Ok(DidStart::WillExit))
     }
 }

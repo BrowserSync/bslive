@@ -4,17 +4,20 @@ use crate::invoke_scope::{InvokeScope, Invoker};
 use crate::monitor_input::InputMonitor;
 use crate::path_monitors::PathMonitors;
 use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
-use crate::servers::ResolveServers;
 use crate::tasks::resolve::ResolveInitialTasks;
 use crate::tasks::task_spec::TaskSpec;
 use actix::{Actor, Addr, AsyncContext, ResponseFuture, Running};
 use actix_rt::Arbiter;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
+use bsnext_core::servers_supervisor::resolve_servers::ResolveServers;
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::{ExternalEventsDTO, TaskTreePreview, TaskTreeSummary};
-use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
-use bsnext_dto::GetActiveServersResponse;
+use bsnext_dto::internal_events::InternalEvents;
+use bsnext_dto::server_events::ChildResult;
+use bsnext_dto::task_events::TaskReportAndTree;
+use bsnext_dto::{GetActiveServersResponse, InputErrorDetailDTO, StartupErrorDTO};
 use bsnext_input::startup::{StartupContext, TopLevelRunMode};
-use bsnext_input::Input;
+use bsnext_input::{Input, InputError};
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -98,7 +101,7 @@ impl BsSystem {
         }
     }
 
-    pub fn publish_any_event(&mut self, evt: AnyEvent) {
+    pub fn publish_external_event(&mut self, evt: AnyEvent) {
         tracing::trace!(?evt);
         let sender = self.any_event_sender.clone();
 
@@ -110,6 +113,30 @@ impl BsSystem {
                 }
             }
         });
+    }
+
+    pub fn publish_internal_event(&mut self, evt: InternalEvents) {
+        match evt {
+            InternalEvents::InputError(InputError::BsLiveRules(bs_rules)) => {
+                let n = miette::GraphicalReportHandler::new();
+                let mut inner = String::new();
+                n.render_report(&mut inner, &bs_rules).expect("write?");
+                let evt = ExternalEventsDTO::InputError(InputErrorDetailDTO { error: inner });
+                self.publish_external_event(AnyEvent::External(evt));
+            }
+            InternalEvents::InputError(err) => {
+                let evt = ExternalEventsDTO::InputError(InputErrorDetailDTO {
+                    error: err.to_string(),
+                });
+                self.publish_external_event(AnyEvent::External(evt));
+            }
+            InternalEvents::StartupError(startup) => {
+                let evt = ExternalEventsDTO::StartupError(StartupErrorDTO {
+                    error: startup.to_string(),
+                });
+                self.publish_external_event(AnyEvent::External(evt));
+            }
+        }
     }
 
     pub(crate) fn before(&mut self, input: &Input) -> TaskSpec {
@@ -147,13 +174,17 @@ impl actix::Handler<ExternalEventMsg> for BsSystem {
     }
 }
 
-pub async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupOk> {
+pub async fn setup_jobs(
+    addr: Addr<BsSystem>,
+    servers_addr: Addr<ServersSupervisor>,
+    input: Input,
+) -> anyhow::Result<SetupOk> {
     let clone = input.clone();
     let clone2 = input.clone();
 
     let spec = addr.send(ResolveInitialTasks::new(clone)).await??;
     let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
-    let (servers, child_results) = addr.send(ResolveServers::new(clone2)).await??;
+    let (servers, child_results) = servers_addr.send(ResolveServers::new(clone2)).await??;
     Ok(SetupOk {
         input,
         report_and_tree,
@@ -169,10 +200,10 @@ pub async fn setup_jobs_only(addr: Addr<BsSystem>, input: Input) -> anyhow::Resu
 }
 
 pub async fn setup_servers_only(
-    addr: Addr<BsSystem>,
+    servers_addr: Addr<ServersSupervisor>,
     input: Input,
 ) -> anyhow::Result<SetupServersOk> {
-    let (servers, child_results) = addr.send(ResolveServers::new(input)).await??;
+    let (servers, child_results) = servers_addr.send(ResolveServers::new(input)).await??;
     Ok(SetupServersOk {
         servers,
         child_results,

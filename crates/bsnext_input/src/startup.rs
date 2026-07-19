@@ -3,10 +3,6 @@ use std::env::current_dir;
 use std::fmt::{Debug, Formatter};
 use std::path::PathBuf;
 
-pub struct Startup {
-    pub tasks: Vec<StartupTask>,
-}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct StartupContext {
     pub cwd: PathBuf,
@@ -84,10 +80,6 @@ pub enum RunMode {
 pub enum TopLevelRunMode {
     Seq,
     All,
-}
-
-pub trait SystemStart {
-    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>>;
 }
 
 impl Default for StartupContext {

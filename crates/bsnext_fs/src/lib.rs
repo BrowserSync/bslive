@@ -172,17 +172,17 @@ impl<'a> From<&'a PathDescription<'_>> for PathDescriptionOwned {
 }
 
 #[derive(Debug, Clone)]
-pub struct BufferedChangeEvent {
-    pub events: Vec<PathDescriptionOwned>,
+pub struct BufferedChangeset {
+    pub changes: Vec<PathDescriptionOwned>,
     pub fs_event_ctx: FsEventContext,
 }
 
-impl BufferedChangeEvent {
+impl BufferedChangeset {
     pub fn dropping_absolute(self, path: &Path) -> Self {
-        if self.events.iter().any(|x| x.absolute == path) {
+        if self.changes.iter().any(|x| x.absolute == path) {
             Self {
-                events: self
-                    .events
+                changes: self
+                    .changes
                     .iter()
                     .filter(|x| x.absolute != path)
                     .map(ToOwned::to_owned)
@@ -191,7 +191,7 @@ impl BufferedChangeEvent {
             }
         } else {
             Self {
-                events: self.events,
+                changes: self.changes,
                 fs_event_ctx: self.fs_event_ctx,
             }
         }

@@ -1,33 +1,27 @@
 use crate::args::{Args, SubCommands};
 use crate::start;
-use crate::start::start_command::StartCommand;
-use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
-use bsnext_input::route::MultiWatch;
-use bsnext_input::Input;
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_output::OutputWriters;
 use bsnext_tracing::{
     init_tracing, init_tracing_with_otel, LineNumberOption, OutputFormat, WriteOption,
 };
 use clap::Parser;
-use std::env::current_dir;
 use std::ffi::OsString;
+use std::future::Future;
 use std::path::PathBuf;
-use tracing::{debug_span, Instrument};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
+use tracing::debug_span;
 
 /// The typical lifecycle when ran from a CLI environment
-pub async fn from_args<I, T>(itr: I) -> Result<(), anyhow::Error>
+pub async fn from_args<I, T>(itr: I, cwd: PathBuf) -> Result<(), anyhow::Error>
 where
     I: IntoIterator<Item = T> + std::fmt::Debug,
     T: Into<OsString> + Clone,
 {
-    unsafe {
-        std::env::set_var("RUST_LIB_BACKTRACE", "0");
-    }
     let args = Args::parse_from(itr);
-    let args_c = args.clone();
-    let cwd = PathBuf::from(current_dir().unwrap().to_string_lossy().to_string());
 
     let logging = *args.logging();
     let write_log_opt = if logging.write_log {
@@ -69,62 +63,76 @@ where
         OutputFormat::Json => OutputWriters::Json,
     };
 
-    let sub_command = args.command.unwrap_or_else(move || {
-        SubCommands::Start(StartCommand {
-            cors: false,
-            port: args.port,
-            trailing: args.trailing.clone(),
-            proxies: vec![],
-            watch_sub_opts: args.watch_opts,
-            logging,
-            format,
-            no_watch: args.no_watch,
-        })
-    });
-
-    tracing::debug!("subcommand = {:?}", sub_command);
     let _guard = debug_span!("parent").entered();
-    let r = async_init(sub_command, writer, args_c, cwd).await;
+    let (sender, fut) = stdout_channel(writer);
+    let result = async_init(args, cwd, (sender, fut)).await;
     drop(_guard);
     drop(tracing_guard);
-    r
+    result
+}
+
+/// a way of running that will collect events and not exit until the program exits naturally
+pub async fn from_args_with_buffered_output<I, T>(
+    itr: I,
+    cwd: PathBuf,
+) -> (anyhow::Result<()>, Vec<AnyEvent>)
+where
+    I: IntoIterator<Item = T> + std::fmt::Debug,
+    T: Into<OsString> + Clone,
+{
+    let args = Args::parse_from(itr);
+
+    let ready_future = futures::future::pending();
+    let (events_sender, mut events_receiver) = mpsc::channel::<AnyEvent>(100);
+
+    let result = async_init(args, cwd, (events_sender, ready_future)).await;
+
+    // now consume all the events
+    let mut events: Vec<AnyEvent> = Vec::new();
+    let len = events_receiver.len();
+
+    tracing::debug!("will try to collect {len} events");
+    let count = events_receiver.recv_many(&mut events, len).await;
+
+    tracing::debug!("did collect {count} events");
+    if count != len {
+        tracing::error!(
+            "collected events didn't match expectation, expected: {len} actual: {count}"
+        );
+    }
+    (result, events)
 }
 
 async fn async_init(
-    command: SubCommands,
-    writer: OutputWriters,
     args: Args,
     cwd: PathBuf,
+    (sender, fut): (Sender<AnyEvent>, impl Future<Output = ()> + 'static),
 ) -> Result<(), anyhow::Error> {
-    match command {
+    let fs_opts = args.fs_opts.clone();
+    let input_opts = args.input_opts.clone();
+    match args.command() {
         SubCommands::Start(start) => {
-            let start_kind = start.as_start_kind(&args.fs_opts, &args.input_opts);
-            start_stdout_wrapper(start_kind, cwd, writer).await
+            let start_kind = start.as_start_kind(&fs_opts, &input_opts);
+            start_wrapper(start_kind, cwd, (sender, fut)).await
         }
         SubCommands::Watch(watch) => {
-            let mut input = Input::default();
-            let multi = MultiWatch::from(watch);
-            input.watchers.push(multi);
-            let start_kind = StartKind::FromInput(StartFromInput { input });
-            start_stdout_wrapper(start_kind, cwd, writer).await
+            let start_kind = watch.as_start_kind(&fs_opts, &input_opts);
+            start_wrapper(start_kind, cwd, (sender, fut)).await
         }
         SubCommands::Run(run) => {
-            let start_kind = run.as_start_kind(&args.input_opts);
-            start_stdout_wrapper(start_kind, cwd, writer)
-                .instrument(debug_span!("SubCommands::Run").or_current())
-                .await
+            let start_kind = run.as_start_kind(&fs_opts, &input_opts);
+            start_wrapper(start_kind, cwd, (sender, fut)).await
         }
     }
 }
 
-async fn start_stdout_wrapper(
+async fn start_wrapper(
     start_kind: StartKind,
     cwd: PathBuf,
-    writer: OutputWriters,
+    (sender, fut): (Sender<AnyEvent>, impl Future<Output = ()> + 'static),
 ) -> anyhow::Result<()> {
-    let (events_sender, channel_future) = stdout_channel(writer);
-    let system_handle = actix_rt::spawn(start::with_sender(cwd, start_kind, events_sender));
-    let channel_handle = actix_rt::spawn(channel_future);
+    let system_handle = actix_rt::spawn(start::with_sender(cwd, start_kind, sender.clone()));
+    let channel_handle = actix_rt::spawn(fut);
     let output = tokio::select! {
         r = system_handle => {
             match r {

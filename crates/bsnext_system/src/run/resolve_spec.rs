@@ -1,7 +1,7 @@
 use crate::system::BsSystem;
 use crate::tasks::task_spec::TaskSpec;
 use actix::{AsyncContext, ResponseFuture};
-use bsnext_dto::internal::{Available, Expected, InitialTaskError, TaskReportAndTree};
+use bsnext_dto::task_events::{Available, Expected, InitialTaskError, TaskReportAndTree};
 use bsnext_input::route::RunOptItem;
 use bsnext_input::startup::TopLevelRunMode;
 use bsnext_input::Input;
