@@ -18,19 +18,19 @@ use typeshare::typeshare;
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "kind", content = "payload")]
 pub enum ExternalEventsDTO {
-    ServerChangeset(ServerChangesetDTO),
-    Watching(WatchingDTO),
-    WatchingStopped(StoppedWatchingDTO),
     FileChanged(FileChangedDTO),
     FilesChanged(FilesChangedDTO),
+    OutputLine(OutputLineDTO),
     InputFileChanged(FileChangedDTO),
     InputAccepted(InputAcceptedDTO),
     InputError(InputErrorDetailDTO),
     StartupError(StartupErrorDTO),
-    OutputLine(OutputLineDTO),
+    ServerChangeset(ServerChangesetDTO),
     TaskAction(TaskActionDTO),
     TaskTreePreview(TaskTreePreview),
     TaskTreeSummary(TaskTreeSummary),
+    Watching(WatchingDTO),
+    WatchingStopped(StoppedWatchingDTO),
 }
 
 #[typeshare]

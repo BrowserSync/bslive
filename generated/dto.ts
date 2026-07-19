@@ -269,19 +269,19 @@ export enum EventLevel {
 
 /** @discriminator kind */
 export type ExternalEventsDTO = 
-	| { kind: "ServerChangeset", payload: ServerChangesetDTO }
-	| { kind: "Watching", payload: WatchingDTO }
-	| { kind: "WatchingStopped", payload: StoppedWatchingDTO }
 	| { kind: "FileChanged", payload: FileChangedDTO }
 	| { kind: "FilesChanged", payload: FilesChangedDTO }
+	| { kind: "OutputLine", payload: OutputLineDTO }
 	| { kind: "InputFileChanged", payload: FileChangedDTO }
 	| { kind: "InputAccepted", payload: InputAcceptedDTO }
 	| { kind: "InputError", payload: InputErrorDetailDTO }
 	| { kind: "StartupError", payload: StartupErrorDTO }
-	| { kind: "OutputLine", payload: OutputLineDTO }
+	| { kind: "ServerChangeset", payload: ServerChangesetDTO }
 	| { kind: "TaskAction", payload: TaskActionDTO }
 	| { kind: "TaskTreePreview", payload: TaskTreePreview }
-	| { kind: "TaskTreeSummary", payload: TaskTreeSummary };
+	| { kind: "TaskTreeSummary", payload: TaskTreeSummary }
+	| { kind: "Watching", payload: WatchingDTO }
+	| { kind: "WatchingStopped", payload: StoppedWatchingDTO };
 
 /** @discriminator kind */
 export type InputErrorDTO = 

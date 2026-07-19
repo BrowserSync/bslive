@@ -3,6 +3,7 @@ use crate::api::BsSystemApi;
 use crate::monitor_any::MonitorAny;
 use crate::monitor_input::MonitorInput;
 use crate::start::start_kind::StartKind;
+use crate::start::SystemStart;
 use crate::system::{
     run_jobs, setup_jobs_only, setup_servers_only, BsSystem, RunDryOk, RunOk, SetupOk,
     SetupServersOk,
@@ -15,7 +16,7 @@ use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal_events::InternalEvents;
 use bsnext_dto::server_events::ChildResult;
 use bsnext_dto::{DidStart, ServerChangesetDTO, StartupError};
-use bsnext_input::startup::{RunMode, SystemStart, SystemStartArgs};
+use bsnext_input::startup::{RunMode, SystemStartArgs};
 use bsnext_input::InputCtx;
 use std::future::ready;
 use std::path::PathBuf;
@@ -36,7 +37,7 @@ pub async fn start_system(
     let start = Start { kind: start_kind };
 
     match sys_addr.send(start).await {
-        Ok(Ok(DidStart::Started(..))) => {
+        Ok(Ok(DidStart::Started)) => {
             tracing::debug!("DidStart::Started");
             let api = BsSystemApi::new(sys_addr, rx);
             Ok(Some(api))
@@ -93,7 +94,7 @@ impl Handler<Start> for BsSystem {
                             input_ctx,
                         });
                         ctx.notify(MonitorAny::new(input.clone()));
-                        Ok(DidStart::Started(servers))
+                        Ok(DidStart::Started)
                     },
                 ))
             }
@@ -118,7 +119,7 @@ impl Handler<Start> for BsSystem {
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
                         ctx.notify(MonitorAny::new(res.input.clone()));
-                        Ok(DidStart::Started(res.servers))
+                        Ok(DidStart::Started)
                     },
                 ))
             }
@@ -161,7 +162,7 @@ impl Handler<Start> for BsSystem {
                             return Err(StartupError::ServerError((*server_error).to_owned()));
                         }
                         ctx.notify(MonitorAny::new(res.input.clone()));
-                        Ok(DidStart::Started(res.servers))
+                        Ok(DidStart::Started)
                     },
                 ))
             }
@@ -173,7 +174,7 @@ impl Handler<Start> for BsSystem {
                     input_ctx: InputCtx::default(),
                 });
                 self.publish_internal_event(InternalEvents::InputError(input_error));
-                let f = ready(Ok(DidStart::Started(Default::default()))).into_actor(self);
+                let f = ready(Ok(DidStart::Started)).into_actor(self);
                 Box::pin(f)
             }
             Ok(SystemStartArgs::RunOnly {

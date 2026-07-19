@@ -1,6 +1,9 @@
+use crate::start::start_kind::start_from_inputs::StartFromInput;
+use crate::start::start_kind::StartKind;
 use crate::watch::watch_sub_opts::WatchSubOpts;
-use bsnext_core::shared_args::LoggingOpts;
+use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
 use bsnext_input::route::{MultiWatch, PathPattern};
+use bsnext_input::Input;
 use bsnext_tracing::OutputFormat;
 use watch_runner::WatchRunnerStr;
 
@@ -38,6 +41,15 @@ pub struct WatchCommand {
     /// output format
     #[arg(short, long, value_enum, default_value_t)]
     pub format: OutputFormat,
+}
+
+impl WatchCommand {
+    pub fn as_start_kind(&self, _fs_opts: &FsOpts, _input_opts: &InputOpts) -> StartKind {
+        let mut input = Input::default();
+        let multi = MultiWatch::from(self.clone());
+        input.watchers.push(multi);
+        StartKind::FromInput(StartFromInput { input })
+    }
 }
 
 impl From<WatchCommand> for MultiWatch {

@@ -10,6 +10,7 @@ pub enum ResolvedInputOutcome {
         err: Box<InputError>,
     },
 
+    /// You provided a path that was resolved
     GivenPath {
         user_input: String,
         cwd: PathBuf,

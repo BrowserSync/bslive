@@ -454,7 +454,7 @@ pub struct ActiveServer {
 
 #[derive(Debug)]
 pub enum DidStart {
-    Started(GetActiveServersResponse),
+    Started,
     WillExit,
 }
 

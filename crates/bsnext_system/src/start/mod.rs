@@ -2,7 +2,9 @@ use crate::start::start_kind::StartKind;
 use crate::start::start_system::start_system;
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::StartupErrorDTO;
+use bsnext_dto::{DidStart, StartupError, StartupErrorDTO};
+use bsnext_input::startup::{StartupContext, SystemStartArgs};
+use bsnext_input::InputError;
 use bsnext_output::stdout::StdoutTarget;
 use bsnext_output::OutputWriters;
 use std::future::Future;
@@ -62,5 +64,12 @@ pub async fn with_sender(
                 .await;
             Err(anyhow::anyhow!("{}", as_str))
         }
+    }
+}
+
+pub trait SystemStart {
+    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>>;
+    fn start(&self, _ctx: &StartupContext) -> impl Future<Output = Result<DidStart, StartupError>> {
+        futures::future::ready(Ok(DidStart::WillExit))
     }
 }

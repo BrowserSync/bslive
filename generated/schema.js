@@ -427,24 +427,16 @@ var taskTreeSummarySchema = z.lazy(
 var externalEventsDTOSchema = z.lazy(
   () => z.discriminatedUnion("kind", [
     z.object({
-      kind: z.literal("ServerChangeset"),
-      payload: serverChangesetDTOSchema
-    }),
-    z.object({
-      kind: z.literal("Watching"),
-      payload: watchingDTOSchema
-    }),
-    z.object({
-      kind: z.literal("WatchingStopped"),
-      payload: stoppedWatchingDTOSchema
-    }),
-    z.object({
       kind: z.literal("FileChanged"),
       payload: fileChangedDTOSchema
     }),
     z.object({
       kind: z.literal("FilesChanged"),
       payload: filesChangedDTOSchema
+    }),
+    z.object({
+      kind: z.literal("OutputLine"),
+      payload: outputLineDTOSchema
     }),
     z.object({
       kind: z.literal("InputFileChanged"),
@@ -463,8 +455,8 @@ var externalEventsDTOSchema = z.lazy(
       payload: startupErrorDTOSchema
     }),
     z.object({
-      kind: z.literal("OutputLine"),
-      payload: outputLineDTOSchema
+      kind: z.literal("ServerChangeset"),
+      payload: serverChangesetDTOSchema
     }),
     z.object({
       kind: z.literal("TaskAction"),
@@ -477,6 +469,14 @@ var externalEventsDTOSchema = z.lazy(
     z.object({
       kind: z.literal("TaskTreeSummary"),
       payload: taskTreeSummarySchema
+    }),
+    z.object({
+      kind: z.literal("Watching"),
+      payload: watchingDTOSchema
+    }),
+    z.object({
+      kind: z.literal("WatchingStopped"),
+      payload: stoppedWatchingDTOSchema
     })
   ])
 );

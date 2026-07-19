@@ -2,7 +2,7 @@ pub mod resolve_spec;
 
 use crate::start::start_kind::run_from_input::RunFromInputPaths;
 use crate::start::start_kind::StartKind;
-use bsnext_core::shared_args::{InputOpts, LoggingOpts};
+use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
 use bsnext_input::route::{RunAll, RunOptItem, RunSeq, ShRunOptItem};
 use bsnext_input::startup::{RunMode, TopLevelRunMode};
 use bsnext_input::Input;
@@ -68,7 +68,7 @@ pub struct RunCommand {
 }
 
 impl RunCommand {
-    pub fn as_start_kind(&self, input_opts: &InputOpts) -> StartKind {
+    pub fn as_start_kind(&self, _fs_opts: &FsOpts, input_opts: &InputOpts) -> StartKind {
         let from_cmd = as_input(self);
 
         tracing::debug!(self.trailing = ?self.trailing);

@@ -1,11 +1,8 @@
 use crate::args::{Args, SubCommands};
 use crate::start;
-use crate::start::start_kind::start_from_inputs::StartFromInput;
 use crate::start::start_kind::StartKind;
 use crate::start::stdout_channel;
 use bsnext_dto::any_event::AnyEvent;
-use bsnext_input::route::MultiWatch;
-use bsnext_input::Input;
 use bsnext_output::OutputWriters;
 use bsnext_tracing::{
     init_tracing, init_tracing_with_otel, LineNumberOption, OutputFormat, WriteOption,
@@ -16,7 +13,7 @@ use std::future::Future;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use tracing::{debug_span, Instrument};
+use tracing::debug_span;
 
 /// The typical lifecycle when ran from a CLI environment
 pub async fn from_args<I, T>(itr: I, cwd: PathBuf) -> Result<(), anyhow::Error>
@@ -119,17 +116,12 @@ async fn async_init(
             start_wrapper(start_kind, cwd, (sender, fut)).await
         }
         SubCommands::Watch(watch) => {
-            let mut input = Input::default();
-            let multi = MultiWatch::from(watch);
-            input.watchers.push(multi);
-            let start_kind = StartKind::FromInput(StartFromInput { input });
+            let start_kind = watch.as_start_kind(&fs_opts, &input_opts);
             start_wrapper(start_kind, cwd, (sender, fut)).await
         }
         SubCommands::Run(run) => {
-            let start_kind = run.as_start_kind(&input_opts);
-            start_wrapper(start_kind, cwd, (sender, fut))
-                .instrument(debug_span!("SubCommands::Run").or_current())
-                .await
+            let start_kind = run.as_start_kind(&fs_opts, &input_opts);
+            start_wrapper(start_kind, cwd, (sender, fut)).await
         }
     }
 }
