@@ -109,7 +109,7 @@ async fn async_init(
     (sender, fut): (Sender<AnyEvent>, impl Future<Output = ()> + 'static),
 ) -> Result<(), anyhow::Error> {
     // let fs_opts = args.fs_opts.clone();
-    let _input_opts = args.input_opts.clone();
+    // let _input_opts = args.input_opts.clone();
     match args.command() {
         (SubCommands::Start(start), input_opts) => {
             // let start_kind = start.as_start_kind(&fs_opts, &input_opts);

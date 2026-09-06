@@ -130,6 +130,8 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
             dir_route.dir = parent.to_string_lossy().to_string();
             route.kind = RouteKind::Dir(dir_route);
             server.routes.push(route)
+        } else {
+            tracing::debug!("routes was empty AND we couldn't find the input ctx file path")
         }
     }
 
