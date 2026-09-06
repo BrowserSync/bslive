@@ -7,7 +7,7 @@ use crate::start::start_kind::start_from_paths::{
 use crate::start::start_kind::StartKind;
 use crate::start::start_system::DidStart;
 use crate::start::SystemStart;
-use crate::system::{BsSystem, CommitInput, GetStartContext, ResolveInput};
+use crate::system::{BsSystem, CommitInput, CommitInputFile, GetStartContext, ResolveInput};
 use crate::tasks::resolve::ResolveInitialTasks;
 use crate::watch::watch_sub_opts::WatchSubOpts;
 use actix::{Actor, Addr};
@@ -18,7 +18,7 @@ use bsnext_dto::StartupError;
 use bsnext_input::route::{CorsOpts, Opts, Route};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::startup::{StartupContext, SystemStartArgs};
-use bsnext_input::{Input, InputError, WatchGlobalConfig};
+use bsnext_input::{Input, InputArgs, InputCtx, InputError, WatchGlobalConfig};
 use bsnext_tracing::OutputFormat;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc::Sender;
@@ -122,7 +122,7 @@ impl SystemStart for StartCommand {
         let system = BsSystem::new(sink.clone(), cwd.clone(), tx);
         let addr = system.start();
 
-        let _startup_ctx = addr
+        let startup_ctx = addr
             .send(GetStartContext)
             .await
             .context("Trying to get ctx")?;
@@ -142,7 +142,16 @@ impl SystemStart for StartCommand {
 
         // remember the ID of the input we are commiting
         let _id = input.as_id();
-        let _r = addr.send(CommitInput::new(input)).await;
+        match resolution {
+            InputResolution::Default => {
+                let _r = addr.send(CommitInput::new(input)).await;
+            }
+            InputResolution::File(file) => {
+                let args = InputArgs::new(self.port);
+                let ctx = InputCtx::new(&[], Some(args), &startup_ctx, Some(&file));
+                let _r = addr.send(CommitInputFile::new(input, file, ctx)).await;
+            }
+        }
 
         let api = BsSystemApi::new(&addr, rx);
         Ok(DidStart::Started { api })
@@ -151,7 +160,7 @@ impl SystemStart for StartCommand {
 
 enum InputResolution {
     Default,
-    UserDefined,
+    File(PathBuf),
 }
 
 impl StartCommand {
@@ -169,7 +178,7 @@ impl StartCommand {
         // otherwise, use a default input to start with...
         let (mut input, resolution) = match input {
             None => (Input::default(), InputResolution::Default),
-            Some(resolved) => (resolved.input, InputResolution::UserDefined),
+            Some(resolved) => (resolved.input, InputResolution::File(resolved.absolute)),
         };
 
         if self.no_watch {

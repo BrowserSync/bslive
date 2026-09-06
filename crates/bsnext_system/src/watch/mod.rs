@@ -95,7 +95,7 @@ impl WatchCommand {
 }
 
 impl SystemStart for WatchCommand {
-    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+    fn resolve_input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         todo!()
     }
 

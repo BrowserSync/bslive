@@ -1,6 +1,5 @@
 pub mod resolve_spec;
 
-use crate::api::BsSystemApi;
 use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
 use crate::start::start_kind::run_from_input::RunFromInputPaths;
 use crate::start::start_kind::StartKind;
@@ -119,7 +118,7 @@ impl RunCommand {
 }
 
 impl SystemStart for RunCommand {
-    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
+    fn resolve_input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
         todo!()
     }
 
@@ -129,12 +128,12 @@ impl SystemStart for RunCommand {
         input_opts: InputOpts,
         sink: Sender<AnyEvent>,
     ) -> Result<DidStart, StartupError> {
-        let (tx, rx) = oneshot::channel();
+        let (tx, _rx) = oneshot::channel();
         let system = BsSystem::new(sink.clone(), cwd.clone(), tx);
         let addr = system.start();
 
         // prepare initial input before any tasks should run
-        let (input, resolution) = self.prepare_input(&addr, &input_opts).await?;
+        let (input, _resolution) = self.prepare_input(&addr, &input_opts).await?;
 
         let named = if self.trailing.is_empty() {
             vec!["default".to_string()]

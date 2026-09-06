@@ -207,6 +207,12 @@ pub struct InputArgs {
     pub port: Option<u16>,
 }
 
+impl InputArgs {
+    pub fn new(port: impl Into<Option<u16>>) -> Self {
+        Self { port: port.into() }
+    }
+}
+
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct InputCtx {
     prev_server_ids: Option<Vec<ServerIdentity>>,
