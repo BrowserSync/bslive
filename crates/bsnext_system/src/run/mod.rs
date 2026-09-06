@@ -1,8 +1,6 @@
 pub mod resolve_spec;
 
 use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
-use crate::start::start_kind::run_from_input::RunFromInputPaths;
-use crate::start::start_kind::StartKind;
 use crate::start::start_system::DidStart;
 use crate::start::SystemStart;
 use crate::system::{BsSystem, CommitInput, ExternalEventMsg, ResolveInput, RunDryOk, RunOk};
@@ -81,13 +79,13 @@ pub struct RunCommand {
 }
 
 #[derive(Debug)]
-enum InputResolution {
+pub enum InputResolution {
     Default,
     UserDefined,
 }
 
 impl RunCommand {
-    pub(crate) async fn prepare_input(
+    pub async fn prepare_input(
         &self,
         addr: &Addr<BsSystem>,
         input_opts: &InputOpts,
@@ -98,7 +96,7 @@ impl RunCommand {
             .await
             .context("mailbox")??;
 
-        let cmd_input = as_fake_input(&self);
+        let cmd_input = as_fake_input(self);
 
         // otherwise, use a default input to start with...
         let (mut input, resolution) = match input {
@@ -166,40 +164,6 @@ impl SystemStart for RunCommand {
         }
 
         Ok(DidStart::WillExit)
-    }
-}
-
-impl RunCommand {
-    pub fn as_start_kind(&self, input_opts: &InputOpts) -> StartKind {
-        let from_cmd = as_fake_input(self);
-
-        tracing::debug!(self.trailing = ?self.trailing);
-        tracing::debug!(self.sh_commands = ?self.sh_commands);
-        tracing::debug!(self.all = ?self.all);
-
-        let named = if self.trailing.is_empty() {
-            vec!["default".to_string()]
-        } else {
-            self.trailing.to_owned()
-        };
-
-        // dry takes precedence
-        let run_mode = if self.dry {
-            RunMode::Dry
-        } else {
-            RunMode::Exec {
-                preview: self.preview,
-                summary: self.summary,
-            }
-        };
-        let top_level = TopLevelRunMode::Seq;
-        StartKind::Run(RunFromInputPaths::new(
-            from_cmd,
-            input_opts.input.clone(),
-            named,
-            run_mode,
-            top_level,
-        ))
     }
 }
 

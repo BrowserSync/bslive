@@ -1,7 +1,5 @@
 use crate::api::BsSystemApi;
 use crate::run::resolve_spec::InvokeRunTasks;
-use crate::start::start_kind::start_from_inputs::StartFromInput;
-use crate::start::start_kind::StartKind;
 use crate::start::start_system::DidStart;
 use crate::start::SystemStart;
 use crate::system::{BsSystem, CommitInput, ResolveInput};
@@ -55,12 +53,6 @@ pub struct WatchCommand {
     /// output format
     #[arg(short, long, value_enum, default_value_t)]
     pub format: OutputFormat,
-}
-
-#[derive(Debug)]
-enum InputResolution {
-    Default,
-    UserDefined,
 }
 
 impl WatchCommand {
@@ -129,15 +121,6 @@ async fn initial_tasks(addr: &Addr<BsSystem>, input: Input) -> anyhow::Result<()
     let _report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
     // let s = archy(&report_and_tree.tree, Prefix::None);
     Ok(())
-}
-
-impl WatchCommand {
-    pub fn as_start_kind(&self, _input_opts: &InputOpts) -> StartKind {
-        let mut input = Input::default();
-        let multi = MultiWatch::from(self.clone());
-        input.watchers.push(multi);
-        StartKind::FromInput(StartFromInput { input })
-    }
 }
 
 impl From<WatchCommand> for MultiWatch {

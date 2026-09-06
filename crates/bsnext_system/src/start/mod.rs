@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 
 pub mod start_command;
-pub mod start_kind;
+pub mod start_from_paths;
 pub mod start_system;
 
 pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<Output = ()>) {

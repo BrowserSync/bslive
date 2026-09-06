@@ -13,9 +13,8 @@ use bsnext_core::servers_supervisor::resolve_servers::ResolveServers;
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal_events::InternalEvents;
-use bsnext_dto::server_events::ChildResult;
 use bsnext_dto::task_events::TaskReportAndTree;
-use bsnext_dto::{GetActiveServersResponse, InputErrorDetailDTO, StartupErrorDTO};
+use bsnext_dto::{InputErrorDetailDTO, StartupErrorDTO};
 use bsnext_input::input_fs::ResolvedInputOutcome;
 use bsnext_input::startup::StartupContext;
 use bsnext_input::{Input, InputCtx, InputError};
@@ -285,61 +284,6 @@ impl actix::Handler<ExternalEventMsg> for BsSystem {
             }
         })
     }
-}
-
-// pub async fn setup_jobs(
-//     addr: Addr<BsSystem>,
-//     servers_addr: Addr<ServersSupervisor>,
-//     input: Input,
-// ) -> anyhow::Result<SetupOk> {
-//     let clone = input.clone();
-//     let clone2 = input.clone();
-//
-//     let spec = addr.send(ResolveInitialTasks::new(clone)).await??;
-//     let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
-//     let (servers, child_results) = servers_addr.send(ResolveServers::new(clone2)).await??;
-//     Ok(SetupOk {
-//         input,
-//         report_and_tree,
-//         servers,
-//         child_results,
-//     })
-// }
-
-// pub async fn setup_jobs_only(addr: &Addr<BsSystem>, input: Input) -> anyhow::Result<SetupTasksOk> {
-//     let spec = addr.send(ResolveInitialTasks::new(input)).await??;
-//     let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
-//     Ok(SetupTasksOk { report_and_tree })
-// }
-
-// pub async fn setup_servers_only(
-//     servers_addr: &Addr<ServersSupervisor>,
-//     input: Input,
-// ) -> anyhow::Result<SetupServersOk> {
-//     let (servers, child_results) = servers_addr.send(ResolveServers::new(input)).await??;
-//     Ok(SetupServersOk {
-//         servers,
-//         child_results,
-//     })
-// }
-
-pub struct SetupOk {
-    pub(crate) input: Input,
-    pub(crate) servers: GetActiveServersResponse,
-    #[allow(dead_code)]
-    pub report_and_tree: TaskReportAndTree,
-    pub(crate) child_results: Vec<ChildResult>,
-}
-
-pub struct SetupServersOk {
-    pub(crate) servers: GetActiveServersResponse,
-    pub(crate) child_results: Vec<ChildResult>,
-}
-
-#[derive(Debug)]
-pub struct SetupTasksOk {
-    #[allow(dead_code)]
-    pub report_and_tree: TaskReportAndTree,
 }
 
 #[derive(Debug)]

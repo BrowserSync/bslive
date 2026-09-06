@@ -1,10 +1,8 @@
 use crate::api::BsSystemApi;
 use crate::run::resolve_spec::InvokeRunTasks;
-use crate::start::start_kind::start_from_inputs::{StartFromInput, StartFromInputPaths};
-use crate::start::start_kind::start_from_paths::{
-    server_config_from_paths, with_explicit_paths, with_inferred_watchers, StartFromPaths,
+use crate::start::start_from_paths::{
+    server_config_from_paths, with_explicit_paths, with_inferred_watchers,
 };
-use crate::start::start_kind::StartKind;
 use crate::start::start_system::DidStart;
 use crate::start::SystemStart;
 use crate::system::{BsSystem, CommitInput, CommitInputFile, GetStartContext, ResolveInput};
@@ -15,7 +13,7 @@ use anyhow::Context;
 use bsnext_core::shared_args::{InputOpts, LoggingOpts};
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::StartupError;
-use bsnext_input::route::{CorsOpts, Opts, Route};
+use bsnext_input::route::{CorsOpts, Opts};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::startup::{StartupContext, SystemStartArgs};
 use bsnext_input::{Input, InputArgs, InputCtx, InputError, WatchGlobalConfig};
@@ -55,54 +53,6 @@ pub struct StartCommand {
     /// additional watchers
     #[clap(flatten)]
     pub watch_sub_opts: WatchSubOpts,
-}
-
-impl StartCommand {
-    pub fn as_start_kind(&self, input_opts: &InputOpts) -> StartKind {
-        // todo: make the addition of a proxy + route opts easier?
-        if !self.trailing.is_empty() {
-            tracing::debug!(
-                "{} trailing, {} inputs",
-                self.trailing.len(),
-                input_opts.input.len()
-            );
-            return StartKind::FromPaths(StartFromPaths {
-                paths: self.trailing.clone(),
-                port: self.port,
-                watch_sub_opts: self.watch_sub_opts.clone(),
-                route_opts: Opts {
-                    cors: self.cors.then_some(CorsOpts::Cors(true)),
-                    ..Default::default()
-                },
-                no_watch: self.no_watch,
-            });
-        }
-
-        tracing::debug!("0 trailing, {} inputs", input_opts.input.len());
-        if input_opts.input.is_empty() && !self.proxies.is_empty() {
-            tracing::debug!("input was empty, but had proxies");
-            let first_proxy = self.proxies.first().expect("guarded first proxy");
-            let r = Route::proxy(first_proxy);
-            let id = ServerIdentity::from_port_or_named(self.port).unwrap_or_else(|_e| {
-                tracing::error!("A problem occurred with the port?");
-                ServerIdentity::named()
-            });
-            let ser = ServerConfig::from_route(r, id);
-            let input = Input::from_server(ser);
-            StartKind::FromInput(StartFromInput { input })
-        } else {
-            tracing::debug!(
-                input_len = input_opts.input.len(),
-                proxes = self.proxies.len(),
-                "neither inputs nor proxies were present"
-            );
-            StartKind::FromInputPaths(StartFromInputPaths {
-                input_paths: input_opts.input.clone(),
-                port: self.port,
-                no_watch: self.no_watch,
-            })
-        }
-    }
 }
 
 impl SystemStart for StartCommand {
