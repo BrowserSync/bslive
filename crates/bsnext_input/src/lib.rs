@@ -217,15 +217,15 @@ pub struct InputCtx {
 
 impl InputCtx {
     pub fn new(
-        servers: &[ServerIdentity],
+        server_identities: &[ServerIdentity],
         args: Option<InputArgs>,
         startup: &StartupContext,
         file_path: Option<&PathBuf>,
     ) -> Self {
-        let prev = if servers.is_empty() {
+        let prev = if server_identities.is_empty() {
             None
         } else {
-            Some(servers.to_vec())
+            Some(server_identities.to_vec())
         };
         Self {
             prev_server_ids: prev,
@@ -266,8 +266,14 @@ impl InputCtx {
 }
 
 pub trait InputCreation {
-    fn from_input_path<P: AsRef<Path>>(path: P, ctx: &InputCtx) -> Result<Input, Box<InputError>>;
-    fn from_input_str<P: AsRef<str>>(content: P, ctx: &InputCtx) -> Result<Input, Box<InputError>>;
+    fn from_input_path<P: AsRef<Path>>(
+        path: P,
+        input_ctx: &InputCtx,
+    ) -> Result<Input, Box<InputError>>;
+    fn from_input_str<P: AsRef<str>>(
+        content: P,
+        input_ctx: &InputCtx,
+    ) -> Result<Input, Box<InputError>>;
 }
 
 pub trait InputWriter {

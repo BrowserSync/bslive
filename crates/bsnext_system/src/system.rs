@@ -185,19 +185,24 @@ impl Handler<ResolveInput> for BsSystem {
 
     fn handle(&mut self, msg: ResolveInput, _ctx: &mut Self::Context) -> Self::Result {
         let cwd = self.cwd.clone();
+        let start = self.start_context.clone();
         Box::pin(async move {
             match ResolvedInputOutcome::new(cwd.clone(), &msg.input_paths) {
                 ResolvedInputOutcome::Missing { err, .. } => Err(err),
                 ResolvedInputOutcome::GivenPath { ref absolute, .. } => {
+                    let ctx = InputCtx::new(&[], None, &start, Some(absolute));
                     Ok(Some(ResolveInputResult {
-                        input: from_input_path(absolute, &Default::default())?,
+                        input: from_input_path(absolute, &ctx)?,
                         absolute: absolute.clone(),
                     }))
                 }
-                ResolvedInputOutcome::Auto { ref absolute, .. } => Ok(Some(ResolveInputResult {
-                    input: from_input_path(absolute, &Default::default())?,
-                    absolute: absolute.clone(),
-                })),
+                ResolvedInputOutcome::Auto { ref absolute, .. } => {
+                    let ctx = InputCtx::new(&[], None, &start, Some(absolute));
+                    Ok(Some(ResolveInputResult {
+                        input: from_input_path(absolute, &ctx)?,
+                        absolute: absolute.clone(),
+                    }))
+                }
                 ResolvedInputOutcome::Empty => Ok(None),
             }
         })
