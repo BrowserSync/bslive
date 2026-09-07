@@ -2,7 +2,7 @@ use crate::run::RunCommand;
 use crate::start::start_command::StartCommand;
 use crate::watch::watch_sub_opts::WatchSubOpts;
 use crate::watch::WatchCommand;
-use bsnext_core::shared_args::{FsOpts, InputOpts, LoggingOpts};
+use bsnext_core::shared_args::{InputOpts, LoggingOpts};
 use bsnext_tracing::OutputFormat;
 // bslive route --path=/ --dir=
 
@@ -17,9 +17,6 @@ pub struct Args {
 
     #[clap(flatten)]
     pub input_opts: InputOpts,
-
-    #[clap(flatten)]
-    pub fs_opts: FsOpts,
 
     /// Only used if we're going to fallback
     #[arg(short, long)]
@@ -37,6 +34,30 @@ pub struct Args {
 
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub trailing: Vec<String>,
+}
+
+impl Args {
+    /// Chose the given command or just default to 'start'
+    pub(crate) fn command(self) -> (SubCommands, InputOpts) {
+        let logging = *self.logging();
+        let format = self.format();
+        self.command.map_or_else(
+            || {
+                let default_cmd = SubCommands::Start(StartCommand {
+                    cors: false,
+                    port: self.port,
+                    trailing: self.trailing.clone(),
+                    proxies: vec![],
+                    watch_sub_opts: self.watch_opts,
+                    logging,
+                    format,
+                    no_watch: self.no_watch,
+                });
+                (default_cmd, self.input_opts.clone())
+            },
+            |cmd| (cmd, self.input_opts.clone()),
+        )
+    }
 }
 
 impl Args {
@@ -60,10 +81,7 @@ impl Args {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum SubCommands {
-    /// Start the services
     Start(StartCommand),
-    /// Just use file watching
     Watch(WatchCommand),
-    /// Just run tasks
     Run(RunCommand),
 }

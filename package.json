@@ -12,7 +12,7 @@
         "bin.js"
     ],
     "devDependencies": {
-        "@napi-rs/cli": "^2.18.3",
+        "@napi-rs/cli": "^3.7.3",
         "@playwright/test": "^1.49.0",
         "ava": "^8.0.1",
         "typescript": "^5.6.3",
@@ -34,8 +34,8 @@
     ],
     "scripts": {
         "artifacts": "napi artifacts",
-        "build": "napi build --cargo-name bslive --platform --release",
-        "build:debug": "napi build --cargo-name bslive --platform",
+        "build": "napi build --output-dir=. --package bslive --platform --release",
+        "build:debug": "napi build --output-dir=. --package bslive --platform",
         "build:client": "npm run build:client --workspaces --if-present",
         "build:example": "npm run build:example --workspaces --if-present",
         "prepublishOnly": "napi prepublish -t npm",
@@ -50,13 +50,11 @@
         "fmt": "prettier tests inject ui --write"
     },
     "napi": {
-        "name": "bslive",
-        "triples": {
-            "additional": [
-                "aarch64-apple-darwin",
-                "aarch64-pc-windows-msvc"
-            ]
-        }
+        "binaryName": "bslive",
+        "targets": [
+            "aarch64-apple-darwin",
+            "aarch64-pc-windows-msvc"
+        ]
     },
     "license": "MIT",
     "ava": {

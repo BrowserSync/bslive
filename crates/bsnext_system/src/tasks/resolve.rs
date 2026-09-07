@@ -1,7 +1,7 @@
 use crate::system::BsSystem;
 use crate::tasks::task_spec::TaskSpec;
 use actix::ResponseFuture;
-use bsnext_dto::internal::InitialTaskError;
+use bsnext_dto::task_events::InitialTaskError;
 use bsnext_input::Input;
 
 #[derive(actix::Message)]

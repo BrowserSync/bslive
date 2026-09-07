@@ -48,7 +48,6 @@ impl actix::Handler<MonitorAny> for BsSystem {
             Ok(..) => {
                 let span = debug_span!("MonitorAny -> InsertResults");
                 let _g = span.entered();
-                tracing::debug!("a monitor was added");
                 // for (index, insert_result) in inner.into_iter().enumerate() {
                 // let task_spec = TaskSpec::opt_from(&insert_result.meta.watch_spec);
                 // let fs_ctx = insert_result.meta.fs_ctx;

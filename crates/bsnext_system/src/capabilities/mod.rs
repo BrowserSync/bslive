@@ -3,7 +3,7 @@ pub mod servers_addr;
 
 use actix::{Actor, Addr};
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
-use bsnext_dto::internal::AnyEvent;
+use bsnext_dto::any_event::AnyEvent;
 use tokio::sync::mpsc::Sender;
 
 #[derive(Debug)]

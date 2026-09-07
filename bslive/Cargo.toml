@@ -14,10 +14,10 @@ serde_json = { workspace = true }
 actix-rt = { workspace = true }
 
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
-napi-derive = "2.16.13"
+napi-derive = "3.5.10"
 
 [dependencies.napi]
-version = "2.16.17"
+version = "3.10.5"
 default-features = false
 features = ["napi4", "serde", "serde-json"]
 

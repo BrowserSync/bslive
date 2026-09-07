@@ -10,21 +10,30 @@ pub mod html_writer;
 pub struct HtmlFs;
 
 impl InputCreation for HtmlFs {
-    fn from_input_path<P: AsRef<Path>>(path: P, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
+    fn from_input_path<P: AsRef<Path>>(
+        path: P,
+        input_ctx: &InputCtx,
+    ) -> Result<Input, Box<InputError>> {
         let str = read_to_string(path).map_err(|e| Box::new(e.into()))?;
-        let input = playground_html_str_to_input(&str, ctx)
+        let input = playground_html_str_to_input(&str, input_ctx)
             .map_err(|e| Box::new(InputError::HtmlError(e.to_string())))?;
         Ok(input)
     }
 
-    fn from_input_str<P: AsRef<str>>(content: P, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
-        let input = playground_html_str_to_input(content.as_ref(), ctx)
+    fn from_input_str<P: AsRef<str>>(
+        content: P,
+        input_ctx: &InputCtx,
+    ) -> Result<Input, Box<InputError>> {
+        let input = playground_html_str_to_input(content.as_ref(), input_ctx)
             .map_err(|e| Box::new(InputError::HtmlError(e.to_string())))?;
         Ok(input)
     }
 }
 
-fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box<InputError>> {
+fn playground_html_str_to_input(
+    html: &str,
+    input_ctx: &InputCtx,
+) -> Result<Input, Box<InputError>> {
     use unindent::unindent;
 
     // parse the HTML
@@ -107,9 +116,9 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
     // 1: first try prev
     // 2: next try if 'port' was provided
     // 3: finally, make one up
-    let iden = ctx
+    let iden = input_ctx
         .first_id()
-        .or_else(|| ServerIdentity::from_port_or_named(ctx.port()).ok())
+        .or_else(|| ServerIdentity::from_port_or_named(input_ctx.port()).ok())
         .unwrap_or_default();
 
     // Create the server
@@ -126,10 +135,12 @@ fn playground_html_str_to_input(html: &str, ctx: &InputCtx) -> Result<Input, Box
         let mut dir_route = DirRoute::default();
         // todo: make this use the CWD of the input file
         // dir_route.diri = ctx.startup_ctx().cwd.to_string_lossy().to_string();
-        if let Some(parent) = ctx.file_path().and_then(|x| x.parent()) {
+        if let Some(parent) = input_ctx.file_path().and_then(|x| x.parent()) {
             dir_route.dir = parent.to_string_lossy().to_string();
             route.kind = RouteKind::Dir(dir_route);
             server.routes.push(route)
+        } else {
+            tracing::debug!("routes was empty AND we couldn't find the input ctx file path")
         }
     }
 

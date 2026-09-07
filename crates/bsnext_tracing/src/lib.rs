@@ -15,6 +15,7 @@ use tracing_subscriber::util::SubscriberInitExt;
     Clone,
     PartialEq,
     Eq,
+    Hash,
     PartialOrd,
     Ord,
     Default,

@@ -1,36 +1,32 @@
-use crate::servers::ResolveServers;
 use crate::system::BsSystem;
 use crate::watchables::MonitorPathWatchables;
 use actix::{ActorFutureExt, AsyncContext, ResponseActFuture, WrapFuture};
-use bsnext_dto::internal::{AnyEvent, ChildResult, ServerError};
-use bsnext_dto::GetActiveServersResponse;
+use bsnext_core::servers_supervisor::resolve_servers::ResolveServers;
+use bsnext_dto::server_events::ServerError;
 use bsnext_input::startup::StartupContext;
 use bsnext_input::{Input, InputCtx};
-use tracing::debug;
 
 #[derive(Debug, actix::Message)]
-#[rtype(result = "Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>")]
+#[rtype(result = "Result<(), ServerError>")]
 pub struct OverrideInput {
     pub input: Input,
-    pub original_event: AnyEvent,
 }
 
 impl actix::Handler<OverrideInput> for BsSystem {
-    type Result =
-        ResponseActFuture<Self, Result<(GetActiveServersResponse, Vec<ChildResult>), ServerError>>;
+    type Result = ResponseActFuture<Self, Result<(), ServerError>>;
 
     fn handle(&mut self, msg: OverrideInput, ctx: &mut Self::Context) -> Self::Result {
         let input_clone = msg.input.clone();
         let start_ctx_clone = self.start_context.clone();
         let addr = ctx.address();
         // let ctx_clone = self.st
-        let f = ctx
-            .address()
+        let f = self
+            .servers()
             .send(ResolveServers::new(msg.input))
             .into_actor(self)
             .map(move |res, actor, _ctx| {
-                debug!(" + did override input");
-                let output = match res {
+                tracing::debug!(" + did override input");
+                let _output = match res {
                     Ok(Ok(res)) => Ok(res),
                     Ok(Err(s_e)) => Err(s_e),
                     Err(err) => Err(ServerError::Unknown(err.to_string())),
@@ -40,7 +36,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
                     MonitorPathWatchables::new(actor.cwd.clone(), &input_clone, addr.recipient());
                 actor.path_monitors.do_send(msg);
                 actor.update_ctx(&input_clone, &start_ctx_clone);
-                output
+                Ok(())
             });
         Box::pin(f)
     }

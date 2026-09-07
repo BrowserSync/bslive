@@ -4,7 +4,7 @@ use crate::watchables::route_watchable::to_route_watchables;
 use crate::watchables::server_watchable::to_server_watchables;
 use actix::Recipient;
 use bsnext_input::{InferWatchers, Input, WatchGlobalConfig};
-use bsnext_path_monitor::PathMonitorEvent;
+use bsnext_path_monitor::PathMonitorChangeset;
 use std::path::PathBuf;
 use tracing::debug;
 
@@ -18,11 +18,11 @@ pub mod server_watchable;
 pub struct MonitorPathWatchables {
     pub watchables: Vec<PathWatchable>,
     pub cwd: PathBuf,
-    pub recipient: Recipient<PathMonitorEvent>,
+    pub recipient: Recipient<PathMonitorChangeset>,
 }
 
 impl MonitorPathWatchables {
-    pub fn new(cwd: PathBuf, input: &Input, recipient: Recipient<PathMonitorEvent>) -> Self {
+    pub fn new(cwd: PathBuf, input: &Input, recipient: Recipient<PathMonitorChangeset>) -> Self {
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
         let any_watchables = to_any_watchables(input);

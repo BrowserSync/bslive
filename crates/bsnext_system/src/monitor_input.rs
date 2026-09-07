@@ -26,6 +26,16 @@ pub struct MonitorInput {
     pub input_ctx: InputCtx,
 }
 
+impl MonitorInput {
+    pub fn new(path: impl Into<PathBuf>, input_ctx: impl Into<InputCtx>) -> Self {
+        Self {
+            path: path.into(),
+            input_ctx: input_ctx.into(),
+            cwd: Default::default(),
+        }
+    }
+}
+
 impl actix::Handler<MonitorInput> for BsSystem {
     type Result = ();
 

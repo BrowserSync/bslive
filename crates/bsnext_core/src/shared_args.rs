@@ -20,17 +20,6 @@ pub struct LoggingOpts {
 }
 
 #[derive(Debug, Default, Clone, clap::Parser)]
-pub struct FsOpts {
-    /// Write input to disk
-    #[arg(long)]
-    pub write: bool,
-
-    /// Force write over directories or files (dangerous)
-    #[arg(long, requires = "write")]
-    pub force: bool,
-}
-
-#[derive(Debug, Default, Clone, clap::Parser)]
 pub struct InputOpts {
     /// Provide a path to an input file
     #[arg(short, long)]

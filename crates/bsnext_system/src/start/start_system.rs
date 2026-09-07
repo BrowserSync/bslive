@@ -1,202 +1,34 @@
 #![allow(clippy::result_large_err)]
 use crate::api::BsSystemApi;
-use crate::monitor_any::MonitorAny;
-use crate::monitor_input::MonitorInput;
-use crate::start::start_kind::StartKind;
-use crate::system::{
-    run_jobs, setup_jobs_only, setup_servers_only, BsSystem, RunDryOk, RunOk, SetupOk,
-    SetupServersOk,
-};
-use actix::{
-    Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture,
-};
-use bsnext_dto::internal::{AnyEvent, ChildResult, InternalEvents};
-use bsnext_dto::{DidStart, StartupError};
-use bsnext_input::startup::{RunMode, SystemStart, SystemStartArgs};
-use bsnext_input::InputCtx;
-use std::future::ready;
+use crate::start::SystemStart;
+use crate::system::BsSystem;
+use actix::{ActorContext, Handler};
+use bsnext_core::shared_args::InputOpts;
+use bsnext_dto::any_event::AnyEvent;
+use bsnext_dto::StartupError;
 use std::path::PathBuf;
-use tokio::sync::oneshot;
-use tracing::debug;
 
 pub async fn start_system(
     cwd: PathBuf,
-    start_kind: StartKind,
+    system_start: impl SystemStart,
+    input_opts: InputOpts,
     events_sender: tokio::sync::mpsc::Sender<AnyEvent>,
 ) -> Result<Option<BsSystemApi>, StartupError> {
-    let (tx, rx) = oneshot::channel();
-    let system = BsSystem::new(events_sender.clone(), cwd, tx);
-    let sys_addr = system.start();
-
-    tracing::debug!("{:?}", start_kind);
-
-    let start = Start { kind: start_kind };
-
-    match sys_addr.send(start).await {
-        Ok(Ok(DidStart::Started(..))) => {
+    match system_start
+        .start(cwd, input_opts, events_sender.clone())
+        .await
+    {
+        Ok(DidStart::Started { api }) => {
             tracing::debug!("DidStart::Started");
-            let api = BsSystemApi::new(sys_addr, rx);
             Ok(Some(api))
         }
-        Ok(Ok(DidStart::WillExit)) => {
+        Ok(DidStart::WillExit) => {
             tracing::debug!("DidStart::WillExit");
             Ok(None)
         }
-        Ok(Err(e)) => Err(e),
         Err(e) => {
             let message = e.to_string();
             Err(StartupError::Other(message))
-        }
-    }
-}
-
-#[derive(Debug, actix::Message)]
-#[rtype(result = "Result<DidStart, StartupError>")]
-pub struct Start {
-    pub kind: StartKind,
-}
-
-impl Handler<Start> for BsSystem {
-    type Result = ResponseActFuture<Self, Result<DidStart, StartupError>>;
-
-    #[tracing::instrument(name = "BsSystem->Start", skip(self, msg, ctx))]
-    fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
-        let addr = ctx.address();
-        match msg.kind.resolve_input(&self.start_context) {
-            Ok(SystemStartArgs::PathWithInput { path, input }) => {
-                debug!("SystemStartArgs::PathWithInput");
-
-                let ids = input.ids();
-                let input_ctx = InputCtx::new(&ids, None, &self.start_context, Some(&path));
-                let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
-
-                Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<SetupOk, anyhow::Error>, actor, ctx| {
-                        let SetupOk { servers, input, .. } = res.map_err(StartupError::Any)?;
-                        debug!("✅ setup jobs completed");
-                        ctx.notify(MonitorInput {
-                            path: path.clone(),
-                            cwd: actor.cwd.clone(),
-                            input_ctx,
-                        });
-                        ctx.notify(MonitorAny::new(input.clone()));
-                        Ok(DidStart::Started(servers))
-                    },
-                ))
-            }
-            Ok(SystemStartArgs::InputOnly { input }) => {
-                debug!("SystemStartArgs::InputOnly");
-
-                let addr = ctx.address();
-                let jobs = crate::system::setup_jobs(addr.clone(), input.clone());
-
-                Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<SetupOk, anyhow::Error>, _actor, ctx| {
-                        let res = res?;
-                        debug!("✅ setup jobs completed");
-                        let errored = ChildResult::first_server_error(&res.child_results);
-                        if let Some(server_error) = errored {
-                            debug!("errored: {:?}", errored);
-                            return Err(StartupError::ServerError((*server_error).to_owned()));
-                        }
-                        ctx.notify(MonitorAny::new(res.input.clone()));
-                        Ok(DidStart::Started(res.servers))
-                    },
-                ))
-            }
-            Ok(SystemStartArgs::InputOnlyDeferred { input, create }) => {
-                debug!("SystemStartArgs::InputOnlyDeferred");
-
-                let addr = ctx.address();
-                let addr_clone = addr.clone();
-                let original_input = input.clone();
-                let jobs = async move {
-                    let res = setup_jobs_only(addr_clone.clone(), original_input.clone()).await?;
-                    let input = create
-                        .exec(original_input)
-                        .map_err(|e| StartupError::InputError(*e))?;
-                    let SetupServersOk {
-                        servers,
-                        child_results,
-                    } = setup_servers_only(addr_clone, input.clone()).await?;
-                    let next = SetupOk {
-                        input,
-                        servers,
-                        child_results,
-                        report_and_tree: res.report_and_tree,
-                    };
-                    Ok(next)
-                };
-
-                Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<SetupOk, anyhow::Error>, _actor, ctx| {
-                        let res = res?;
-                        debug!("✅ setup jobs completed");
-                        let errored = ChildResult::first_server_error(&res.child_results);
-                        if let Some(server_error) = errored {
-                            debug!("errored: {:?}", errored);
-                            return Err(StartupError::ServerError((*server_error).to_owned()));
-                        }
-                        ctx.notify(MonitorAny::new(res.input.clone()));
-                        Ok(DidStart::Started(res.servers))
-                    },
-                ))
-            }
-            Ok(SystemStartArgs::PathWithInvalidInput { path, input_error }) => {
-                debug!("SystemStartArgs::PathWithInvalidInput");
-                ctx.notify(MonitorInput {
-                    path: path.clone(),
-                    cwd: self.cwd.clone(),
-                    input_ctx: InputCtx::default(),
-                });
-                self.publish_any_event(AnyEvent::Internal(InternalEvents::InputError(input_error)));
-                let f = ready(Ok(DidStart::Started(Default::default()))).into_actor(self);
-                Box::pin(f)
-            }
-            Ok(SystemStartArgs::RunOnly {
-                input,
-                named,
-                run_mode: RunMode::Exec { summary, preview },
-                top_level_run_mode,
-            }) => {
-                debug!("SystemStartArgs::RunOnly + exec");
-                let addr = ctx.address();
-                let jobs = run_jobs(
-                    addr,
-                    input.clone(),
-                    named,
-                    top_level_run_mode,
-                    preview,
-                    summary,
-                );
-                Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<RunOk, anyhow::Error>, _actor, _ctx| match res {
-                        Ok(RunOk { .. }) => Ok(DidStart::WillExit),
-                        Err(err) => Err(StartupError::Any(err)),
-                    },
-                ))
-            }
-            Ok(SystemStartArgs::RunOnly {
-                input,
-                named,
-                run_mode: RunMode::Dry,
-                top_level_run_mode,
-            }) => {
-                debug!("SystemStartArgs::RunOnly + dry");
-                let addr = ctx.address();
-                let jobs =
-                    crate::system::print_jobs(addr, input.clone(), named, top_level_run_mode);
-                Box::pin(jobs.into_actor(self).map(
-                    move |res: Result<RunDryOk, anyhow::Error>, _actor, _ctx| match res {
-                        Ok(RunDryOk) => Ok(DidStart::WillExit),
-                        Err(err) => Err(StartupError::Any(err)),
-                    },
-                ))
-            }
-            Err(e) => {
-                let f = ready(Err(StartupError::InputError(*e))).into_actor(self);
-                Box::pin(f)
-            }
         }
     }
 }
@@ -212,4 +44,10 @@ impl Handler<StopSystem> for BsSystem {
         tracing::trace!("handling StopSystem. Note: not graceful.");
         ctx.stop();
     }
+}
+
+#[derive(Debug)]
+pub enum DidStart {
+    Started { api: BsSystemApi },
+    WillExit,
 }

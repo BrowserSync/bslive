@@ -6,6 +6,7 @@ use bsnext_fs_helpers::{DirError, FsWriteError};
 use miette::JSONReportHandler;
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::net::AddrParseError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -30,7 +31,7 @@ pub mod watch_opts;
 pub mod when_guard;
 pub mod yml;
 
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Hash, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Input {
     #[serde(default)]
     pub servers: Vec<server_config::ServerConfig>,
@@ -40,6 +41,14 @@ pub struct Input {
     pub run: BTreeMap<String, Vec<RunOptItem>>,
     #[serde(default)]
     pub config: InputConfig,
+}
+
+impl Input {
+    pub fn as_id(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
 impl Input {
@@ -121,7 +130,7 @@ impl FromStr for Input {
     }
 }
 
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Hash, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct InputConfig {
     pub watchers: WatchGlobalConfig,
     pub global_fs_ignore: Option<PathPattern>,
@@ -129,7 +138,7 @@ pub struct InputConfig {
     pub global_fs_debounce: Option<DebounceDuration>,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Hash, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
 pub enum WatchGlobalConfig {
     Enabled { infer: InferWatchers },
@@ -144,7 +153,7 @@ impl Default for WatchGlobalConfig {
     }
 }
 
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Hash, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub enum InferWatchers {
     None,
     Routes,
@@ -198,6 +207,12 @@ pub struct InputArgs {
     pub port: Option<u16>,
 }
 
+impl InputArgs {
+    pub fn new(port: impl Into<Option<u16>>) -> Self {
+        Self { port: port.into() }
+    }
+}
+
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct InputCtx {
     prev_server_ids: Option<Vec<ServerIdentity>>,
@@ -208,15 +223,15 @@ pub struct InputCtx {
 
 impl InputCtx {
     pub fn new(
-        servers: &[ServerIdentity],
+        server_identities: &[ServerIdentity],
         args: Option<InputArgs>,
         startup: &StartupContext,
         file_path: Option<&PathBuf>,
     ) -> Self {
-        let prev = if servers.is_empty() {
+        let prev = if server_identities.is_empty() {
             None
         } else {
-            Some(servers.to_vec())
+            Some(server_identities.to_vec())
         };
         Self {
             prev_server_ids: prev,
@@ -257,8 +272,14 @@ impl InputCtx {
 }
 
 pub trait InputCreation {
-    fn from_input_path<P: AsRef<Path>>(path: P, ctx: &InputCtx) -> Result<Input, Box<InputError>>;
-    fn from_input_str<P: AsRef<str>>(content: P, ctx: &InputCtx) -> Result<Input, Box<InputError>>;
+    fn from_input_path<P: AsRef<Path>>(
+        path: P,
+        input_ctx: &InputCtx,
+    ) -> Result<Input, Box<InputError>>;
+    fn from_input_str<P: AsRef<str>>(
+        content: P,
+        input_ctx: &InputCtx,
+    ) -> Result<Input, Box<InputError>>;
 }
 
 pub trait InputWriter {

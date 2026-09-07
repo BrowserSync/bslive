@@ -12,9 +12,10 @@ use crate::runtime_ctx::RuntimeCtx;
 use crate::server::handler_listen::Listen;
 use crate::server::handler_patch::Patch;
 use crate::servers_supervisor::input_changed_handler::InputChangedResponse;
-use bsnext_dto::internal::{
+use bsnext_dto::any_event::AnyEvent;
+use bsnext_dto::server_events::PatchError;
+use bsnext_dto::server_events::{
     ChildCreated, ChildHandlerMinimal, ChildNotCreated, ChildNotPatched, ChildPatched, ChildResult,
-    PatchError,
 };
 use futures_util::future::join_all;
 use futures_util::FutureExt;
@@ -24,6 +25,7 @@ use tracing::{span, Instrument, Level};
 #[derive(Debug)]
 pub struct ServersSupervisor {
     pub(crate) handlers: std::collections::HashMap<ServerIdentity, ChildHandler>,
+    pub(crate) ex_sender: tokio::sync::mpsc::Sender<AnyEvent>,
     tx: Option<Sender<()>>,
 }
 
@@ -44,9 +46,10 @@ impl ChildHandler {
 }
 
 impl ServersSupervisor {
-    pub fn new(tx: Sender<()>) -> Self {
+    pub fn new(tx: Sender<()>, ex_sender: tokio::sync::mpsc::Sender<AnyEvent>) -> Self {
         Self {
             handlers: std::default::Default::default(),
+            ex_sender,
             tx: Some(tx),
         }
     }

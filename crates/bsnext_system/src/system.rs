@@ -1,30 +1,31 @@
 use crate::capabilities::Capabilities;
 use crate::fs_task_tracker::FsTaskTracker;
+use crate::input_fs::from_input_path;
 use crate::invoke_scope::{InvokeScope, Invoker};
-use crate::monitor_input::InputMonitor;
+use crate::monitor_any::MonitorAny;
+use crate::monitor_input::{InputMonitor, MonitorInput};
 use crate::path_monitors::PathMonitors;
-use crate::run::resolve_spec::{InvokeRunTasks, ResolveSpec};
-use crate::servers::ResolveServers;
-use crate::tasks::resolve::ResolveInitialTasks;
 use crate::tasks::task_spec::TaskSpec;
-use actix::{Actor, Addr, AsyncContext, ResponseFuture, Running};
+use actix::{Actor, Addr, AsyncContext, Handler, ResponseFuture, Running};
 use actix_rt::Arbiter;
 use bsnext_core::servers_supervisor::actor::ServersSupervisor;
-use bsnext_dto::external_events::{ExternalEventsDTO, TaskTreePreview, TaskTreeSummary};
-use bsnext_dto::internal::{AnyEvent, ChildResult, TaskReportAndTree};
-use bsnext_dto::GetActiveServersResponse;
-use bsnext_input::startup::{StartupContext, TopLevelRunMode};
-use bsnext_input::Input;
+use bsnext_core::servers_supervisor::resolve_servers::ResolveServers;
+use bsnext_dto::any_event::AnyEvent;
+use bsnext_dto::external_events::ExternalEventsDTO;
+use bsnext_dto::internal_events::InternalEvents;
+use bsnext_dto::task_events::TaskReportAndTree;
+use bsnext_dto::{InputErrorDetailDTO, StartupErrorDTO};
+use bsnext_input::input_fs::ResolvedInputOutcome;
+use bsnext_input::startup::StartupContext;
+use bsnext_input::{Input, InputCtx, InputError};
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
 use std::path::PathBuf;
-use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::Receiver;
 
 #[derive(Debug)]
 pub struct BsSystem {
     pub(crate) self_addr: Option<Addr<BsSystem>>,
-    capabilities_addr: Addr<Capabilities>,
     servers_addr: Addr<ServersSupervisor>,
     any_event_sender: Sender<AnyEvent>,
     pub(crate) input_monitors: Option<InputMonitor>,
@@ -55,9 +56,6 @@ impl Actor for BsSystem {
 }
 
 impl BsSystem {
-    pub fn capabilities(&self) -> &Addr<Capabilities> {
-        &self.capabilities_addr
-    }
     pub fn servers(&self) -> &Addr<ServersSupervisor> {
         &self.servers_addr
     }
@@ -70,23 +68,18 @@ impl BsSystem {
         cwd: PathBuf,
         tx: tokio::sync::oneshot::Sender<()>,
     ) -> Self {
-        let servers = ServersSupervisor::new(tx);
+        let servers = ServersSupervisor::new(tx, any_event_sender.clone());
         let servers_addr = servers.start();
         let capabilities = Capabilities::new(any_event_sender.clone(), servers_addr.clone());
         let capabilities_addr = capabilities.start();
         let start_context = StartupContext::from_cwd(Some(&cwd));
-        let invoker = Invoker::new(
-            capabilities_addr.clone(),
-            servers_addr.clone(),
-            any_event_sender.clone(),
-        );
+        let invoker = Invoker::new(capabilities_addr.clone(), any_event_sender.clone());
         let invoker_addr = invoker.start();
         let fs_task_tracker = FsTaskTracker::new(invoker_addr.clone().recipient()).start();
         let monitor = PathMonitors::new();
         let monitor = monitor.start();
         BsSystem {
             self_addr: None,
-            capabilities_addr,
             servers_addr,
             any_event_sender,
             input_monitors: None,
@@ -98,7 +91,7 @@ impl BsSystem {
         }
     }
 
-    pub fn publish_any_event(&mut self, evt: AnyEvent) {
+    pub fn publish_external_event(&mut self, evt: AnyEvent) {
         tracing::trace!(?evt);
         let sender = self.any_event_sender.clone();
 
@@ -110,6 +103,30 @@ impl BsSystem {
                 }
             }
         });
+    }
+
+    pub fn publish_internal_event(&mut self, evt: InternalEvents) {
+        match evt {
+            InternalEvents::InputError(InputError::BsLiveRules(bs_rules)) => {
+                let n = miette::GraphicalReportHandler::new();
+                let mut inner = String::new();
+                n.render_report(&mut inner, &bs_rules).expect("write?");
+                let evt = ExternalEventsDTO::InputError(InputErrorDetailDTO { error: inner });
+                self.publish_external_event(AnyEvent::External(evt));
+            }
+            InternalEvents::InputError(err) => {
+                let evt = ExternalEventsDTO::InputError(InputErrorDetailDTO {
+                    error: err.to_string(),
+                });
+                self.publish_external_event(AnyEvent::External(evt));
+            }
+            InternalEvents::StartupError(startup) => {
+                let evt = ExternalEventsDTO::StartupError(StartupErrorDTO {
+                    error: startup.to_string(),
+                });
+                self.publish_external_event(AnyEvent::External(evt));
+            }
+        }
     }
 
     pub(crate) fn before(&mut self, input: &Input) -> TaskSpec {
@@ -125,6 +142,128 @@ impl BsSystem {
 
         let (tx, rx) = tokio::sync::oneshot::channel::<TaskReportAndTree>();
         (InvokeScope::new(trigger, spec, tx), rx)
+    }
+}
+
+#[derive(Debug, actix::Message)]
+#[rtype(result = "StartupContext")]
+pub struct GetStartContext;
+
+impl Handler<GetStartContext> for BsSystem {
+    type Result = ResponseFuture<StartupContext>;
+
+    fn handle(&mut self, _msg: GetStartContext, _ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(futures::future::ready(self.start_context.clone()))
+    }
+}
+
+#[derive(Debug, actix::Message)]
+#[rtype(result = "Result<Option<ResolveInputResult>, Box<InputError>>")]
+pub struct ResolveInput {
+    pub input_paths: Vec<String>,
+}
+
+impl ResolveInput {
+    pub fn from_strs<A: AsRef<str>>(paths: &[A]) -> Self {
+        Self {
+            input_paths: paths.iter().map(|s| s.as_ref().to_string()).collect(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ResolveInputResult {
+    pub input: Input,
+    pub absolute: PathBuf,
+}
+
+impl Handler<ResolveInput> for BsSystem {
+    type Result = ResponseFuture<Result<Option<ResolveInputResult>, Box<InputError>>>;
+
+    fn handle(&mut self, msg: ResolveInput, _ctx: &mut Self::Context) -> Self::Result {
+        let cwd = self.cwd.clone();
+        let start = self.start_context.clone();
+        Box::pin(async move {
+            match ResolvedInputOutcome::new(cwd.clone(), &msg.input_paths) {
+                ResolvedInputOutcome::Missing { err, .. } => Err(err),
+                ResolvedInputOutcome::GivenPath { ref absolute, .. } => {
+                    let ctx = InputCtx::new(&[], None, &start, Some(absolute));
+                    Ok(Some(ResolveInputResult {
+                        input: from_input_path(absolute, &ctx)?,
+                        absolute: absolute.clone(),
+                    }))
+                }
+                ResolvedInputOutcome::Auto { ref absolute, .. } => {
+                    let ctx = InputCtx::new(&[], None, &start, Some(absolute));
+                    Ok(Some(ResolveInputResult {
+                        input: from_input_path(absolute, &ctx)?,
+                        absolute: absolute.clone(),
+                    }))
+                }
+                ResolvedInputOutcome::Empty => Ok(None),
+            }
+        })
+    }
+}
+
+#[derive(Debug, actix::Message)]
+#[rtype(result = "Result<(), anyhow::Error>")]
+pub struct CommitInput {
+    pub(crate) input: Input,
+}
+
+impl CommitInput {
+    pub fn new(input: impl Into<Input>) -> Self {
+        Self {
+            input: input.into(),
+        }
+    }
+}
+
+impl actix::Handler<CommitInput> for BsSystem {
+    type Result = ResponseFuture<Result<(), anyhow::Error>>;
+
+    fn handle(&mut self, msg: CommitInput, ctx: &mut Self::Context) -> Self::Result {
+        let input = msg.input;
+        let servers = self.servers().clone();
+        let self_addr = ctx.address();
+        servers.do_send(ResolveServers::new(input.clone()));
+        self_addr.do_send(MonitorAny::new(input));
+        Box::pin(async move { Ok(()) })
+    }
+}
+
+#[derive(Debug, actix::Message)]
+#[rtype(result = "Result<(), anyhow::Error>")]
+pub struct CommitInputFile {
+    pub(crate) input: Input,
+    pub(crate) absolute: PathBuf,
+    pub(crate) ctx: InputCtx,
+}
+
+impl CommitInputFile {
+    pub fn new(input: impl Into<Input>, pb: impl Into<PathBuf>, ctx: impl Into<InputCtx>) -> Self {
+        Self {
+            input: input.into(),
+            absolute: pb.into(),
+            ctx: ctx.into(),
+        }
+    }
+}
+
+impl actix::Handler<CommitInputFile> for BsSystem {
+    type Result = ResponseFuture<Result<(), anyhow::Error>>;
+
+    fn handle(&mut self, msg: CommitInputFile, ctx: &mut Self::Context) -> Self::Result {
+        let input = msg.input;
+        let self_addr = ctx.address();
+        let abs = msg.absolute;
+        let ctx = msg.ctx;
+        Box::pin(async move {
+            let _v = self_addr.send(CommitInput { input }).await?;
+            self_addr.send(MonitorInput::new(abs, ctx)).await?;
+            Ok(())
+        })
     }
 }
 
@@ -147,118 +286,7 @@ impl actix::Handler<ExternalEventMsg> for BsSystem {
     }
 }
 
-pub async fn setup_jobs(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupOk> {
-    let clone = input.clone();
-    let clone2 = input.clone();
-
-    let spec = addr.send(ResolveInitialTasks::new(clone)).await??;
-    let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
-    let (servers, child_results) = addr.send(ResolveServers::new(clone2)).await??;
-    Ok(SetupOk {
-        input,
-        report_and_tree,
-        servers,
-        child_results,
-    })
-}
-
-pub async fn setup_jobs_only(addr: Addr<BsSystem>, input: Input) -> anyhow::Result<SetupTasksOk> {
-    let spec = addr.send(ResolveInitialTasks::new(input)).await??;
-    let report_and_tree = addr.send(InvokeRunTasks::new(spec)).await??;
-    Ok(SetupTasksOk { report_and_tree })
-}
-
-pub async fn setup_servers_only(
-    addr: Addr<BsSystem>,
-    input: Input,
-) -> anyhow::Result<SetupServersOk> {
-    let (servers, child_results) = addr.send(ResolveServers::new(input)).await??;
-    Ok(SetupServersOk {
-        servers,
-        child_results,
-    })
-}
-
-pub async fn run_jobs(
-    addr: Addr<BsSystem>,
-    input: Input,
-    named: Vec<String>,
-    top_level_run_mode: TopLevelRunMode,
-    preview: bool,
-    summary: bool,
-) -> anyhow::Result<RunOk> {
-    let spec_output = addr
-        .send(ResolveSpec::new(input, named, top_level_run_mode))
-        .await??;
-    let spec = spec_output.as_spec();
-    let tree = spec.as_tree();
-
-    if preview {
-        addr.send(ExternalEventMsg {
-            evt: ExternalEventsDTO::TaskTreePreview(TaskTreePreview {
-                tree: tree.clone(),
-                will_exec: true,
-            }),
-        })
-        .await??;
-        tokio::time::sleep(Duration::from_secs(2)).await;
-    }
-
-    let report_and_tree = addr.send(InvokeRunTasks::new(spec.clone())).await??;
-
-    if summary {
-        let tree = spec.as_tree();
-        addr.send(ExternalEventMsg {
-            evt: ExternalEventsDTO::TaskTreeSummary(TaskTreeSummary::from_report(
-                tree,
-                &report_and_tree.report_map,
-            )),
-        })
-        .await??;
-    }
-
-    Ok(RunOk { report_and_tree })
-}
-
-pub async fn print_jobs(
-    addr: Addr<BsSystem>,
-    input: Input,
-    named: Vec<String>,
-    top_level_run_mode: TopLevelRunMode,
-) -> anyhow::Result<RunDryOk> {
-    let spec_output = addr
-        .send(ResolveSpec::new(input, named, top_level_run_mode))
-        .await??;
-    let spec = spec_output.as_spec();
-    let tree = spec.as_tree();
-    addr.send(ExternalEventMsg {
-        evt: ExternalEventsDTO::TaskTreePreview(TaskTreePreview {
-            tree: tree.clone(),
-            will_exec: false,
-        }),
-    })
-    .await??;
-    Ok(RunDryOk)
-}
-
-pub struct SetupOk {
-    pub(crate) input: Input,
-    pub(crate) servers: GetActiveServersResponse,
-    #[allow(dead_code)]
-    pub report_and_tree: TaskReportAndTree,
-    pub(crate) child_results: Vec<ChildResult>,
-}
-
-pub struct SetupServersOk {
-    pub(crate) servers: GetActiveServersResponse,
-    pub(crate) child_results: Vec<ChildResult>,
-}
-
-pub struct SetupTasksOk {
-    #[allow(dead_code)]
-    pub report_and_tree: TaskReportAndTree,
-}
-
+#[derive(Debug)]
 pub struct RunOk {
     #[allow(dead_code)]
     pub report_and_tree: TaskReportAndTree,

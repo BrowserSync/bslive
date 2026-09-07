@@ -1,5 +1,5 @@
 use actix::{Actor, ActorFutureExt, Recipient, ResponseActFuture, WrapFuture};
-use bsnext_dto::internal::AnyEvent;
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_task::as_actor::AsActor;
 use bsnext_task::invocation::Invocation;
 use bsnext_task::invocation_result::InvocationResult;
