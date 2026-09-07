@@ -93,7 +93,8 @@ impl SystemStart for StartCommand {
             }
             InputResolution::File(file) => {
                 let args = InputArgs::new(self.port);
-                let ctx = InputCtx::new(&[], Some(args), &startup_ctx, Some(&file));
+                let server_ids = input.ids();
+                let ctx = InputCtx::new(&server_ids, Some(args), &startup_ctx, Some(&file));
                 let _r = addr.send(CommitInputFile::new(input, file, ctx)).await;
             }
         }
