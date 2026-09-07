@@ -11,8 +11,7 @@ use bsnext_core::shared_args::{InputOpts, LoggingOpts};
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::StartupError;
 use bsnext_input::route::{MultiWatch, PathPattern};
-use bsnext_input::startup::{StartupContext, SystemStartArgs};
-use bsnext_input::{Input, InputError};
+use bsnext_input::Input;
 use bsnext_tracing::OutputFormat;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
@@ -87,10 +86,6 @@ impl WatchCommand {
 }
 
 impl SystemStart for WatchCommand {
-    fn resolve_input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        todo!()
-    }
-
     async fn start(
         &self,
         cwd: PathBuf,

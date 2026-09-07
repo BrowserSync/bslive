@@ -108,33 +108,28 @@ async fn async_init(
     cwd: PathBuf,
     (sender, fut): (Sender<AnyEvent>, impl Future<Output = ()> + 'static),
 ) -> Result<(), anyhow::Error> {
-    // let fs_opts = args.fs_opts.clone();
-    // let _input_opts = args.input_opts.clone();
     match args.command() {
         (SubCommands::Start(start), input_opts) => {
-            // let start_kind = start.as_start_kind(&fs_opts, &input_opts);
             start_wrapper(start, cwd, input_opts, (sender, fut)).await
         }
         (SubCommands::Watch(watch), input_opts) => {
-            // let start_kind = watch.as_start_kind(&fs_opts, &input_opts);
             start_wrapper(watch, cwd, input_opts, (sender, fut)).await
         }
         (SubCommands::Run(run), input_opts) => {
-            // let start_kind = run.as_start_kind(&fs_opts, &input_opts);
             start_wrapper(run, cwd, input_opts, (sender, fut)).await
         }
     }
 }
 
 async fn start_wrapper(
-    start_kind: impl SystemStart + 'static,
+    system_start: impl SystemStart + 'static,
     cwd: PathBuf,
     input_opts: InputOpts,
     (sender, fut): (Sender<AnyEvent>, impl Future<Output = ()> + 'static),
 ) -> anyhow::Result<()> {
     let system_handle = actix_rt::spawn(start::with_sender(
         cwd,
-        start_kind,
+        system_start,
         input_opts,
         sender.clone(),
     ));

@@ -10,11 +10,11 @@ use std::path::PathBuf;
 
 pub async fn start_system(
     cwd: PathBuf,
-    start_kind: impl SystemStart,
+    system_start: impl SystemStart,
     input_opts: InputOpts,
     events_sender: tokio::sync::mpsc::Sender<AnyEvent>,
 ) -> Result<Option<BsSystemApi>, StartupError> {
-    match start_kind
+    match system_start
         .start(cwd, input_opts, events_sender.clone())
         .await
     {

@@ -26,31 +26,6 @@ impl StartupContext {
     }
 }
 
-#[derive(Debug)]
-pub enum SystemStartArgs {
-    PathWithInput {
-        path: PathBuf,
-        input: Input,
-    },
-    InputOnly {
-        input: Input,
-    },
-    InputOnlyDeferred {
-        input: Input,
-        create: Lazy,
-    },
-    PathWithInvalidInput {
-        path: PathBuf,
-        input_error: InputError,
-    },
-    RunOnly {
-        input: Input,
-        named: Vec<String>,
-        run_mode: RunMode,
-        top_level_run_mode: TopLevelRunMode,
-    },
-}
-
 pub struct Lazy {
     inner: Box<dyn Fn(Input) -> Result<Input, Box<InputError>>>,
 }

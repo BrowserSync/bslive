@@ -5,8 +5,6 @@ use bsnext_core::shared_args::InputOpts;
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::{StartupError, StartupErrorDTO};
-use bsnext_input::startup::{StartupContext, SystemStartArgs};
-use bsnext_input::InputError;
 use bsnext_output::stdout::StdoutTarget;
 use bsnext_output::OutputWriters;
 use start_system::DidStart;
@@ -40,16 +38,16 @@ pub fn stdout_channel(writer: OutputWriters) -> (Sender<AnyEvent>, impl Future<O
     (events_sender, channel_future)
 }
 
-#[tracing::instrument(skip(start_kind))]
+#[tracing::instrument(skip(system_start))]
 pub async fn with_sender(
     cwd: PathBuf,
-    start_kind: impl SystemStart,
+    system_start: impl SystemStart,
     input_opts: InputOpts,
     events_sender: Sender<AnyEvent>,
 ) -> Result<(), anyhow::Error> {
     let ecc = events_sender.clone();
 
-    let startup = start_system(cwd, start_kind, input_opts, events_sender).await;
+    let startup = start_system(cwd, system_start, input_opts, events_sender).await;
     match startup {
         // If the startup was successful, keep hold of the handle to keep the system running
         Ok(Some(api)) => match api.handle().await {
@@ -72,7 +70,6 @@ pub async fn with_sender(
 }
 
 pub trait SystemStart {
-    fn resolve_input(&self, ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>>;
     #[allow(async_fn_in_trait)]
     async fn start(
         &self,

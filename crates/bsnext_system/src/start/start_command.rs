@@ -15,8 +15,7 @@ use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::StartupError;
 use bsnext_input::route::{CorsOpts, Opts};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
-use bsnext_input::startup::{StartupContext, SystemStartArgs};
-use bsnext_input::{Input, InputArgs, InputCtx, InputError, WatchGlobalConfig};
+use bsnext_input::{Input, InputArgs, InputCtx, WatchGlobalConfig};
 use bsnext_tracing::OutputFormat;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc::Sender;
@@ -56,10 +55,6 @@ pub struct StartCommand {
 }
 
 impl SystemStart for StartCommand {
-    fn resolve_input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        todo!()
-    }
-
     async fn start(
         &self,
         cwd: PathBuf,

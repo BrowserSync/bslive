@@ -11,8 +11,8 @@ use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::{ExternalEventsDTO, TaskTreePreview, TaskTreeSummary};
 use bsnext_dto::StartupError;
 use bsnext_input::route::{RunAll, RunOptItem, RunSeq, ShRunOptItem};
-use bsnext_input::startup::{RunMode, StartupContext, SystemStartArgs, TopLevelRunMode};
-use bsnext_input::{Input, InputError};
+use bsnext_input::startup::{RunMode, TopLevelRunMode};
+use bsnext_input::Input;
 use bsnext_tracing::OutputFormat;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -116,10 +116,6 @@ impl RunCommand {
 }
 
 impl SystemStart for RunCommand {
-    fn resolve_input(&self, _ctx: &StartupContext) -> Result<SystemStartArgs, Box<InputError>> {
-        todo!()
-    }
-
     async fn start(
         &self,
         cwd: PathBuf,
