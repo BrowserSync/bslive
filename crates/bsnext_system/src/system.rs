@@ -21,7 +21,7 @@ use bsnext_dto::{InputErrorDetailDTO, StartupErrorDTO};
 use bsnext_input::input_fs::ResolvedInputOutcome;
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::startup::StartupContext;
-use bsnext_input::{Input, InputCtx, InputError};
+use bsnext_input::{Input, InputArgs, InputCtx, InputError};
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -256,12 +256,14 @@ impl Handler<GetStartContext> for BsSystem {
 #[rtype(result = "Result<Option<ResolveInputResult>, Box<InputError>>")]
 pub struct ResolveInput {
     pub input_paths: Vec<String>,
+    pub optional_port: Option<u16>,
 }
 
 impl ResolveInput {
-    pub fn from_strs<A: AsRef<str>>(paths: &[A]) -> Self {
+    pub fn from_strs<A: AsRef<str>>(paths: &[A], optional_port: &Option<u16>) -> Self {
         Self {
             input_paths: paths.iter().map(|s| s.as_ref().to_string()).collect(),
+            optional_port: optional_port.clone(),
         }
     }
 }
@@ -278,18 +280,21 @@ impl Handler<ResolveInput> for BsSystem {
     fn handle(&mut self, msg: ResolveInput, _ctx: &mut Self::Context) -> Self::Result {
         let cwd = self.cwd.clone();
         let start = self.start_context.clone();
+        let optional_port = msg.optional_port;
         Box::pin(async move {
             match ResolvedInputOutcome::new(cwd.clone(), &msg.input_paths) {
                 ResolvedInputOutcome::Missing { err, .. } => Err(err),
                 ResolvedInputOutcome::GivenPath { ref absolute, .. } => {
-                    let ctx = InputCtx::new(&[], None, &start, Some(absolute));
+                    let args = optional_port.map(InputArgs::new);
+                    let ctx = InputCtx::new(&[], args, &start, Some(absolute));
                     Ok(Some(ResolveInputResult {
                         input: from_input_path(absolute, &ctx)?,
                         absolute: absolute.clone(),
                     }))
                 }
                 ResolvedInputOutcome::Auto { ref absolute, .. } => {
-                    let ctx = InputCtx::new(&[], None, &start, Some(absolute));
+                    let args = optional_port.map(InputArgs::new);
+                    let ctx = InputCtx::new(&[], args, &start, Some(absolute));
                     Ok(Some(ResolveInputResult {
                         input: from_input_path(absolute, &ctx)?,
                         absolute: absolute.clone(),

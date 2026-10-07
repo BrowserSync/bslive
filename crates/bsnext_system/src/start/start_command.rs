@@ -73,7 +73,7 @@ impl SystemStart for StartCommand {
             .context("Trying to get ctx")?;
 
         // prepare initial input before any tasks should run
-        let (mut input, resolution) = self.prepare_input(&addr, &input_opts).await?;
+        let (mut input, resolution) = self.prepare_input(&addr, &input_opts, &self.port).await?;
 
         // now run any 'before' tasks run before we try anything.
         initial_tasks(&addr, input.clone()).await?;
@@ -114,10 +114,11 @@ impl StartCommand {
         &self,
         addr: &Addr<BsSystem>,
         input_opts: &InputOpts,
+        optional_port: &Option<u16>,
     ) -> anyhow::Result<(Input, InputResolution)> {
         // try to resolve input from disk
         let input = addr
-            .send(ResolveInput::from_strs(&input_opts.input))
+            .send(ResolveInput::from_strs(&input_opts.input, optional_port))
             .await
             .context("mailbox")??;
 

@@ -174,8 +174,8 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
                     //
                     // }
 
-                    // let dto = ServerChangesetDTO::from_changes(&resp, &res);
-                    // dbg!(dto);
+                    let dto = ServerChangesetDTO::from_changes(&resp, &res);
+                    dbg!(dto);
 
                     // let _ = sender
                     //     .send(AnyEvent::External(ExternalEventsDTO::ServerChangeset(dto)))
