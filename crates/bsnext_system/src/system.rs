@@ -332,7 +332,8 @@ impl actix::Handler<CommitInput> for BsSystem {
         let status_tracker = self.status_tracker.clone();
 
         // let servers_state = input.servers;
-        // self_addr.do_send(MonitorAny::new(input));
+        // todo: make this another thing to eventually come up
+        self_addr.do_send(MonitorAny::new(input.clone()));
         Box::pin(async move {
             let _ = status_tracker
                 .send(Accept { input })

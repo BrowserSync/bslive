@@ -5,6 +5,7 @@ use crate::servers_supervisor::get_servers_handler::GetActiveServers;
 use crate::servers_supervisor::input_changed_handler::{InputChanged, InputChangedResponse};
 use actix::ActorFutureExt;
 use actix::{Addr, AsyncContext, ResponseActFuture, ResponseFuture, WrapFuture};
+use actix_rt::Arbiter;
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::server_events::{ChildResult, ServerError};
@@ -174,12 +175,14 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
                     //
                     // }
 
-                    let dto = ServerChangesetDTO::from_changes(&resp, &res);
-                    dbg!(dto);
-
-                    // let _ = sender
-                    //     .send(AnyEvent::External(ExternalEventsDTO::ServerChangeset(dto)))
-                    //     .await;
+                    Arbiter::current().spawn({
+                        let dto = ServerChangesetDTO::from_changes(&resp, &res);
+                        async move {
+                            let _ = sender
+                                .send(AnyEvent::External(ExternalEventsDTO::ServerChangeset(dto)))
+                                .await;
+                        }
+                    });
                 }
             }
             Ok(())
