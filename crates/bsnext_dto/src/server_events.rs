@@ -1,3 +1,4 @@
+use actix::{Handler, ResponseFuture};
 use bsnext_input::server_config::ServerIdentity;
 use std::net::SocketAddr;
 
@@ -5,6 +6,7 @@ use std::net::SocketAddr;
 pub struct ChildHandlerMinimal {
     pub identity: ServerIdentity,
     pub socket_addr: SocketAddr,
+    pub content_hash: u64,
 }
 
 #[derive(Debug, Clone, actix::Message)]
@@ -17,6 +19,7 @@ pub struct ChildCreated {
 #[rtype(result = "()")]
 pub struct ChildPatched {
     pub server_handler: ChildHandlerMinimal,
+    pub next_content_hash: u64,
     pub route_change_set: bsnext_input::route_manifest::RouteChangeSet,
     pub client_config_change_set: bsnext_input::client_config::ClientConfigChangeSet,
 }

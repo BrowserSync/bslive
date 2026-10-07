@@ -22,6 +22,8 @@ pub mod server_events;
 pub mod startup_events;
 pub mod task_events;
 
+pub mod status_events;
+
 #[typeshare]
 #[derive(Debug, serde::Serialize)]
 pub struct ServerDesc {
@@ -447,6 +449,7 @@ impl From<&ActiveServer> for ServerDTO {
 #[derive(Debug, Clone)]
 pub struct ActiveServer {
     pub identity: ServerIdentity,
+    pub content_hash: u64,
     pub socket_addr: SocketAddr,
 }
 

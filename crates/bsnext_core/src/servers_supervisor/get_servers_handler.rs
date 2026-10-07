@@ -7,10 +7,8 @@ use bsnext_dto::{ActiveServer, GetActiveServersResponse};
 #[rtype(result = "GetActiveServersResponse")]
 pub struct GetActiveServers;
 
-impl actix::Handler<GetActiveServers> for ServersSupervisor {
-    type Result = GetActiveServersResponse;
-
-    fn handle(&mut self, _msg: GetActiveServers, _ctx: &mut Self::Context) -> Self::Result {
+impl ServersSupervisor {
+    pub fn active_servers(&self) -> GetActiveServersResponse {
         GetActiveServersResponse {
             servers: self
                 .handlers
@@ -18,9 +16,17 @@ impl actix::Handler<GetActiveServers> for ServersSupervisor {
                 .map(|(identity, child_handler)| ActiveServer {
                     identity: identity.clone(),
                     socket_addr: child_handler.socket_addr,
+                    content_hash: child_handler.content_hash,
                 })
                 .collect(),
         }
+    }
+}
+impl actix::Handler<GetActiveServers> for ServersSupervisor {
+    type Result = GetActiveServersResponse;
+
+    fn handle(&mut self, _msg: GetActiveServers, _ctx: &mut Self::Context) -> Self::Result {
+        self.active_servers()
     }
 }
 

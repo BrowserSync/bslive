@@ -1,11 +1,13 @@
 use crate::server::handler_stop::Stop;
-use actix::{Actor, Addr, ResponseFuture, Running};
+use actix::{Actor, Addr, Message, Recipient, ResponseFuture, Running};
 
 use crate::server::actor::ServerActor;
 
 use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::Input;
 use std::collections::HashSet;
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::marker::PhantomData;
 use std::net::SocketAddr;
 
 use crate::runtime_ctx::RuntimeCtx;
@@ -17,6 +19,7 @@ use bsnext_dto::server_events::PatchError;
 use bsnext_dto::server_events::{
     ChildCreated, ChildHandlerMinimal, ChildNotCreated, ChildNotPatched, ChildPatched, ChildResult,
 };
+use bsnext_dto::status_events::{ServerStatusReader, ServerStatusWriter, ServersStatus};
 use futures_util::future::join_all;
 use futures_util::FutureExt;
 use tokio::sync::oneshot::Sender;
@@ -25,8 +28,11 @@ use tracing::{span, Instrument, Level};
 #[derive(Debug)]
 pub struct ServersSupervisor {
     pub(crate) handlers: std::collections::HashMap<ServerIdentity, ChildHandler>,
-    pub(crate) ex_sender: tokio::sync::mpsc::Sender<AnyEvent>,
+    pub(crate) sender: tokio::sync::mpsc::Sender<AnyEvent>,
+    pub(crate) state_reader: Recipient<ServerStatusReader>,
+    pub(crate) state_writer: Recipient<ServerStatusWriter>,
     tx: Option<Sender<()>>,
+    pub(crate) status: ServersStatus,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +40,7 @@ pub struct ChildHandler {
     pub actor_address: Addr<ServerActor>,
     pub identity: ServerIdentity,
     pub socket_addr: SocketAddr,
+    pub content_hash: u64,
 }
 
 impl ChildHandler {
@@ -41,16 +48,25 @@ impl ChildHandler {
         ChildHandlerMinimal {
             identity: self.identity.clone(),
             socket_addr: self.socket_addr,
+            content_hash: self.content_hash,
         }
     }
 }
 
 impl ServersSupervisor {
-    pub fn new(tx: Sender<()>, ex_sender: tokio::sync::mpsc::Sender<AnyEvent>) -> Self {
+    pub fn new(
+        tx: Sender<()>,
+        ex_sender: tokio::sync::mpsc::Sender<AnyEvent>,
+        state_reader: Recipient<ServerStatusReader>,
+        state_writer: Recipient<ServerStatusWriter>,
+    ) -> Self {
         Self {
             handlers: std::default::Default::default(),
-            ex_sender,
+            sender: ex_sender,
             tx: Some(tx),
+            status: ServersStatus::default(),
+            state_reader,
+            state_writer,
         }
     }
 
@@ -119,7 +135,7 @@ impl ServersSupervisor {
                     let server = ServerActor::new_from_config(server_config.clone());
                     let actor_addr = server.start();
                     let actor_addr_c = actor_addr.clone();
-                    let c = server_config.clone();
+                    let original_config = server_config.clone();
                     actor_addr
                         .send(Listen {
                             // todo: tie this to the input somehow?
@@ -127,15 +143,19 @@ impl ServersSupervisor {
                             parent: self_addr.clone().recipient(),
                             evt_receiver: self_addr.clone().recipient(),
                         })
-                        .map(|r| (r, c, actor_addr_c))
+                        .map(|r| (r, original_config, actor_addr_c))
                 });
                 let results = join_all(fts).await;
                 let start_child_results = results.into_iter().map(|(r, c, addr)| match r {
                     Ok(Ok(socket_addr)) => {
+                        let mut hasher = DefaultHasher::new();
+                        c.hash(&mut hasher);
+                        let content_hash = hasher.finish();
                         let evt = ChildResult::Created(ChildCreated {
                             server_handler: ChildHandlerMinimal {
                                 identity: c.identity,
                                 socket_addr,
+                                content_hash,
                             },
                         });
                         (Some(addr), evt)
@@ -151,32 +171,39 @@ impl ServersSupervisor {
                 });
 
                 let patch_futures = patch_jobs.into_iter().map(|(child, server_config)| {
+                    let mut hasher = DefaultHasher::new();
+                    server_config.hash(&mut hasher);
+                    let content_hash = hasher.finish();
                     child
                         .actor_address
                         .send(Patch { server_config })
-                        .map(|r| (r, child))
+                        .map(move |r| (r, child, content_hash))
                 });
                 let results = join_all(patch_futures).await;
-                let patch_child_results = results.into_iter().map(|(r, child_handler)| match r {
-                    Ok(Ok((route_change_set, client_config_change_set))) => {
-                        let evt = ChildResult::Patched(ChildPatched {
-                            server_handler: child_handler.minimal(),
-                            route_change_set,
-                            client_config_change_set,
+                let patch_child_results =
+                    results
+                        .into_iter()
+                        .map(|(r, child_handler, next_content_hash)| match r {
+                            Ok(Ok((route_change_set, client_config_change_set))) => {
+                                let evt = ChildResult::Patched(ChildPatched {
+                                    server_handler: child_handler.minimal(),
+                                    route_change_set,
+                                    client_config_change_set,
+                                    next_content_hash,
+                                });
+                                (Some(child_handler.actor_address), evt)
+                            }
+                            Ok(Err(err)) => {
+                                let evt = ChildResult::PatchErr(ChildNotPatched {
+                                    patch_error: PatchError::DidNotPatch {
+                                        reason: err.to_string(),
+                                    },
+                                    identity: child_handler.identity.clone(),
+                                });
+                                (None, evt)
+                            }
+                            Err(_) => unreachable!("mailbox error on patch"),
                         });
-                        (Some(child_handler.actor_address), evt)
-                    }
-                    Ok(Err(err)) => {
-                        let evt = ChildResult::PatchErr(ChildNotPatched {
-                            patch_error: PatchError::DidNotPatch {
-                                reason: err.to_string(),
-                            },
-                            identity: child_handler.identity.clone(),
-                        });
-                        (None, evt)
-                    }
-                    Err(_) => unreachable!("mailbox error on patch"),
-                });
 
                 let changes = shutdown_child_results
                     .chain(start_child_results)

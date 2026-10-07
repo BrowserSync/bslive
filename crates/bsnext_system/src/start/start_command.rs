@@ -152,8 +152,7 @@ impl StartCommand {
 
         let identity = ServerIdentity::from_port_or_named(port).context("port")?;
 
-        let server_config = server_config_from_paths(cwd, &paths, &route_opts, identity)
-            .context("server config")?;
+        let server_config = server_config_from_paths(cwd, &paths, &route_opts, identity)?;
 
         Ok(server_config)
     }
