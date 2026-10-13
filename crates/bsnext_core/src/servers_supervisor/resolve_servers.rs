@@ -1,27 +1,29 @@
 use crate::server::handler_client_config::ClientConfigChange;
 use crate::server::handler_routes_updated::RoutesUpdated;
-use crate::servers_supervisor::actor::{ChildHandler, ChildStopped, ServersSupervisor};
-use crate::servers_supervisor::get_servers_handler::GetActiveServers;
+use crate::servers_supervisor::actor::{ChildHandler, ServersSupervisor};
 use crate::servers_supervisor::input_changed_handler::{InputChanged, InputChangedResponse};
 use actix::ActorFutureExt;
-use actix::{Addr, AsyncContext, ResponseActFuture, ResponseFuture, WrapFuture};
+use actix::{AsyncContext, ResponseActFuture, WrapFuture};
 use actix_rt::Arbiter;
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::server_events::{ChildResult, ServerError};
 use bsnext_dto::status_events::{
-    active_server_status_hash, ServerStatusReader, ServerStatusWriter, ServersStatus, StateValue,
+    active_server_status_hash, ServerStatusReader, ServerStatusWriter, ServiceStatus, StateValue,
 };
-use bsnext_dto::{GetActiveServersResponse, ServerChangesetDTO};
-use bsnext_input::Input;
-use std::convert::Infallible;
-use std::hash::{DefaultHasher, Hash, Hasher};
+use bsnext_dto::ServerChangesetDTO;
 use std::time::Duration;
 use tracing::debug;
 
 #[derive(actix::Message)]
 #[rtype(result = "Result<(), ServerError>")]
 pub struct ResolveServers;
+
+impl Default for ResolveServers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl ResolveServers {
     pub fn new() -> Self {
@@ -33,7 +35,7 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
     type Result = ResponseActFuture<Self, Result<(), ServerError>>;
 
     #[tracing::instrument(skip_all, name = "Handler->ResolveServers->ServersSupervisor")]
-    fn handle(&mut self, msg: ResolveServers, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: ResolveServers, ctx: &mut Self::Context) -> Self::Result {
         let addr = ctx.address();
         let sender = self.sender.clone();
         let local_status = self.status;
@@ -46,7 +48,7 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
                 unreachable!("can it fail?")
             };
 
-            if let (ServersStatus::Ready { .. }, ServersStatus::Ready { .. }) =
+            if let (ServiceStatus::Ready { .. }, ServiceStatus::Ready { .. }) =
                 (sys_server_status, local_status)
             {
                 tracing::info!("doing nothing, sys + local state match");
@@ -59,9 +61,9 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
             tracing::info!("There's something to reconcile...");
 
             let expected_id = match sys_server_status {
-                ServersStatus::Idle => todo!("how can we get here?"),
-                ServersStatus::Reconciling { desired, .. } => desired,
-                ServersStatus::Ready { .. } => todo!("how...?"),
+                ServiceStatus::Idle => todo!("how can we get here?"),
+                ServiceStatus::Reconciling { desired, .. } => desired,
+                ServiceStatus::Ready { .. } => todo!("how...?"),
             };
 
             let results = addr.send(InputChanged { input }).await;
@@ -114,7 +116,6 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
                             }
                             ChildResult::Patched(p) if maybe_addr.is_some() => {
                                 // todo: must mark new content_id...
-                                dbg!("must mark local content_hash as the resolved one");
                                 tracing::info!(
                                     content_hash = p.server_handler.content_hash,
                                     next_content_hash = p.next_content_hash,
@@ -156,24 +157,20 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
                     let observed = StateValue::new(active_server_status_hash(&resp.servers));
                     let len = resp.servers.len();
                     if observed == desired {
-                        act.status = ServersStatus::Ready { desired, observed };
+                        act.status = ServiceStatus::Ready { desired, observed };
                         state_writer.do_send(ServerStatusWriter {
                             server_status: act.status,
                         });
                     } else {
-                        act.status = ServersStatus::Reconciling {
-                            desired,
-                            observed: Some(observed),
-                        };
+                        todo!("will set to reconciling... but is it?");
+                        // act.status = ServiceStatus::Reconciling {
+                        //     desired,
+                        //     observed: Some(observed),
+                        // };
                     }
                     tracing::info!(observed = ?act.status, len, ?desired, "observed");
 
-                    ctx.notify_later(ResolveServers, Duration::from_secs(2));
-
-                    // if the current state matches the desired state, we're done for now, shedule a new check
-                    // if observed.eq(desired) {
-                    //
-                    // }
+                    ctx.notify_later(ResolveServers, Duration::from_millis(1000));
 
                     Arbiter::current().spawn({
                         let dto = ServerChangesetDTO::from_changes(&resp, &res);
@@ -188,12 +185,4 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
             Ok(())
         }))
     }
-}
-
-async fn get_servers(
-    addr: Addr<ServersSupervisor>,
-    results: Vec<ChildResult>,
-) -> anyhow::Result<(GetActiveServersResponse, Vec<ChildResult>)> {
-    let resp = addr.send(GetActiveServers).await?;
-    Ok((resp, results))
 }

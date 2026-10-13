@@ -1,5 +1,5 @@
 use crate::server::handler_stop::Stop;
-use actix::{Actor, Addr, Message, Recipient, ResponseFuture, Running};
+use actix::{Actor, Addr, Recipient, ResponseFuture, Running};
 
 use crate::server::actor::ServerActor;
 
@@ -7,7 +7,6 @@ use bsnext_input::server_config::ServerIdentity;
 use bsnext_input::Input;
 use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::marker::PhantomData;
 use std::net::SocketAddr;
 
 use crate::runtime_ctx::RuntimeCtx;
@@ -19,7 +18,7 @@ use bsnext_dto::server_events::PatchError;
 use bsnext_dto::server_events::{
     ChildCreated, ChildHandlerMinimal, ChildNotCreated, ChildNotPatched, ChildPatched, ChildResult,
 };
-use bsnext_dto::status_events::{ServerStatusReader, ServerStatusWriter, ServersStatus};
+use bsnext_dto::status_events::{ServerStatusReader, ServerStatusWriter, ServiceStatus};
 use futures_util::future::join_all;
 use futures_util::FutureExt;
 use tokio::sync::oneshot::Sender;
@@ -32,7 +31,7 @@ pub struct ServersSupervisor {
     pub(crate) state_reader: Recipient<ServerStatusReader>,
     pub(crate) state_writer: Recipient<ServerStatusWriter>,
     tx: Option<Sender<()>>,
-    pub(crate) status: ServersStatus,
+    pub(crate) status: ServiceStatus,
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +63,7 @@ impl ServersSupervisor {
             handlers: std::default::Default::default(),
             sender: ex_sender,
             tx: Some(tx),
-            status: ServersStatus::default(),
+            status: ServiceStatus::default(),
             state_reader,
             state_writer,
         }

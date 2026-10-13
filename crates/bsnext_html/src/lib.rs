@@ -113,8 +113,6 @@ fn playground_html_str_to_input(
     // Now start to build up the input
     let mut input = Input::default();
 
-    dbg!(&input_ctx);
-
     // 1: first try prev
     // 2: next try if 'port' was provided
     // 3: finally, make one up

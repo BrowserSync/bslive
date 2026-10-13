@@ -2,10 +2,7 @@ use crate::watchables::any_watchable::to_any_watchables;
 use crate::watchables::path_watchable::PathWatchable;
 use crate::watchables::route_watchable::to_route_watchables;
 use crate::watchables::server_watchable::to_server_watchables;
-use actix::Recipient;
 use bsnext_input::{InferWatchers, Input, WatchGlobalConfig};
-use bsnext_path_monitor::PathMonitorChangeset;
-use std::path::PathBuf;
 use tracing::debug;
 
 pub mod any_watchable;
@@ -13,16 +10,14 @@ pub mod path_watchable;
 pub mod route_watchable;
 pub mod server_watchable;
 
-#[derive(actix::Message)]
+#[derive(Debug, actix::Message, Hash, Eq, PartialEq)]
 #[rtype(result = "()")]
 pub struct MonitorPathWatchables {
     pub watchables: Vec<PathWatchable>,
-    pub cwd: PathBuf,
-    pub recipient: Recipient<PathMonitorChangeset>,
 }
 
 impl MonitorPathWatchables {
-    pub fn new(cwd: PathBuf, input: &Input, recipient: Recipient<PathMonitorChangeset>) -> Self {
+    pub fn new(input: &Input) -> Self {
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
         let any_watchables = to_any_watchables(input);
@@ -65,16 +60,6 @@ impl MonitorPathWatchables {
             WatchGlobalConfig::Disabled => vec![],
         };
 
-        debug!(
-            "{} watchables to add, cwd: {}",
-            watchables.len(),
-            cwd.display()
-        );
-
-        MonitorPathWatchables {
-            watchables,
-            cwd,
-            recipient,
-        }
+        MonitorPathWatchables { watchables }
     }
 }

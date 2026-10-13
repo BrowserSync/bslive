@@ -1,7 +1,7 @@
+use crate::path_monitors::RequestMonitor;
 use crate::system::{BsSystem, CommitInput};
 use crate::watchables::MonitorPathWatchables;
 use actix::{ActorFutureExt, AsyncContext, ResponseActFuture, WrapFuture};
-use bsnext_core::servers_supervisor::resolve_servers::ResolveServers;
 use bsnext_dto::server_events::ServerError;
 use bsnext_input::startup::StartupContext;
 use bsnext_input::{Input, InputCtx};
@@ -18,7 +18,6 @@ impl actix::Handler<OverrideInput> for BsSystem {
     fn handle(&mut self, msg: OverrideInput, ctx: &mut Self::Context) -> Self::Result {
         let start_ctx_clone = self.start_context.clone();
         let addr = ctx.address();
-        let addr_2 = ctx.address();
         let input = msg.input;
         let f = async move {
             let _ = addr
@@ -28,10 +27,11 @@ impl actix::Handler<OverrideInput> for BsSystem {
                 .await;
             input
         };
-        Box::pin(f.into_actor(self).map(move |input, actor, _ctx| {
+        Box::pin(f.into_actor(self).map(move |input, actor, ctx| {
             tracing::debug!(" + did override input");
-            let msg = MonitorPathWatchables::new(actor.cwd.clone(), &input, addr_2.recipient());
-            actor.path_monitors.do_send(msg);
+            let msg = MonitorPathWatchables::new(&input);
+            let request = RequestMonitor::new(msg, ctx.address().recipient(), actor.cwd.clone());
+            actor.path_monitors.do_send(request);
             actor.update_ctx(&input, &start_ctx_clone);
             Ok(())
         }))

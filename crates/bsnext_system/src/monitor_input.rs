@@ -41,6 +41,10 @@ impl actix::Handler<MonitorInput> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "Handler->MonitorInput->BsSystem")]
     fn handle(&mut self, msg: MonitorInput, ctx: &mut Self::Context) -> Self::Result {
+        if self.input_monitors.as_ref().is_some() {
+            tracing::debug!("refusing to setup another input monitor");
+            return;
+        }
         let sys = ctx.address().recipient();
         let debounce = Debounce::Trailing {
             duration: Duration::from_millis(300),
