@@ -1,10 +1,10 @@
 use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+use crate::route::WatchSpec;
 use crate::watchables::any_watchable::AnyWatchable;
 use crate::watchables::route_watchable::RouteWatchable;
 use crate::watchables::server_watchable::ServerWatchable;
-use bsnext_input::route::WatchSpec;
 use std::path::Path;
 
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]

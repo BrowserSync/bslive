@@ -1,9 +1,9 @@
 use crate::path_monitors::RequestMonitor;
 use crate::system::{BsSystem, CommitInput};
-use crate::watchables::MonitorPathWatchables;
 use actix::{ActorFutureExt, AsyncContext, ResponseActFuture, WrapFuture};
 use bsnext_dto::server_events::ServerError;
 use bsnext_input::startup::StartupContext;
+use bsnext_input::watchables::PathWatchables;
 use bsnext_input::{Input, InputCtx};
 
 #[derive(Debug, actix::Message)]
@@ -29,7 +29,7 @@ impl actix::Handler<OverrideInput> for BsSystem {
         };
         Box::pin(f.into_actor(self).map(move |input, actor, ctx| {
             tracing::debug!(" + did override input");
-            let msg = MonitorPathWatchables::new(&input);
+            let msg = PathWatchables::new(&input);
             let request = RequestMonitor::new(msg, ctx.address().recipient(), actor.cwd.clone());
             actor.path_monitors.do_send(request);
             actor.update_ctx(&input, &start_ctx_clone);

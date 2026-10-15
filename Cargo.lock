@@ -597,6 +597,7 @@ dependencies = [
  "serde_yaml",
  "shell-words",
  "thiserror 1.0.60",
+ "tracing",
 ]
 
 [[package]]

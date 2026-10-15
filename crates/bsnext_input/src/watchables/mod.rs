@@ -2,7 +2,7 @@ use crate::watchables::any_watchable::to_any_watchables;
 use crate::watchables::path_watchable::PathWatchable;
 use crate::watchables::route_watchable::to_route_watchables;
 use crate::watchables::server_watchable::to_server_watchables;
-use bsnext_input::{InferWatchers, Input, WatchGlobalConfig};
+use crate::{InferWatchers, Input, WatchGlobalConfig};
 use tracing::debug;
 
 pub mod any_watchable;
@@ -10,13 +10,12 @@ pub mod path_watchable;
 pub mod route_watchable;
 pub mod server_watchable;
 
-#[derive(Debug, actix::Message, Hash, Eq, PartialEq)]
-#[rtype(result = "()")]
-pub struct MonitorPathWatchables {
+#[derive(Debug, Hash, Eq, PartialEq)]
+pub struct PathWatchables {
     pub watchables: Vec<PathWatchable>,
 }
 
-impl MonitorPathWatchables {
+impl PathWatchables {
     pub fn new(input: &Input) -> Self {
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
@@ -34,7 +33,7 @@ impl MonitorPathWatchables {
             .iter()
             .map(|w| PathWatchable::Any(w.to_owned()));
 
-        let watchables: Vec<_> = match &input.config.watchers {
+        let watchables: Vec<PathWatchable> = match &input.config.watchers {
             WatchGlobalConfig::Enabled { infer } => match infer {
                 InferWatchers::None => {
                     debug!("processing {} any watchables", any.len());
@@ -60,6 +59,6 @@ impl MonitorPathWatchables {
             WatchGlobalConfig::Disabled => vec![],
         };
 
-        MonitorPathWatchables { watchables }
+        PathWatchables { watchables }
     }
 }

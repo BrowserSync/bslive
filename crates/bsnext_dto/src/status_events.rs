@@ -1,5 +1,6 @@
 use crate::ActiveServer;
 use bsnext_input::server_config::ServerConfig;
+use bsnext_input::watchables::PathWatchables;
 use bsnext_input::Input;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -10,7 +11,7 @@ pub struct ServerStatusReader;
 #[derive(Debug, actix::Message)]
 #[rtype(result = "()")]
 pub struct ServerStatusWriter {
-    pub server_status: ServiceStatus,
+    pub servers_status: ServiceStatus,
 }
 
 #[derive(Debug, actix::Message)]
@@ -43,9 +44,18 @@ pub enum ServiceStatus {
         observed: Option<StateValue>,
     },
     Ready {
-        desired: StateValue,
         observed: StateValue,
     },
+}
+
+impl ServiceStatus {
+    pub fn observed(&self) -> Option<StateValue> {
+        match self {
+            ServiceStatus::Idle => None,
+            ServiceStatus::Reconciling { observed, .. } => *observed,
+            ServiceStatus::Ready { observed, .. } => Some(*observed),
+        }
+    }
 }
 
 pub fn server_status_hash(servers: &[ServerConfig]) -> u64 {
@@ -64,8 +74,9 @@ pub fn server_status_hash(servers: &[ServerConfig]) -> u64 {
     hasher.finish()
 }
 
-pub fn monitor_status_hash(servers: &[ServerConfig]) -> u64 {
-    let mut identities = servers
+pub fn monitor_status_hash(path_watchables: &PathWatchables) -> u64 {
+    let mut identities = path_watchables
+        .watchables
         .iter()
         .map(|x| {
             let mut hasher = DefaultHasher::new();
@@ -73,6 +84,15 @@ pub fn monitor_status_hash(servers: &[ServerConfig]) -> u64 {
             hasher.finish()
         })
         .collect::<Vec<_>>();
+    identities.sort_unstable();
+
+    let mut hasher = DefaultHasher::new();
+    identities.hash(&mut hasher);
+    hasher.finish()
+}
+
+pub fn list_hash(items: &[u64]) -> u64 {
+    let mut identities = items.iter().collect::<Vec<_>>();
     identities.sort_unstable();
 
     let mut hasher = DefaultHasher::new();

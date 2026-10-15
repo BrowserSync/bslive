@@ -1,7 +1,10 @@
 use crate::PathMonitorChangeset;
 use crate::path_and_filter::PathAndFilter;
 use crate::watch_paths_msg::WatchPaths;
-use actix::{Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient, StreamHandler};
+use actix::{
+    Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient, ResponseFuture,
+    StreamHandler,
+};
 use actix_rt::Arbiter;
 use bsnext_fs::actor::FsWatcher;
 use bsnext_fs::buffered_debounce::BufferedStreamOpsExt;
@@ -105,6 +108,32 @@ impl actix::Handler<WatchPaths> for PathMonitor {
                 <Self as StreamHandler<Vec<FsEvent>>>::add_stream(stream, ctx);
             }
         }
+    }
+}
+
+#[derive(Debug, actix::Message)]
+#[rtype(result = "ConnectedWatchersResult")]
+pub struct ConnectedWatchers;
+
+#[derive(Debug)]
+pub struct ConnectedWatchersResult {
+    pub desired_len: usize,
+    pub observed_len: usize,
+}
+
+impl actix::Handler<ConnectedWatchers> for PathMonitor {
+    type Result = ResponseFuture<ConnectedWatchersResult>;
+
+    fn handle(&mut self, _msg: ConnectedWatchers, _ctx: &mut Self::Context) -> Self::Result {
+        let addrs = self.addrs.clone();
+        Box::pin(async move {
+            let desired_len = addrs.len();
+            let observed_len = addrs.iter().filter(|addr| addr.connected()).count();
+            ConnectedWatchersResult {
+                desired_len,
+                observed_len,
+            }
+        })
     }
 }
 

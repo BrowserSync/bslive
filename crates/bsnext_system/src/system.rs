@@ -5,7 +5,6 @@ use crate::invoke_scope::{InvokeScope, Invoker};
 use crate::monitor_input::{InputMonitor, MonitorInput};
 use crate::path_monitors::{ConfigureRecipient, MonitorAny, PathMonitors};
 use crate::tasks::task_spec::TaskSpec;
-use crate::watchables::MonitorPathWatchables;
 use actix::ActorFutureExt;
 use actix::{
     Actor, Addr, AsyncContext, Handler, ResponseActFuture, ResponseFuture, Running, WrapFuture,
@@ -17,16 +16,16 @@ use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::internal_events::InternalEvents;
 use bsnext_dto::status_events::{
-    server_status_hash, MonitorStatusReader, MonitorStatusWriter, ServerStatusReader,
-    ServerStatusWriter, ServiceStatus, StateValue,
+    monitor_status_hash, server_status_hash, MonitorStatusReader, MonitorStatusWriter,
+    ServerStatusReader, ServerStatusWriter, ServiceStatus, StateValue,
 };
 use bsnext_dto::task_events::TaskReportAndTree;
 use bsnext_dto::{InputErrorDetailDTO, StartupErrorDTO};
 use bsnext_input::input_fs::ResolvedInputOutcome;
 use bsnext_input::startup::StartupContext;
+use bsnext_input::watchables::PathWatchables;
 use bsnext_input::{Input, InputArgs, InputCtx, InputError};
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::Receiver;
@@ -223,40 +222,41 @@ impl StatusTracker {
             ServiceStatus::Reconciling { observed, .. } => {
                 ServiceStatus::Reconciling { observed, desired }
             }
-            ServiceStatus::Ready { observed, .. } if observed != desired => {
+            ServiceStatus::Ready { observed } if observed != desired => {
                 ServiceStatus::Reconciling {
                     observed: Some(observed),
                     desired,
                 }
             }
-            ServiceStatus::Ready { observed, desired } => {
-                ServiceStatus::Ready { observed, desired }
-            }
+            ServiceStatus::Ready { observed } => ServiceStatus::Ready { observed },
         };
         tracing::info!(id = id, "hasher for servers")
     }
     fn mark_monitors(&mut self, input: &Input) {
         tracing::info!("will mark monitors");
-        let content = MonitorPathWatchables::new(input);
-        let mut hasher = DefaultHasher::new();
-        content.hash(&mut hasher);
-        let id = hasher.finish();
-        let desired = StateValue::new(id);
+        let path_watchables = PathWatchables::new(input);
+        let id = monitor_status_hash(&path_watchables);
+        let next_desired = StateValue::new(id);
         self.monitor_status = match self.monitor_status {
             ServiceStatus::Idle => ServiceStatus::Reconciling {
                 observed: None,
-                desired,
+                desired: next_desired,
             },
-            ServiceStatus::Reconciling { .. } => todo!("how can both be reconciling?"),
-            ServiceStatus::Ready { observed, .. } if observed != desired => {
+            ServiceStatus::Reconciling {
+                // here we drop the old desired state
+                desired: _,
+                observed,
+            } => ServiceStatus::Reconciling {
+                observed,
+                desired: next_desired,
+            },
+            ServiceStatus::Ready { observed } if observed != next_desired => {
                 ServiceStatus::Reconciling {
                     observed: Some(observed),
-                    desired,
+                    desired: next_desired,
                 }
             }
-            ServiceStatus::Ready { observed, desired } => {
-                ServiceStatus::Ready { observed, desired }
-            }
+            ServiceStatus::Ready { observed } => ServiceStatus::Ready { observed },
         };
         tracing::info!(id = id, "hasher for servers");
         // let id = server_status_hash(&input.servers);
@@ -291,7 +291,9 @@ impl Handler<MonitorStatusWriter> for StatusTracker {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: MonitorStatusWriter, _ctx: &mut Self::Context) -> Self::Result {
-        tracing::info!(status = ?msg.monitor_status, "got next monitor status");
+        tracing::info!("status writer for monitor");
+        tracing::info!(next.status = ?msg.monitor_status, " --> ");
+        tracing::info!(prev.status = ?self.monitor_status, " --> ");
         self.monitor_status = msg.monitor_status;
         Box::pin(async move {})
     }
@@ -301,9 +303,11 @@ impl Handler<ServerStatusWriter> for StatusTracker {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: ServerStatusWriter, _ctx: &mut Self::Context) -> Self::Result {
-        tracing::info!(status = ?msg.server_status, "got next server status");
+        tracing::info!("status writer for servers");
+        tracing::info!(next.status = ?msg.servers_status, " --> ");
+        tracing::info!(prev.status = ?self.servers_status, " --> ");
         // dbg!(&msg.server_status);
-        self.servers_status = msg.server_status;
+        self.servers_status = msg.servers_status;
         Box::pin(async move {})
     }
 }

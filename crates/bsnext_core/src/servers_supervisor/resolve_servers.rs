@@ -157,9 +157,9 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
                     let observed = StateValue::new(active_server_status_hash(&resp.servers));
                     let len = resp.servers.len();
                     if observed == desired {
-                        act.status = ServiceStatus::Ready { desired, observed };
+                        act.status = ServiceStatus::Ready { observed };
                         state_writer.do_send(ServerStatusWriter {
-                            server_status: act.status,
+                            servers_status: act.status,
                         });
                     } else {
                         todo!("will set to reconciling... but is it?");
@@ -168,6 +168,7 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
                         //     observed: Some(observed),
                         // };
                     }
+
                     tracing::info!(observed = ?act.status, len, ?desired, "observed");
 
                     ctx.notify_later(ResolveServers, Duration::from_millis(1000));
