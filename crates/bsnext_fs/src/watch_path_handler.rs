@@ -41,20 +41,14 @@ impl Handler<RequestWatchPath> for FsWatcher {
                 let evt = FsEventKind::PathAdded(PathAddedEvent {
                     path: relative.clone(),
                 });
-                self.receiver.do_send(FsEvent {
-                    kind: evt,
-                    fs_event_ctx: self.ctx,
-                })
+                self.receiver.do_send(FsEvent::new(evt, self.ctx))
             }
             Err(err) => {
-                tracing::error!("cannot watch: {}", err);
+                tracing::debug!("cannot watch, error: {}", err);
                 let evt = FsEventKind::PathNotFoundError(PathEvent {
                     path: msg.path.clone(),
                 });
-                self.receiver.do_send(FsEvent {
-                    kind: evt,
-                    fs_event_ctx: self.ctx,
-                });
+                self.receiver.do_send(FsEvent::new(evt, self.ctx));
                 ctx.stop();
             }
         }

@@ -15,7 +15,6 @@ use bsnext_fs::{
 };
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::route::WatchSpec;
-use bsnext_input::{InputError, PathDefinition, PathDefs, PathError};
 use bsnext_path_monitor::{Changeset, PathMonitorChangeset};
 use bsnext_task::task_trigger::FsChangesTrigger;
 use std::path::PathBuf;
@@ -65,15 +64,15 @@ impl BsSystem {
         addr: Addr<Self>,
         debounce: Debounce,
     ) -> Option<ExternalEventsDTO> {
-        match &fs_event.kind {
-            FsEventKind::Change(ch) if fs_event.fs_event_ctx.is_root() => {
+        match &fs_event.kind() {
+            FsEventKind::Change(ch) if fs_event.fs_event_ctx().is_root() => {
                 tracing::info!("fs_event_ctx=root");
                 addr.do_send(ResolveInputAgain);
                 None
             }
             FsEventKind::Change(inner) => {
                 let servers_addr = self.servers().clone();
-                let evt = handle_any_change(servers_addr, &fs_event.fs_event_ctx, inner);
+                let evt = handle_any_change(servers_addr, fs_event.fs_event_ctx(), inner);
                 Some(evt)
             }
             FsEventKind::PathAdded(path) => handle_path_added(path, &debounce),
@@ -136,21 +135,21 @@ fn handle_any_change(
     ))
 }
 
-fn handle_path_not_found(cwd: PathBuf, pdo: &PathEvent) -> Option<ExternalEventsDTO> {
+fn handle_path_not_found(_cwd: PathBuf, pdo: &PathEvent) -> Option<ExternalEventsDTO> {
     let as_str = pdo.path.to_string_lossy().to_string();
-    let cwd = cwd.clone();
-    let abs = cwd.join(&as_str);
-    let def = PathDefinition {
-        input: as_str,
-        cwd: cwd.clone(),
-        absolute: abs,
-    };
-    let err = InputError::PathError(PathError::MissingPaths {
-        paths: PathDefs(vec![def]),
-    });
+    // let cwd = cwd.clone();
+    // let abs = cwd.join(&as_str);
+    // let def = PathDefinition {
+    //     input: as_str,
+    //     cwd: cwd.clone(),
+    //     absolute: abs,
+    // };
+    // let err = InputError::PathError(PathError::MissingPaths {
+    //     paths: PathDefs(vec![def]),
+    // });
 
     Some(ExternalEventsDTO::InputError(InputErrorDetailDTO {
-        error: err.to_string(),
+        error: format!("{} not found, trying again in 2 second intervals", as_str),
     }))
 }
 

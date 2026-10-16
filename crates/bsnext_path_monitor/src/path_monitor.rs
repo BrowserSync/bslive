@@ -160,7 +160,7 @@ impl StreamHandler<Vec<FsEvent>> for PathMonitor {
         debug!("  └ {:?}", unique);
         let outgoing = unique
             .into_iter()
-            .filter_map(|e| match &e.kind {
+            .filter_map(|e| match e.kind() {
                 FsEventKind::Change(pd) => Some(pd.to_owned()),
                 _ => None,
             })
@@ -252,7 +252,7 @@ impl Handler<FsEvent> for PathMonitor {
         let span = debug_span!("Handler->FsEvent->PathMonitor");
         let _guard = span.enter();
         let sender = self.inner_sender.clone();
-        match &msg.kind {
+        match &msg.kind() {
             FsEventKind::Change(PathDescriptionOwned { .. }) => {
                 debug!("FsEventKind::Change");
                 Arbiter::current().spawn(async move {
