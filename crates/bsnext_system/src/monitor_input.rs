@@ -1,9 +1,9 @@
 use crate::system::BsSystem;
-use crate::watchables::any_watchable::AnyWatchable;
-use crate::watchables::path_watchable::PathWatchable;
 use actix::{Actor, Addr, AsyncContext};
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::route::WatchSpec;
+use bsnext_input::watchables::any_watchable::AnyWatchable;
+use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::InputCtx;
 use bsnext_path_monitor::path_monitor::PathMonitor;
 use bsnext_path_monitor::watch_paths_msg::WatchPaths;
@@ -41,6 +41,10 @@ impl actix::Handler<MonitorInput> for BsSystem {
 
     #[tracing::instrument(skip_all, name = "Handler->MonitorInput->BsSystem")]
     fn handle(&mut self, msg: MonitorInput, ctx: &mut Self::Context) -> Self::Result {
+        if self.input_monitors.as_ref().is_some() {
+            tracing::debug!("refusing to setup another input monitor");
+            return;
+        }
         let sys = ctx.address().recipient();
         let debounce = Debounce::Trailing {
             duration: Duration::from_millis(300),

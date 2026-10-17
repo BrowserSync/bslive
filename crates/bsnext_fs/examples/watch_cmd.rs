@@ -71,7 +71,7 @@ impl actix::Handler<FsEvent> for Example {
     fn handle(&mut self, msg: FsEvent, _ctx: &mut Self::Context) {
         tracing::info!(running = self.running, " ++ incoming");
         tracing::info!(cmd = self.cmd.0.to_str());
-        tracing::info!(?msg.kind);
+        tracing::info!(kind = ?msg.kind());
     }
 }
 

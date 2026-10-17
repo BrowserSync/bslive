@@ -8,6 +8,7 @@ use crate::{
 use bsnext_output::OutputWriterTrait;
 use bsnext_task::task_report::TaskReport;
 use bsnext_task::NodePath;
+use console::style;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
@@ -169,11 +170,11 @@ impl OutputWriterTrait for ExternalEventsDTO {
                 Ok(())
             }
             ExternalEventsDTO::InputError(InputErrorDetailDTO { error }) => {
-                writeln!(sink, "{error}")?;
+                writeln!(sink, "{} {error}", style("[warning]").on_yellow())?;
                 Ok(())
             }
             ExternalEventsDTO::StartupError(StartupErrorDTO { error }) => {
-                writeln!(sink, "{error}")?;
+                writeln!(sink, "{} {error}", style("[error]").on_red())?;
                 Ok(())
             }
         }

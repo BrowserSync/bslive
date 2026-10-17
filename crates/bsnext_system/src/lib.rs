@@ -14,7 +14,7 @@ pub mod path_monitors;
 pub mod run;
 mod servers;
 pub mod start;
+mod status_tracker;
 mod system;
 pub mod tasks;
 pub mod watch;
-pub mod watchables;

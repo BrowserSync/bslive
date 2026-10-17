@@ -94,10 +94,8 @@ impl FsWatcher {
                     tracing::trace!("ignored: count: {}: {ignored}", ignore.len());
 
                     if any_match && !ignored {
-                        let as_fs_event = FsEvent {
-                            kind: FsEventKind::Change(PathDescriptionOwned::from(&pd)),
-                            fs_event_ctx: ctx,
-                        };
+                        let as_fs_event =
+                            FsEvent::new(FsEventKind::Change(PathDescriptionOwned::from(&pd)), ctx);
                         receiver.do_send(as_fs_event);
                     } else {
                         tracing::trace!(

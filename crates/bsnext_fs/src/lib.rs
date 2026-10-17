@@ -86,11 +86,20 @@ impl Default for FsEventContext {
 #[derive(actix::Message, Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 #[rtype(result = "()")]
 pub struct FsEvent {
-    pub kind: FsEventKind,
-    pub fs_event_ctx: FsEventContext,
+    kind: FsEventKind,
+    fs_event_ctx: FsEventContext,
 }
 
 impl FsEvent {
+    pub fn kind(&self) -> &FsEventKind {
+        &self.kind
+    }
+    pub fn fs_event_ctx(&self) -> &FsEventContext {
+        &self.fs_event_ctx
+    }
+    pub fn new(kind: FsEventKind, fs_event_ctx: FsEventContext) -> Self {
+        Self { kind, fs_event_ctx }
+    }
     pub fn changed<A: AsRef<Path>>(absolute: A, relative: A, ctx_id: u64) -> Self {
         Self {
             kind: FsEventKind::Change(PathDescriptionOwned {
