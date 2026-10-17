@@ -1,7 +1,7 @@
-use actix::ActorFutureExt;
 use actix::{Actor, Addr, AsyncContext, Recipient, ResponseActFuture, ResponseFuture, WrapFuture};
+use actix::{ActorFutureExt, Running};
 use bsnext_dto::status_events::{
-    list_hash, MonitorStatusReader, MonitorStatusWriter, ServiceStatus, StateValue,
+    list_hash, MonitorStatusReader, MonitorStatusWriter, ResourceStatus, ServiceStatus, StateValue,
 };
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::watchables::path_watchable::PathWatchable;
@@ -13,12 +13,57 @@ use bsnext_path_monitor::PathMonitorChangeset;
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::time::Duration;
-use tracing::{debug, debug_span};
+use tracing::{debug, debug_span, Instrument};
+
+#[derive(Debug, Default, Clone)]
+enum LocalResource {
+    #[default]
+    Pending,
+    Waiting {
+        reason: String,
+        attempts: usize,
+    },
+    Ready,
+    Failed {
+        reason: String,
+    },
+}
+
+impl From<&'_ LocalResource> for ResourceStatus {
+    fn from(value: &'_ LocalResource) -> Self {
+        match value {
+            LocalResource::Pending => ResourceStatus::Pending,
+            LocalResource::Waiting { reason, .. } => ResourceStatus::Waiting {
+                reason: reason.clone(),
+            },
+            LocalResource::Ready => ResourceStatus::Ready,
+            LocalResource::Failed { reason } => ResourceStatus::Failed {
+                reason: reason.clone(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct LocalState {
+    inner: HashMap<PathWatchable, LocalResource>,
+}
+
+impl LocalState {
+    pub(crate) fn as_resource_status(&self) -> HashMap<PathWatchable, ResourceStatus> {
+        let mut resource_status = HashMap::new();
+        for (path_watchable, local_resource) in &self.inner {
+            resource_status.insert(path_watchable.clone(), local_resource.into());
+        }
+        resource_status
+    }
+}
 
 #[derive(Debug)]
 pub struct PathMonitors {
     cwd: PathBuf,
     path_monitors: HashMap<PathWatchable, Addr<PathMonitor>>,
+    local_state: LocalState,
     state_reader: Recipient<MonitorStatusReader>,
     state_writer: Recipient<MonitorStatusWriter>,
     status: ServiceStatus,
@@ -35,6 +80,7 @@ impl PathMonitors {
         Self {
             cwd,
             path_monitors: Default::default(),
+            local_state: Default::default(),
             state_writer,
             state_reader,
             status_hashes: vec![],
@@ -46,6 +92,21 @@ impl PathMonitors {
 
 impl actix::Actor for PathMonitors {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        tracing::trace!(actor.name = "PathMonitors", actor.lifecyle = "started");
+    }
+
+    fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
+        tracing::trace!(actor.name = "PathMonitors", actor.lifecyle = "stopping");
+        Running::Stop
+    }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        tracing::trace!(actor.name = "PathMonitors", actor.lifecyle = "stopped");
+        self.local_state.inner.clear();
+        todo!("we cleared all local state here...")
+    }
 }
 
 #[derive(actix::Message)]
@@ -97,12 +158,25 @@ impl actix::Handler<RequestMonitor> for PathMonitors {
         let incoming = inner.watchables.iter().collect::<BTreeSet<_>>();
 
         let in_both = incoming.intersection(&existing).collect::<Vec<_>>();
-        let to_add = incoming.difference(&existing).collect::<Vec<_>>();
+        let to_skip = self
+            .local_state
+            .inner
+            .iter()
+            .filter_map(|(k, v)| match v {
+                LocalResource::Failed { .. } => Some(k.clone()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        let to_add = incoming
+            .difference(&existing)
+            .filter(|x| !to_skip.contains(x))
+            .collect::<Vec<_>>();
         let to_remove = existing.difference(&incoming).collect::<Vec<_>>();
 
         debug!("{} duplicates", in_both.len());
         debug!("{} monitors to remove", to_remove.len());
         debug!("{} monitors to add", to_add.len());
+        debug!("{} monitors to skip", to_skip.len());
 
         for any_watchable in to_remove {
             if let Some(path_monitor_addr) = self.path_monitors.get(any_watchable) {
@@ -145,9 +219,11 @@ impl actix::Handler<RequestMonitor> for PathMonitors {
             );
 
             let path_monitor_addr = path_monitor.start();
-
+            if let Some(matching_state) = self.local_state.inner.get(path_watchable) {
+                tracing::debug!(?matching_state)
+            }
             ctx.notify(InsertMonitor(
-                (*path_watchable).clone(),
+                (**path_watchable).clone(),
                 path_monitor_addr,
                 paths,
             ))
@@ -269,24 +345,6 @@ impl actix::Handler<MonitorAny> for PathMonitors {
                 }
             }
             Ok::<_, anyhow::Error>(())
-            // if local_id.is_none() {
-            //     tracing::info!("There's something to reconcile...");
-            // } else if local_id.is_some_and(|v| v != expected_id) {
-            //     tracing::info!("There's something to reconcile...");
-            // } else {
-            //
-            // }
-            // dbg!("huh?", will_reconcile);
-            // let watchables = PathWatchables::new(&input);
-            // let content_hash = monitor_status_hash(&watchables);
-            // let list = list_hash(&local_hashes);
-            //
-            // if expected_id == list {
-            //     todo!("it became 'ready'");
-            // }
-            // tracing::debug!("{} computed from input, {} observed", content_hash, list);
-            // let request = RequestMonitor::new(watchables, recipient, cwd);
-            // monitors_addr.send(request).await?;
         }))
     }
 }
@@ -307,15 +365,25 @@ impl actix::Handler<TryReconcile> for PathMonitors {
         };
         let monitors_addr = ctx.address();
         let cwd = self.cwd.clone();
+        let watchables = PathWatchables::new(&input);
+        for x in &watchables.watchables {
+            self.local_state.inner.entry(x.clone()).or_default();
+        }
+        self.state_writer.do_send(MonitorStatusWriter {
+            monitor_status: self.status,
+            monitor_resource_status: self.local_state.as_resource_status(),
+        });
+        let states = self.local_state.inner.clone();
         Box::pin(
             async move {
-                tracing::debug!("will try to reconcile things...");
-                let watchables = PathWatchables::new(&input);
-                // let content_hash = monitor_status_hash(&watchables);
+                let span = tracing::debug_span!("try reconcile");
+                let _enter = span.enter();
+                tracing::debug!(?states);
                 let request = RequestMonitor::new(watchables, recipient, cwd);
                 monitors_addr.send(request).await?;
                 Ok::<_, anyhow::Error>(())
             }
+            .in_current_span()
             .into_actor(self)
             .map(|_result, _actor, ctx| {
                 ctx.notify(TryRead);
@@ -333,38 +401,90 @@ impl actix::Handler<TryRead> for PathMonitors {
     type Result = ResponseActFuture<Self, Result<(), anyhow::Error>>;
 
     fn handle(&mut self, _msg: TryRead, _ctx: &mut Self::Context) -> Self::Result {
-        let addrs = self.path_monitors.clone();
-        let addr_len = addrs.len();
+        let jobs = self
+            .path_monitors
+            .clone()
+            .iter()
+            .map(|(path_watchable, v)| {
+                (
+                    path_watchable.clone(),
+                    (
+                        v.clone(),
+                        self.local_state
+                            .inner
+                            .get(path_watchable)
+                            .map(ToOwned::to_owned)
+                            .expect("If we get here there's a buug"),
+                    ),
+                )
+            })
+            .collect::<HashMap<PathWatchable, (Addr<PathMonitor>, LocalResource)>>();
+        let jobs_len = jobs.len();
         let state_writer = self.state_writer.clone();
 
         #[derive(Debug)]
         enum LocalResult {
-            Ready { observed_local: StateValue },
-            NotReady { observed_local: StateValue },
+            Ready {
+                observed_status: StateValue,
+                local_states: HashMap<PathWatchable, LocalResource>,
+            },
+            NotReady {
+                observed_status: StateValue,
+                local_states: HashMap<PathWatchable, LocalResource>,
+            },
         }
 
         let future = async move {
             tracing::debug!(
                 "will ask {} addresses for their ConnectedWatchers",
-                addr_len
+                jobs_len
             );
             let mut hashes = vec![];
-            for (path_watchable, addr) in addrs {
+            let mut local_states: HashMap<PathWatchable, LocalResource> = HashMap::new();
+            for (path_watchable, (addr, local_resource)) in jobs {
                 let hash = path_watchable.as_id();
                 let re = addr.send(ConnectedWatchers).await?;
-                if re.observed_len == re.desired_len {
+                let is_good = re.observed_len == re.desired_len;
+                if is_good {
                     hashes.push(hash);
+                    local_states.insert(path_watchable, LocalResource::Ready);
+                } else {
+                    let next = match local_resource {
+                        LocalResource::Pending => LocalResource::Waiting {
+                            reason: "didn't start".to_string(),
+                            attempts: 1,
+                        },
+                        LocalResource::Waiting { attempts, .. } if attempts == 5 => {
+                            LocalResource::Failed {
+                                reason: format!("max attempts reached ({})", attempts),
+                            }
+                        }
+                        LocalResource::Waiting { attempts, .. } => LocalResource::Waiting {
+                            reason: "didn't start".to_string(),
+                            attempts: attempts + 1,
+                        },
+                        LocalResource::Ready => LocalResource::Waiting {
+                            reason: "was ready, lost?".to_string(),
+                            attempts: 0,
+                        },
+                        LocalResource::Failed { reason: _ } => LocalResource::Failed {
+                            reason: "failed again...".to_string(),
+                        },
+                    };
+                    local_states.insert(path_watchable, next);
                 }
             }
             let list = list_hash(&hashes);
             let state_value = StateValue::new(list);
-            let result = if hashes.len() == addr_len {
+            let result = if hashes.len() == jobs_len {
                 LocalResult::Ready {
-                    observed_local: state_value,
+                    observed_status: state_value,
+                    local_states,
                 }
             } else {
                 LocalResult::NotReady {
-                    observed_local: state_value,
+                    observed_status: state_value,
+                    local_states,
                 }
             };
             Ok::<_, anyhow::Error>(result)
@@ -377,39 +497,53 @@ impl actix::Handler<TryRead> for PathMonitors {
             };
 
             match res {
-                LocalResult::Ready { observed_local } => match act.status {
-                    ServiceStatus::Idle => {
-                        todo!("how?")
-                    }
-                    ServiceStatus::Reconciling { desired, .. } if desired == observed_local => {
-                        tracing::debug!("will set ready, desired matched local");
-                        act.status = ServiceStatus::Ready {
-                            observed: observed_local,
-                        };
-                    }
-                    ServiceStatus::Reconciling {
-                        desired: _,
-                        observed: observed_prev,
-                    } => {
-                        tracing::debug!("still reconciling, but now it's a new thing");
-                        act.status = ServiceStatus::Reconciling {
-                            desired: observed_local,
+                LocalResult::Ready {
+                    observed_status: observed_local,
+                    local_states,
+                } => {
+                    act.local_state = LocalState {
+                        inner: local_states,
+                    };
+                    match act.status {
+                        ServiceStatus::Idle => {
+                            todo!("how?")
+                        }
+                        ServiceStatus::Reconciling { desired, .. } if desired == observed_local => {
+                            tracing::debug!("will set ready, desired matched local");
+                            act.status = ServiceStatus::Ready {
+                                observed: observed_local,
+                            };
+                        }
+                        ServiceStatus::Reconciling {
+                            desired: _,
                             observed: observed_prev,
-                        };
+                        } => {
+                            tracing::debug!("still reconciling, but now it's a new thing");
+                            act.status = ServiceStatus::Reconciling {
+                                desired: observed_local,
+                                observed: observed_prev,
+                            };
+                        }
+                        ServiceStatus::Ready { observed } if observed == observed_local => {
+                            tracing::debug!("nothing to do!");
+                        }
+                        ServiceStatus::Ready { observed } => {
+                            tracing::debug!("downgrading to reconciling");
+                            act.status = ServiceStatus::Reconciling {
+                                desired: observed_local,
+                                observed: Some(observed),
+                            };
+                        }
                     }
-                    ServiceStatus::Ready { observed } if observed == observed_local => {
-                        tracing::debug!("nothing to do!");
-                    }
-                    ServiceStatus::Ready { observed } => {
-                        tracing::debug!("downgrading to reconciling");
-                        act.status = ServiceStatus::Reconciling {
-                            desired: observed_local,
-                            observed: Some(observed),
-                        };
-                    }
-                },
-                LocalResult::NotReady { observed_local } => {
+                }
+                LocalResult::NotReady {
+                    observed_status: observed_local,
+                    local_states,
+                } => {
                     tracing::debug!("local result was not ready, setting to reconciling...");
+                    act.local_state = LocalState {
+                        inner: local_states,
+                    };
                     let observed_prev = act.status.observed();
                     act.status = ServiceStatus::Reconciling {
                         desired: observed_local,
@@ -420,6 +554,7 @@ impl actix::Handler<TryRead> for PathMonitors {
             }
             state_writer.do_send(MonitorStatusWriter {
                 monitor_status: act.status,
+                monitor_resource_status: act.local_state.as_resource_status(),
             });
             ctx.notify_later(MonitorAny, Duration::from_secs(1));
             Ok(())

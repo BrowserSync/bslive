@@ -8,13 +8,14 @@ use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::{InputErrorDetailDTO, StoppedWatchingDTO, WatchingDTO};
+use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
 use bsnext_fs::{
     BufferedChangeset, Debounce, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathDescriptionOwned, PathEvent,
 };
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::route::WatchSpec;
+use bsnext_input::PathDefinition;
 use bsnext_path_monitor::{Changeset, PathMonitorChangeset};
 use bsnext_task::task_trigger::FsChangesTrigger;
 use std::path::PathBuf;
@@ -135,22 +136,18 @@ fn handle_any_change(
     ))
 }
 
-fn handle_path_not_found(_cwd: PathBuf, pdo: &PathEvent) -> Option<ExternalEventsDTO> {
+#[tracing::instrument]
+fn handle_path_not_found(cwd: PathBuf, pdo: &PathEvent) -> Option<ExternalEventsDTO> {
     let as_str = pdo.path.to_string_lossy().to_string();
-    // let cwd = cwd.clone();
-    // let abs = cwd.join(&as_str);
-    // let def = PathDefinition {
-    //     input: as_str,
-    //     cwd: cwd.clone(),
-    //     absolute: abs,
-    // };
-    // let err = InputError::PathError(PathError::MissingPaths {
-    //     paths: PathDefs(vec![def]),
-    // });
-
-    Some(ExternalEventsDTO::InputError(InputErrorDetailDTO {
-        error: format!("{} not found, trying again in 2 second intervals", as_str),
-    }))
+    let cwd = cwd.clone();
+    let abs = cwd.join(&as_str);
+    let def = PathDefinition {
+        input: as_str,
+        cwd: cwd.clone(),
+        absolute: abs,
+    };
+    tracing::debug!(?def, "path not found");
+    None
 }
 
 fn handle_path_added(path: &PathAddedEvent, debounce: &Debounce) -> Option<ExternalEventsDTO> {

@@ -1,7 +1,9 @@
 use crate::ActiveServer;
 use bsnext_input::server_config::ServerConfig;
+use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::watchables::PathWatchables;
 use bsnext_input::Input;
+use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 #[derive(Debug, actix::Message)]
@@ -22,6 +24,7 @@ pub struct MonitorStatusReader;
 #[rtype(result = "()")]
 pub struct MonitorStatusWriter {
     pub monitor_status: ServiceStatus,
+    pub monitor_resource_status: HashMap<PathWatchable, ResourceStatus>,
 }
 
 #[derive(Debug, Clone, Hash, Copy, Eq, Ord, PartialEq, PartialOrd)]
@@ -33,6 +36,19 @@ impl StateValue {
     pub fn new(value: u64) -> Self {
         Self { value }
     }
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub enum ResourceStatus {
+    #[default]
+    Pending,
+    Waiting {
+        reason: String,
+    },
+    Ready,
+    Failed {
+        reason: String,
+    },
 }
 
 #[derive(Debug, Default, Clone, Hash, Copy, Eq, PartialEq, Ord, PartialOrd)]
