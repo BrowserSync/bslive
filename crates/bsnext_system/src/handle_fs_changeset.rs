@@ -8,7 +8,7 @@ use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::{StoppedWatchingDTO, WatchingDTO};
+use bsnext_dto::StoppedWatchingDTO;
 use bsnext_fs::{
     BufferedChangeset, Debounce, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathDescriptionOwned, PathEvent,
@@ -151,9 +151,8 @@ fn handle_path_not_found(cwd: PathBuf, pdo: &PathEvent) -> Option<ExternalEvents
 }
 
 fn handle_path_added(path: &PathAddedEvent, debounce: &Debounce) -> Option<ExternalEventsDTO> {
-    Some(ExternalEventsDTO::Watching(WatchingDTO::from_path_buf(
-        &path.path, *debounce,
-    )))
+    tracing::debug!(?path.path, ?debounce, "path added");
+    None
 }
 
 fn handle_path_removed(path: &PathEvent) -> Option<ExternalEventsDTO> {

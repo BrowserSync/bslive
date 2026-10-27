@@ -176,7 +176,7 @@ impl OutputWriterTrait for ExternalEventsDTO {
             ExternalEventsDTO::StartupError(StartupErrorDTO { error }) => {
                 writeln!(sink, "{} {error}", style("[error]").on_red())?;
                 Ok(())
-            }
+            } // ExternalEventsDTO::Transition() => {}
         }
     }
 }

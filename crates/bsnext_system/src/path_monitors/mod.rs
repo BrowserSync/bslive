@@ -1,8 +1,9 @@
 use actix::{Actor, Addr, AsyncContext, Recipient, ResponseActFuture, ResponseFuture, WrapFuture};
 use actix::{ActorFutureExt, Running};
 use bsnext_dto::status_events::{
-    list_hash, MonitorStatusReader, MonitorStatusWriter, ResourceStatus, ServiceStatus, StateValue,
+    list_hash, MonitorStatusReader, MonitorStatusWriter, ServiceStatus, StateValue,
 };
+use bsnext_dto::status_events_dto::ResourceStatus;
 use bsnext_fs::{Debounce, FsEventContext};
 use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::watchables::PathWatchables;

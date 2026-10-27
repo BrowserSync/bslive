@@ -1,5 +1,6 @@
+use crate::status_events_dto::ResourceStatus;
 use crate::ActiveServer;
-use bsnext_input::server_config::ServerConfig;
+use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::watchables::PathWatchables;
 use bsnext_input::Input;
@@ -27,6 +28,37 @@ pub struct MonitorStatusWriter {
     pub monitor_resource_status: HashMap<PathWatchable, ResourceStatus>,
 }
 
+/// This is the event we'll broadcast, it will grow with more sub systems
+#[derive(Debug)]
+pub enum Transition {
+    Server(ServerResource),
+    PathMonitor(PathMonitorResource),
+}
+
+impl Transition {
+    pub fn path_monitor(status: ResourceStatus, watchable: PathWatchable) -> Self {
+        Transition::PathMonitor(PathMonitorResource::new(status, watchable))
+    }
+}
+
+#[derive(Debug)]
+pub struct ServerResource {
+    status: ResourceStatus,
+    server: ServerIdentity,
+}
+
+#[derive(Debug)]
+pub struct PathMonitorResource {
+    status: ResourceStatus,
+    watchable: PathWatchable,
+}
+
+impl PathMonitorResource {
+    pub fn new(status: ResourceStatus, watchable: PathWatchable) -> Self {
+        Self { status, watchable }
+    }
+}
+
 #[derive(Debug, Clone, Hash, Copy, Eq, Ord, PartialEq, PartialOrd)]
 pub struct StateValue {
     value: u64,
@@ -36,19 +68,6 @@ impl StateValue {
     pub fn new(value: u64) -> Self {
         Self { value }
     }
-}
-
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub enum ResourceStatus {
-    #[default]
-    Pending,
-    Waiting {
-        reason: String,
-    },
-    Ready,
-    Failed {
-        reason: String,
-    },
 }
 
 #[derive(Debug, Default, Clone, Hash, Copy, Eq, PartialEq, Ord, PartialOrd)]

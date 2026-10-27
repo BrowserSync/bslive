@@ -1,14 +1,17 @@
 use crate::system::Accept;
 use actix::{Actor, Handler, ResponseFuture};
+use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::status_events::{
     monitor_status_hash, server_status_hash, MonitorStatusReader, MonitorStatusWriter,
-    ResourceStatus, ServerStatusReader, ServerStatusWriter, ServiceStatus, StateValue,
+    ServerStatusReader, ServerStatusWriter, ServiceStatus, StateValue, Transition,
 };
+use bsnext_dto::status_events_dto::ResourceStatus;
 use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::watchables::PathWatchables;
 use bsnext_input::Input;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use tokio::sync::mpsc::Sender;
 use tracing::debug_span;
 
 pub struct StatusTracker {
@@ -17,6 +20,7 @@ pub struct StatusTracker {
     servers_status: ServiceStatus,
     monitor_status: ServiceStatus,
     monitor_resource_status: HashMap<PathWatchable, ResourceStatus>,
+    sender: Sender<AnyEvent>,
 }
 
 impl Actor for StatusTracker {
@@ -40,13 +44,14 @@ impl Handler<Accept> for StatusTracker {
 }
 
 impl StatusTracker {
-    pub fn new(cwd: PathBuf) -> Self {
+    pub fn new(cwd: PathBuf, sender: Sender<AnyEvent>) -> Self {
         Self {
             servers_status: ServiceStatus::default(),
             monitor_status: ServiceStatus::default(),
             monitor_resource_status: Default::default(),
             input: Input::default(),
             cwd,
+            sender,
         }
     }
     fn mark_servers(&mut self, input: &Input) {
@@ -145,6 +150,10 @@ impl Handler<MonitorStatusWriter> for StatusTracker {
                 .is_some_and(|x| x != status);
             tracing::info!(did_transition);
             if did_transition {
+                let _evt = Transition::path_monitor(status.clone(), id.clone());
+                todo!("publish the event!");
+                // dbg!(&evt);
+                // self.sender.send(evt).await.unwrap();
                 match status {
                     ResourceStatus::Pending => {}
                     ResourceStatus::Waiting { reason } => {
@@ -157,7 +166,6 @@ impl Handler<MonitorStatusWriter> for StatusTracker {
         }
         self.monitor_status = msg.monitor_status;
         self.monitor_resource_status = msg.monitor_resource_status;
-        println!("...")
     }
 }
 

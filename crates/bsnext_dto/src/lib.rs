@@ -23,6 +23,7 @@ pub mod startup_events;
 pub mod task_events;
 
 pub mod status_events;
+pub mod status_events_dto;
 
 #[typeshare]
 #[derive(Debug, serde::Serialize)]

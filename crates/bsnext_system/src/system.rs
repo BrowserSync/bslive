@@ -74,7 +74,8 @@ impl BsSystem {
         cwd: PathBuf,
         tx: tokio::sync::oneshot::Sender<()>,
     ) -> Self {
-        let status_tracker = StatusTracker::new(cwd.clone());
+        // todo!("figure where the event goes? probably the status tracker can broadcast updates onto any_event_sender?");
+        let status_tracker = StatusTracker::new(cwd.clone(), any_event_sender.clone());
         let status_tracker = status_tracker.start();
         let servers = ServersSupervisor::new(
             tx,

@@ -613,6 +613,7 @@ name = "bsnext_md"
 version = "0.28.2"
 dependencies = [
  "anyhow",
+ "bsnext_dto",
  "bsnext_input",
  "insta",
  "markdown",
