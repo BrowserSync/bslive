@@ -303,33 +303,6 @@ pub struct FilesChangedDTO {
 
 #[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct WatchingDTO {
-    pub paths: Vec<String>,
-    pub debounce: DebounceDTO,
-}
-
-#[typeshare]
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct StoppedWatchingDTO {
-    pub paths: Vec<String>,
-}
-
-impl StoppedWatchingDTO {
-    pub fn from_path_buf(p: &Path) -> Self {
-        Self {
-            paths: vec![p.to_string_lossy().to_string()],
-        }
-    }
-}
-
-impl Display for WatchingDTO {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "yo")
-    }
-}
-
-#[typeshare]
-#[derive(Debug, Clone, serde::Serialize)]
 pub struct DebounceDTO {
     kind: String,
     ms: String,
@@ -360,15 +333,6 @@ impl FileChangedDTO {
     pub fn from_path_buf(p: &Path) -> Self {
         Self {
             path: p.to_string_lossy().to_string(),
-        }
-    }
-}
-
-impl WatchingDTO {
-    pub fn from_path_buf(p: &Path, debounce: Debounce) -> Self {
-        Self {
-            paths: vec![p.to_string_lossy().to_string()],
-            debounce: debounce.into(),
         }
     }
 }

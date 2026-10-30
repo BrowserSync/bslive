@@ -118,7 +118,6 @@ impl FsEvent {
 pub enum FsEventKind {
     Change(PathDescriptionOwned),
     PathAdded(PathAddedEvent),
-    PathRemoved(PathEvent),
     PathNotFoundError(PathEvent),
 }
 

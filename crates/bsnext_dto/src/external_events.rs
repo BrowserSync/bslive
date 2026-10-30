@@ -1,10 +1,10 @@
 use crate::any_event::AnyEvent;
 use crate::archy::{archy, overlay_results, ArchyNode, Prefix};
-use crate::status_events_dto::TransitionDTO;
+use crate::status_events_dto::{ResourceStatus, TransitionDTO};
 use crate::{
     FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, InputErrorDetailDTO, OutputLineDTO,
     ServerChangeDTO, ServerChangesetDTO, ServerIdentityDTO, StartupErrorDTO, StderrLineDTO,
-    StdoutLineDTO, StoppedWatchingDTO, WatchingDTO,
+    StdoutLineDTO,
 };
 use bsnext_output::OutputWriterTrait;
 use bsnext_task::task_report::TaskReport;
@@ -31,8 +31,6 @@ pub enum ExternalEventsDTO {
     TaskAction(TaskActionDTO),
     TaskTreePreview(TaskTreePreview),
     TaskTreeSummary(TaskTreeSummary),
-    Watching(WatchingDTO),
-    WatchingStopped(StoppedWatchingDTO),
     Transition(TransitionDTO),
 }
 
@@ -132,8 +130,6 @@ impl OutputWriterTrait for ExternalEventsDTO {
 
     fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
         match self {
-            ExternalEventsDTO::Watching(watching) => print_watching(sink, watching),
-            ExternalEventsDTO::WatchingStopped(watching) => print_stopped_watching(sink, watching),
             ExternalEventsDTO::InputAccepted(input_accepted) => {
                 print_input_accepted(sink, input_accepted)
             }
@@ -194,7 +190,21 @@ fn print_transition<W: Write>(w: &mut W, trans: &TransitionDTO) -> anyhow::Resul
         TransitionDTO::PathMonitor(path_monitor_dto) => {
             let dir = path_monitor_dto.watchable.watch_path();
             let debounce = &path_monitor_dto.debounce;
-            writeln!(w, "[watching {}] {}", debounce, dir)?;
+            match &path_monitor_dto.status {
+                ResourceStatus::Pending => todo!("can we be pending here?"),
+                ResourceStatus::Waiting { reason } => {
+                    // todo: ("here we need to ensure input monitor is counted as a resource now");
+                    let prefix = style(format!("[waiting: {reason}]")).on_yellow();
+                    writeln!(w, "{prefix} {dir}")?;
+                }
+                ResourceStatus::Ready => {
+                    writeln!(w, "[watching {debounce}] {dir}")?;
+                }
+                ResourceStatus::Failed { reason } => {
+                    let prefix = style(format!("[failed: {reason}]")).on_red();
+                    writeln!(w, "{prefix} {dir}")?;
+                }
+            }
         }
     }
     Ok(())
@@ -221,13 +231,6 @@ fn print_task_tree_summary<W: Write>(
     let tree_with_results = overlay_results(tree, report_map);
     let s = archy(&tree_with_results, Prefix::None);
     write!(w, "{s}")?;
-    Ok(())
-}
-
-pub fn print_stopped_watching<W: Write>(w: &mut W, evt: &StoppedWatchingDTO) -> anyhow::Result<()> {
-    for x in &evt.paths {
-        writeln!(w, "[watching:stopped] {x}")?;
-    }
     Ok(())
 }
 
@@ -325,13 +328,6 @@ pub fn short_file_list<A: AsRef<str>>(paths: &[A]) -> String {
         })
         .collect::<Vec<_>>();
     file_names.join(", ")
-}
-
-pub fn print_watching<W: Write>(w: &mut W, evt: &WatchingDTO) -> anyhow::Result<()> {
-    for x in &evt.paths {
-        writeln!(w, "[watching {}] {}", evt.debounce, x)?;
-    }
-    Ok(())
 }
 
 pub fn has_output_line_matching(events: &[AnyEvent], expected: &str) -> bool {
