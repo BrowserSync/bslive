@@ -1,11 +1,13 @@
 use crate::system::Accept;
 use actix::{Actor, Handler, ResponseFuture};
+use actix_rt::Arbiter;
 use bsnext_dto::any_event::AnyEvent;
+use bsnext_dto::external_events::ExternalEventsDTO;
 use bsnext_dto::status_events::{
     monitor_status_hash, server_status_hash, MonitorStatusReader, MonitorStatusWriter,
     ServerStatusReader, ServerStatusWriter, ServiceStatus, StateValue, Transition,
 };
-use bsnext_dto::status_events_dto::ResourceStatus;
+use bsnext_dto::status_events_dto::{ResourceStatus, TransitionDTO};
 use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::watchables::PathWatchables;
 use bsnext_input::Input;
@@ -149,11 +151,17 @@ impl Handler<MonitorStatusWriter> for StatusTracker {
                 .get(id)
                 .is_some_and(|x| x != status);
             tracing::info!(did_transition);
+            let sender = self.sender.clone();
             if did_transition {
-                let _evt = Transition::path_monitor(status.clone(), id.clone());
-                todo!("publish the event!");
+                let evt = Transition::path_monitor(status.clone(), id.clone());
+                let trans: TransitionDTO = evt.into();
+                // todo!("publish the event!");
                 // dbg!(&evt);
-                // self.sender.send(evt).await.unwrap();
+                Arbiter::current().spawn(async move {
+                    let _ = sender
+                        .send(AnyEvent::External(ExternalEventsDTO::Transition(trans)))
+                        .await;
+                });
                 match status {
                     ResourceStatus::Pending => {}
                     ResourceStatus::Waiting { reason } => {

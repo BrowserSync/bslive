@@ -43,14 +43,14 @@ impl Transition {
 
 #[derive(Debug)]
 pub struct ServerResource {
-    status: ResourceStatus,
-    server: ServerIdentity,
+    pub status: ResourceStatus,
+    pub server: ServerIdentity,
 }
 
 #[derive(Debug)]
 pub struct PathMonitorResource {
-    status: ResourceStatus,
-    watchable: PathWatchable,
+    pub status: ResourceStatus,
+    pub watchable: PathWatchable,
 }
 
 impl PathMonitorResource {

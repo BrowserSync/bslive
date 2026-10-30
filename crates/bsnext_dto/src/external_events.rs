@@ -1,5 +1,6 @@
 use crate::any_event::AnyEvent;
 use crate::archy::{archy, overlay_results, ArchyNode, Prefix};
+use crate::status_events_dto::TransitionDTO;
 use crate::{
     FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, InputErrorDetailDTO, OutputLineDTO,
     ServerChangeDTO, ServerChangesetDTO, ServerIdentityDTO, StartupErrorDTO, StderrLineDTO,
@@ -32,6 +33,7 @@ pub enum ExternalEventsDTO {
     TaskTreeSummary(TaskTreeSummary),
     Watching(WatchingDTO),
     WatchingStopped(StoppedWatchingDTO),
+    Transition(TransitionDTO),
 }
 
 #[typeshare]
@@ -177,8 +179,25 @@ impl OutputWriterTrait for ExternalEventsDTO {
                 writeln!(sink, "{} {error}", style("[error]").on_red())?;
                 Ok(())
             } // ExternalEventsDTO::Transition() => {}
+            ExternalEventsDTO::Transition(trans) => print_transition(sink, trans),
         }
     }
+}
+
+fn print_transition<W: Write>(w: &mut W, trans: &TransitionDTO) -> anyhow::Result<()> {
+    match trans {
+        TransitionDTO::Server(server_dto) => {
+            // let server_display = server_display(server_dto.server, server_dto.)
+            // write!(w, "{}", server_dto.server)?
+            dbg!(server_dto);
+        }
+        TransitionDTO::PathMonitor(path_monitor_dto) => {
+            let dir = path_monitor_dto.watchable.watch_path();
+            let debounce = &path_monitor_dto.debounce;
+            writeln!(w, "[watching {}] {}", debounce, dir)?;
+        }
+    }
+    Ok(())
 }
 
 fn print_task_tree<W: Write>(w: &mut W, tree: &ArchyNode) -> anyhow::Result<()> {

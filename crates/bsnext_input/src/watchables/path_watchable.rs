@@ -1,10 +1,11 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use crate::route::WatchSpec;
+use crate::route::{DebounceDuration, WatchSpec};
 use crate::watchables::any_watchable::AnyWatchable;
 use crate::watchables::route_watchable::RouteWatchable;
 use crate::watchables::server_watchable::ServerWatchable;
+use bsnext_fs::Debounce;
 use std::path::Path;
 
 #[derive(PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
@@ -91,5 +92,14 @@ impl PathWatchable {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
         hasher.finish()
+    }
+
+    pub fn debounce(&self) -> Debounce {
+        let spec = match self {
+            PathWatchable::Server(server) => &server.watch_spec,
+            PathWatchable::Route(route) => &route.watch_spec,
+            PathWatchable::Any(any) => &any.watch_spec,
+        };
+        spec.debounce.map(Debounce::from).unwrap_or_default()
     }
 }
