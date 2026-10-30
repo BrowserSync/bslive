@@ -4,6 +4,10 @@
 
 export type InvocationIdDTO = string;
 
+export interface AnyWatchableDTO {
+	dir: string;
+}
+
 export interface ArchyNode {
 	id: string;
 	label: string;
@@ -88,6 +92,28 @@ export interface InputErrorDetailDTO {
 }
 
 /** @discriminator kind */
+export type ResourceStatus = 
+	| { kind: "Pending", payload?: undefined }
+	| { kind: "Waiting", payload: {
+	reason: string;
+}}
+	| { kind: "Ready", payload?: undefined }
+	| { kind: "Failed", payload: {
+	reason: string;
+}};
+
+/** @discriminator kind */
+export type PathWatchableDTO = 
+	| { kind: "Server", payload: ServerWatchableDTO }
+	| { kind: "Route", payload: RouteWatchableDTO }
+	| { kind: "Any", payload: AnyWatchableDTO };
+
+export interface PathMonitorResourceDTO {
+	status: ResourceStatus;
+	watchable: PathWatchableDTO;
+}
+
+/** @discriminator kind */
 export type RouteKindDTO = 
 	| { kind: "Html", payload: {
 	html: string;
@@ -117,6 +143,11 @@ export interface RouteDTO {
 export interface RouteIdentityDTO {
 	path: string;
 	kind_str: string;
+}
+
+export interface RouteWatchableDTO {
+	address: string;
+	dir: string;
 }
 
 /** @discriminator kind */
@@ -169,6 +200,16 @@ export interface ServerChangesetDTO {
 export interface ServerDesc {
 	routes: RouteDTO[];
 	id: string;
+}
+
+export interface ServerResourceDTO {
+	status: ResourceStatus;
+	server: ServerIdentityDTO;
+}
+
+export interface ServerWatchableDTO {
+	address: string;
+	dir: string;
 }
 
 export interface SseDTOOpts {
@@ -310,4 +351,9 @@ export type OutputLineDTO =
 export type StartupEventDTO = 
 	| { kind: "Started", payload?: undefined }
 	| { kind: "FailedStartup", payload: string };
+
+/** @discriminator kind */
+export type TransitionDTO = 
+	| { kind: "Server", payload: ServerResourceDTO }
+	| { kind: "PathMonitor", payload: PathMonitorResourceDTO };
 

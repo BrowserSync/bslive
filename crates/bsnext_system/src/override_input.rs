@@ -1,9 +1,9 @@
-use crate::system::BsSystem;
-use crate::watchables::MonitorPathWatchables;
+use crate::path_monitors::RequestMonitor;
+use crate::system::{BsSystem, CommitInput};
 use actix::{ActorFutureExt, AsyncContext, ResponseActFuture, WrapFuture};
-use bsnext_core::servers_supervisor::resolve_servers::ResolveServers;
 use bsnext_dto::server_events::ServerError;
 use bsnext_input::startup::StartupContext;
+use bsnext_input::watchables::PathWatchables;
 use bsnext_input::{Input, InputCtx};
 
 #[derive(Debug, actix::Message)]
@@ -16,29 +16,25 @@ impl actix::Handler<OverrideInput> for BsSystem {
     type Result = ResponseActFuture<Self, Result<(), ServerError>>;
 
     fn handle(&mut self, msg: OverrideInput, ctx: &mut Self::Context) -> Self::Result {
-        let input_clone = msg.input.clone();
         let start_ctx_clone = self.start_context.clone();
         let addr = ctx.address();
-        // let ctx_clone = self.st
-        let f = self
-            .servers()
-            .send(ResolveServers::new(msg.input))
-            .into_actor(self)
-            .map(move |res, actor, _ctx| {
-                tracing::debug!(" + did override input");
-                let _output = match res {
-                    Ok(Ok(res)) => Ok(res),
-                    Ok(Err(s_e)) => Err(s_e),
-                    Err(err) => Err(ServerError::Unknown(err.to_string())),
-                };
-                // todo: only process the override if valid?
-                let msg =
-                    MonitorPathWatchables::new(actor.cwd.clone(), &input_clone, addr.recipient());
-                actor.path_monitors.do_send(msg);
-                actor.update_ctx(&input_clone, &start_ctx_clone);
-                Ok(())
-            });
-        Box::pin(f)
+        let input = msg.input;
+        let f = async move {
+            let _ = addr
+                .send(CommitInput {
+                    input: input.clone(),
+                })
+                .await;
+            input
+        };
+        Box::pin(f.into_actor(self).map(move |input, actor, ctx| {
+            tracing::debug!(" + did override input");
+            let msg = PathWatchables::new(&input);
+            let request = RequestMonitor::new(msg, ctx.address().recipient(), actor.cwd.clone());
+            actor.path_monitors.do_send(request);
+            actor.update_ctx(&input, &start_ctx_clone);
+            Ok(())
+        }))
     }
 }
 

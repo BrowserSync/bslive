@@ -22,6 +22,9 @@ var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
 
 // schema.ts
 var invocationIdDTOSchema = z.string();
+var anyWatchableDTOSchema = z.object({
+  dir: z.string()
+});
 var archyNodeSchema = z.lazy(
   () => z.object({
     id: z.string(),
@@ -103,6 +106,50 @@ var inputAcceptedDTOSchema = z.object({
 var inputErrorDetailDTOSchema = z.object({
   error: z.string()
 });
+var resourceStatusSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("Pending"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Waiting"),
+    payload: z.object({
+      reason: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Ready"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Failed"),
+    payload: z.object({
+      reason: z.string()
+    })
+  })
+]);
+var serverWatchableDTOSchema = z.object({
+  address: z.string(),
+  dir: z.string()
+});
+var routeWatchableDTOSchema = z.object({
+  address: z.string(),
+  dir: z.string()
+});
+var pathWatchableDTOSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("Server"),
+    payload: serverWatchableDTOSchema
+  }),
+  z.object({
+    kind: z.literal("Route"),
+    payload: routeWatchableDTOSchema
+  }),
+  z.object({
+    kind: z.literal("Any"),
+    payload: anyWatchableDTOSchema
+  })
+]);
 var sseDTOOptsSchema = z.object({
   body: z.string()
 });
@@ -221,6 +268,10 @@ var serverChangesetDTOSchema = z.object({
 var routeDTOSchema = z.object({
   path: z.string(),
   kind: routeKindDTOSchema
+});
+var serverResourceDTOSchema = z.object({
+  status: resourceStatusSchema,
+  server: serverIdentityDTOSchema
 });
 var startupErrorDTOSchema = z.object({
   error: z.string()
@@ -375,10 +426,24 @@ var startupEventDTOSchema = z.discriminatedUnion("kind", [
     payload: z.string()
   })
 ]);
+var pathMonitorResourceDTOSchema = z.object({
+  status: resourceStatusSchema,
+  watchable: pathWatchableDTOSchema
+});
 var serverDescSchema = z.object({
   routes: z.array(routeDTOSchema),
   id: z.string()
 });
+var transitionDTOSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("Server"),
+    payload: serverResourceDTOSchema
+  }),
+  z.object({
+    kind: z.literal("PathMonitor"),
+    payload: pathMonitorResourceDTOSchema
+  })
+]);
 var taskActionStageDTOSchema = z.lazy(
   () => z.discriminatedUnion("kind", [
     z.object({
@@ -481,6 +546,7 @@ var externalEventsDTOSchema = z.lazy(
   ])
 );
 export {
+  anyWatchableDTOSchema,
   archyNodeSchema,
   changeDTOSchema,
   changeKindSchema,
@@ -501,9 +567,13 @@ export {
   invocationIdDTOSchema,
   logLevelDTOSchema,
   outputLineDTOSchema,
+  pathMonitorResourceDTOSchema,
+  pathWatchableDTOSchema,
+  resourceStatusSchema,
   routeDTOSchema,
   routeIdentityDTOSchema,
   routeKindDTOSchema,
+  routeWatchableDTOSchema,
   serverChangeDTOSchema,
   serverChangeSchema,
   serverChangeSetItemSchema,
@@ -512,6 +582,8 @@ export {
   serverDTOSchema,
   serverDescSchema,
   serverIdentityDTOSchema,
+  serverResourceDTOSchema,
+  serverWatchableDTOSchema,
   sseDTOOptsSchema,
   startupErrorDTOSchema,
   startupEventDTOSchema,
@@ -525,5 +597,6 @@ export {
   taskResultDTOSchema,
   taskTreePreviewSchema,
   taskTreeSummarySchema,
+  transitionDTOSchema,
   watchingDTOSchema
 };

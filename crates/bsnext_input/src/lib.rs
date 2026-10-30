@@ -28,10 +28,11 @@ pub mod target;
 #[cfg(test)]
 pub mod watch_opt_test;
 pub mod watch_opts;
+pub mod watchables;
 pub mod when_guard;
 pub mod yml;
 
-#[derive(Debug, Default, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Hash, Clone, serde::Deserialize)]
 pub struct Input {
     #[serde(default)]
     pub servers: Vec<server_config::ServerConfig>,
@@ -280,10 +281,6 @@ pub trait InputCreation {
         content: P,
         input_ctx: &InputCtx,
     ) -> Result<Input, Box<InputError>>;
-}
-
-pub trait InputWriter {
-    fn input_to_str(&self, input: &Input) -> String;
 }
 
 #[derive(Debug, miette::Diagnostic, thiserror::Error)]

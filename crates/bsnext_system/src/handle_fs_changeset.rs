@@ -1,24 +1,24 @@
 use crate::fs_task_tracker::TriggerFsTask;
-use crate::input_fs::from_input_path;
-use crate::override_input::OverrideInput;
-use crate::system::BsSystem;
-use crate::tasks::task_comms::TaskComms;
+use crate::monitor_input::InputMonitor;
+use crate::system::{BsSystem, ResolveInputAgain};
 use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
 use actix::{Addr, AsyncContext};
+use bsnext_core::servers_supervisor::actor::ServersSupervisor;
 use bsnext_core::servers_supervisor::file_changed_handler::FileChanged;
 use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::external_events::ExternalEventsDTO;
-use bsnext_dto::{InputErrorDetailDTO, StoppedWatchingDTO, WatchingDTO};
+use bsnext_dto::StoppedWatchingDTO;
 use bsnext_fs::{
     BufferedChangeset, Debounce, FsEvent, FsEventContext, FsEventKind, PathAddedEvent,
     PathDescriptionOwned, PathEvent,
 };
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::route::WatchSpec;
-use bsnext_input::{Input, InputError, PathDefinition, PathDefs, PathError};
+use bsnext_input::PathDefinition;
 use bsnext_path_monitor::{Changeset, PathMonitorChangeset};
 use bsnext_task::task_trigger::FsChangesTrigger;
+use std::path::PathBuf;
 use tracing::{debug, debug_span, info};
 
 impl actix::Handler<PathMonitorChangeset> for BsSystem {
@@ -39,7 +39,9 @@ impl actix::Handler<PathMonitorChangeset> for BsSystem {
                 None
             }
             Changeset::BufferedChange(buff) => {
-                if let Some((task_trigger, task_spec)) = self.handle_buffered(buff, watch_spec) {
+                if let Some((task_trigger, task_spec)) =
+                    handle_buffered(self.input_monitors.as_ref(), buff, watch_spec)
+                {
                     tracing::debug!("will trigger task runner");
                     self.fs_task_tracker
                         .do_send(TriggerFsTask::new(task_spec, task_trigger));
@@ -63,163 +65,113 @@ impl BsSystem {
         addr: Addr<Self>,
         debounce: Debounce,
     ) -> Option<ExternalEventsDTO> {
-        match &fs_event.kind {
-            FsEventKind::Change(ch) if fs_event.fs_event_ctx.is_root() => {
+        match &fs_event.kind() {
+            FsEventKind::Change(ch) if fs_event.fs_event_ctx().is_root() => {
                 tracing::info!("fs_event_ctx=root");
-                match self.handle_input_change(ch) {
-                    // if the change included a new Input, use it
-                    Ok((_, Some(input))) => {
-                        tracing::info!("will override input");
-                        addr.do_send(OverrideInput { input });
-                        // return None here so that the event is not published yet (the updated Input will do it)
-                        None
-                    }
-                    // otherwise publish the change as usual
-                    Ok((evt, None)) => Some(evt),
-                    Err(e) => {
-                        println!("{e}");
-                        None
-                    }
-                }
+                addr.do_send(ResolveInputAgain);
+                None
             }
             FsEventKind::Change(inner) => {
-                let evt = self.handle_any_change(&fs_event.fs_event_ctx, inner);
+                let servers_addr = self.servers().clone();
+                let evt = handle_any_change(servers_addr, fs_event.fs_event_ctx(), inner);
                 Some(evt)
             }
-            FsEventKind::PathAdded(path) => self.handle_path_added(path, &debounce),
-            FsEventKind::PathRemoved(path) => self.handle_path_removed(path),
-            FsEventKind::PathNotFoundError(pdo) => self.handle_path_not_found(pdo),
+            FsEventKind::PathAdded(path) => handle_path_added(path, &debounce),
+            FsEventKind::PathRemoved(path) => handle_path_removed(path),
+            FsEventKind::PathNotFoundError(pdo) => handle_path_not_found(self.cwd.clone(), pdo),
         }
     }
-    #[tracing::instrument(skip_all)]
-    fn handle_buffered(
-        &mut self,
-        buf: BufferedChangeset,
-        watch_spec: WatchSpec,
-    ) -> Option<(FsChangesTrigger, TaskSpec)> {
-        tracing::debug!(msg.event_count = buf.changes.len(), msg.ctx = ?buf.fs_event_ctx, ?buf);
+}
 
-        let change = if let Some(mon) = &self.input_monitors {
-            if let Some(fp) = mon.input_ctx.file_path() {
-                tracing::debug!("Dropping input crossover {}", fp.display());
-                buf.dropping_absolute(fp)
-            } else {
-                buf
-            }
+#[tracing::instrument(skip_all)]
+fn handle_buffered(
+    input_monitor: Option<&InputMonitor>,
+    buf: BufferedChangeset,
+    watch_spec: WatchSpec,
+) -> Option<(FsChangesTrigger, TaskSpec)> {
+    tracing::debug!(msg.event_count = buf.changes.len(), msg.ctx = ?buf.fs_event_ctx, ?buf);
+
+    let change = if let Some(mon) = input_monitor {
+        if let Some(fp) = mon.input_ctx.file_path() {
+            tracing::debug!("Dropping input crossover {}", fp.display());
+            buf.dropping_absolute(fp)
         } else {
             buf
-        };
-
-        if change.changes.is_empty() {
-            tracing::debug!(
-                "Ignoring handle_buffered events because it was empty after removing input monitor"
-            );
-            return None;
         }
+    } else {
+        buf
+    };
 
-        let paths = change
-            .changes
-            .iter()
-            .map(|evt| evt.absolute.to_owned())
-            .collect::<Vec<_>>();
-
-        let task_spec = self.task_spec_for_fs_event(&watch_spec);
-        let trigger = FsChangesTrigger::new(paths, change.fs_event_ctx);
-
-        Some((trigger, task_spec))
+    if change.changes.is_empty() {
+        tracing::debug!(
+            "Ignoring handle_buffered events because it was empty after removing input monitor"
+        );
+        return None;
     }
 
-    pub fn task_comms(&mut self) -> TaskComms {
-        TaskComms::new(self.sender().clone())
-    }
+    let paths = change
+        .changes
+        .iter()
+        .map(|evt| evt.absolute.to_owned())
+        .collect::<Vec<_>>();
 
-    fn handle_any_change(
-        &mut self,
-        fs_event_ctx: &FsEventContext,
-        inner: &PathDescriptionOwned,
-    ) -> ExternalEventsDTO {
-        tracing::trace!(?inner, "Other file changed");
-        self.servers().do_send(FileChanged {
-            path: inner.absolute.clone(),
-            ctx: *fs_event_ctx,
-        });
-        ExternalEventsDTO::FileChanged(bsnext_dto::FileChangedDTO::from_path_buf(
-            inner.relative.as_ref().unwrap_or(&inner.absolute),
-        ))
-    }
-    fn handle_input_change(
-        &mut self,
-        inner: &PathDescriptionOwned,
-    ) -> Result<(ExternalEventsDTO, Option<Input>), Box<InputError>> {
-        tracing::info!("InputFile file changed {:?}", inner);
+    let task_spec = task_spec_for_fs_event(&watch_spec);
+    let trigger = FsChangesTrigger::new(paths, change.fs_event_ctx);
 
-        let ctx = self
-            .input_monitors
-            .as_ref()
-            .map(|input_monitor| input_monitor.input_ctx.clone())
-            .unwrap_or_default();
+    Some((trigger, task_spec))
+}
 
-        let input = from_input_path(&inner.absolute, &ctx);
+fn handle_any_change(
+    servers_addr: Addr<ServersSupervisor>,
+    fs_event_ctx: &FsEventContext,
+    inner: &PathDescriptionOwned,
+) -> ExternalEventsDTO {
+    tracing::trace!(?inner, "Other file changed");
+    servers_addr.do_send(FileChanged {
+        path: inner.absolute.clone(),
+        ctx: *fs_event_ctx,
+    });
+    ExternalEventsDTO::FileChanged(bsnext_dto::FileChangedDTO::from_path_buf(
+        inner.relative.as_ref().unwrap_or(&inner.absolute),
+    ))
+}
 
-        let Ok(input) = input else {
-            let err = input.unwrap_err();
-            return Err(err);
-        };
-        let path_to_report = inner.relative.as_ref().unwrap_or(&inner.absolute);
+#[tracing::instrument]
+fn handle_path_not_found(cwd: PathBuf, pdo: &PathEvent) -> Option<ExternalEventsDTO> {
+    let as_str = pdo.path.to_string_lossy().to_string();
+    let cwd = cwd.clone();
+    let abs = cwd.join(&as_str);
+    let def = PathDefinition {
+        input: as_str,
+        cwd: cwd.clone(),
+        absolute: abs,
+    };
+    tracing::debug!(?def, "path not found");
+    None
+}
 
-        Ok((
-            ExternalEventsDTO::InputFileChanged(bsnext_dto::FileChangedDTO::from_path_buf(
-                path_to_report,
-            )),
-            Some(input),
-        ))
-    }
-    fn handle_path_added(
-        &self,
-        path: &PathAddedEvent,
-        debounce: &Debounce,
-    ) -> Option<ExternalEventsDTO> {
-        Some(ExternalEventsDTO::Watching(WatchingDTO::from_path_buf(
-            &path.path, *debounce,
-        )))
-    }
+fn handle_path_added(path: &PathAddedEvent, debounce: &Debounce) -> Option<ExternalEventsDTO> {
+    tracing::debug!(?path.path, ?debounce, "path added");
+    None
+}
 
-    fn handle_path_removed(&mut self, path: &PathEvent) -> Option<ExternalEventsDTO> {
-        Some(ExternalEventsDTO::WatchingStopped(
-            StoppedWatchingDTO::from_path_buf(&path.path),
-        ))
-    }
+fn handle_path_removed(path: &PathEvent) -> Option<ExternalEventsDTO> {
+    Some(ExternalEventsDTO::WatchingStopped(
+        StoppedWatchingDTO::from_path_buf(&path.path),
+    ))
+}
 
-    fn handle_path_not_found(&mut self, pdo: &PathEvent) -> Option<ExternalEventsDTO> {
-        let as_str = pdo.path.to_string_lossy().to_string();
-        let cwd = self.cwd.clone();
-        let abs = cwd.join(&as_str);
-        let def = PathDefinition {
-            input: as_str,
-            cwd: self.cwd.clone(),
-            absolute: abs,
-        };
-        let err = InputError::PathError(PathError::MissingPaths {
-            paths: PathDefs(vec![def]),
-        });
-
-        Some(ExternalEventsDTO::InputError(InputErrorDetailDTO {
-            error: err.to_string(),
-        }))
-    }
-
-    #[tracing::instrument(skip_all)]
-    fn task_spec_for_fs_event(&self, watch_spec: &WatchSpec) -> TaskSpec {
-        if let Some(spec) = TaskSpec::opt_from(watch_spec) {
-            info!("matching task_spec: {:?}", spec);
-            info!("matching fs_event_ctx: {:?}", watch_spec);
-            spec.to_owned()
-        } else {
-            debug!("creating a default task spec on the fly because fs_event_ctx didn't match any task specs");
-            TaskSpec::seq(&[
-                Runnable::BsLiveTask(BsLiveBuiltInTask::NotifyServer),
-                Runnable::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent),
-            ])
-        }
+#[tracing::instrument(skip_all)]
+fn task_spec_for_fs_event(watch_spec: &WatchSpec) -> TaskSpec {
+    if let Some(spec) = TaskSpec::opt_from(watch_spec) {
+        info!("matching task_spec: {:?}", spec);
+        info!("matching fs_event_ctx: {:?}", watch_spec);
+        spec.to_owned()
+    } else {
+        debug!("creating a default task spec on the fly because fs_event_ctx didn't match any task specs");
+        TaskSpec::seq(&[
+            Runnable::BsLiveTask(BsLiveBuiltInTask::NotifyServer),
+            Runnable::BsLiveTask(BsLiveBuiltInTask::PublishExternalEvent),
+        ])
     }
 }

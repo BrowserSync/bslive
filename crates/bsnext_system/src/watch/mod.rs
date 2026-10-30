@@ -62,7 +62,7 @@ impl WatchCommand {
     ) -> anyhow::Result<Input> {
         // try to resolve input from disk
         let input = addr
-            .send(ResolveInput::from_strs(&input_opts.input))
+            .send(ResolveInput::from_strs(&input_opts.input, &None))
             .await
             .context("mailbox")??;
 

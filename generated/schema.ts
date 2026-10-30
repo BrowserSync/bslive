@@ -16,6 +16,10 @@ import {
 
 export const invocationIdDTOSchema = z.string();
 
+export const anyWatchableDTOSchema = z.object({
+    dir: z.string(),
+});
+
 export const archyNodeSchema: z.ZodSchema<ArchyNode> = z.lazy(() =>
     z.object({
         id: z.string(),
@@ -110,6 +114,54 @@ export const inputAcceptedDTOSchema = z.object({
 export const inputErrorDetailDTOSchema = z.object({
     error: z.string(),
 });
+
+export const resourceStatusSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("Pending"),
+        payload: z.undefined().optional(),
+    }),
+    z.object({
+        kind: z.literal("Waiting"),
+        payload: z.object({
+            reason: z.string(),
+        }),
+    }),
+    z.object({
+        kind: z.literal("Ready"),
+        payload: z.undefined().optional(),
+    }),
+    z.object({
+        kind: z.literal("Failed"),
+        payload: z.object({
+            reason: z.string(),
+        }),
+    }),
+]);
+
+export const serverWatchableDTOSchema = z.object({
+    address: z.string(),
+    dir: z.string(),
+});
+
+export const routeWatchableDTOSchema = z.object({
+    address: z.string(),
+    dir: z.string(),
+});
+
+export const pathWatchableDTOSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("Server"),
+        payload: serverWatchableDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("Route"),
+        payload: routeWatchableDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("Any"),
+        payload: anyWatchableDTOSchema,
+    }),
+]);
 
 export const sseDTOOptsSchema = z.object({
     body: z.string(),
@@ -237,6 +289,11 @@ export const serverChangesetDTOSchema = z.object({
 export const routeDTOSchema = z.object({
     path: z.string(),
     kind: routeKindDTOSchema,
+});
+
+export const serverResourceDTOSchema = z.object({
+    status: resourceStatusSchema,
+    server: serverIdentityDTOSchema,
 });
 
 export const startupErrorDTOSchema = z.object({
@@ -406,10 +463,26 @@ export const startupEventDTOSchema = z.discriminatedUnion("kind", [
     }),
 ]);
 
+export const pathMonitorResourceDTOSchema = z.object({
+    status: resourceStatusSchema,
+    watchable: pathWatchableDTOSchema,
+});
+
 export const serverDescSchema = z.object({
     routes: z.array(routeDTOSchema),
     id: z.string(),
 });
+
+export const transitionDTOSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("Server"),
+        payload: serverResourceDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("PathMonitor"),
+        payload: pathMonitorResourceDTOSchema,
+    }),
+]);
 
 export const taskActionStageDTOSchema: z.ZodSchema<TaskActionStageDTO> = z.lazy(
     () =>

@@ -1,19 +1,48 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+use crate::route::{DebounceDuration, WatchSpec};
 use crate::watchables::any_watchable::AnyWatchable;
 use crate::watchables::route_watchable::RouteWatchable;
 use crate::watchables::server_watchable::ServerWatchable;
-use bsnext_input::route::WatchSpec;
+use bsnext_fs::Debounce;
 use std::path::Path;
 
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+#[derive(PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum PathWatchable {
     Server(ServerWatchable),
     Route(RouteWatchable),
     Any(AnyWatchable),
 }
 
+impl Debug for PathWatchable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            PathWatchable::Server(server) => {
+                let lines = server
+                    .dirs
+                    .iter()
+                    .map(|x| format!("'{}'", x.display()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "PathWatchable::Server({lines})")?;
+            }
+            PathWatchable::Route(route) => {
+                write!(f, "PathWatchable::Route('{}')", route.dir.display())?;
+            }
+            PathWatchable::Any(any) => {
+                let lines = any
+                    .dirs
+                    .iter()
+                    .map(|x| format!("'{}'", x.display()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "PathWatchable::Any({lines})")?;
+            }
+        }
+        Ok(())
+    }
+}
 impl Display for PathWatchable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
@@ -63,5 +92,14 @@ impl PathWatchable {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
         hasher.finish()
+    }
+
+    pub fn debounce(&self) -> Debounce {
+        let spec = match self {
+            PathWatchable::Server(server) => &server.watch_spec,
+            PathWatchable::Route(route) => &route.watch_spec,
+            PathWatchable::Any(any) => &any.watch_spec,
+        };
+        spec.debounce.map(Debounce::from).unwrap_or_default()
     }
 }
