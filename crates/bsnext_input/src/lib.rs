@@ -20,6 +20,7 @@ pub mod route;
 
 pub mod bs_live_built_in_task;
 pub mod input_fs;
+pub mod input_src;
 pub mod route_cli;
 pub mod route_manifest;
 pub mod server_config;

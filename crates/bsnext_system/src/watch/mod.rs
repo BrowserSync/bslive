@@ -104,7 +104,7 @@ impl SystemStart for WatchCommand {
 
         // remember the ID of the input we are commiting
         let _id = input.as_id();
-        let _r = addr.send(CommitInput::new(input)).await;
+        let _r = addr.send(CommitInput::new(input, &[])).await;
 
         let api = BsSystemApi::new(&addr, rx);
         Ok(DidStart::Started { api })

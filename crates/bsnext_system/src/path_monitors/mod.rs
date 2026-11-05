@@ -5,6 +5,7 @@ use bsnext_dto::status_events::{
 };
 use bsnext_dto::status_events_dto::ResourceStatus;
 use bsnext_fs::{Debounce, FsEventContext};
+use bsnext_input::input_src::InputSrc;
 use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::watchables::PathWatchables;
 use bsnext_input::Input;
@@ -201,6 +202,7 @@ impl actix::Handler<RequestMonitor> for PathMonitors {
                 PathWatchable::Server(watchable) => watchable.server_identity.as_id(),
                 PathWatchable::Route(watchable) => watchable.server_identity.as_id(),
                 PathWatchable::Any(_) => watchable_hash,
+                PathWatchable::Input(_) => 0,
             };
             tracing::trace!(?fs_ctx_id);
 
@@ -208,7 +210,7 @@ impl actix::Handler<RequestMonitor> for PathMonitors {
             let spec = path_watchable.spec();
             tracing::trace!(?spec);
 
-            let debounce = spec.debounce.map(Debounce::from).unwrap_or_default();
+            let debounce = path_watchable.debounce();
             tracing::trace!(?debounce);
 
             let path_monitor = PathMonitor::new(
@@ -305,7 +307,8 @@ impl actix::Handler<MonitorAny> for PathMonitors {
             let Ok(..) = monitors_addr.send(TryEvict).await else {
                 unreachable!("can it fail?")
             };
-            let Ok((sys_service_status, input)) = state_reader.send(MonitorStatusReader).await
+            let Ok((sys_service_status, input, input_srcs)) =
+                state_reader.send(MonitorStatusReader).await
             else {
                 unreachable!("can it fail?")
             };
@@ -324,7 +327,7 @@ impl actix::Handler<MonitorAny> for PathMonitors {
                 ServiceStatus::Ready { observed, .. } => observed,
             };
 
-            Ok::<_, anyhow::Error>(Some((expected_id, input)))
+            Ok::<_, anyhow::Error>(Some((expected_id, input, input_srcs)))
         };
 
         Box::pin(future.into_actor(self).map(|res, actor, ctx| {
@@ -336,13 +339,13 @@ impl actix::Handler<MonitorAny> for PathMonitors {
                 None => {
                     tracing::debug!("--- we decided there's nothing to do because local and remote states match")
                 }
-                Some((desired, input)) => {
+                Some((desired, input, input_src)) => {
                     tracing::debug!("+++ There's something to reconcile...");
                     actor.status = ServiceStatus::Reconciling {
                         desired,
                         observed: actor.status.observed(),
                     };
-                    ctx.notify(TryReconcile { input });
+                    ctx.notify(TryReconcile { input, input_src });
                 }
             }
             Ok::<_, anyhow::Error>(())
@@ -354,6 +357,7 @@ impl actix::Handler<MonitorAny> for PathMonitors {
 #[rtype(result = "Result<(), anyhow::Error>")]
 struct TryReconcile {
     input: Input,
+    input_src: Vec<InputSrc>,
 }
 
 impl actix::Handler<TryReconcile> for PathMonitors {
@@ -361,14 +365,15 @@ impl actix::Handler<TryReconcile> for PathMonitors {
 
     fn handle(&mut self, msg: TryReconcile, ctx: &mut Self::Context) -> Self::Result {
         let input = msg.input;
+        let input_src = msg.input_src;
         let Some(recipient) = self.recipient.clone() else {
             todo!("How can this happen?");
         };
         let monitors_addr = ctx.address();
         let cwd = self.cwd.clone();
-        let watchables = PathWatchables::new(&input);
-        for x in &watchables.watchables {
-            self.local_state.inner.entry(x.clone()).or_default();
+        let watchables = PathWatchables::new(&input, &input_src);
+        for watchable in &watchables.watchables {
+            self.local_state.inner.entry(watchable.clone()).or_default();
         }
         self.state_writer.do_send(MonitorStatusWriter {
             monitor_status: self.status,

@@ -19,6 +19,7 @@ use bsnext_dto::internal_events::InternalEvents;
 use bsnext_dto::task_events::TaskReportAndTree;
 use bsnext_dto::{InputErrorDetailDTO, StartupErrorDTO};
 use bsnext_input::input_fs::ResolvedInputOutcome;
+use bsnext_input::input_src::{FileInputSrc, InputSrc};
 use bsnext_input::startup::StartupContext;
 use bsnext_input::{Input, InputArgs, InputCtx, InputError};
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
@@ -169,6 +170,7 @@ impl BsSystem {
 pub struct Accept {
     pub input: Input,
     pub cwd: PathBuf,
+    pub input_src: Vec<InputSrc>,
 }
 
 #[derive(Debug, actix::Message)]
@@ -297,12 +299,14 @@ impl actix::Handler<ResolveInputAgain> for BsSystem {
 #[rtype(result = "Result<(), anyhow::Error>")]
 pub struct CommitInput {
     pub(crate) input: Input,
+    pub(crate) input_src: Vec<InputSrc>,
 }
 
 impl CommitInput {
-    pub fn new(input: impl Into<Input>) -> Self {
+    pub fn new(input: impl Into<Input>, srcs: &[InputSrc]) -> Self {
         Self {
             input: input.into(),
+            input_src: srcs.to_vec(),
         }
     }
 }
@@ -312,6 +316,7 @@ impl actix::Handler<CommitInput> for BsSystem {
 
     fn handle(&mut self, msg: CommitInput, _ctx: &mut Self::Context) -> Self::Result {
         let input = msg.input;
+        let input_src = msg.input_src;
         let servers = self.servers().clone();
         let monitors = self.path_monitors.clone();
         let cwd = self.cwd.clone();
@@ -323,7 +328,11 @@ impl actix::Handler<CommitInput> for BsSystem {
         // todo: make this another thing to eventually come up
         Box::pin(async move {
             status_tracker
-                .send(Accept { input, cwd })
+                .send(Accept {
+                    input,
+                    cwd,
+                    input_src,
+                })
                 .await
                 .expect("mailbox");
 
@@ -365,8 +374,13 @@ impl actix::Handler<CommitInputFile> for BsSystem {
         let abs = msg.absolute;
         let ctx = msg.ctx;
         Box::pin(async move {
-            let _v = self_addr.send(CommitInput { input }).await?;
-            self_addr.send(MonitorInput::new(abs, ctx)).await?;
+            let _v = self_addr
+                .send(CommitInput {
+                    input,
+                    input_src: vec![InputSrc::File(FileInputSrc { absolute: abs })],
+                })
+                .await?;
+            // self_addr.send(MonitorInput::new(abs, ctx)).await?;
             Ok(())
         })
     }

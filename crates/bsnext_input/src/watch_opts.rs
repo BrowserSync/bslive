@@ -1,6 +1,6 @@
 use crate::route::WatchSpec;
 
-#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize)]
 #[serde(untagged)]
 pub enum WatchOpts {
     Bool(bool),

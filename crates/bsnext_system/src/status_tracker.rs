@@ -8,6 +8,7 @@ use bsnext_dto::status_events::{
     ServerStatusReader, ServerStatusWriter, ServiceStatus, StateValue, Transition,
 };
 use bsnext_dto::status_events_dto::{ResourceStatus, TransitionDTO};
+use bsnext_input::input_src::InputSrc;
 use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::watchables::PathWatchables;
 use bsnext_input::Input;
@@ -19,6 +20,7 @@ use tracing::debug_span;
 pub struct StatusTracker {
     input: Input,
     cwd: PathBuf,
+    input_src: Vec<InputSrc>,
     servers_status: ServiceStatus,
     monitor_status: ServiceStatus,
     monitor_resource_status: HashMap<PathWatchable, ResourceStatus>,
@@ -33,6 +35,7 @@ impl Handler<Accept> for StatusTracker {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: Accept, _ctx: &mut Self::Context) -> Self::Result {
+        self.input_src = msg.input_src;
         self.mark_servers(&msg.input);
         self.mark_monitors(&msg.input);
         self.input = msg.input;
@@ -52,6 +55,7 @@ impl StatusTracker {
             monitor_status: ServiceStatus::default(),
             monitor_resource_status: Default::default(),
             input: Input::default(),
+            input_src: vec![],
             cwd,
             sender,
         }
@@ -80,7 +84,7 @@ impl StatusTracker {
     }
     fn mark_monitors(&mut self, input: &Input) {
         tracing::info!("will mark monitors");
-        let path_watchables = PathWatchables::new(input);
+        let path_watchables = PathWatchables::new(input, &self.input_src);
         let id = monitor_status_hash(&path_watchables);
         let next_desired = StateValue::new(id);
         self.monitor_status = match self.monitor_status {
@@ -123,12 +127,13 @@ impl Handler<ServerStatusReader> for StatusTracker {
 }
 
 impl Handler<MonitorStatusReader> for StatusTracker {
-    type Result = ResponseFuture<(ServiceStatus, Input)>;
+    type Result = ResponseFuture<(ServiceStatus, Input, Vec<InputSrc>)>;
 
     fn handle(&mut self, _msg: MonitorStatusReader, _ctx: &mut Self::Context) -> Self::Result {
         Box::pin(futures::future::ready((
             self.monitor_status,
             self.input.clone(),
+            self.input_src.clone(),
         )))
     }
 }

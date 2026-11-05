@@ -1,5 +1,6 @@
 use crate::status_events_dto::ResourceStatus;
 use crate::ActiveServer;
+use bsnext_input::input_src::InputSrc;
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
 use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::watchables::PathWatchables;
@@ -18,7 +19,7 @@ pub struct ServerStatusWriter {
 }
 
 #[derive(Debug, actix::Message)]
-#[rtype(result = "(ServiceStatus, Input)")]
+#[rtype(result = "(ServiceStatus, Input, Vec<InputSrc>)")]
 pub struct MonitorStatusReader;
 
 #[derive(Debug, actix::Message)]

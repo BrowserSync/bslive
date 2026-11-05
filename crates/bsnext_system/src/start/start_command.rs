@@ -89,7 +89,7 @@ impl SystemStart for StartCommand {
         let _id = input.as_id();
         match resolution {
             InputResolution::Default => {
-                let _r = addr.send(CommitInput::new(input)).await;
+                let _r = addr.send(CommitInput::new(input, &[])).await;
             }
             InputResolution::File(file) => {
                 let args = InputArgs::new(self.port);

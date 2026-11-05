@@ -54,6 +54,7 @@ pub enum PathWatchableDTO {
     Server(ServerWatchableDTO),
     Route(RouteWatchableDTO),
     Any(AnyWatchableDTO),
+    Input(InputWatchableDTO),
 }
 
 impl From<&PathWatchable> for PathWatchableDTO {
@@ -84,6 +85,15 @@ impl From<&PathWatchable> for PathWatchableDTO {
                     .join(",");
                 Self::Any(AnyWatchableDTO { dir: dirs })
             }
+            PathWatchable::Input(input_watchable) => {
+                let dirs = input_watchable
+                    .dirs
+                    .iter()
+                    .map(|x| x.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                Self::Any(AnyWatchableDTO { dir: dirs })
+            }
         }
     }
 }
@@ -94,6 +104,7 @@ impl PathWatchableDTO {
             Self::Server(server) => server.dir.as_str(),
             Self::Route(route) => route.dir.as_str(),
             Self::Any(any) => any.dir.as_str(),
+            Self::Input(input) => input.dir.as_str(),
         }
     }
 }
@@ -115,6 +126,12 @@ pub struct RouteWatchableDTO {
 #[typeshare]
 #[derive(Debug, serde::Serialize, Clone)]
 pub struct AnyWatchableDTO {
+    pub dir: String,
+}
+
+#[typeshare]
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct InputWatchableDTO {
     pub dir: String,
 }
 

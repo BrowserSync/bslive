@@ -3,16 +3,19 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::route::{DebounceDuration, WatchSpec};
 use crate::watchables::any_watchable::AnyWatchable;
+use crate::watchables::input_watchable::InputWatchable;
 use crate::watchables::route_watchable::RouteWatchable;
 use crate::watchables::server_watchable::ServerWatchable;
 use bsnext_fs::Debounce;
 use std::path::Path;
+use std::time::Duration;
 
 #[derive(PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum PathWatchable {
     Server(ServerWatchable),
     Route(RouteWatchable),
     Any(AnyWatchable),
+    Input(InputWatchable),
 }
 
 impl Debug for PathWatchable {
@@ -38,6 +41,15 @@ impl Debug for PathWatchable {
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "PathWatchable::Any({lines})")?;
+            }
+            PathWatchable::Input(input_watchable) => {
+                let lines = input_watchable
+                    .dirs
+                    .iter()
+                    .map(|x| format!("'{}'", x.display()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "PathWatchable::Input({lines})")?;
             }
         }
         Ok(())
@@ -67,6 +79,15 @@ impl Display for PathWatchable {
                     .join(", ");
                 write!(f, "PathWatchable::Any({lines})")?;
             }
+            PathWatchable::Input(input_watchable) => {
+                let lines = input_watchable
+                    .dirs
+                    .iter()
+                    .map(|x| format!("'{}'", x.display()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "PathWatchable::Input({lines})")?;
+            }
         }
         Ok(())
     }
@@ -78,6 +99,7 @@ impl PathWatchable {
             PathWatchable::Server(server) => &server.watch_spec,
             PathWatchable::Route(route) => &route.watch_spec,
             PathWatchable::Any(any) => &any.watch_spec,
+            PathWatchable::Input(input) => &input.watch_spec,
         }
     }
     pub fn watch_paths(&self) -> Vec<&Path> {
@@ -85,6 +107,7 @@ impl PathWatchable {
             PathWatchable::Server(server) => server.dirs.iter().map(|x| x.as_path()).collect(),
             PathWatchable::Route(route) => vec![&route.dir],
             PathWatchable::Any(any) => any.dirs.iter().map(|x| x.as_path()).collect(),
+            PathWatchable::Input(input) => input.dirs.iter().map(|x| x.as_path()).collect(),
         }
     }
 
@@ -96,10 +119,16 @@ impl PathWatchable {
 
     pub fn debounce(&self) -> Debounce {
         let spec = match self {
-            PathWatchable::Server(server) => &server.watch_spec,
-            PathWatchable::Route(route) => &route.watch_spec,
-            PathWatchable::Any(any) => &any.watch_spec,
+            PathWatchable::Server(server) => Some(&server.watch_spec),
+            PathWatchable::Route(route) => Some(&route.watch_spec),
+            PathWatchable::Any(any) => Some(&any.watch_spec),
+            PathWatchable::Input(input) => None,
         };
-        spec.debounce.map(Debounce::from).unwrap_or_default()
+        match spec {
+            None => Debounce::Trailing {
+                duration: Duration::from_millis(300),
+            },
+            Some(spec) => spec.debounce.map(Debounce::from).unwrap_or_default(),
+        }
     }
 }

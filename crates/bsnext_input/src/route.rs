@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
-#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize)]
 pub struct Route {
     #[serde(with = "crate::path_def")]
     pub path: PathDef,
@@ -46,7 +46,7 @@ pub enum PathDefError {
     InsertError(#[from] InsertError),
 }
 
-#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, Hash, Clone, serde::Deserialize)]
 pub struct FallbackRoute {
     #[serde(flatten)]
     pub kind: RouteKind,
@@ -54,7 +54,7 @@ pub struct FallbackRoute {
     pub opts: Opts,
 }
 
-#[derive(Debug, Default, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, PartialEq, Hash, Clone, serde::Deserialize)]
 pub struct Opts {
     #[serde(flatten)]
     pub cors: Option<CorsOpts>,
@@ -420,18 +420,7 @@ impl FromStr for PathPattern {
     }
 }
 
-#[derive(
-    Debug,
-    Default,
-    Ord,
-    PartialOrd,
-    PartialEq,
-    Eq,
-    Hash,
-    Clone,
-    serde::Deserialize,
-    serde::Serialize,
-)]
+#[derive(Debug, Default, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, serde::Deserialize)]
 pub struct WatchSpec {
     pub debounce: Option<DebounceDuration>,
     pub only: Option<PathPattern>,
@@ -639,9 +628,7 @@ impl Default for PrefixOpt {
     }
 }
 
-#[derive(
-    Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize, serde::Serialize,
-)]
+#[derive(Debug, PartialOrd, Ord, Eq, PartialEq, Hash, Clone, serde::Deserialize)]
 pub struct MultiWatch {
     pub dirs: WatcherDirs,
     #[serde(flatten)]

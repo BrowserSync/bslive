@@ -45,7 +45,7 @@ impl actix::Handler<MonitorInput> for BsSystem {
             tracing::debug!("refusing to setup another input monitor");
             return;
         }
-        let sys = ctx.address().recipient();
+        let self_recip = ctx.address().recipient();
         let debounce = Debounce::Trailing {
             duration: Duration::from_millis(300),
         };
@@ -57,8 +57,13 @@ impl actix::Handler<MonitorInput> for BsSystem {
             watch_spec: WatchSpec::default(),
         });
 
-        let input_path_monitor =
-            PathMonitor::new(sys, debounce, self.cwd.clone(), ctx, pw.spec().clone());
+        let input_path_monitor = PathMonitor::new(
+            self_recip,
+            debounce,
+            self.cwd.clone(),
+            ctx,
+            pw.spec().clone(),
+        );
 
         tracing::debug!("starting input monitor");
 

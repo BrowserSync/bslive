@@ -147,7 +147,7 @@ impl SystemStart for RunCommand {
         let top_level = TopLevelRunMode::Seq;
 
         let _id = input.as_id();
-        let _r = addr.send(CommitInput::new(input.clone())).await;
+        let _r = addr.send(CommitInput::new(input.clone(), &[])).await;
 
         match run_mode {
             RunMode::Exec { .. } => {
