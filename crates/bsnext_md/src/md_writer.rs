@@ -50,6 +50,7 @@ fn _input_to_str(input: &Input) -> String {
     chunks.join("\n")
 }
 
+#[allow(unused)]
 fn route_to_markdown(kind: &RouteKind, path: &str) -> String {
     match kind {
         RouteKind::Raw(raw) => match raw {
@@ -72,18 +73,22 @@ fn route_to_markdown(kind: &RouteKind, path: &str) -> String {
     }
 }
 
+#[allow(unused)]
 fn fenced_input(code: &str) -> String {
     format!("```yaml bslive_input\n{code}```")
 }
 
+#[allow(unused)]
 fn fenced_route(code: &str) -> String {
     format!("```yaml bslive_route\n{code}```")
 }
 
+#[allow(unused)]
 fn fenced_playground(code: &str) -> String {
     format!("```html playground\n{code}\n```")
 }
 
+#[allow(unused)]
 fn fenced_body(lang: &str, code: &str) -> String {
     format!("```{lang}\n{code}\n```")
 }

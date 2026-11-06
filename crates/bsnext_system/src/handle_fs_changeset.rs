@@ -1,5 +1,4 @@
 use crate::fs_task_tracker::TriggerFsTask;
-use crate::monitor_input::InputMonitor;
 use crate::system::{BsSystem, ResolveInputAgain};
 use crate::tasks::task_spec::TaskSpec;
 use crate::tasks::Runnable;
@@ -14,7 +13,7 @@ use bsnext_fs::{
 };
 use bsnext_input::bs_live_built_in_task::BsLiveBuiltInTask;
 use bsnext_input::route::WatchSpec;
-use bsnext_input::PathDefinition;
+use bsnext_input::{InputCtx, PathDefinition};
 use bsnext_path_monitor::{Changeset, PathMonitorChangeset};
 use bsnext_task::task_trigger::FsChangesTrigger;
 use std::path::PathBuf;
@@ -39,7 +38,7 @@ impl actix::Handler<PathMonitorChangeset> for BsSystem {
             }
             Changeset::BufferedChange(buff) => {
                 if let Some((task_trigger, task_spec)) =
-                    handle_buffered(self.input_monitors.as_ref(), buff, watch_spec)
+                    handle_buffered(self.input_ctx.as_ref(), buff, watch_spec)
                 {
                     tracing::debug!("will trigger task runner");
                     self.fs_task_tracker
@@ -64,6 +63,7 @@ impl BsSystem {
         addr: Addr<Self>,
         debounce: Debounce,
     ) -> Option<ExternalEventsDTO> {
+        tracing::debug!(ctx = ?fs_event.fs_event_ctx());
         match &fs_event.kind() {
             FsEventKind::Change(ch) if fs_event.fs_event_ctx().is_root() => {
                 tracing::info!("fs_event_ctx=root");
@@ -83,19 +83,15 @@ impl BsSystem {
 
 #[tracing::instrument(skip_all)]
 fn handle_buffered(
-    input_monitor: Option<&InputMonitor>,
+    input_ctx: Option<&InputCtx>,
     buf: BufferedChangeset,
     watch_spec: WatchSpec,
 ) -> Option<(FsChangesTrigger, TaskSpec)> {
     tracing::debug!(msg.event_count = buf.changes.len(), msg.ctx = ?buf.fs_event_ctx, ?buf);
 
-    let change = if let Some(mon) = input_monitor {
-        if let Some(fp) = mon.input_ctx.file_path() {
-            tracing::debug!("Dropping input crossover {}", fp.display());
-            buf.dropping_absolute(fp)
-        } else {
-            buf
-        }
+    let change = if let Some(fp) = input_ctx.and_then(|x| x.file_path()) {
+        tracing::debug!("Dropping input crossover {}", fp.display());
+        buf.dropping_absolute(fp)
     } else {
         buf
     };

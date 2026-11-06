@@ -2,7 +2,6 @@ use crate::capabilities::Capabilities;
 use crate::fs_task_tracker::FsTaskTracker;
 use crate::input_fs::from_input_path;
 use crate::invoke_scope::{InvokeScope, Invoker};
-use crate::monitor_input::{InputMonitor, MonitorInput};
 use crate::path_monitors::{ConfigureRecipient, MonitorAny, PathMonitors};
 use crate::status_tracker::StatusTracker;
 use crate::tasks::task_spec::TaskSpec;
@@ -21,7 +20,7 @@ use bsnext_dto::{InputErrorDetailDTO, StartupErrorDTO};
 use bsnext_input::input_fs::ResolvedInputOutcome;
 use bsnext_input::input_src::{FileInputSrc, InputSrc};
 use bsnext_input::startup::StartupContext;
-use bsnext_input::{Input, InputArgs, InputCtx, InputError};
+use bsnext_input::{Input, InputArgs, InputCtx, InputCtxSource, InputError};
 use bsnext_task::task_trigger::{ExecTrigger, TaskTrigger, TaskTriggerSource};
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
@@ -33,7 +32,7 @@ pub struct BsSystem {
     servers_addr: Addr<ServersSupervisor>,
     any_event_sender: Sender<AnyEvent>,
     pub(crate) status_tracker: Addr<StatusTracker>,
-    pub(crate) input_monitors: Option<InputMonitor>,
+    pub(crate) input_ctx: Option<InputCtx>,
     pub(crate) fs_task_tracker: Addr<FsTaskTracker>,
     pub(crate) path_monitors: Addr<PathMonitors>,
     pub(crate) invoker_addr: Addr<Invoker>,
@@ -101,7 +100,7 @@ impl BsSystem {
             self_addr: None,
             servers_addr,
             any_event_sender,
-            input_monitors: None,
+            input_ctx: None,
             path_monitors: monitor,
             invoker_addr,
             fs_task_tracker,
@@ -212,14 +211,36 @@ impl Handler<ResolveInput> for BsSystem {
 
     fn handle(&mut self, msg: ResolveInput, _ctx: &mut Self::Context) -> Self::Result {
         let cwd = self.cwd.clone();
-        let start = self.start_context.clone();
-        let optional_port = msg.optional_port;
+        let startup_ctx = self.start_context.clone();
+
+        let optional_port = msg
+            .optional_port
+            .or(self.input_ctx.as_ref().and_then(|x| x.port()));
+
+        let prev_ids = self
+            .input_ctx
+            .as_ref()
+            .and_then(|ctx| ctx.server_ids().map(ToOwned::to_owned))
+            .unwrap_or_default();
+
+        let input_paths = if !msg.input_paths.is_empty() {
+            msg.input_paths
+        } else {
+            let prev_path = self
+                .input_ctx
+                .as_ref()
+                .and_then(|c| c.file_path().to_owned());
+            prev_path
+                .map(|pb| vec![pb.to_string_lossy().to_string()])
+                .unwrap_or_default()
+        };
+
         Box::pin(async move {
-            match ResolvedInputOutcome::new(cwd.clone(), &msg.input_paths) {
+            match ResolvedInputOutcome::new(cwd.clone(), &input_paths) {
                 ResolvedInputOutcome::Missing { err, .. } => Err(err),
                 ResolvedInputOutcome::GivenPath { ref absolute, .. } => {
                     let args = optional_port.map(InputArgs::new);
-                    let ctx = InputCtx::new(&[], args.clone(), &start, Some(absolute));
+                    let ctx = InputCtx::new(&prev_ids, args.clone(), &startup_ctx, Some(absolute));
                     tracing::debug!(?absolute, ?args, ?ctx, "ResolvedInputOutcome::GivenPath");
                     Ok(Some(ResolveInputResult {
                         input: from_input_path(absolute, &ctx)?,
@@ -228,7 +249,7 @@ impl Handler<ResolveInput> for BsSystem {
                 }
                 ResolvedInputOutcome::Auto { ref absolute, .. } => {
                     let args = optional_port.map(InputArgs::new);
-                    let ctx = InputCtx::new(&[], args, &start, Some(absolute));
+                    let ctx = InputCtx::new(&prev_ids, args, &startup_ctx, Some(absolute));
                     Ok(Some(ResolveInputResult {
                         input: from_input_path(absolute, &ctx)?,
                         absolute: absolute.clone(),
@@ -248,47 +269,23 @@ impl actix::Handler<ResolveInputAgain> for BsSystem {
     type Result = ResponseActFuture<Self, Result<(), anyhow::Error>>;
 
     fn handle(&mut self, _msg: ResolveInputAgain, ctx: &mut Self::Context) -> Self::Result {
-        let Some(monitor) = &self.input_monitors else {
-            todo!("this cannot occur?");
-        };
-
-        let Some(pb) = monitor.input_ctx.file_path() else {
-            todo!("this cannot occur?");
-        };
-
-        let input_ctx = monitor.input_ctx.clone();
-        let port = input_ctx.port();
-
-        let as_str = pb.to_string_lossy();
-        let as_str = as_str.to_string();
         let msg = ResolveInput {
-            input_paths: vec![as_str],
-            optional_port: port,
+            input_paths: vec![],
+            optional_port: None,
         };
-
-        self.publish_external_event(AnyEvent::External(ExternalEventsDTO::InputFileChanged(
-            bsnext_dto::FileChangedDTO::from_path_buf(pb),
-        )));
-
-        let sys_addr = ctx.address().clone();
-
-        let future = async move {
-            let Some(ResolveInputResult { input, absolute }) = sys_addr.send(msg).await?? else {
-                todo!("...");
-            };
-
-            Ok::<_, anyhow::Error>((input, absolute, input_ctx))
-        };
-
-        Box::pin(future.into_actor(self).map(|result, _actor, ctx| {
-            if let Ok((input, absolute, input_ctx)) = result {
-                ctx.notify(CommitInputFile {
-                    input,
-                    absolute,
-                    ctx: input_ctx,
-                });
-            } else {
-                tracing::error!("something went wrong?")
+        let f = ctx.address().send(msg);
+        Box::pin(f.into_actor(self).map(|result, _actor, ctx| {
+            match result {
+                Ok(Ok(Some(r))) => {
+                    ctx.notify(CommitInputFile {
+                        input: r.input,
+                        absolute: r.absolute,
+                        ctx: InputCtxSource::Prev,
+                    });
+                }
+                _ => {
+                    tracing::error!("something went wrong?")
+                }
             }
             Ok(())
         }))
@@ -352,15 +349,15 @@ impl actix::Handler<CommitInput> for BsSystem {
 pub struct CommitInputFile {
     pub(crate) input: Input,
     pub(crate) absolute: PathBuf,
-    pub(crate) ctx: InputCtx,
+    pub(crate) ctx: InputCtxSource,
 }
 
 impl CommitInputFile {
-    pub fn new(input: impl Into<Input>, pb: impl Into<PathBuf>, ctx: impl Into<InputCtx>) -> Self {
+    pub fn new(input: impl Into<Input>, pb: impl Into<PathBuf>, ctx: InputCtxSource) -> Self {
         Self {
             input: input.into(),
             absolute: pb.into(),
-            ctx: ctx.into(),
+            ctx,
         }
     }
 }
@@ -372,7 +369,12 @@ impl actix::Handler<CommitInputFile> for BsSystem {
         let input = msg.input;
         let self_addr = ctx.address();
         let abs = msg.absolute;
-        let ctx = msg.ctx;
+        match msg.ctx {
+            InputCtxSource::Prev => {
+                // noop
+            }
+            InputCtxSource::New(ctx) => self.input_ctx = Some(ctx),
+        };
         Box::pin(async move {
             let _v = self_addr
                 .send(CommitInput {

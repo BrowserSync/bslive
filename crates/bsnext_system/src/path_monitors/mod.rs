@@ -4,7 +4,7 @@ use bsnext_dto::status_events::{
     list_hash, MonitorStatusReader, MonitorStatusWriter, ServiceStatus, StateValue,
 };
 use bsnext_dto::status_events_dto::ResourceStatus;
-use bsnext_fs::{Debounce, FsEventContext};
+use bsnext_fs::FsEventContext;
 use bsnext_input::input_src::InputSrc;
 use bsnext_input::watchables::path_watchable::PathWatchable;
 use bsnext_input::watchables::PathWatchables;
@@ -107,7 +107,6 @@ impl actix::Actor for PathMonitors {
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         tracing::trace!(actor.name = "PathMonitors", actor.lifecyle = "stopped");
         self.local_state.inner.clear();
-        todo!("we cleared all local state here...")
     }
 }
 
@@ -196,17 +195,24 @@ impl actix::Handler<RequestMonitor> for PathMonitors {
                 .into_iter()
                 .map(ToOwned::to_owned)
                 .collect::<Vec<_>>();
+
             tracing::trace!(?watchable_hash);
 
-            let fs_ctx_id = match path_watchable {
-                PathWatchable::Server(watchable) => watchable.server_identity.as_id(),
-                PathWatchable::Route(watchable) => watchable.server_identity.as_id(),
-                PathWatchable::Any(_) => watchable_hash,
-                PathWatchable::Input(_) => 0,
+            let fs_ctx = match path_watchable {
+                PathWatchable::Server(watchable) => {
+                    let id = watchable.server_identity.as_id();
+                    FsEventContext::new(id, watchable_hash)
+                }
+                PathWatchable::Route(watchable) => {
+                    let id = watchable.server_identity.as_id();
+                    FsEventContext::new(id, watchable_hash)
+                }
+                PathWatchable::Any(_) => FsEventContext::new(watchable_hash, watchable_hash),
+                PathWatchable::Input(_) => FsEventContext::for_root(watchable_hash),
             };
-            tracing::trace!(?fs_ctx_id);
 
-            let fs_ctx = FsEventContext::new(fs_ctx_id, watchable_hash);
+            tracing::trace!(?fs_ctx);
+
             let spec = path_watchable.spec();
             tracing::trace!(?spec);
 
@@ -371,7 +377,7 @@ impl actix::Handler<TryReconcile> for PathMonitors {
         };
         let monitors_addr = ctx.address();
         let cwd = self.cwd.clone();
-        let watchables = PathWatchables::new(&input, &input_src);
+        let watchables = PathWatchables::new(&input, &input_src, cwd.as_ref());
         for watchable in &watchables.watchables {
             self.local_state.inner.entry(watchable.clone()).or_default();
         }

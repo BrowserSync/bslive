@@ -5,6 +5,7 @@ use crate::watchables::path_watchable::PathWatchable;
 use crate::watchables::route_watchable::to_route_watchables;
 use crate::watchables::server_watchable::to_server_watchables;
 use crate::{InferWatchers, Input, WatchGlobalConfig};
+use std::path::Path;
 use tracing::debug;
 
 pub mod any_watchable;
@@ -19,11 +20,11 @@ pub struct PathWatchables {
 }
 
 impl PathWatchables {
-    pub fn new(input: &Input, src_list: &[InputSrc]) -> Self {
+    pub fn new(input: &Input, src_list: &[InputSrc], cwd: &Path) -> Self {
         let route_watchables = to_route_watchables(input);
         let server_watchables = to_server_watchables(input);
         let any_watchables = to_any_watchables(input);
-        let input_watchables = to_input_watchable(src_list);
+        let input_watchables = to_input_watchable(src_list, cwd);
 
         let routes = route_watchables
             .iter()

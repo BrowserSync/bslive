@@ -223,6 +223,12 @@ pub struct InputCtx {
     file_path: Option<PathBuf>,
 }
 
+#[derive(Debug)]
+pub enum InputCtxSource {
+    Prev,
+    New(InputCtx),
+}
+
 impl InputCtx {
     pub fn new(
         server_identities: &[ServerIdentity],

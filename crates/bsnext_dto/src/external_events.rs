@@ -188,7 +188,7 @@ fn print_transition<W: Write>(w: &mut W, trans: &TransitionDTO) -> anyhow::Resul
             dbg!(server_dto);
         }
         TransitionDTO::PathMonitor(path_monitor_dto) => {
-            let dir = path_monitor_dto.watchable.watch_path();
+            let dir = path_monitor_dto.watchable.display_paths();
             let debounce = &path_monitor_dto.debounce;
             match &path_monitor_dto.status {
                 ResourceStatus::Pending => todo!("can we be pending here?"),

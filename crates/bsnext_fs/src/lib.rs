@@ -57,11 +57,8 @@ impl FsEventContext {
     pub fn new(id: u64, origin_id: u64) -> Self {
         Self { id, origin_id }
     }
-    pub fn for_root() -> Self {
-        Self {
-            id: 0,
-            origin_id: 0,
-        }
+    pub fn for_root(origin_id: u64) -> Self {
+        Self { id: 0, origin_id }
     }
 }
 
@@ -70,7 +67,7 @@ impl FsEventContext {
         self.id
     }
     pub fn is_root(&self) -> bool {
-        self.id == 0 && self.origin_id == 0
+        self.id == 0
     }
 }
 

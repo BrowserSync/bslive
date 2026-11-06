@@ -15,7 +15,7 @@ use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::StartupError;
 use bsnext_input::route::{CorsOpts, Opts};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
-use bsnext_input::{Input, InputArgs, InputCtx, WatchGlobalConfig};
+use bsnext_input::{Input, InputArgs, InputCtx, InputCtxSource, WatchGlobalConfig};
 use bsnext_tracing::OutputFormat;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc::Sender;
@@ -95,6 +95,7 @@ impl SystemStart for StartCommand {
                 let args = InputArgs::new(self.port);
                 let server_ids = input.ids();
                 let ctx = InputCtx::new(&server_ids, Some(args), &startup_ctx, Some(&file));
+                let ctx = InputCtxSource::New(ctx);
                 let _r = addr.send(CommitInputFile::new(input, file, ctx)).await;
             }
         }

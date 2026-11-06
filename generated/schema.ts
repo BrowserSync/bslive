@@ -115,6 +115,11 @@ export const inputErrorDetailDTOSchema = z.object({
     error: z.string(),
 });
 
+export const inputWatchableDTOSchema = z.object({
+    absolute_paths: z.string(),
+    relative_paths: z.string(),
+});
+
 export const resourceStatusSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("Pending"),
@@ -139,12 +144,12 @@ export const resourceStatusSchema = z.discriminatedUnion("kind", [
 ]);
 
 export const serverWatchableDTOSchema = z.object({
-    address: z.string(),
+    server: serverIdentityDTOSchema,
     dir: z.string(),
 });
 
 export const routeWatchableDTOSchema = z.object({
-    address: z.string(),
+    server: serverIdentityDTOSchema,
     dir: z.string(),
 });
 
@@ -160,6 +165,10 @@ export const pathWatchableDTOSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("Any"),
         payload: anyWatchableDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("Input"),
+        payload: inputWatchableDTOSchema,
     }),
 ]);
 
@@ -310,10 +319,6 @@ export const stdoutLineDTOSchema = z.object({
     prefix: z.string().optional(),
 });
 
-export const stoppedWatchingDTOSchema = z.object({
-    paths: z.array(z.string()),
-});
-
 export const taskConclusionDTOSchema = z.union([
     z.object({
         kind: z.literal("Ok"),
@@ -332,11 +337,6 @@ export const taskConclusionDTOSchema = z.union([
 export const taskTreePreviewSchema = z.object({
     tree: archyNodeSchema,
     will_exec: z.boolean(),
-});
-
-export const watchingDTOSchema = z.object({
-    paths: z.array(z.string()),
-    debounce: debounceDTOSchema,
 });
 
 export const changeKindSchema = z.nativeEnum(ChangeKind);
@@ -466,6 +466,7 @@ export const startupEventDTOSchema = z.discriminatedUnion("kind", [
 export const pathMonitorResourceDTOSchema = z.object({
     status: resourceStatusSchema,
     watchable: pathWatchableDTOSchema,
+    debounce: debounceDTOSchema,
 });
 
 export const serverDescSchema = z.object({
@@ -583,12 +584,8 @@ export const externalEventsDTOSchema: z.ZodSchema<ExternalEventsDTO> = z.lazy(
                 payload: taskTreeSummarySchema,
             }),
             z.object({
-                kind: z.literal("Watching"),
-                payload: watchingDTOSchema,
-            }),
-            z.object({
-                kind: z.literal("WatchingStopped"),
-                payload: stoppedWatchingDTOSchema,
+                kind: z.literal("Transition"),
+                payload: transitionDTOSchema,
             }),
         ]),
 );

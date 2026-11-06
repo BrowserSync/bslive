@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use crate::route::{DebounceDuration, WatchSpec};
+use crate::route::WatchSpec;
 use crate::watchables::any_watchable::AnyWatchable;
 use crate::watchables::input_watchable::InputWatchable;
 use crate::watchables::route_watchable::RouteWatchable;
@@ -10,7 +10,7 @@ use bsnext_fs::Debounce;
 use std::path::Path;
 use std::time::Duration;
 
-#[derive(PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone)]
 pub enum PathWatchable {
     Server(ServerWatchable),
     Route(RouteWatchable),
@@ -18,43 +18,6 @@ pub enum PathWatchable {
     Input(InputWatchable),
 }
 
-impl Debug for PathWatchable {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            PathWatchable::Server(server) => {
-                let lines = server
-                    .dirs
-                    .iter()
-                    .map(|x| format!("'{}'", x.display()))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                write!(f, "PathWatchable::Server({lines})")?;
-            }
-            PathWatchable::Route(route) => {
-                write!(f, "PathWatchable::Route('{}')", route.dir.display())?;
-            }
-            PathWatchable::Any(any) => {
-                let lines = any
-                    .dirs
-                    .iter()
-                    .map(|x| format!("'{}'", x.display()))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                write!(f, "PathWatchable::Any({lines})")?;
-            }
-            PathWatchable::Input(input_watchable) => {
-                let lines = input_watchable
-                    .dirs
-                    .iter()
-                    .map(|x| format!("'{}'", x.display()))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                write!(f, "PathWatchable::Input({lines})")?;
-            }
-        }
-        Ok(())
-    }
-}
 impl Display for PathWatchable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
@@ -122,7 +85,7 @@ impl PathWatchable {
             PathWatchable::Server(server) => Some(&server.watch_spec),
             PathWatchable::Route(route) => Some(&route.watch_spec),
             PathWatchable::Any(any) => Some(&any.watch_spec),
-            PathWatchable::Input(input) => None,
+            PathWatchable::Input(_input) => None,
         };
         match spec {
             None => Debounce::Trailing {

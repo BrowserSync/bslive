@@ -8,7 +8,6 @@ mod handle_fs_changeset;
 pub mod input_fs;
 mod invoke_scope;
 pub mod monitor_any;
-pub mod monitor_input;
 pub mod path_monitors;
 pub mod run;
 mod servers;

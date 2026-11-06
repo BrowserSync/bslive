@@ -1,7 +1,6 @@
 use crate::status_events::Transition;
 use crate::{DebounceDTO, ServerIdentityDTO};
 use bsnext_input::watchables::path_watchable::PathWatchable;
-use std::path::Path;
 use typeshare::typeshare;
 
 /// @discriminator kind
@@ -86,25 +85,37 @@ impl From<&PathWatchable> for PathWatchableDTO {
                 Self::Any(AnyWatchableDTO { dir: dirs })
             }
             PathWatchable::Input(input_watchable) => {
-                let dirs = input_watchable
+                let absolute_paths = input_watchable
                     .dirs
                     .iter()
                     .map(|x| x.display().to_string())
                     .collect::<Vec<_>>()
                     .join(",");
-                Self::Any(AnyWatchableDTO { dir: dirs })
+                let relative_paths = input_watchable
+                    .dirs
+                    .iter()
+                    .map(|x| {
+                        let next = x.strip_prefix(&input_watchable.cwd).ok().unwrap_or(x);
+                        next.display().to_string()
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",");
+                Self::Input(InputWatchableDTO {
+                    absolute_paths,
+                    relative_paths,
+                })
             }
         }
     }
 }
 
 impl PathWatchableDTO {
-    pub fn watch_path(&self) -> &str {
+    pub fn display_paths(&self) -> &str {
         match self {
             Self::Server(server) => server.dir.as_str(),
             Self::Route(route) => route.dir.as_str(),
             Self::Any(any) => any.dir.as_str(),
-            Self::Input(input) => input.dir.as_str(),
+            Self::Input(input) => input.relative_paths.as_str(),
         }
     }
 }
@@ -132,7 +143,8 @@ pub struct AnyWatchableDTO {
 #[typeshare]
 #[derive(Debug, serde::Serialize, Clone)]
 pub struct InputWatchableDTO {
-    pub dir: String,
+    pub absolute_paths: String,
+    pub relative_paths: String,
 }
 
 /// @discriminator kind

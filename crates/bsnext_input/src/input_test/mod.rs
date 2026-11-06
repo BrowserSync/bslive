@@ -14,7 +14,7 @@ fn test_deserialize() {
 
 #[test]
 fn test_deserialize_2() {
-    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    #[derive(serde::Deserialize, Debug)]
     struct Config {
         pub items: Vec<Route>,
     }
@@ -47,7 +47,7 @@ fn test_deserialize_2() {
 
 #[test]
 fn test_deserialize_cors_false() {
-    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    #[derive(serde::Deserialize, Debug)]
     struct Config {
         pub items: Vec<Route>,
     }
@@ -66,7 +66,7 @@ fn test_deserialize_cors_false() {
 
 #[test]
 fn test_deserialize_compressions_absent() {
-    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    #[derive(serde::Deserialize, Debug)]
     struct Config {
         pub items: Vec<Route>,
     }
@@ -83,7 +83,7 @@ fn test_deserialize_compressions_absent() {
 
 #[test]
 fn test_deserialize_compressions_true() {
-    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    #[derive(serde::Deserialize, Debug)]
     struct Config {
         pub items: Vec<Route>,
     }
@@ -135,7 +135,7 @@ fn test_com_yaml() -> anyhow::Result<()> {
 
 #[test]
 fn test_deserialize_3_headers_control() {
-    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    #[derive(serde::Deserialize, Debug)]
     struct Config {
         pub items: Vec<Route>,
     }
@@ -151,7 +151,7 @@ fn test_deserialize_3_headers_control() {
 
 #[test]
 fn test_deserialize_3_headers() {
-    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    #[derive(serde::Deserialize, Debug)]
     struct Config {
         pub items: Vec<Route>,
     }

@@ -84,7 +84,7 @@ impl StatusTracker {
     }
     fn mark_monitors(&mut self, input: &Input) {
         tracing::info!("will mark monitors");
-        let path_watchables = PathWatchables::new(input, &self.input_src);
+        let path_watchables = PathWatchables::new(input, &self.input_src, &self.cwd);
         let id = monitor_status_hash(&path_watchables);
         let next_desired = StateValue::new(id);
         self.monitor_status = match self.monitor_status {
@@ -160,8 +160,6 @@ impl Handler<MonitorStatusWriter> for StatusTracker {
             if did_transition {
                 let evt = Transition::path_monitor(status.clone(), id.clone());
                 let trans: TransitionDTO = evt.into();
-                // todo!("publish the event!");
-                // dbg!(&evt);
                 Arbiter::current().spawn(async move {
                     let _ = sender
                         .send(AnyEvent::External(ExternalEventsDTO::Transition(trans)))
