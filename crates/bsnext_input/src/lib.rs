@@ -132,7 +132,7 @@ impl FromStr for Input {
     }
 }
 
-#[derive(Debug, Hash, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Hash, Default, Clone, serde::Deserialize)]
 pub struct InputConfig {
     pub watchers: WatchGlobalConfig,
     pub global_fs_ignore: Option<PathPattern>,

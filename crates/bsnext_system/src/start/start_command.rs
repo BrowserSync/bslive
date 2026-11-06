@@ -38,6 +38,10 @@ pub struct StartCommand {
     #[clap(flatten)]
     pub logging: LoggingOpts,
 
+    /// provide this flag to disable command prefixes
+    #[arg(long = "no-prefix", default_value = "false")]
+    pub no_prefix: bool,
+
     /// output options
     #[arg(short, long, value_enum, default_value_t)]
     pub format: OutputFormat,

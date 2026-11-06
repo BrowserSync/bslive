@@ -6,7 +6,7 @@ use crate::{
     ServerChangeDTO, ServerChangesetDTO, ServerIdentityDTO, StartupErrorDTO, StderrLineDTO,
     StdoutLineDTO,
 };
-use bsnext_output::OutputWriterTrait;
+use bsnext_output::{OutputGlobalPrefix, OutputWriterTrait};
 use bsnext_task::task_report::TaskReport;
 use bsnext_task::NodePath;
 use console::style;
@@ -128,7 +128,11 @@ impl OutputWriterTrait for ExternalEventsDTO {
             .map_err(|e| anyhow::anyhow!(e.to_string()))
     }
 
-    fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+    fn write_pretty<W: Write>(
+        &self,
+        output_global_prefix: &OutputGlobalPrefix,
+        sink: &mut W,
+    ) -> anyhow::Result<()> {
         match self {
             ExternalEventsDTO::InputAccepted(input_accepted) => {
                 print_input_accepted(sink, input_accepted)
@@ -141,7 +145,7 @@ impl OutputWriterTrait for ExternalEventsDTO {
                 print_input_file_changed(sink, file_changed)
             }
             ExternalEventsDTO::OutputLine(OutputLineDTO::Stdout(stdout)) => {
-                print_stdout_line(sink, stdout)
+                print_stdout_line(sink, output_global_prefix, stdout)
             }
             ExternalEventsDTO::OutputLine(OutputLineDTO::Stderr(stderr)) => {
                 print_stderr_line(sink, stderr)
@@ -268,12 +272,20 @@ pub fn print_input_file_changed<W: Write>(w: &mut W, evt: &FileChangedDTO) -> an
     Ok(())
 }
 
-pub fn print_stdout_line<W: Write>(w: &mut W, line: &StdoutLineDTO) -> anyhow::Result<()> {
-    match &line.prefix {
-        None => writeln!(w, "{}", line.line)?,
-        Some(prefix) => {
-            let color = hash(prefix) % 256;
-            writeln!(w, "\x1b[38;5;{}m{}\x1b[0m {}", color, prefix, line.line)?
+pub fn print_stdout_line<W: Write>(
+    w: &mut W,
+    global_prefix: &OutputGlobalPrefix,
+    line: &StdoutLineDTO,
+) -> anyhow::Result<()> {
+    if matches!(global_prefix, OutputGlobalPrefix::None) {
+        writeln!(w, "{}", line.line)?
+    } else {
+        match &line.prefix {
+            None => writeln!(w, "{}", line.line)?,
+            Some(prefix) => {
+                let color = hash(prefix) % 256;
+                writeln!(w, "\x1b[38;5;{}m{}\x1b[0m {}", color, prefix, line.line)?
+            }
         }
     }
     Ok(())

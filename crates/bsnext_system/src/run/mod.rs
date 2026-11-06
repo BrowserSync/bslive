@@ -54,7 +54,7 @@ pub struct RunCommand {
     /// commands to run
     #[arg(long = "sh")]
     pub sh_commands: Vec<String>,
-    /// provide this flag to disable command prefixes
+    /// provide this flag to disable global prefixes
     #[arg(long = "no-prefix", default_value = "false")]
     pub no_prefix: bool,
     /// logging options
