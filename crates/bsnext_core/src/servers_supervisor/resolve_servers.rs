@@ -162,11 +162,14 @@ impl actix::Handler<ResolveServers> for ServersSupervisor {
                             servers_status: act.status,
                         });
                     } else {
-                        todo!("will set to reconciling... but is it?");
-                        // act.status = ServiceStatus::Reconciling {
-                        //     desired,
-                        //     observed: Some(observed),
-                        // };
+                        // todo!("will set to reconciling... but is it?");
+                        act.status = ServiceStatus::Reconciling {
+                            desired,
+                            observed: Some(observed),
+                        };
+                        state_writer.do_send(ServerStatusWriter {
+                            servers_status: act.status,
+                        });
                     }
 
                     tracing::info!(observed = ?act.status, len, ?desired, "observed");

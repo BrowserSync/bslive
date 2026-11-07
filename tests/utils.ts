@@ -6,8 +6,10 @@ import {
     externalEventsDTOSchema,
     outputLineDTOSchema,
     serverChangesetDTOSchema,
+    transitionDTOSchema,
 } from "../generated/schema.js";
 import { clearInterval } from "node:timers";
+import { TransitionDTO } from "@browsersync/generated/dto";
 
 const either = externalEventsDTOSchema;
 
@@ -71,6 +73,10 @@ export const test = base.extend<{
             kind: z.infer<typeof either>["kind"],
             count?: number,
         ) => Promise<z.infer<typeof either>[]>;
+        waitForTransition: (
+            kind: z.infer<typeof transitionDTOSchema>["kind"],
+            count?: number,
+        ) => Promise<TransitionDTO[]>;
         outputLines: (
             count?: number,
         ) => Promise<z.infer<typeof outputLineDTOSchema>["payload"][]>;
@@ -350,6 +356,42 @@ export const test = base.extend<{
                         );
                         if (matched.length >= count) {
                             resolve(matched);
+                            clearInterval(int);
+                            return;
+                        }
+                    }, 50);
+                });
+            },
+            waitForTransition(
+                kind: TransitionDTO["kind"],
+                count = 1,
+            ): Promise<TransitionDTO[]> {
+                return new Promise((resolve, reject) => {
+                    let start = Date.now();
+                    let max = 5000;
+                    let int = setInterval(() => {
+                        if (Date.now() - start > max) {
+                            reject(new Error(`timed out waiting for ${kind}`));
+                            clearInterval(int);
+                            return;
+                        }
+                        let output: TransitionDTO[] = [];
+                        for (let parsedMessage of parsedMessages) {
+                            if (
+                                parsedMessage.kind === "Transition" &&
+                                parsedMessage.payload.kind == kind
+                            ) {
+                                output.push(parsedMessage.payload);
+                            }
+                        }
+                        const matched = parsedMessages.filter((x) => {
+                            return (
+                                x.kind === "Transition" &&
+                                x.payload.kind === kind
+                            );
+                        });
+                        if (matched.length >= count) {
+                            resolve(output);
                             clearInterval(int);
                             return;
                         }

@@ -1,13 +1,28 @@
 [
   {
-    "kind": "Watching",
+    "kind": "Transition",
     "payload": {
-      "paths": [
-        "examples/watch/src"
-      ],
-      "debounce": {
-        "kind": "buffered",
-        "ms": "300"
+      "kind": "PathMonitor",
+      "payload": {
+        "status": {
+          "kind": "Ready"
+        },
+        "watchable": {
+          "kind": "Route",
+          "payload": {
+            "server": {
+              "kind": "Named",
+              "payload": {
+                "name": "blenders"
+              }
+            },
+            "dir": "examples/watch/src"
+          }
+        },
+        "debounce": {
+          "kind": "buffered",
+          "ms": "300"
+        }
       }
     }
   }

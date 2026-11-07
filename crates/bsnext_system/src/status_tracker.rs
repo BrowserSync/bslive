@@ -148,31 +148,23 @@ impl Handler<MonitorStatusWriter> for StatusTracker {
         tracing::debug!(prev.resource_status = ?self.monitor_resource_status, " --> ");
         tracing::debug!(next.status = ?msg.monitor_status, " --> ");
         tracing::debug!(next.resource_status = ?msg.monitor_resource_status, " --> ");
-        for (id, status) in &msg.monitor_resource_status {
-            let span = debug_span!("monitor resource status", id = ?id);
+        for (path_watchable, status) in &msg.monitor_resource_status {
+            let span = debug_span!("monitor resource status", id = ?path_watchable);
             let _g = span.enter();
             let did_transition = self
                 .monitor_resource_status
-                .get(id)
+                .get(path_watchable)
                 .is_some_and(|x| x != status);
             tracing::info!(did_transition);
             let sender = self.sender.clone();
             if did_transition {
-                let evt = Transition::path_monitor(status.clone(), id.clone());
-                let trans: TransitionDTO = evt.into();
+                let evt = Transition::path_monitor(status.clone(), path_watchable.clone());
+                let trans = TransitionDTO::from(evt);
                 Arbiter::current().spawn(async move {
                     let _ = sender
                         .send(AnyEvent::External(ExternalEventsDTO::Transition(trans)))
                         .await;
                 });
-                match status {
-                    ResourceStatus::Pending => {}
-                    ResourceStatus::Waiting { reason } => {
-                        tracing::info!("waiting! reason: {reason}")
-                    }
-                    ResourceStatus::Ready => tracing::info!("ready!"),
-                    ResourceStatus::Failed { reason } => tracing::info!("failed reason: {reason}!"),
-                }
             }
         }
         self.monitor_status = msg.monitor_status;
