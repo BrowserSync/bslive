@@ -7,7 +7,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::net::SocketAddr;
 use std::str::FromStr;
 
-#[derive(Debug, Default, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Hash, Clone, serde::Deserialize)]
 pub struct ServerConfig {
     #[serde(flatten)]
     pub identity: ServerIdentity,
@@ -51,9 +51,7 @@ impl ServerConfig {
     }
 }
 
-#[derive(
-    Debug, Ord, PartialOrd, PartialEq, Hash, Eq, Clone, serde::Deserialize, serde::Serialize,
-)]
+#[derive(Debug, Ord, PartialOrd, PartialEq, Hash, Eq, Clone, serde::Deserialize)]
 #[serde(untagged)]
 pub enum ServerIdentity {
     PortNamed {
@@ -162,7 +160,7 @@ impl ServerIdentity {
 
 #[test]
 fn server_config_as_enum() {
-    #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+    #[derive(Debug, Clone, serde::Deserialize)]
     struct C {
         servers: Vec<ServerConfig>,
     }
@@ -189,7 +187,7 @@ servers:
 
 #[test]
 fn with_port() {
-    #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+    #[derive(Debug, Clone, serde::Deserialize)]
     struct C {
         servers: Vec<ServerConfig>,
     }

@@ -20,6 +20,7 @@ pub mod route;
 
 pub mod bs_live_built_in_task;
 pub mod input_fs;
+pub mod input_src;
 pub mod route_cli;
 pub mod route_manifest;
 pub mod server_config;
@@ -28,10 +29,11 @@ pub mod target;
 #[cfg(test)]
 pub mod watch_opt_test;
 pub mod watch_opts;
+pub mod watchables;
 pub mod when_guard;
 pub mod yml;
 
-#[derive(Debug, Default, Hash, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Hash, Clone, serde::Deserialize)]
 pub struct Input {
     #[serde(default)]
     pub servers: Vec<server_config::ServerConfig>,
@@ -130,7 +132,7 @@ impl FromStr for Input {
     }
 }
 
-#[derive(Debug, Hash, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Hash, Default, Clone, serde::Deserialize)]
 pub struct InputConfig {
     pub watchers: WatchGlobalConfig,
     pub global_fs_ignore: Option<PathPattern>,
@@ -221,6 +223,12 @@ pub struct InputCtx {
     file_path: Option<PathBuf>,
 }
 
+#[derive(Debug)]
+pub enum InputCtxSource {
+    Prev,
+    New(InputCtx),
+}
+
 impl InputCtx {
     pub fn new(
         server_identities: &[ServerIdentity],
@@ -280,10 +288,6 @@ pub trait InputCreation {
         content: P,
         input_ctx: &InputCtx,
     ) -> Result<Input, Box<InputError>>;
-}
-
-pub trait InputWriter {
-    fn input_to_str(&self, input: &Input) -> String;
 }
 
 #[derive(Debug, miette::Diagnostic, thiserror::Error)]

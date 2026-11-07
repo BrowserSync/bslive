@@ -1,16 +1,10 @@
+use bsnext_dto::ServerIdentityDTO;
 use bsnext_input::route::{RawRoute, RouteKind};
-use bsnext_input::server_config::ServerIdentity;
-use bsnext_input::{Input, InputWriter};
+use bsnext_input::Input;
 use mime_guess::get_mime_extensions_str;
 use serde_json::json;
 
 pub struct MdWriter;
-
-impl InputWriter for MdWriter {
-    fn input_to_str(&self, input: &Input) -> String {
-        _input_to_str(input)
-    }
-}
 
 fn _input_to_str(input: &Input) -> String {
     let mut chunks = vec![];
@@ -18,7 +12,7 @@ fn _input_to_str(input: &Input) -> String {
         #[derive(Debug, serde::Serialize)]
         struct FakeServerConfig {
             #[serde(flatten)]
-            identity: ServerIdentity,
+            identity: ServerIdentityDTO,
         }
         #[derive(Debug, serde::Serialize)]
         struct FakeInput {
@@ -26,7 +20,7 @@ fn _input_to_str(input: &Input) -> String {
         }
         let just_identity = FakeInput {
             servers: vec![FakeServerConfig {
-                identity: server_config.identity.clone(),
+                identity: ServerIdentityDTO::from(&server_config.identity),
             }],
         };
         let yml = serde_yaml::to_string(&just_identity).expect("never fail here");
@@ -56,6 +50,7 @@ fn _input_to_str(input: &Input) -> String {
     chunks.join("\n")
 }
 
+#[allow(unused)]
 fn route_to_markdown(kind: &RouteKind, path: &str) -> String {
     match kind {
         RouteKind::Raw(raw) => match raw {
@@ -78,18 +73,22 @@ fn route_to_markdown(kind: &RouteKind, path: &str) -> String {
     }
 }
 
+#[allow(unused)]
 fn fenced_input(code: &str) -> String {
     format!("```yaml bslive_input\n{code}```")
 }
 
+#[allow(unused)]
 fn fenced_route(code: &str) -> String {
     format!("```yaml bslive_route\n{code}```")
 }
 
+#[allow(unused)]
 fn fenced_playground(code: &str) -> String {
     format!("```html playground\n{code}\n```")
 }
 
+#[allow(unused)]
 fn fenced_body(lang: &str, code: &str) -> String {
     format!("```{lang}\n{code}\n```")
 }

@@ -54,7 +54,7 @@ pub struct RunCommand {
     /// commands to run
     #[arg(long = "sh")]
     pub sh_commands: Vec<String>,
-    /// provide this flag to disable command prefixes
+    /// provide this flag to disable global prefixes
     #[arg(long = "no-prefix", default_value = "false")]
     pub no_prefix: bool,
     /// logging options
@@ -92,7 +92,7 @@ impl RunCommand {
     ) -> anyhow::Result<(Input, InputResolution)> {
         // try to resolve input from disk
         let input = addr
-            .send(ResolveInput::from_strs(&input_opts.input))
+            .send(ResolveInput::from_strs(&input_opts.input, &None))
             .await
             .context("mailbox")??;
 
@@ -147,7 +147,7 @@ impl SystemStart for RunCommand {
         let top_level = TopLevelRunMode::Seq;
 
         let _id = input.as_id();
-        let _r = addr.send(CommitInput::new(input.clone())).await;
+        let _r = addr.send(CommitInput::new(input.clone(), &[])).await;
 
         match run_mode {
             RunMode::Exec { .. } => {

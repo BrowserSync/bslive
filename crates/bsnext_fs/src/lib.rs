@@ -57,11 +57,8 @@ impl FsEventContext {
     pub fn new(id: u64, origin_id: u64) -> Self {
         Self { id, origin_id }
     }
-    pub fn for_root() -> Self {
-        Self {
-            id: 0,
-            origin_id: 0,
-        }
+    pub fn for_root(origin_id: u64) -> Self {
+        Self { id: 0, origin_id }
     }
 }
 
@@ -70,7 +67,7 @@ impl FsEventContext {
         self.id
     }
     pub fn is_root(&self) -> bool {
-        self.id == 0 && self.origin_id == 0
+        self.id == 0
     }
 }
 
@@ -86,11 +83,20 @@ impl Default for FsEventContext {
 #[derive(actix::Message, Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
 #[rtype(result = "()")]
 pub struct FsEvent {
-    pub kind: FsEventKind,
-    pub fs_event_ctx: FsEventContext,
+    kind: FsEventKind,
+    fs_event_ctx: FsEventContext,
 }
 
 impl FsEvent {
+    pub fn kind(&self) -> &FsEventKind {
+        &self.kind
+    }
+    pub fn fs_event_ctx(&self) -> &FsEventContext {
+        &self.fs_event_ctx
+    }
+    pub fn new(kind: FsEventKind, fs_event_ctx: FsEventContext) -> Self {
+        Self { kind, fs_event_ctx }
+    }
     pub fn changed<A: AsRef<Path>>(absolute: A, relative: A, ctx_id: u64) -> Self {
         Self {
             kind: FsEventKind::Change(PathDescriptionOwned {
@@ -109,7 +115,6 @@ impl FsEvent {
 pub enum FsEventKind {
     Change(PathDescriptionOwned),
     PathAdded(PathAddedEvent),
-    PathRemoved(PathEvent),
     PathNotFoundError(PathEvent),
 }
 

@@ -1,6 +1,6 @@
 use crate::{StartupError, StartupEventDTO};
 use bsnext_input::InputError;
-use bsnext_output::OutputWriterTrait;
+use bsnext_output::{OutputGlobalPrefix, OutputWriterTrait};
 use std::io::Write;
 
 impl OutputWriterTrait for StartupEvent {
@@ -10,7 +10,11 @@ impl OutputWriterTrait for StartupEvent {
             .map_err(|e| anyhow::anyhow!(e.to_string()))
     }
 
-    fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+    fn write_pretty<W: Write>(
+        &self,
+        _global_prefix: &OutputGlobalPrefix,
+        sink: &mut W,
+    ) -> anyhow::Result<()> {
         match self {
             StartupEvent::Started => {
                 writeln!(sink, "started...")?;

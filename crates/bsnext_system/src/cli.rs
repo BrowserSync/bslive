@@ -22,7 +22,6 @@ where
     T: Into<OsString> + Clone,
 {
     let args = Args::parse_from(itr);
-
     let logging = *args.logging();
     let write_log_opt = if logging.write_log {
         WriteOption::File
@@ -56,10 +55,10 @@ where
     };
 
     let format_clone = format;
-
+    let prefix = args.global_prefix();
     let writer = match format_clone {
-        OutputFormat::Tui => OutputWriters::Pretty,
-        OutputFormat::Normal => OutputWriters::Pretty,
+        OutputFormat::Tui => OutputWriters::Pretty { prefix },
+        OutputFormat::Normal => OutputWriters::Pretty { prefix },
         OutputFormat::Json => OutputWriters::Json,
     };
 

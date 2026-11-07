@@ -1,0 +1,32 @@
+<style>
+    body {
+        background: white
+    }
+</style>
+
+<code>count: </code>
+
+<script type="module">
+    const elem = document.querySelector("code");
+    let count = 0;
+    let then = performance.now();
+    let last = 0;
+
+    commit(last);
+
+    function commit(count) {
+        elem.innerText = `Count: ${count}`;
+    }
+
+    function run() {
+        let now = performance.now();
+        let diff = Math.floor((now - then) / 1000);
+        if (diff !== last) {
+            last = diff;
+            commit(last);
+        }
+        requestAnimationFrame(run);
+    }
+
+    requestAnimationFrame(run);
+</script>

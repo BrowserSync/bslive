@@ -3,6 +3,7 @@ use crate::start::start_command::StartCommand;
 use crate::watch::watch_sub_opts::WatchSubOpts;
 use crate::watch::WatchCommand;
 use bsnext_core::shared_args::{InputOpts, LoggingOpts};
+use bsnext_output::OutputGlobalPrefix;
 use bsnext_tracing::OutputFormat;
 // bslive route --path=/ --dir=
 
@@ -32,6 +33,10 @@ pub struct Args {
     #[clap(long)]
     pub no_watch: bool,
 
+    /// pass '--no-prefix' to prevent output lines being prefixed with the node tree path by default'
+    #[clap(long)]
+    pub no_prefix: bool,
+
     /// Paths to serve + possibly watch, incompatible with `-i` option
     pub trailing: Vec<String>,
 }
@@ -52,11 +57,29 @@ impl Args {
                     logging,
                     format,
                     no_watch: self.no_watch,
+                    no_prefix: self.no_prefix,
                 });
                 (default_cmd, self.input_opts.clone())
             },
             |cmd| (cmd, self.input_opts.clone()),
         )
+    }
+
+    pub fn global_prefix(&self) -> OutputGlobalPrefix {
+        if self.no_prefix {
+            return OutputGlobalPrefix::None;
+        }
+        self.command
+            .as_ref()
+            .and_then(|cmd| {
+                let global_refused = match cmd {
+                    SubCommands::Start(start) => start.no_prefix,
+                    SubCommands::Watch(watch) => watch.no_prefix,
+                    SubCommands::Run(run) => run.no_prefix,
+                };
+                global_refused.then_some(OutputGlobalPrefix::None)
+            })
+            .unwrap_or_default()
     }
 }
 

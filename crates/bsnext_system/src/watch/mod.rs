@@ -62,7 +62,7 @@ impl WatchCommand {
     ) -> anyhow::Result<Input> {
         // try to resolve input from disk
         let input = addr
-            .send(ResolveInput::from_strs(&input_opts.input))
+            .send(ResolveInput::from_strs(&input_opts.input, &None))
             .await
             .context("mailbox")??;
 
@@ -104,7 +104,7 @@ impl SystemStart for WatchCommand {
 
         // remember the ID of the input we are commiting
         let _id = input.as_id();
-        let _r = addr.send(CommitInput::new(input)).await;
+        let _r = addr.send(CommitInput::new(input, &[])).await;
 
         let api = BsSystemApi::new(&addr, rx);
         Ok(DidStart::Started { api })

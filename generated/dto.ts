@@ -4,6 +4,10 @@
 
 export type InvocationIdDTO = string;
 
+export interface AnyWatchableDTO {
+	dir: string;
+}
+
 export interface ArchyNode {
 	id: string;
 	label: string;
@@ -87,6 +91,35 @@ export interface InputErrorDetailDTO {
 	error: string;
 }
 
+export interface InputWatchableDTO {
+	absolute_paths: string;
+	relative_paths: string;
+}
+
+/** @discriminator kind */
+export type ResourceStatus = 
+	| { kind: "Pending", payload?: undefined }
+	| { kind: "Waiting", payload: {
+	reason: string;
+}}
+	| { kind: "Ready", payload?: undefined }
+	| { kind: "Failed", payload: {
+	reason: string;
+}};
+
+/** @discriminator kind */
+export type PathWatchableDTO = 
+	| { kind: "Server", payload: ServerWatchableDTO }
+	| { kind: "Route", payload: RouteWatchableDTO }
+	| { kind: "Any", payload: AnyWatchableDTO }
+	| { kind: "Input", payload: InputWatchableDTO };
+
+export interface PathMonitorResourceDTO {
+	status: ResourceStatus;
+	watchable: PathWatchableDTO;
+	debounce: DebounceDTO;
+}
+
 /** @discriminator kind */
 export type RouteKindDTO = 
 	| { kind: "Html", payload: {
@@ -117,6 +150,11 @@ export interface RouteDTO {
 export interface RouteIdentityDTO {
 	path: string;
 	kind_str: string;
+}
+
+export interface RouteWatchableDTO {
+	server: ServerIdentityDTO;
+	dir: string;
 }
 
 /** @discriminator kind */
@@ -171,6 +209,16 @@ export interface ServerDesc {
 	id: string;
 }
 
+export interface ServerResourceDTO {
+	status: ResourceStatus;
+	server: ServerIdentityDTO;
+}
+
+export interface ServerWatchableDTO {
+	server: ServerIdentityDTO;
+	dir: string;
+}
+
 export interface SseDTOOpts {
 	body: string;
 }
@@ -187,10 +235,6 @@ export interface StderrLineDTO {
 export interface StdoutLineDTO {
 	line: string;
 	prefix?: string;
-}
-
-export interface StoppedWatchingDTO {
-	paths: string[];
 }
 
 /** @discriminator kind */
@@ -234,11 +278,6 @@ export interface TaskTreeSummary {
 	report_map: Record<string, TaskReportDTO>;
 }
 
-export interface WatchingDTO {
-	paths: string[];
-	debounce: DebounceDTO;
-}
-
 /**
  * An event describing a change
  * @discriminator kind
@@ -280,8 +319,7 @@ export type ExternalEventsDTO =
 	| { kind: "TaskAction", payload: TaskActionDTO }
 	| { kind: "TaskTreePreview", payload: TaskTreePreview }
 	| { kind: "TaskTreeSummary", payload: TaskTreeSummary }
-	| { kind: "Watching", payload: WatchingDTO }
-	| { kind: "WatchingStopped", payload: StoppedWatchingDTO };
+	| { kind: "Transition", payload: TransitionDTO };
 
 /** @discriminator kind */
 export type InputErrorDTO = 
@@ -310,4 +348,9 @@ export type OutputLineDTO =
 export type StartupEventDTO = 
 	| { kind: "Started", payload?: undefined }
 	| { kind: "FailedStartup", payload: string };
+
+/** @discriminator kind */
+export type TransitionDTO = 
+	| { kind: "Server", payload: ServerResourceDTO }
+	| { kind: "PathMonitor", payload: PathMonitorResourceDTO };
 

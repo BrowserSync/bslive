@@ -16,6 +16,10 @@ import {
 
 export const invocationIdDTOSchema = z.string();
 
+export const anyWatchableDTOSchema = z.object({
+    dir: z.string(),
+});
+
 export const archyNodeSchema: z.ZodSchema<ArchyNode> = z.lazy(() =>
     z.object({
         id: z.string(),
@@ -110,6 +114,63 @@ export const inputAcceptedDTOSchema = z.object({
 export const inputErrorDetailDTOSchema = z.object({
     error: z.string(),
 });
+
+export const inputWatchableDTOSchema = z.object({
+    absolute_paths: z.string(),
+    relative_paths: z.string(),
+});
+
+export const resourceStatusSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("Pending"),
+        payload: z.undefined().optional(),
+    }),
+    z.object({
+        kind: z.literal("Waiting"),
+        payload: z.object({
+            reason: z.string(),
+        }),
+    }),
+    z.object({
+        kind: z.literal("Ready"),
+        payload: z.undefined().optional(),
+    }),
+    z.object({
+        kind: z.literal("Failed"),
+        payload: z.object({
+            reason: z.string(),
+        }),
+    }),
+]);
+
+export const serverWatchableDTOSchema = z.object({
+    server: serverIdentityDTOSchema,
+    dir: z.string(),
+});
+
+export const routeWatchableDTOSchema = z.object({
+    server: serverIdentityDTOSchema,
+    dir: z.string(),
+});
+
+export const pathWatchableDTOSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("Server"),
+        payload: serverWatchableDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("Route"),
+        payload: routeWatchableDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("Any"),
+        payload: anyWatchableDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("Input"),
+        payload: inputWatchableDTOSchema,
+    }),
+]);
 
 export const sseDTOOptsSchema = z.object({
     body: z.string(),
@@ -239,6 +300,11 @@ export const routeDTOSchema = z.object({
     kind: routeKindDTOSchema,
 });
 
+export const serverResourceDTOSchema = z.object({
+    status: resourceStatusSchema,
+    server: serverIdentityDTOSchema,
+});
+
 export const startupErrorDTOSchema = z.object({
     error: z.string(),
 });
@@ -251,10 +317,6 @@ export const stderrLineDTOSchema = z.object({
 export const stdoutLineDTOSchema = z.object({
     line: z.string(),
     prefix: z.string().optional(),
-});
-
-export const stoppedWatchingDTOSchema = z.object({
-    paths: z.array(z.string()),
 });
 
 export const taskConclusionDTOSchema = z.union([
@@ -275,11 +337,6 @@ export const taskConclusionDTOSchema = z.union([
 export const taskTreePreviewSchema = z.object({
     tree: archyNodeSchema,
     will_exec: z.boolean(),
-});
-
-export const watchingDTOSchema = z.object({
-    paths: z.array(z.string()),
-    debounce: debounceDTOSchema,
 });
 
 export const changeKindSchema = z.nativeEnum(ChangeKind);
@@ -406,10 +463,27 @@ export const startupEventDTOSchema = z.discriminatedUnion("kind", [
     }),
 ]);
 
+export const pathMonitorResourceDTOSchema = z.object({
+    status: resourceStatusSchema,
+    watchable: pathWatchableDTOSchema,
+    debounce: debounceDTOSchema,
+});
+
 export const serverDescSchema = z.object({
     routes: z.array(routeDTOSchema),
     id: z.string(),
 });
+
+export const transitionDTOSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("Server"),
+        payload: serverResourceDTOSchema,
+    }),
+    z.object({
+        kind: z.literal("PathMonitor"),
+        payload: pathMonitorResourceDTOSchema,
+    }),
+]);
 
 export const taskActionStageDTOSchema: z.ZodSchema<TaskActionStageDTO> = z.lazy(
     () =>
@@ -510,12 +584,8 @@ export const externalEventsDTOSchema: z.ZodSchema<ExternalEventsDTO> = z.lazy(
                 payload: taskTreeSummarySchema,
             }),
             z.object({
-                kind: z.literal("Watching"),
-                payload: watchingDTOSchema,
-            }),
-            z.object({
-                kind: z.literal("WatchingStopped"),
-                payload: stoppedWatchingDTOSchema,
+                kind: z.literal("Transition"),
+                payload: transitionDTOSchema,
             }),
         ]),
 );

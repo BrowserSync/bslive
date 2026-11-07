@@ -22,6 +22,9 @@ var EventLevel = /* @__PURE__ */ ((EventLevel2) => {
 
 // schema.ts
 var invocationIdDTOSchema = z.string();
+var anyWatchableDTOSchema = z.object({
+  dir: z.string()
+});
 var archyNodeSchema = z.lazy(
   () => z.object({
     id: z.string(),
@@ -103,6 +106,58 @@ var inputAcceptedDTOSchema = z.object({
 var inputErrorDetailDTOSchema = z.object({
   error: z.string()
 });
+var inputWatchableDTOSchema = z.object({
+  absolute_paths: z.string(),
+  relative_paths: z.string()
+});
+var resourceStatusSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("Pending"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Waiting"),
+    payload: z.object({
+      reason: z.string()
+    })
+  }),
+  z.object({
+    kind: z.literal("Ready"),
+    payload: z.undefined().optional()
+  }),
+  z.object({
+    kind: z.literal("Failed"),
+    payload: z.object({
+      reason: z.string()
+    })
+  })
+]);
+var serverWatchableDTOSchema = z.object({
+  server: serverIdentityDTOSchema,
+  dir: z.string()
+});
+var routeWatchableDTOSchema = z.object({
+  server: serverIdentityDTOSchema,
+  dir: z.string()
+});
+var pathWatchableDTOSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("Server"),
+    payload: serverWatchableDTOSchema
+  }),
+  z.object({
+    kind: z.literal("Route"),
+    payload: routeWatchableDTOSchema
+  }),
+  z.object({
+    kind: z.literal("Any"),
+    payload: anyWatchableDTOSchema
+  }),
+  z.object({
+    kind: z.literal("Input"),
+    payload: inputWatchableDTOSchema
+  })
+]);
 var sseDTOOptsSchema = z.object({
   body: z.string()
 });
@@ -222,6 +277,10 @@ var routeDTOSchema = z.object({
   path: z.string(),
   kind: routeKindDTOSchema
 });
+var serverResourceDTOSchema = z.object({
+  status: resourceStatusSchema,
+  server: serverIdentityDTOSchema
+});
 var startupErrorDTOSchema = z.object({
   error: z.string()
 });
@@ -232,9 +291,6 @@ var stderrLineDTOSchema = z.object({
 var stdoutLineDTOSchema = z.object({
   line: z.string(),
   prefix: z.string().optional()
-});
-var stoppedWatchingDTOSchema = z.object({
-  paths: z.array(z.string())
 });
 var taskConclusionDTOSchema = z.union([
   z.object({
@@ -253,10 +309,6 @@ var taskConclusionDTOSchema = z.union([
 var taskTreePreviewSchema = z.object({
   tree: archyNodeSchema,
   will_exec: z.boolean()
-});
-var watchingDTOSchema = z.object({
-  paths: z.array(z.string()),
-  debounce: debounceDTOSchema
 });
 var changeKindSchema = z.nativeEnum(ChangeKind);
 var changeDTOSchema = z.lazy(
@@ -375,10 +427,25 @@ var startupEventDTOSchema = z.discriminatedUnion("kind", [
     payload: z.string()
   })
 ]);
+var pathMonitorResourceDTOSchema = z.object({
+  status: resourceStatusSchema,
+  watchable: pathWatchableDTOSchema,
+  debounce: debounceDTOSchema
+});
 var serverDescSchema = z.object({
   routes: z.array(routeDTOSchema),
   id: z.string()
 });
+var transitionDTOSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("Server"),
+    payload: serverResourceDTOSchema
+  }),
+  z.object({
+    kind: z.literal("PathMonitor"),
+    payload: pathMonitorResourceDTOSchema
+  })
+]);
 var taskActionStageDTOSchema = z.lazy(
   () => z.discriminatedUnion("kind", [
     z.object({
@@ -471,16 +538,13 @@ var externalEventsDTOSchema = z.lazy(
       payload: taskTreeSummarySchema
     }),
     z.object({
-      kind: z.literal("Watching"),
-      payload: watchingDTOSchema
-    }),
-    z.object({
-      kind: z.literal("WatchingStopped"),
-      payload: stoppedWatchingDTOSchema
+      kind: z.literal("Transition"),
+      payload: transitionDTOSchema
     })
   ])
 );
 export {
+  anyWatchableDTOSchema,
   archyNodeSchema,
   changeDTOSchema,
   changeKindSchema,
@@ -498,12 +562,17 @@ export {
   inputAcceptedDTOSchema,
   inputErrorDTOSchema,
   inputErrorDetailDTOSchema,
+  inputWatchableDTOSchema,
   invocationIdDTOSchema,
   logLevelDTOSchema,
   outputLineDTOSchema,
+  pathMonitorResourceDTOSchema,
+  pathWatchableDTOSchema,
+  resourceStatusSchema,
   routeDTOSchema,
   routeIdentityDTOSchema,
   routeKindDTOSchema,
+  routeWatchableDTOSchema,
   serverChangeDTOSchema,
   serverChangeSchema,
   serverChangeSetItemSchema,
@@ -512,12 +581,13 @@ export {
   serverDTOSchema,
   serverDescSchema,
   serverIdentityDTOSchema,
+  serverResourceDTOSchema,
+  serverWatchableDTOSchema,
   sseDTOOptsSchema,
   startupErrorDTOSchema,
   startupEventDTOSchema,
   stderrLineDTOSchema,
   stdoutLineDTOSchema,
-  stoppedWatchingDTOSchema,
   taskActionDTOSchema,
   taskActionStageDTOSchema,
   taskConclusionDTOSchema,
@@ -525,5 +595,5 @@ export {
   taskResultDTOSchema,
   taskTreePreviewSchema,
   taskTreeSummarySchema,
-  watchingDTOSchema
+  transitionDTOSchema
 };

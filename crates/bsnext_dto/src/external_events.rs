@@ -1,13 +1,15 @@
 use crate::any_event::AnyEvent;
 use crate::archy::{archy, overlay_results, ArchyNode, Prefix};
+use crate::status_events_dto::{ResourceStatus, TransitionDTO};
 use crate::{
     FileChangedDTO, FilesChangedDTO, InputAcceptedDTO, InputErrorDetailDTO, OutputLineDTO,
     ServerChangeDTO, ServerChangesetDTO, ServerIdentityDTO, StartupErrorDTO, StderrLineDTO,
-    StdoutLineDTO, StoppedWatchingDTO, WatchingDTO,
+    StdoutLineDTO,
 };
-use bsnext_output::OutputWriterTrait;
+use bsnext_output::{OutputGlobalPrefix, OutputWriterTrait};
 use bsnext_task::task_report::TaskReport;
 use bsnext_task::NodePath;
+use console::style;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
@@ -29,8 +31,7 @@ pub enum ExternalEventsDTO {
     TaskAction(TaskActionDTO),
     TaskTreePreview(TaskTreePreview),
     TaskTreeSummary(TaskTreeSummary),
-    Watching(WatchingDTO),
-    WatchingStopped(StoppedWatchingDTO),
+    Transition(TransitionDTO),
 }
 
 #[typeshare]
@@ -127,10 +128,12 @@ impl OutputWriterTrait for ExternalEventsDTO {
             .map_err(|e| anyhow::anyhow!(e.to_string()))
     }
 
-    fn write_pretty<W: Write>(&self, sink: &mut W) -> anyhow::Result<()> {
+    fn write_pretty<W: Write>(
+        &self,
+        output_global_prefix: &OutputGlobalPrefix,
+        sink: &mut W,
+    ) -> anyhow::Result<()> {
         match self {
-            ExternalEventsDTO::Watching(watching) => print_watching(sink, watching),
-            ExternalEventsDTO::WatchingStopped(watching) => print_stopped_watching(sink, watching),
             ExternalEventsDTO::InputAccepted(input_accepted) => {
                 print_input_accepted(sink, input_accepted)
             }
@@ -142,7 +145,7 @@ impl OutputWriterTrait for ExternalEventsDTO {
                 print_input_file_changed(sink, file_changed)
             }
             ExternalEventsDTO::OutputLine(OutputLineDTO::Stdout(stdout)) => {
-                print_stdout_line(sink, stdout)
+                print_stdout_line(sink, output_global_prefix, stdout)
             }
             ExternalEventsDTO::OutputLine(OutputLineDTO::Stderr(stderr)) => {
                 print_stderr_line(sink, stderr)
@@ -169,15 +172,46 @@ impl OutputWriterTrait for ExternalEventsDTO {
                 Ok(())
             }
             ExternalEventsDTO::InputError(InputErrorDetailDTO { error }) => {
-                writeln!(sink, "{error}")?;
+                writeln!(sink, "{} {error}", style("[warning]").on_yellow())?;
                 Ok(())
             }
             ExternalEventsDTO::StartupError(StartupErrorDTO { error }) => {
-                writeln!(sink, "{error}")?;
+                writeln!(sink, "{} {error}", style("[error]").on_red())?;
                 Ok(())
+            } // ExternalEventsDTO::Transition() => {}
+            ExternalEventsDTO::Transition(trans) => print_transition(sink, trans),
+        }
+    }
+}
+
+fn print_transition<W: Write>(w: &mut W, trans: &TransitionDTO) -> anyhow::Result<()> {
+    match trans {
+        TransitionDTO::Server(server_dto) => {
+            // let server_display = server_display(server_dto.server, server_dto.)
+            // write!(w, "{}", server_dto.server)?
+            dbg!(server_dto);
+        }
+        TransitionDTO::PathMonitor(path_monitor_dto) => {
+            let dir = path_monitor_dto.watchable.display_paths();
+            let debounce = &path_monitor_dto.debounce;
+            match &path_monitor_dto.status {
+                ResourceStatus::Pending => todo!("can we be pending here?"),
+                ResourceStatus::Waiting { reason } => {
+                    // todo: ("here we need to ensure input monitor is counted as a resource now");
+                    let prefix = style(format!("[waiting: {reason}]")).on_yellow();
+                    writeln!(w, "{prefix} {dir}")?;
+                }
+                ResourceStatus::Ready => {
+                    writeln!(w, "[watching {debounce}] {dir}")?;
+                }
+                ResourceStatus::Failed { reason } => {
+                    let prefix = style(format!("[failed: {reason}]")).on_red();
+                    writeln!(w, "{prefix} {dir}")?;
+                }
             }
         }
     }
+    Ok(())
 }
 
 fn print_task_tree<W: Write>(w: &mut W, tree: &ArchyNode) -> anyhow::Result<()> {
@@ -201,13 +235,6 @@ fn print_task_tree_summary<W: Write>(
     let tree_with_results = overlay_results(tree, report_map);
     let s = archy(&tree_with_results, Prefix::None);
     write!(w, "{s}")?;
-    Ok(())
-}
-
-pub fn print_stopped_watching<W: Write>(w: &mut W, evt: &StoppedWatchingDTO) -> anyhow::Result<()> {
-    for x in &evt.paths {
-        writeln!(w, "[watching:stopped] {x}")?;
-    }
     Ok(())
 }
 
@@ -245,12 +272,20 @@ pub fn print_input_file_changed<W: Write>(w: &mut W, evt: &FileChangedDTO) -> an
     Ok(())
 }
 
-pub fn print_stdout_line<W: Write>(w: &mut W, line: &StdoutLineDTO) -> anyhow::Result<()> {
-    match &line.prefix {
-        None => writeln!(w, "{}", line.line)?,
-        Some(prefix) => {
-            let color = hash(prefix) % 256;
-            writeln!(w, "\x1b[38;5;{}m{}\x1b[0m {}", color, prefix, line.line)?
+pub fn print_stdout_line<W: Write>(
+    w: &mut W,
+    global_prefix: &OutputGlobalPrefix,
+    line: &StdoutLineDTO,
+) -> anyhow::Result<()> {
+    if matches!(global_prefix, OutputGlobalPrefix::None) {
+        writeln!(w, "{}", line.line)?
+    } else {
+        match &line.prefix {
+            None => writeln!(w, "{}", line.line)?,
+            Some(prefix) => {
+                let color = hash(prefix) % 256;
+                writeln!(w, "\x1b[38;5;{}m{}\x1b[0m {}", color, prefix, line.line)?
+            }
         }
     }
     Ok(())
@@ -305,13 +340,6 @@ pub fn short_file_list<A: AsRef<str>>(paths: &[A]) -> String {
         })
         .collect::<Vec<_>>();
     file_names.join(", ")
-}
-
-pub fn print_watching<W: Write>(w: &mut W, evt: &WatchingDTO) -> anyhow::Result<()> {
-    for x in &evt.paths {
-        writeln!(w, "[watching {}] {}", evt.debounce, x)?;
-    }
-    Ok(())
 }
 
 pub fn has_output_line_matching(events: &[AnyEvent], expected: &str) -> bool {

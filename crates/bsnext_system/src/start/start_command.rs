@@ -15,7 +15,7 @@ use bsnext_dto::any_event::AnyEvent;
 use bsnext_dto::StartupError;
 use bsnext_input::route::{CorsOpts, Opts};
 use bsnext_input::server_config::{ServerConfig, ServerIdentity};
-use bsnext_input::{Input, InputArgs, InputCtx, WatchGlobalConfig};
+use bsnext_input::{Input, InputArgs, InputCtx, InputCtxSource, WatchGlobalConfig};
 use bsnext_tracing::OutputFormat;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc::Sender;
@@ -37,6 +37,10 @@ pub struct StartCommand {
     /// logging options
     #[clap(flatten)]
     pub logging: LoggingOpts,
+
+    /// provide this flag to disable command prefixes
+    #[arg(long = "no-prefix", default_value = "false")]
+    pub no_prefix: bool,
 
     /// output options
     #[arg(short, long, value_enum, default_value_t)]
@@ -73,7 +77,7 @@ impl SystemStart for StartCommand {
             .context("Trying to get ctx")?;
 
         // prepare initial input before any tasks should run
-        let (mut input, resolution) = self.prepare_input(&addr, &input_opts).await?;
+        let (mut input, resolution) = self.prepare_input(&addr, &input_opts, &self.port).await?;
 
         // now run any 'before' tasks run before we try anything.
         initial_tasks(&addr, input.clone()).await?;
@@ -89,12 +93,13 @@ impl SystemStart for StartCommand {
         let _id = input.as_id();
         match resolution {
             InputResolution::Default => {
-                let _r = addr.send(CommitInput::new(input)).await;
+                let _r = addr.send(CommitInput::new(input, &[])).await;
             }
             InputResolution::File(file) => {
                 let args = InputArgs::new(self.port);
                 let server_ids = input.ids();
                 let ctx = InputCtx::new(&server_ids, Some(args), &startup_ctx, Some(&file));
+                let ctx = InputCtxSource::New(ctx);
                 let _r = addr.send(CommitInputFile::new(input, file, ctx)).await;
             }
         }
@@ -114,10 +119,11 @@ impl StartCommand {
         &self,
         addr: &Addr<BsSystem>,
         input_opts: &InputOpts,
+        optional_port: &Option<u16>,
     ) -> anyhow::Result<(Input, InputResolution)> {
         // try to resolve input from disk
         let input = addr
-            .send(ResolveInput::from_strs(&input_opts.input))
+            .send(ResolveInput::from_strs(&input_opts.input, optional_port))
             .await
             .context("mailbox")??;
 
@@ -152,8 +158,7 @@ impl StartCommand {
 
         let identity = ServerIdentity::from_port_or_named(port).context("port")?;
 
-        let server_config = server_config_from_paths(cwd, &paths, &route_opts, identity)
-            .context("server config")?;
+        let server_config = server_config_from_paths(cwd, &paths, &route_opts, identity)?;
 
         Ok(server_config)
     }

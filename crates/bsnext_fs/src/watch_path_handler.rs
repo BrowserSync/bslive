@@ -14,7 +14,7 @@ impl Handler<RequestWatchPath> for FsWatcher {
     type Result = ();
 
     // todo: ensure this isn't sent for every input change
-    fn handle(&mut self, msg: RequestWatchPath, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: RequestWatchPath, ctx: &mut Self::Context) -> Self::Result {
         let Some(watcher) = self.watcher.as_mut() else {
             todo!("Can this ever be reached?");
         };
@@ -41,21 +41,15 @@ impl Handler<RequestWatchPath> for FsWatcher {
                 let evt = FsEventKind::PathAdded(PathAddedEvent {
                     path: relative.clone(),
                 });
-                self.receiver.do_send(FsEvent {
-                    kind: evt,
-                    fs_event_ctx: self.ctx,
-                })
+                self.receiver.do_send(FsEvent::new(evt, self.ctx))
             }
             Err(err) => {
-                tracing::error!("cannot watch: {}", err);
+                tracing::debug!("cannot watch, error: {}", err);
                 let evt = FsEventKind::PathNotFoundError(PathEvent {
                     path: msg.path.clone(),
                 });
-                self.receiver.do_send(FsEvent {
-                    kind: evt,
-                    fs_event_ctx: self.ctx,
-                });
-                _ctx.stop();
+                self.receiver.do_send(FsEvent::new(evt, self.ctx));
+                ctx.stop();
             }
         }
     }

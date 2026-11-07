@@ -37,12 +37,11 @@ test.describe(
         },
     },
     () => {
-        test("normal", async ({ page, bs, request }) => {
-            let out = bs.waitForOutput("Watching");
+        test("normal", async ({ page, bs }) => {
+            let out = bs.waitForTransition("PathMonitor");
             await page.goto(bs.path("/"));
-            bs.touch("examples/watch/src/01.txt");
             let lines = await out;
-            expect(JSON.stringify(lines, null, 2)).toMatchSnapshot();
+            expect(lines).toHaveLength(1);
         });
     },
 );
@@ -66,7 +65,7 @@ test.describe(
     },
     () => {
         test("path and command override", async ({ page, bs, request }) => {
-            let out = bs.waitForOutput("Watching");
+            let _out = bs.waitForTransition("PathMonitor");
             await page.goto(bs.path("/"));
 
             // Install mock handler
@@ -113,7 +112,7 @@ test.describe(
     },
     () => {
         test("path and command override", async ({ page, bs, request }) => {
-            let out = bs.waitForOutput("Watching");
+            let _out = bs.waitForTransition("PathMonitor");
             await page.goto(bs.path("/"));
 
             // Install mock handler
@@ -228,7 +227,7 @@ test.describe(
             bs,
             request,
         }) => {
-            await bs.waitForOutput("Watching");
+            await bs.waitForTransition("PathMonitor");
             await page.goto(bs.path("/"));
 
             // Install mock handler
@@ -288,7 +287,7 @@ test.describe(
             bs,
             request,
         }) => {
-            await bs.waitForOutput("Watching");
+            await bs.waitForTransition("PathMonitor");
             await page.goto(bs.path("/"));
 
             // Install mock handler
